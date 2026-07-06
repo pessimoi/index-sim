@@ -532,7 +532,7 @@ The rewrite is architecturally acceptable when:
 - Data and price imports are schema-validated.
 - Current state, target plan, accepted decisions and open questions are updated in docs.
 
-Current acceptance status: build, typecheck, unit tests, golden fixtures, Playwright smoke and dependency audit must be rerun after each Phase 6 change. Full user replacement remains gated by UI parity against [ui-parity-spec.md](ui-parity-spec.md), feature coverage in [../product/feature-inventory.md](../product/feature-inventory.md), final cannon workbench placement/browser numeric parity, old `localStorage` migration, implementation of accepted live market/hiscores features and generated data workflow.
+Current acceptance status: the 2026-07-06 consolidated release-evidence pass is recorded in [rewrite-parity-report.md](rewrite-parity-report.md). Build, typecheck, unit tests, golden fixtures, Playwright smoke, dependency audit, static security searches and release-copy classification passed for the current rewrite path, with classified residuals and explicit `not run` scope for live upstream calls and full visual regression. Re-run the same gate after each release-impacting change. Full user replacement remains gated by feature coverage in [../product/feature-inventory.md](../product/feature-inventory.md), deeper legacy migration decisions, authoritative generated data workflow, production live market/hiscores runtime and provider wiring, deploy/security-header acceptance and any broader all-fixture browser-display or visual-regression evidence that a future release decision requires.
 
 ## 14. Open decisions
 

@@ -52,6 +52,24 @@ In the managed Codex sandbox, Node-based localhost connections can fail with `EP
 When that happens, run `npm run test:e2e` with explicit sandbox escalation instead of
 moving helper scripts outside the repository.
 
+## V1 release evidence snapshot
+
+The latest consolidated release-evidence pass was run on 2026-07-06 for the current Vite/React rewrite path. This records executed checks only; it does not choose production hosting, CSP implementation, live upstream providers, generated data workflow, full visual regression or deeper legacy migration.
+
+| Check | Latest result | Notes and follow-up |
+| --- | --- | --- |
+| `npm run typecheck` | `pass` | Core TypeScript gate passed. Re-run after TypeScript or source changes. |
+| `npm run test` | `pass` | Full Vitest run passed across 21 files and 308 tests. Includes unit, schema, UI/view-model, persistence, live-integration mock, migration and performance smoke coverage. |
+| `npm run test:golden` | `pass` | Golden fixture run passed 19 tests. Fixture changes still require an accepted baseline decision before updating snapshots. |
+| `npm run build` | `pass` | Vite build passed with only the known chunk-size warning. |
+| `npm run test:e2e` | `pass after sandbox escalation` | The first sandboxed run failed to bind the local Vite server with `listen EPERM 127.0.0.1:5173`; the same command then passed with explicit sandbox escalation: 41 Playwright tests in about 1.3 minutes. Tests stayed mocked/same-origin and did not call live upstream services. |
+| `npm audit` | `pass` | Reported 0 vulnerabilities. |
+| Static DOM/code execution search | `pass with classified residual` | Found only `src/adapters/browser/index.ts` `new Function`, classified as trusted bundled legacy data bootstrap in the adapter-owned sandbox. |
+| Static secrets search | `pass with false positives` | Found item/package/doc text such as `token`, `js-tokens`, `css-tokenizer` and no real API key, secret, bearer token, password or private key. |
+| Release-copy audit | `pass with classified residuals` | Legacy `run_sim.py`, `/api/prices`, `/api/scrape` and legacy `/api/hiscores` hits remain archived evidence or documentation/history. Production rewrite paths use typed same-origin status/sync/lookup contracts and service-aware copy. |
+| Full visual regression | `not run` | Out of scope for this release-evidence pass; Playwright smoke and numeric snapshots are the current browser evidence. |
+| Live upstream integration calls | `not run` | Automated tests must stay mocked until authoritative upstream and runtime/provider decisions are accepted. |
+
 ## Golden legacy fixtures
 
 Current-behavior golden fixtures live in `src/tests/fixtures/legacy-golden.json`.
@@ -102,6 +120,7 @@ npm run test
 They cover:
 
 - pure combat formula unit tests
+- hit distribution bucket normalization and probability-total invariants
 - melee stance fallback and attack-type selection
 - equipment bonus summing, two-handed shield exclusion and thrown ammo handling
 - browser-global boundary checks for `src/domain/**`
@@ -284,6 +303,7 @@ They cover:
 - structured missing-price, approximate-data, gem price alias and fallback warnings
 - combat-integrated parity for all 18 fixtures covering prayer, food, recoil, dragonfire, alch, ranged ammo, magic runes, low-value loot, cannon occupancy and cannonball supply
 - scarce/AFK spot target and respawn caps, visible inventory reserve details and prayer restore capacity fields
+- domain-owned general potion carry recommendation, including no-general-boost inactive fallback, non-finite trip fallback, vial and single-dose match state and long-trip carry scaling
 
 ## Planner domain tests
 
@@ -350,30 +370,68 @@ They cover:
 - manual accuracy/damage/speed override state to `SimulationRequest.manualOverrides` mapping and visible combat metric changes
 - MonsterCard view-model contract for nullable monster stats, active defence rows and compact setup summaries
 - extended trip-control state to `TripPolicy` mapping without leaking trip fields into `SimulationRequest`
-- scarce/AFK Trip controls, inventory reserve details and prayer restore capacity in the UI view model
+- scarce/AFK Trip controls, inventory reserve details, prayer restore capacity and derived general potion recommendation in the UI view model
 - domain-backed result, compare and planner view models
+- Stats hit distribution view-model labels, bucket accessibility text and probability-total invariants
+- Stats XP routing view-model rows, cannon-only XP row visibility, Prayer/Magic-alch partial/not-modeled statuses and Trip/banking summary mapping
+- Duel comparison view-model rows for live setup and saved snapshots against the current monster, including deltas and best-marker fields
 - structured money warning view models for price alias and fallback surfacing
 - dense compare monster/drop filters, irrelevant monster state, active-target forced visibility and derived row state markers
+- dense compare XP/hr and net GP/hr visible-row scale affordance model, including separate positive and negative net GP/hr scaling
 - special attack result metrics in the UI view model
 - numeric summary parity for the default melee fixture and a ranged safespot fixture
 - cannon-enabled view-model coverage for visible XP/hr, GP/hr, net GP/hr and supply changes
 - linked cannon/sparse assumptions, cannon reserve impact and cannonball supply costs in the UI view model
 - a performance smoke test that keeps the immediate level-input calculation path smaller than compare/planner full-panel work
 - versioned rewrite setup persistence through `PersistedEnvelope<T>`
+- separate versioned Duel snapshot persistence under `index-sim:duel-snapshots`, including snapshot name/form normalization, max-list limits and rejection of computed-result payloads
 - dense compare filter defaults, persisted irrelevant monster state and cleanup of unknown monster ids
 - per-combat-type loadout stash/restore, persisted schema validation and active loadout mapping into `SimulationRequest`
+- multi-prayer and multi-boost normalization, canonical `None` handling, unknown id dropping and same-category replacement before `SimulationRequest`
 - manual combat override persistence/defaulting and bounded domain behavior
 - active weapon, gear, ammo and spell selection mapping into `SimulationRequest`, including two-handed weapon shield lock/clear behavior
+- deterministic visible-candidate gear quick actions for the active combat style, including current-selection ties and shield-lock disabled state
 - rewrite-owned monster-specific custom setup create/restore/remove helpers, persisted schema validation and dense row marker/calculation mapping
 - per-monster loot settings for high-alch enablement, kill overhead and talisman spot, with separate persistence from `index-sim:loot-prefs`
 - defaulting and sanitization for newly modeled trip-control fields in persisted rewrite setups
 - defaulting and sanitization for special attack controls in persisted rewrite setups
 - versioned per-monster cannon settings persistence in the rewrite setup envelope
+- derived general potion recommendations staying out of persisted rewrite setup state
 - versioned last-player hiscores and browser-local price history persistence through `PersistedEnvelope<T>`
 - browser-local Economy movers analysis, Snapshot now and confirmed Clear history that removes only `index-sim:price-history`
 - refusal to implicitly migrate mismatched persisted versions
 - validated `PriceSet` import errors
-- Playwright smoke for the workbench shell, PlayerSidebar, legacy-order TabBar, right-side MonsterCard rail, mobile MonsterCard ordering, MonsterCard target switch/drop-filter sharing/active defence highlights, dense spreadsheet Compare pane, metric strip, combat-style switching, per-combat-type loadout restore, manual combat override persistence/reset, SetupBar custom setup create/restore/remove, Melee/Ranged/Magic equipment pane edits with searchable selectors and persisted selections, tab-routed special attack controls/metrics, trip survival/food/recoil controls, dense row markers, browser-rendered dense numeric snapshots, browser-rendered metric-strip acceptance snapshots for default melee, ranged safespot, cannon-enabled ranged, loot action override, manual food/prayer trip, imported PriceSet, mocked market sync and compatible legacy import paths, final Cannon tab controls with sparse-link/reset behavior and expanded output snapshots for effective targets, cannon DPS, balls/hr, balls/kill, cannon ranged XP/hr, effective XP/hr, effective net GP/hr, ball costs, cannonballs/trip and K/hr uplift, Planner tab open/metric/current-XP/target/skill-lock/gear-pool/Recompute/training-order/timeline/chart persistence flow, per-monster loot settings persistence, full monster table row count, table sorting, dense compare filters/relevance persistence, row target selection, per-monster cannon controls, Economy price-history controls, mocked hiscores lookup/apply flow and mocked market sync/report/history flow
+- Playwright smoke for the workbench shell, PlayerSidebar, legacy-order TabBar, right-side MonsterCard rail, mobile MonsterCard ordering, MonsterCard target switch/drop-filter sharing/active defence highlights, dense spreadsheet Compare pane, Dense Compare mobile/tablet page-width containment and internal horizontal table scroll, dense XP/net-GP scale indicators, metric strip, Stats XP routing, Trip & banking summary and hit distribution histogram, combat-style switching, per-combat-type loadout restore, multi-prayer/multi-boost workbench controls with compact-strip primary edits and `+N` markers, active-style gear quick actions with two-handed shield lock, manual combat override persistence/reset, SetupBar custom setup create/restore/remove, Melee/Ranged/Magic equipment pane edits with searchable selectors and persisted selections, tab-routed special attack controls/metrics, trip survival/food/recoil controls, dense row markers, browser-rendered dense numeric release-path snapshots for default melee, melee alch-relevant, ranged safespot, ranged cannon, magic safespot and custom loot-settings marker rows, browser-rendered metric-strip acceptance snapshots for those target selections plus default melee, ranged safespot, cannon-enabled ranged, loot action override, manual food/prayer trip, imported PriceSet, mocked market sync and compatible legacy import paths, final Cannon tab controls with sparse-link/reset behavior and expanded output snapshots for effective targets, cannon DPS, balls/hr, balls/kill, cannon ranged XP/hr, effective XP/hr, effective net GP/hr, ball costs, cannonballs/trip and K/hr uplift, Duel tab snapshot/rename/load/delete/persistence flow, Planner tab open/metric/current-XP/target/skill-lock/gear-pool/Recompute/training-order/timeline/chart persistence flow, per-monster loot settings persistence, full monster table row count, table sorting, dense compare filters/relevance persistence, row target selection, per-monster cannon controls, Economy price-history controls, mocked hiscores lookup/apply flow and mocked market sync/report/history flow
+
+Run the focused browser smoke for the visible Stats workflow with:
+
+```sh
+npm run test:e2e -- --grep "Stats"
+```
+
+Run the focused browser smoke for the Dense Compare scale indicators with:
+
+```sh
+npm run test:e2e -- --grep "dense XP"
+```
+
+Run the focused browser smoke for Dense Compare release-path numeric snapshots with:
+
+```sh
+npm run test:e2e -- --grep "release-path dense"
+```
+
+Run the focused browser smoke for Dense Compare mobile/tablet overflow containment with:
+
+```sh
+npm run test:e2e -- --grep "Dense Compare mobile"
+```
+
+Run the focused browser smoke for the visible Duel workflow with:
+
+```sh
+npm run test:e2e -- --grep "Duel"
+```
 
 ## Current lightweight checks
 

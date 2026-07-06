@@ -51,8 +51,8 @@ Required order and behavior:
 | 3    | STR         | reserved     | SPELL       | Melee strength, ranged reserved alignment cell, or magic spell select.                                                                            |
 | 4    | DEF         | DEF          | DEF         | Defence level.                                                                                                                                    |
 | 5    | STANCE      | STANCE       | STANCE      | Weapon/style control using the same stance options as the active combat type.                                                                     |
-| 6    | PRAY        | PRAY         | PRAY        | Compact primary prayer selector. Multi-prayer detail can be deferred to the full workbench, but this control must update rewrite `prayers` state. |
-| 7    | POT         | POT          | POT         | Compact primary boost selector. Multi-boost detail can be deferred to the full workbench, but this control must update rewrite `boosts` state.    |
+| 6    | PRAY        | PRAY         | PRAY        | Compact primary prayer selector. It preserves other active compatible prayer categories, shows a `+N` marker for them and updates rewrite `prayers` state. |
+| 7    | POT         | POT          | POT         | Compact primary boost selector. It preserves other active compatible boost categories, shows a `+N` marker for them and updates rewrite `boosts` state.    |
 | 8    | ACC+        | ACC+         | M+%         | Manual accuracy or magic accuracy adjustment. Empty value uses the derived equipment/stance value.                                                |
 | 9    | DMG+        | DMG+         | DMG%        | Manual damage adjustment. Empty value uses the derived equipment/ammo/spell value.                                                                |
 | 10   | SPD         | SPD          | SPD         | Manual attack speed in seconds. Empty value uses the weapon/style-derived speed.                                                                  |
@@ -215,11 +215,26 @@ target remains visible even when filters or irrelevant state would otherwise
 hide it. Stable row state markers are present for custom setup, high-alch
 override, kill-overhead override, hidden/irrelevant and forced-current-target
 rows. Playwright coverage now snapshots browser-rendered dense numeric cells for
-representative default melee Hill Giant, settled ranged Greater Demon and
-cannon-enabled ranged Dagannoth rows, and also locks the related metric-strip
-numbers for default melee, ranged safespot, cannon, loot action override,
-manual food/prayer trip, imported PriceSet, mocked market sync and compatible
-legacy import paths.
+release-path rows covering default melee Hill Giant, melee alch-relevant Chaos
+Dwarf, ranged safespot Greater Demon, cannon-enabled ranged Dagannoth with
+negative net GP/hr, magic safespot Blue Dragon and a custom Green Dragon setup
+with high-alch plus kill-overhead markers. It also locks the related
+metric-strip numbers for default melee, alch-relevant melee, ranged safespot,
+cannon, magic safespot, custom loot settings, loot action override, manual
+food/prayer trip, imported PriceSet, mocked market sync and compatible legacy
+import paths. Dense XP/HR and NET GP/HR cells now include compact
+row-scale indicators derived from the currently visible rows after sort/filter;
+net GP/hr uses separate positive and negative relative scales so profitable and
+loss-making rows remain visually distinct while the numeric value remains the
+primary content.
+
+Mobile/tablet implementation note: Playwright now smokes Dense Compare at
+390px mobile and 768px tablet widths. The smoke verifies that the page itself
+does not gain horizontal overflow, the wide monster table scrolls inside
+`.dense-table-wrap`, sticky headers do not overlap the first visible body row,
+compact setup controls, metric strip and initial rows remain visible, and the
+current target remains forced-visible after irrelevant-state plus long
+monster/drop filter paths.
 
 ## Layout Contract
 
@@ -383,6 +398,23 @@ Required content:
 - Hit distribution histogram.
 - XP routing chips.
 
+Current implementation note: the rewrite Stats pane now includes the shared
+metric strip, XP routing chips, a Trip & banking summary and a
+normal-player-attack hit distribution histogram. XP routing is derived in the
+view-model from the current combat XP breakdown and trip output: player combat
+XP/hr is always shown, cannon ranged XP/hr appears only when cannon contributes,
+skill-specific combat XP rows are listed and Prayer/Magic-alch rows are marked
+as partial/not-modeled instead of claiming full `totalXpPerHour` parity. The
+Trip & banking summary mirrors the current trip result for kills/trip, trip
+length, bank time, effective kills/hr, supply/kill, net GP/hr, current bound,
+safespot and protection state. Hit distribution bucket data is derived from the
+current combat result through the domain/view-model boundary, with bounded hit
+chance/max-hit inputs, a combined miss/zero bucket, damage buckets, accessible
+bucket labels and a max-hit marker. This does not change the `SimulationResult`
+contract or combat golden baselines. Combat roll metric expansion, full
+Prayer/alch total-XP ownership and special/cannon hit distributions remain open
+parity work.
+
 ### Melee, Ranged and Magic
 
 Required shared content:
@@ -402,7 +434,7 @@ Required style-specific content:
 - Ranged: bow vs thrown mode, arrows, ranged special weapon and spec-arrow selection.
 - Magic: staff, spell, rune cost, god spell staff/charge handling and magic-specific boosts.
 
-Current implementation note: the rewrite workbench now exposes Melee, Ranged and Magic equipment panes backed by `GameDataSnapshot` option data. They provide searchable weapon selectors, style selectors, single prayer/boost controls, sustained/repot controls, manual accuracy/damage/speed override controls, equipment slot selectors, an equipment bonus summary, Ranged ammo selection and Magic spell selection. Selecting a two-handed weapon clears and locks the shield slot while the weapon remains active. These controls write the versioned per-combat-type loadout state and flow through `formToSimulationRequest()`. Manual overrides map to `SimulationRequest.manualOverrides`; invalid or out-of-range values are rejected by persisted-state validation and defensively ignored by the combat domain.
+Current implementation note: the rewrite workbench now exposes Melee, Ranged and Magic equipment panes backed by `GameDataSnapshot` option data. They provide searchable weapon selectors, style selectors, per-slot gear quick action buttons, primary prayer/boost selectors, multi-prayer and multi-boost checkbox controls with same-category replacement and canonical `None` handling, sustained/repot controls, manual accuracy/damage/speed override controls, equipment slot selectors, an equipment bonus summary, Ranged ammo selection and Magic spell selection. The gear quick action MVP scores only currently visible slot candidates for the active combat style: melee uses active attack-type bonus plus weighted strength, ranged uses ranged attack plus weighted ranged strength, and magic uses magic attack plus magic damage when present. It is not a full loadout optimizer and does not use prices, requirements, quests, future gear or hidden candidates. Selecting a two-handed weapon clears and locks the shield slot while the weapon remains active. These controls write the versioned per-combat-type loadout state and flow through `formToSimulationRequest()` as multi-value prayer/boost arrays. Manual overrides map to `SimulationRequest.manualOverrides`; invalid or out-of-range values are rejected by persisted-state validation and defensively ignored by the combat domain.
 
 Current special-attack implementation note: the dense rewrite UI has an interim Special attack section that exposes the existing domain-supported melee and ranged DPS special weapons, ranged spec-arrow selection for bow specials and result metrics for spec max hit, hit chance, specs/hr, DPS with spec and DPS gain. The control writes versioned rewrite setup state and `formToSimulationRequest()` only emits `specialAttack` for valid supported selections. Magic special attack UI is disabled because no magic DPS special path is currently modeled, and DBA restore/detail behavior remains a separate Trip/workbench parity step.
 
@@ -578,7 +610,7 @@ Required content:
 - Food-per-kill override.
 - Trip outcome, effective rates, supply rates, ammo and prayer drain details.
 
-Current implementation note: the rewrite state/schema now models `bankSeconds` as a nullable auto/manual value plus `potionSets`, `potionDoses`, `singleDose`, `dbaRestore`, `runeSlots`, `safespot`, `protect`, `recoilRings`, `foodCount`, `foodPerKillOverride`, `prayerPotionSets`, `prayerPotionDoses`, `altarSeconds`, `scarceSpot`, `targetsAtSpot` and `respawnSeconds`, and maps active Trip assumptions into `TripPolicy` without adding Trip fields to `SimulationRequest`. Version 3 rewrite setup envelopes remain backward compatible because newly modeled fields default through the Zod schema, and legacy auto bank time imports as `bankSeconds: null`. The root UI exposes food selector, bank time Auto/Manual seconds, single-dose toggle, general potion vials/doses, teleport item, ranged ammo recovery, DBA restore when melee DBA special boost is active, magic rune slots, safespot Auto/On/Off, protect prayer, antifire, antipoison, prayer restore auto/manual vials/manual doses, altar timing, scarce/AFK target count and respawn seconds, food-count auto/manual, food-per-kill override and recoil ring count when ring of recoil is equipped. Non-applicable reserve controls stay visible in disabled/read-only form for the current combat style or setup. The domain applies enabled scarce/respawn limits to effective trip rates before prayer-per-kill is calculated. The Cannon pane can link its target count and respawn seconds into the same Trip sparse state, so cannon-at-spot sparse assumptions are visible in the Cannon workflow instead of hidden in generic Trip state. The Trip summary is grouped by survival, prayer, food, inventory reserve, potion slots, scarce cap, recoil and outcome/effective rates, and shows selected food, bank time, teleport reserve, ammo recovery, DBA restore, rune slots, active survival, prayer restore, prayer carried, max kills from prayer, prayer points per dose, food and recoil assumptions, respawn-bound status, inventory reserve slots/parts, potion carry/slots/parts/costs, loot capacity, free-at-start details, supply/kill, ammo/kill and effective net GP/hr. Open question: should the archived legacy UI `potRec` heuristic be promoted into a domain-owned general potion recommendation/apply contract, or remain legacy-only UI evidence? The rewrite does not yet expose that general recommendation because this slice avoids copying legacy UI-owned trip math back into the React view.
+Current implementation note: the rewrite state/schema now models `bankSeconds` as a nullable auto/manual value plus `potionSets`, `potionDoses`, `singleDose`, `dbaRestore`, `runeSlots`, `safespot`, `protect`, `recoilRings`, `foodCount`, `foodPerKillOverride`, `prayerPotionSets`, `prayerPotionDoses`, `altarSeconds`, `scarceSpot`, `targetsAtSpot` and `respawnSeconds`, and maps active Trip assumptions into `TripPolicy` without adding Trip fields to `SimulationRequest`. Version 3 rewrite setup envelopes remain backward compatible because newly modeled fields default through the Zod schema, and legacy auto bank time imports as `bankSeconds: null`. The root UI exposes food selector, bank time Auto/Manual seconds, single-dose toggle, general potion vials/doses, a general potion recommendation panel with recommended carry, repot interval, active-trip estimate, match status and Apply recommendation action, teleport item, ranged ammo recovery, DBA restore when melee DBA special boost is active, magic rune slots, safespot Auto/On/Off, protect prayer, antifire, antipoison, prayer restore auto/manual vials/manual doses, altar timing, scarce/AFK target count and respawn seconds, food-count auto/manual, food-per-kill override and recoil ring count when ring of recoil is equipped. Non-applicable reserve controls stay visible in disabled/read-only form for the current combat style or setup. The domain applies enabled scarce/respawn limits to effective trip rates before prayer-per-kill is calculated. The general potion recommendation is derived in `src/domain/trip` from selected general combat boosts, `sustained`, `repotThreshold`, finite `cycleSec * killsPerTrip` active fighting time and the current vial/single-dose mode; it is not persisted and Apply only writes `potionSets` or `potionDoses`. The Cannon pane can link its target count and respawn seconds into the same Trip sparse state, so cannon-at-spot sparse assumptions are visible in the Cannon workflow instead of hidden in generic Trip state. The Trip summary is grouped by survival, prayer, food, inventory reserve, potion slots, scarce cap, recoil and outcome/effective rates, and shows selected food, bank time, teleport reserve, ammo recovery, DBA restore, rune slots, active survival, prayer restore, prayer carried, max kills from prayer, prayer points per dose, food and recoil assumptions, respawn-bound status, inventory reserve slots/parts, potion carry/slots/parts/costs, loot capacity, free-at-start details, supply/kill, ammo/kill and effective net GP/hr. Open question: should exact archived legacy UI `potRec` numerical parity be accepted as a requirement, and should sustained-off setups offer a one-dose snapshot recommendation instead of the current inactive safe fallback?
 
 ### Cannon
 
@@ -604,6 +636,21 @@ Required content:
 - Rename, load and delete snapshot controls.
 - Table comparing live and saved setups on the current monster.
 - Best markers for effective XP/hr, effective net GP/hr and GP/XP.
+
+Current implementation note: the rewrite Duel tab now exposes the visible
+snapshot workflow over the Goal 1 foundation. `src/app/state/duel-snapshots.ts`
+owns version 1 of the separate rewrite-local `index-sim:duel-snapshots`
+persistence contract. Snapshot payloads store validated and normalized
+`CombatSetupFormState` values only, reject oversized persisted lists, cap
+app-side mutations to 12 snapshots and do not store calculated results, upstream
+data, player names or shared-link data. The UI can snapshot the current setup,
+rename snapshots, load a snapshot into the live editor while preserving the
+current target monster, and delete individual snapshots. The comparison table
+uses `createDuelComparisonViewModel()` to build live plus snapshot rows by
+re-simulating each snapshot setup against the current active monster, including
+XP/hr, effective net GP/hr, GP/XP and best-marker fields where live can also win.
+Legacy `duelSetups` migration, account-backed saves, shared permalinks and a
+cross-monster Duel matrix remain out of scope.
 
 ### Planner
 
@@ -674,12 +721,12 @@ Current implementation note: partially complete. Combat type, levels, stance
 and key trip-rate summary are in PlayerSidebar, and per-combat-type loadout
 stash/restore is implemented in versioned setup state. Dedicated Melee, Ranged
 and Magic equipment panes now cover searchable weapon, ammo, spell and gear
-selectors plus bonus summaries and two-handed shield locking. SetupBar now
+selectors, per-slot active-style gear quick actions, bonus summaries and two-handed shield locking. SetupBar now
 covers rewrite-owned monster-specific custom setup create/edit/remove, manual
 accuracy/damage/speed overrides and target switch restore. MonsterCard now
 adds target search, shared drop filter, active defence highlight and compact
-equipment overview in the right rail. Best-in-slot actions and legacy custom
-setup migration remain open.
+equipment overview in the right rail. Full best-in-slot semantics and legacy
+custom setup migration remain open.
 
 ### Phase D: main workflow parity
 
@@ -688,8 +735,11 @@ setup migration remain open.
 
 ### Phase E: missing tab parity
 
-- Add Cannon, Duel, Economy and Settings parity, subject to product decisions for live sync and price history.
-- Add persisted UI state for duel snapshots, planner config, relevance and per-monster maps.
+- Legacy `duelSetups` migration remains a separate decision.
+- Add remaining Settings parity, subject to product decisions for live sync and
+  price history.
+- Add any remaining persisted UI state for settings or later accepted
+  per-monster maps.
 
 ### Phase F: replacement hardening
 

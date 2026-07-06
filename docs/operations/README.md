@@ -111,6 +111,20 @@ The rewrite data layer can adapt current legacy runtime data into a validated `G
 
 Open question: the authoritative refresh workflow for these files is not present in the repo. The target market source is `markets.lostcity.rs`, and retained 12-hour shared price history snapshots are accepted as a target. Live user-triggered market sync and browser-local accepted-price history are accepted in [../technical/live-integrations-spec.md](../technical/live-integrations-spec.md), but the concrete shared latest/history writer, deploy path, scheduled execution mechanism, database choice or backend-managed shared price history still need separate recorded decisions.
 
+## Current release evidence snapshot
+
+The latest V1 release-evidence pass was consolidated on 2026-07-06 for the current Vite/React rewrite path.
+
+| Area | Status | Evidence | Operational follow-up |
+| --- | --- | --- | --- |
+| Core commands | `pass` | `npm run typecheck`, `npm run test`, `npm run test:golden`, `npm run build` and `git diff --check` passed. | Re-run before release and after any source changes. |
+| Browser smoke | `pass after sandbox escalation` | `npm run test:e2e` passed 41 Playwright tests in about 1.3 minutes after the documented Codex localhost `EPERM` sandbox limitation required explicit escalation. | Keep the smoke mocked/same-origin; do not treat it as live provider evidence. |
+| Dependency audit | `pass` | `npm audit` reported 0 vulnerabilities. | Re-run after dependency changes. |
+| Security/static copy audit | `pass with classified residuals` | Static searches found only the trusted bundled legacy-data sandbox bootstrap, false-positive secret strings, typed same-origin contract/test paths, archived legacy evidence and documentation/history. | Continue classifying hits before release. Do not remove legacy evidence or add legacy `/api/*` shims without a separate decision. |
+| Production live integrations | `not accepted yet` | Hiscores and market sync have same-origin dev/preview boundaries and mocked tests, but no accepted production runtime, provider wiring or live upstream evidence. | Do not describe live hiscores or market sync as production-available until those decisions are recorded. |
+| Deploy/security headers | `not selected yet` | Static-host headers are recommended below, but no deploy target is accepted. | Confirm the target host can set the required headers before a real deployment. |
+| Generated data workflow | `not selected yet` | Current UI still bootstraps from trusted bundled legacy data through a sandbox adapter. | Replace with an authoritative generated `GameDataSnapshot` after the source/update workflow is accepted. |
+
 ## Release checklist, current app
 
 Until a real release process exists:
