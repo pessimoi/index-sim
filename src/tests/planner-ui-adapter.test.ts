@@ -39,6 +39,7 @@ describe("planner UI adapter", () => {
         ...DEFAULT_PLANNER_UI_STATE.skillLocks,
         attack: true
       },
+      averageOverSession: false,
       onlyCurrentGear: true,
       gearPool: {
         weapon: ["missing_weapon", weaponId]
@@ -53,6 +54,7 @@ describe("planner UI adapter", () => {
     expect(adapter.input.request).not.toHaveProperty("targetLevels");
     expect(adapter.options.metric).toBe("gph");
     expect(adapter.options.lockGear).toBe(true);
+    expect(adapter.options.sustained).toBe(false);
     expect(adapter.options.targets).toMatchObject({
       attack: DEFAULT_FORM_STATE.levels.attack,
       strength: 64
@@ -62,6 +64,20 @@ describe("planner UI adapter", () => {
     });
     expect(adapter.state.gearPool.weapon).toEqual([weaponId]);
     expect(adapter.pool.weapon).toEqual([weaponId]);
+  });
+
+  it("maps Planner avg-over-session independently from combat setup sustained mode", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const form: CombatSetupFormState = { ...DEFAULT_FORM_STATE, sustained: false };
+    const plannerState = PlannerUiStateSchema.parse({
+      ...createDefaultPlannerUiState(form),
+      averageOverSession: true
+    });
+
+    const adapter = createPlannerDomainAdapter(form, context, {}, plannerState);
+
+    expect(adapter.input.request.sustained).toBe(false);
+    expect(adapter.options.sustained).toBe(true);
   });
 
   it("builds a cleaned planner gear pool editor from the canonical allowed pool", async () => {

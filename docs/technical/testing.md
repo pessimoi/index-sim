@@ -151,6 +151,9 @@ They cover:
 
 - adapting the legacy runtime data into a validated `GameDataSnapshot`
 - validating committed `prices.json`, `alch.json` and `price-history.json`
+- duplicate raw JSON key detection before `JSON.parse` can drop earlier values
+- duplicate legacy monster id detection before object conversion
+- malformed loot entry rejection for missing/invalid names, chances, quantities and nested `_expand` rows
 - rejecting malformed imported `PriceSet` JSON
 - returning missing-price warnings without mutating the `PriceSet`
 
@@ -216,7 +219,7 @@ The legacy storage migration unit tests live in:
 npm run test -- src/tests/legacy-migration.test.ts src/tests/ui-adapters.test.ts
 ```
 
-They cover known legacy key detection, the policy table that classifies every known legacy key as `migrate`, `review-only`, `intentional-reset` or `legacy-only`, defensive `sim_input_v3` JSON parsing, invalid non-object legacy setup state, safe mapping into the current rewrite form schema, unknown entity-id skips, numeric range/default handling, oversized payload rejection, compatible `sim_hiscore_player` import, malformed hiscores skips with sanitized warnings, compatible legacy price/alch map conversion into an explicit `PriceSet`, malformed/oversized/unknown price skips, failed price import preserving the current `PriceSet`, legacy price-history detection without unsafe mutation across known history keys, invalid rewrite setup envelopes/data, rewrite setup version mismatch, the guarantee that inspection does not write or delete legacy or rewrite storage keys, explicit known-key clearing behavior and the `sim_planner_v1` boundary: detected, not parsed/imported into `index-sim:planner-ui`, safe for invalid/oversized payloads and kept unless the user confirms Clear.
+They cover known legacy key detection, the policy table that classifies every known legacy key as `migrate`, `review-only`, `intentional-reset` or `legacy-only`, defensive `sim_input_v3` JSON parsing, invalid non-object legacy setup state, safe mapping into the current rewrite form schema, unknown entity-id skips, numeric range/default handling, oversized payload rejection, compatible `sim_hiscore_player` import, malformed hiscores skips with sanitized warnings, compatible legacy price/alch map conversion into an explicit `PriceSet`, malformed/oversized/unknown price skips, failed price import preserving the current `PriceSet`, legacy price-history detection without unsafe mutation across known history keys, invalid rewrite setup envelopes/data, rewrite setup version mismatch, the guarantee that inspection does not write or delete legacy or rewrite storage keys, explicit known-key clearing behavior and the review-only boundaries for `sim_planner_v1` and `sim_hidden_tiers_v1`: detected, not parsed/imported into rewrite-owned state, safe for invalid/oversized payloads and kept unless the user confirms Clear.
 
 The Playwright scaffold covers the user-facing notice/review flow: legacy keys show a migration notice, the review UX lists the import plan, review/reset plan, per-key policy and exact clear list, Import writes compatible setup, hiscores last-player and accepted-price-history state while keeping legacy keys, `sim_planner_v1` stays review-only and does not overwrite existing `index-sim:planner-ui`, Keep dismisses without deletion, Clear removes only known legacy keys after confirmation and an existing rewrite setup is not overwritten until the user chooses Import.
 
@@ -252,7 +255,14 @@ They cover:
 - browser-local price history snapshots only for accepted imported or synced `PriceSet` values, with failed import/sync paths leaving history unchanged
 - browser-local Economy movers analysis for latest-vs-previous, latest-vs-first and explicit snapshot baselines, including filter/sort behavior and missing or zero baseline prices without `NaN`/`Infinity`
 
-The Playwright scaffold includes a mocked `/api/market/status` and `/api/market/sync` smoke path. It also checks the browser-local price history summary, Economy movers analysis, Snapshot now, confirmed Clear history, browser-rendered metric-strip numbers after a mocked market `PriceSet` is accepted, the default disabled-provider copy and absence of stale production `/api/prices` or `/api/scrape` instructions. It must stay mocked; automated tests must not call a live market upstream.
+The Playwright scaffold includes a mocked `/api/market/status` and `/api/market/sync` smoke path. It also checks Settings Price data counts and validated `PriceSet` import, the browser-local price history summary, Economy movers analysis, Snapshot now, confirmed Clear history, browser-rendered metric-strip numbers after a mocked market `PriceSet` is accepted, Result/Loot/Economy price-warning surfacing for imported price sets, the default disabled-provider copy and absence of stale production `/api/prices` or `/api/scrape` instructions. It must stay mocked; automated tests must not call a live market upstream.
+
+The same scaffold also covers Settings Gear menu tier filtering for rewrite-owned
+hidden gear preferences: hiding a tier removes matching unselected options from
+gear pickers, keeps `None` and the current selection visible, and persists the
+versioned `index-sim:hidden-gear-tiers` state. Focused UI adapter tests cover the
+tier classifier, option filtering, storage schema and legacy
+`sim_hidden_tiers_v1` review-only boundary.
 
 ## Trip, loot and supply tests
 
@@ -271,7 +281,7 @@ npm run test -- src/tests/trip-loot-supply.test.ts
 They cover:
 
 - stackability, default loot actions and bone prayer XP rules
-- structured missing-price and approximate-data warnings
+- structured missing-price, approximate-data, gem price alias and fallback warnings
 - combat-integrated parity for all 18 fixtures covering prayer, food, recoil, dragonfire, alch, ranged ammo, magic runes, low-value loot, cannon occupancy and cannonball supply
 - scarce/AFK spot target and respawn caps, visible inventory reserve details and prayer restore capacity fields
 
@@ -289,13 +299,13 @@ For a focused run:
 npm run test -- src/tests/planner-domain.test.ts
 ```
 
-Planner UI state and adapter foundation tests live in `src/tests/planner-ui-state.test.ts` and `src/tests/planner-ui-adapter.test.ts`. They cover the versioned `index-sim:planner-ui` envelope, invalid/version fallback, gear-pool cleanup against the active allowed pool, editor option shaping, adapter mapping into `src/domain/planner`, timeline data and deterministic DPS-vs-cumulative-XP chart data. For a focused run:
+Planner UI state and adapter foundation tests live in `src/tests/planner-ui-state.test.ts` and `src/tests/planner-ui-adapter.test.ts`. They cover the versioned `index-sim:planner-ui` envelope, invalid/version fallback, gear-pool cleanup against the active allowed pool, editor option shaping, adapter mapping into `src/domain/planner`, avg-over-session mapping into the domain Planner `sustained` option, timeline data and deterministic DPS-vs-cumulative-XP chart data. For a focused run:
 
 ```sh
 npm run test -- src/tests/planner-ui-state.test.ts src/tests/planner-ui-adapter.test.ts
 ```
 
-The visible Planner tab workflow is covered by the Playwright scaffold, including metric/current-XP/target/skill-lock edits, gear-pool selection, Recompute, persisted Planner UI state and the timeline/chart areas. For a focused browser smoke:
+The visible Planner tab workflow is covered by the Playwright scaffold, including metric/current-XP/target/skill-lock edits, avg-over-session pending/Recompute behavior, gear-pool selection, the manual requirement-policy warning, persisted Planner UI state and the timeline/chart areas. For a focused browser smoke:
 
 ```sh
 npm run test:e2e -- --grep "Planner"
@@ -308,7 +318,8 @@ They cover:
 - explicit gear eligibility policy and default pool filtering
 - candidate-weapon stance selection, including the legacy `accByType`/stance regression risk
 - missing future/unknown weapon warnings without adding canonical data
-- deterministic golden plans for melee weapon unlock, ranged bow unlock and magic spell unlock
+- deterministic V1 rewrite acceptance golden plans for melee weapon unlock, ranged bow
+  unlock, magic spell unlock and boosted sustained melee training
 
 ## UI, adapters and persistence tests
 
@@ -337,9 +348,11 @@ They cover:
 - searchable weapon, ammo, spell and equipment-slot option view models
 - supported special attack state to `SimulationRequest.specialAttack` mapping, including ranged spec-arrow fallback
 - manual accuracy/damage/speed override state to `SimulationRequest.manualOverrides` mapping and visible combat metric changes
+- MonsterCard view-model contract for nullable monster stats, active defence rows and compact setup summaries
 - extended trip-control state to `TripPolicy` mapping without leaking trip fields into `SimulationRequest`
 - scarce/AFK Trip controls, inventory reserve details and prayer restore capacity in the UI view model
 - domain-backed result, compare and planner view models
+- structured money warning view models for price alias and fallback surfacing
 - dense compare monster/drop filters, irrelevant monster state, active-target forced visibility and derived row state markers
 - special attack result metrics in the UI view model
 - numeric summary parity for the default melee fixture and a ranged safespot fixture
@@ -360,7 +373,7 @@ They cover:
 - browser-local Economy movers analysis, Snapshot now and confirmed Clear history that removes only `index-sim:price-history`
 - refusal to implicitly migrate mismatched persisted versions
 - validated `PriceSet` import errors
-- Playwright smoke for the workbench shell, PlayerSidebar, legacy-order TabBar, dense spreadsheet Compare pane, metric strip, combat-style switching, per-combat-type loadout restore, manual combat override persistence/reset, SetupBar custom setup create/restore/remove, Melee/Ranged/Magic equipment pane edits with searchable selectors and persisted selections, tab-routed special attack controls/metrics, trip survival/food/recoil controls, dense row markers, browser-rendered dense numeric snapshots, browser-rendered metric-strip acceptance snapshots for default melee, ranged safespot, cannon-enabled ranged, loot action override, manual food/prayer trip, imported PriceSet, mocked market sync and compatible legacy import paths, final Cannon tab controls with sparse-link/reset behavior and expanded output snapshots for effective targets, cannon DPS, balls/hr, balls/kill, cannon ranged XP/hr, effective XP/hr, effective net GP/hr, ball costs, cannonballs/trip and K/hr uplift, Planner tab open/metric/current-XP/target/skill-lock/gear-pool/Recompute/training-order/timeline/chart persistence flow, per-monster loot settings persistence, full monster table row count, table sorting, dense compare filters/relevance persistence, row target selection, per-monster cannon controls, Economy price-history controls, mocked hiscores lookup/apply flow and mocked market sync/report/history flow
+- Playwright smoke for the workbench shell, PlayerSidebar, legacy-order TabBar, right-side MonsterCard rail, mobile MonsterCard ordering, MonsterCard target switch/drop-filter sharing/active defence highlights, dense spreadsheet Compare pane, metric strip, combat-style switching, per-combat-type loadout restore, manual combat override persistence/reset, SetupBar custom setup create/restore/remove, Melee/Ranged/Magic equipment pane edits with searchable selectors and persisted selections, tab-routed special attack controls/metrics, trip survival/food/recoil controls, dense row markers, browser-rendered dense numeric snapshots, browser-rendered metric-strip acceptance snapshots for default melee, ranged safespot, cannon-enabled ranged, loot action override, manual food/prayer trip, imported PriceSet, mocked market sync and compatible legacy import paths, final Cannon tab controls with sparse-link/reset behavior and expanded output snapshots for effective targets, cannon DPS, balls/hr, balls/kill, cannon ranged XP/hr, effective XP/hr, effective net GP/hr, ball costs, cannonballs/trip and K/hr uplift, Planner tab open/metric/current-XP/target/skill-lock/gear-pool/Recompute/training-order/timeline/chart persistence flow, per-monster loot settings persistence, full monster table row count, table sorting, dense compare filters/relevance persistence, row target selection, per-monster cannon controls, Economy price-history controls, mocked hiscores lookup/apply flow and mocked market sync/report/history flow
 
 ## Current lightweight checks
 

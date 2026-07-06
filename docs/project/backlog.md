@@ -9,23 +9,23 @@ Bounded work that can be picked up without inventing a new architecture.
 - Add a small static-run section to operations once the preferred local run command is confirmed.
 - Fix the legacy browser planner `accByType`/stance issues described in `PROJECT_REVIEW_NOTES.md`, or replace the UI path with `src/domain/planner`.
 - Fix legacy current-monster price sync for nested loot entries, or retire that archived path after rewrite parity is accepted. The rewrite market sync path now expands nested/tagged items through `src/data/market-sync-items.ts`.
-- Add data validation for duplicate item keys and malformed loot entries.
-- Normalize gem/item price aliases before moving economy logic into the rewrite.
+- Extend the data reliability gate after a canonical data decision: raw JSON duplicate keys, duplicate legacy monster ids and malformed loot entries are now tested, but the archived `gamedata.js` source still contains duplicate object keys that require a canonical value decision before hard-gating that file.
+- Finish canonical gem/item price alias normalization after the data-source workflow is accepted. Known gem/item alias and fallback price paths now surface structured warnings near Result, Loot and Economy money values, but canonical key normalization remains open.
 - Decide whether ranged/magic/halberd auto-safespot remains default UX.
 - Add NPC size data or document an intentional dragon-halberd special delta.
 
 ## Rewrite preparation
 
 - Implement the accepted v1 replacement scope: combat, result summary, monster compare, loot/economy, trip and planner.
-- Add acceptance evidence for v1 replacement: golden/parity pass, documented intentional deltas, performance-budget pass and security checks.
+- Add acceptance evidence for v1 replacement: golden/parity pass, documented intentional deltas, performance-budget pass and security checks. Planner V1 acceptance now has rewrite-domain golden evidence for melee unlock, ranged unlock, magic spell unlock and boosted sustained training; legacy planner numeric parity remains a separate decision if a legacy-clone line is requested.
 - Prioritize the missing legacy UI workflows listed in [../product/feature-inventory.md](../product/feature-inventory.md) into parity-required, later enhancement or legacy-only buckets.
 - Ring-of-recoil XP attribution decision is closed by D-031: legacy remains comparison evidence, while rewrite combat XP is not reduced by trip-layer recoil damage; keep the accepted delta explicit in XP tests and release evidence.
-- Finish remaining Loot/economy parity after the current-monster action workflow, per-monster loot settings and browser-local Economy tab: fuller nested-table loot/economy workflows and any accepted legacy/full-history migration remain open. Browser-local price history summary, movers analysis, Snapshot now and confirmed Clear history now exist for accepted imported/synced/manual active price sets.
-- Finish remaining Trip parity after the scarce/AFK target/respawn controls, reserve summary, prayer restore capacity summary and Cannon sparse-linking: fuller legacy trip-control placement/wording remains open.
+- Finish remaining Loot/economy parity after the current-monster action workflow, per-monster loot settings, browser-local Economy tab, Loot value composition, full nested drop detail, readable action-impact detail and browser-local Economy-history context in Loot rows: accepted legacy/full-history migration and live/shared history remain open. Browser-local price history summary, movers analysis, Snapshot now and confirmed Clear history now exist for accepted imported/synced/manual active price sets.
+- Finish remaining Trip parity after the food/banking, scarce/AFK target/respawn, reserve summary, prayer restore capacity, general potion carry controls, grouped Trip summary and Cannon sparse-linking paths: the accepted owner/formula for a visible general potion dose recommendation/apply flow and any final legacy wording polish remain open.
 - Cannon final workbench placement is implemented. Extend Cannon browser-rendered numeric parity only if release later requires all-fixture browser-display coverage beyond the current Dagannoth dense row, root metric strip and expanded Cannon output snapshots.
 - Extend dense compare parity beyond the current monster/drop filters, irrelevant state, per-monster alch/overhead markers and browser-rendered release-path numeric snapshots only if broader full browser-display parity is required.
 - Model full `totalXpPerHour` parity for prayer and alch XP rows once those row owners are explicit.
-- Add legacy planner UI-state fixtures if that behavior needs parity.
+- Add legacy planner UI-state fixtures only if legacy planner numeric parity or legacy planner state migration is explicitly accepted.
 - Extend mocked live integration fixtures as upstream contracts become authoritative. Initial hiscores and market sync mocked coverage exists for schema/API/adapter/UI paths.
 - Decide whether review-only legacy live-integration `localStorage` areas should get deeper migration, especially full price history. Compatible hiscores last-player and current price/alch import are already covered by the legacy import flow; legacy scrape-key metadata is classified as intentional reset on confirmed clear.
 - Replace the legacy runtime snapshot adapter with a staged authoritative generated `GameDataSnapshot` from LostCityRS/Content Revision 274 once the source workflow is accepted.

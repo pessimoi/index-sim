@@ -18,6 +18,7 @@ import {
   ammoOptions,
   createCompareRows,
   createDenseCompareRows,
+  createMonsterCardViewModel,
   createPlannerViewModel,
   createSimulationViewModel,
   equipmentSlotOptions,
@@ -116,6 +117,10 @@ function rangedDagannothForm(): CombatSetupFormState {
       bankSeconds: 150
     }
   };
+}
+
+function activeDefenceKeys(card: ReturnType<typeof createMonsterCardViewModel>): string[] {
+  return card.defenceRows.filter((row) => row.active).map((row) => row.key);
 }
 
 describe("rewrite UI view models", () => {
@@ -301,6 +306,162 @@ describe("rewrite UI view models", () => {
     expect(overridden.combat.dps).toBeGreaterThan(derived.combat.dps);
   });
 
+  it("builds MonsterCard active defence rows from melee attack types", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const stab = createSimulationViewModel(
+      { ...DEFAULT_FORM_STATE, weaponId: "dragon_dagger_p", styleId: "accurate" },
+      context
+    );
+    const slash = createSimulationViewModel(
+      { ...DEFAULT_FORM_STATE, weaponId: "rune_scimitar", styleId: "aggressive" },
+      context
+    );
+    const crush = createSimulationViewModel(
+      { ...DEFAULT_FORM_STATE, weaponId: "dragon_mace", styleId: "aggressive" },
+      context
+    );
+
+    expect(stab.combat.debug.attackType).toBe("stab");
+    expect(stab.monsterCard.activeDefenceField).toBe("defStab");
+    expect(activeDefenceKeys(stab.monsterCard)).toEqual(["stab"]);
+    expect(slash.combat.debug.attackType).toBe("slash");
+    expect(slash.monsterCard.activeDefenceField).toBe("defSlash");
+    expect(activeDefenceKeys(slash.monsterCard)).toEqual(["slash"]);
+    expect(crush.combat.debug.attackType).toBe("crush");
+    expect(crush.monsterCard.activeDefenceField).toBe("defCrush");
+    expect(activeDefenceKeys(crush.monsterCard)).toEqual(["crush"]);
+  });
+
+  it("builds MonsterCard active defence rows for ranged and magic", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const ranged = createSimulationViewModel(rangedRockCrabForm(), context);
+    const magicForm = normalizeFormState({
+      ...switchCombatStyleLoadout(DEFAULT_FORM_STATE, "magic"),
+      monsterId: "chaos_druid",
+      weaponId: "staff_of_fire",
+      spellId: "fire_wave",
+      styleId: "accurate",
+      boosts: ["magic"]
+    });
+    const magic = createSimulationViewModel(magicForm, context);
+
+    expect(ranged.monsterCard.activeDefenceField).toBe("defRange");
+    expect(activeDefenceKeys(ranged.monsterCard)).toEqual(["range"]);
+    expect(ranged.monsterCard.setupOverview.attackType).toBe("ranged");
+    expect(magic.monsterCard.activeDefenceField).toBe("defMagic");
+    expect(activeDefenceKeys(magic.monsterCard)).toEqual(["magic"]);
+    expect(magic.monsterCard.setupOverview.attackType).toBe("magic");
+  });
+
+  it("keeps missing MonsterCard stat and defence fields nullable", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const sparseContext = {
+      ...context,
+      gameData: {
+        ...context.gameData,
+        monsters: {
+          ...context.gameData.monsters,
+          giant: {
+            ...context.gameData.monsters.giant,
+            attack: undefined,
+            strength: undefined,
+            defLevel: undefined,
+            magicLevel: undefined,
+            attackSpeed: undefined,
+            defStab: undefined,
+            defSlash: undefined,
+            defCrush: undefined,
+            defRange: undefined,
+            defMagic: undefined
+          }
+        }
+      }
+    };
+    const card = createMonsterCardViewModel(DEFAULT_FORM_STATE, sparseContext);
+
+    expect(card.stats.filter((row) => row.missing).map((row) => row.key)).toEqual(
+      expect.arrayContaining(["attack", "strength", "defence", "magic", "attackSpeed"])
+    );
+    expect(card.stats.find((row) => row.key === "hitpoints")).toMatchObject({
+      value: context.gameData.monsters.giant.hp,
+      missing: false
+    });
+    expect(card.defenceRows.every((row) => row.value === null && row.missing)).toBe(true);
+    expect(card.activeDefenceField).toBe("defSlash");
+    expect(activeDefenceKeys(card)).toEqual(["slash"]);
+  });
+
+  it("builds MonsterCard setup badge and compact weapon, ammo and spell summary", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const defaultCard = createMonsterCardViewModel(DEFAULT_FORM_STATE, context, {
+      hasCustomSetup: true
+    });
+    const rangedCard = createMonsterCardViewModel(rangedRockCrabForm(), context);
+    const magicCard = createMonsterCardViewModel(
+      normalizeFormState({
+        ...switchCombatStyleLoadout(DEFAULT_FORM_STATE, "magic"),
+        weaponId: "staff_of_fire",
+        spellId: "fire_wave",
+        styleId: "accurate"
+      }),
+      context,
+      { setupMode: "custom" }
+    );
+
+    expect(defaultCard.setupBadge).toMatchObject({
+      mode: "default",
+      label: "Default setup (custom saved)",
+      tone: "default",
+      hasCustomSetup: true
+    });
+    expect(defaultCard.setupOverview.weapon).toMatchObject({
+      id: "rune_scimitar",
+      label: "Rune scimitar"
+    });
+    expect(defaultCard.setupOverview.ammo).toBeNull();
+    expect(defaultCard.setupOverview.spell).toBeNull();
+    expect(defaultCard.setupOverview.summary).toContain("Weapon: Rune scimitar");
+    expect(rangedCard.setupOverview.ammo).toMatchObject({
+      id: "mith_arrow",
+      label: "Mithril arrow"
+    });
+    expect(magicCard.setupBadge).toMatchObject({
+      mode: "custom",
+      label: "Custom setup",
+      tone: "custom",
+      hasCustomSetup: true
+    });
+    expect(magicCard.setupOverview.spell).toMatchObject({
+      id: "fire_wave",
+      label: "Fire Wave"
+    });
+    expect(magicCard.setupOverview.summary).toEqual(
+      expect.arrayContaining(["Weapon: Staff of fire", "Spell: Fire Wave"])
+    );
+  });
+
+  it("keeps structured money warnings available for UI surfacing", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const { uncut_sapphire: _uncutSapphire, ...itemPrices } = context.priceSet.itemPrices;
+    const result = createSimulationViewModel(DEFAULT_FORM_STATE, {
+      ...context,
+      priceSet: {
+        ...context.priceSet,
+        itemPrices: { ...itemPrices, sapphire: 451 }
+      }
+    });
+
+    expect(result.moneyWarnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "price-alias-used",
+          severity: "info"
+        })
+      ])
+    );
+    expect(result.warnings.join("\n")).toContain("Using alias price");
+  });
+
   it("maps extended trip controls to the domain policy without leaking into SimulationRequest", async () => {
     const { context } = await loadBundledLegacyContext();
     const form: CombatSetupFormState = {
@@ -310,14 +471,20 @@ describe("rewrite UI view models", () => {
         altarSeconds: 45,
         antifire: true,
         antipoison: true,
+        bankSeconds: null,
+        dbaRestore: false,
         foodCount: 12,
         foodPerKillOverride: 1.5,
+        potionDoses: 7,
+        potionSets: 2,
         prayerPotionDoses: 6,
         prayerPotionSets: 2,
         protect: "missiles",
         recoilRings: 4,
+        runeSlots: 3,
         safespot: true,
         scarceSpot: true,
+        singleDose: true,
         targetsAtSpot: 2,
         respawnSeconds: 45
       }
@@ -330,13 +497,19 @@ describe("rewrite UI view models", () => {
     expect(trip).toMatchObject({
       antifire: true,
       antipoison: true,
+      bankSeconds: null,
+      dbaRestore: false,
       foodCount: 12,
       foodPerKillOverride: 1.5,
+      potionDoses: 7,
+      potionSets: 2,
       prayerPotionDoses: 6,
       protect: "missiles",
       recoilRings: 4,
+      runeSlots: 3,
       safespot: true,
       scarceSpot: true,
+      singleDose: true,
       targetsAtSpot: 2,
       respawnSeconds: 45
     });
@@ -411,9 +584,15 @@ describe("rewrite UI view models", () => {
   it("keeps null trip controls on domain defaults", () => {
     const trip = formToTripPolicy(DEFAULT_FORM_STATE);
 
+    expect(trip.bankSeconds).toBeNull();
     expect(trip.safespot).toBeUndefined();
     expect(trip.foodCount).toBeUndefined();
     expect(trip.foodPerKillOverride).toBeUndefined();
+    expect(trip.potionSets).toBe(1);
+    expect(trip.potionDoses).toBe(4);
+    expect(trip.singleDose).toBe(false);
+    expect(trip.dbaRestore).toBe(true);
+    expect(trip.runeSlots).toBe(2);
     expect(trip.prayerPotionSets).toBeUndefined();
     expect(trip.prayerPotionDoses).toBeUndefined();
     expect(trip.altarSeconds).toBeUndefined();
@@ -444,6 +623,52 @@ describe("rewrite UI view models", () => {
     expect(scarce.trip.effectiveKph).toBeLessThan(baseline.trip.effectiveKph);
     expect(scarce.trip.effectiveGpPerHour).toBeLessThan(baseline.trip.effectiveGpPerHour);
     expect(scarce.trip.trip.slots.reserveParts).toContain("teleport");
+  });
+
+  it("applies potion, auto-bank and reserve defaults to the trip view model", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const magicForm = normalizeFormState({
+      ...switchCombatStyleLoadout(DEFAULT_FORM_STATE, "magic"),
+      boosts: ["magic"],
+      trip: {
+        ...DEFAULT_FORM_STATE.trip,
+        bankSeconds: null,
+        potionDoses: 6,
+        potionSets: 3,
+        prayerMode: "none",
+        runeSlots: 4,
+        singleDose: true
+      }
+    });
+    const dbaRestoreForm: CombatSetupFormState = {
+      ...DEFAULT_FORM_STATE,
+      boosts: ["dba_spec"],
+      trip: {
+        ...DEFAULT_FORM_STATE.trip,
+        dbaRestore: true
+      }
+    };
+    const dbaNoRestoreForm: CombatSetupFormState = {
+      ...dbaRestoreForm,
+      trip: {
+        ...dbaRestoreForm.trip,
+        dbaRestore: false
+      }
+    };
+
+    const magic = createSimulationViewModel(magicForm, context);
+    const dbaRestore = createSimulationViewModel(dbaRestoreForm, context);
+    const dbaNoRestore = createSimulationViewModel(dbaNoRestoreForm, context);
+
+    expect(magic.trip.trip.bankSeconds).toBe(90);
+    expect(magic.trip.trip.singleDose).toBe(true);
+    expect(magic.trip.trip.slots.potionDoses).toBe(6);
+    expect(magic.trip.trip.slots.potionSets).toBe(3);
+    expect(magic.trip.trip.slots.reserveParts).toContain("4 combat-rune");
+    expect(dbaRestore.trip.trip.slots.reserveParts).toContain("restore vial");
+    expect(dbaRestore.trip.trip.slots.potionParts).toContain("1 restore");
+    expect(dbaNoRestore.trip.trip.slots.reserveParts).not.toContain("restore vial");
+    expect(dbaNoRestore.trip.trip.slots.potionParts).not.toContain("1 restore");
   });
 
   it("maps selected melee special attack into SimulationRequest only when valid", async () => {
@@ -643,6 +868,34 @@ describe("rewrite UI view models", () => {
     );
   });
 
+  it("builds loot value composition with top contributors, tail grouping and full nested rows", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const form: CombatSetupFormState = {
+      ...DEFAULT_FORM_STATE,
+      monsterId: "firegiant"
+    };
+    const result = createSimulationViewModel(form, context);
+    const composition = result.lootSummary.valueComposition;
+    const positiveRows = result.lootRows
+      .filter((row) => row.effectiveEvGp > 0)
+      .sort((left, right) => right.effectiveEvGp - left.effectiveEvGp);
+    const otherRow = composition.rows.find((row) => row.isOther);
+    const nestedRow = result.lootRows.find((row) => row.expandedRows.length > 8);
+
+    expect(positiveRows.length).toBeGreaterThan(8);
+    expect(composition.rows[0]?.rowId).toBe(positiveRows[0]?.rowId);
+    expect(composition.rows[0]?.shareOfPositivePct).toBeGreaterThan(0);
+    expect(otherRow?.name).toBe("Other drops");
+    expect(composition.rows.reduce((sum, row) => sum + row.gpPerKill, 0)).toBeCloseTo(
+      composition.positiveGpPerKill,
+      6
+    );
+    expect(composition.displayedGpPerKill).toBeCloseTo(result.trip.gpPerKill, 6);
+    expect(nestedRow).toBeDefined();
+    expect(nestedRow?.expandedRows.length).toBeGreaterThan(8);
+    expect(nestedRow?.expandedRows.every((row) => row.weightLabel !== null)).toBe(true);
+  });
+
   it("exposes sensible loot actions and per-action net GP/hr impacts", async () => {
     const { context } = await loadBundledLegacyContext();
     const form: CombatSetupFormState = {
@@ -668,6 +921,130 @@ describe("rewrite UI view models", () => {
     expect(alchable?.availableActions).toContain("alch");
     expect(bones?.actionImpacts.length).toBe(bones?.availableActions.length);
     expect(Number.isFinite(bones?.selectedDeltaNetGpPerHour ?? NaN)).toBe(true);
+    expect(bones?.prefLabel).toBe("Bury");
+    expect(bones?.effectiveEvGp).toBe(0);
+    expect(bones?.valueDetails.some((detail) => detail.label === "Bury prayer XP")).toBe(true);
+    const buryImpact = bones?.actionImpacts.find((impact) => impact.action === "bury");
+    const lootImpact = bones?.actionImpacts.find((impact) => impact.action === "loot");
+    const skipImpact = bones?.actionImpacts.find((impact) => impact.action === "skip");
+    expect(buryImpact?.label).toBe("Bury");
+    expect(buryImpact?.isSelected).toBe(true);
+    expect(buryImpact?.isDefault).toBe(true);
+    expect(buryImpact?.notes.some((note) => note.includes("prayer XP/kill"))).toBe(true);
+    expect(lootImpact?.gpPerKillContribution).toBeGreaterThan(0);
+    expect(skipImpact?.gpPerKillContribution).toBe(0);
+  });
+
+  it("labels trip-layer eaten or displaced loot rows in the view model when present", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const result = createSimulationViewModel(
+      {
+        ...DEFAULT_FORM_STATE,
+        monsterId: "green_dragon",
+        trip: {
+          ...DEFAULT_FORM_STATE.trip,
+          foodKey: "none",
+          foodCount: 0,
+          foodPerKillOverride: 0,
+          safespot: false,
+          protect: "none",
+          teleport: true,
+          bankSeconds: 300,
+          prayerMode: "none",
+          antifire: true
+        }
+      },
+      context
+    );
+    const stateful = result.lootRows.find((row) => row.stateLabel !== null);
+
+    expect(stateful).toBeDefined();
+    expect(stateful?.stateLabel).toBe("Displaced by inventory");
+    expect(stateful?.effectiveEvGp).toBe(0);
+    expect(stateful?.valueDetails.some((detail) => detail.label === "Trip state")).toBe(true);
+  });
+
+  it("adds browser-local price history context to loot rows without changing loot math", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const base = createSimulationViewModel(DEFAULT_FORM_STATE, context);
+    const withHistory = createSimulationViewModel(
+      DEFAULT_FORM_STATE,
+      context,
+      {},
+      {},
+      {},
+      {
+        lootPriceHistoryByItem: {
+          big_bones: {
+            itemId: "big_bones",
+            itemLabel: "Big bones",
+            latestPrice: 350,
+            baselinePrice: 500,
+            gpDelta: -150,
+            percentDelta: -30,
+            latestLabel: "Latest test prices",
+            baselineLabel: "Previous test prices"
+          }
+        }
+      }
+    );
+    const parentOnlyModel = createSimulationViewModel(
+      { ...DEFAULT_FORM_STATE, monsterId: "firegiant" },
+      context,
+      {},
+      {},
+      {},
+      { lootPriceHistoryByItem: {} }
+    );
+    const bones = withHistory.lootRows.find((row) => row.key === "big_bones");
+    const untracked = withHistory.lootRows.find((row) => row.key && row.key !== "big_bones");
+    const parentOnly = parentOnlyModel.lootRows.find((row) => row.key === null);
+
+    expect(withHistory.trip.gpPerKill).toBeCloseTo(base.trip.gpPerKill, 6);
+    expect(withHistory.trip.effectiveNetGpPerHour).toBeCloseTo(base.trip.effectiveNetGpPerHour, 6);
+    expect(bones?.historyContext).toMatchObject({
+      itemId: "big_bones",
+      itemLabel: "Big bones",
+      tracked: true,
+      latestPrice: 350,
+      baselinePrice: 500,
+      gpDelta: -150,
+      percentDelta: -30,
+      statusLabel: "Tracked locally"
+    });
+    expect(untracked?.historyContext.statusLabel).toBe("No local history");
+    expect(parentOnly?.historyContext.statusLabel).toBe("No item key");
+  });
+
+  it("normalizes malformed loot price history display numbers to a neutral missing state", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const result = createSimulationViewModel(
+      DEFAULT_FORM_STATE,
+      context,
+      {},
+      {},
+      {},
+      {
+        lootPriceHistoryByItem: {
+          big_bones: {
+            itemId: "big_bones",
+            latestPrice: Number.POSITIVE_INFINITY,
+            baselinePrice: Number.NaN,
+            gpDelta: Number.NEGATIVE_INFINITY,
+            percentDelta: Number.POSITIVE_INFINITY,
+            latestLabel: "Malformed latest",
+            baselineLabel: "Malformed baseline"
+          }
+        }
+      }
+    );
+    const bones = result.lootRows.find((row) => row.key === "big_bones");
+
+    expect(bones?.historyContext.tracked).toBe(true);
+    expect(bones?.historyContext.latestPrice).toBeNull();
+    expect(bones?.historyContext.baselinePrice).toBeNull();
+    expect(bones?.historyContext.gpDelta).toBeNull();
+    expect(bones?.historyContext.percentDelta).toBeNull();
   });
 
   it("applies per-monster high-alch, overhead and talisman loot settings", async () => {

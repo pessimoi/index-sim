@@ -648,10 +648,15 @@ function mapTrip(
   if (!isRecord(legacy.trip)) return;
   mapTripFoodKey(legacy.trip, draft, report);
   mapTripBoolean(legacy.trip, draft, report, "teleport");
-  mapTripInteger(legacy.trip, draft, report, "bankSeconds", 0, 3600);
+  mapTripNullableInteger(legacy.trip, draft, report, "bankSeconds", 0, 3600);
+  mapTripInteger(legacy.trip, draft, report, "potionSets", 0, 28);
+  mapTripInteger(legacy.trip, draft, report, "potionDoses", 0, 112);
+  mapTripBoolean(legacy.trip, draft, report, "singleDose");
+  mapTripBoolean(legacy.trip, draft, report, "dbaRestore");
   mapTripEnum(legacy.trip, draft, report, "prayerMode", PRAYER_MODES);
   mapTripBoolean(legacy.trip, draft, report, "alching");
   mapTripBoolean(legacy.trip, draft, report, "recoverAmmo");
+  mapTripInteger(legacy.trip, draft, report, "runeSlots", 0, 28);
   mapTripBoolean(legacy.trip, draft, report, "antifire");
   mapTripBoolean(legacy.trip, draft, report, "antipoison");
   mapTripNullableBoolean(legacy.trip, draft, report, "safespot");

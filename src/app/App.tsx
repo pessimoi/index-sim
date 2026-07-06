@@ -50,9 +50,10 @@ import type {
   MarketStatusResponse,
   MarketSyncReport,
   MarketSyncScope,
+  PriceSet,
   SimulationContext
 } from "@/domain/shared";
-import { defaultOverhead, lootPreferenceKeysForMonster, type LootAction } from "@/domain/trip";
+import { FOOD, defaultOverhead, lootPreferenceKeysForMonster, type LootAction } from "@/domain/trip";
 import { applyMarketSyncResponse, summarizeMarketSyncReport } from "./state/market-sync";
 import {
   LEGACY_MIGRATION_DISMISSED_STORAGE_KEY,
@@ -64,6 +65,17 @@ import {
   countApplicableHiscoresSkills,
   createHiscoresPreviewRows
 } from "./state/hiscores";
+import {
+  DEFAULT_HIDDEN_GEAR_TIERS_STATE,
+  GEAR_TIER_DEFS,
+  HIDDEN_GEAR_TIERS_STORAGE_KEY,
+  HIDDEN_GEAR_TIERS_VERSION,
+  HiddenGearTiersStateSchema,
+  filterHiddenGearTierOptions,
+  hideAllGearTiers,
+  setHiddenGearTier,
+  type HiddenGearTiersState
+} from "./state/hidden-gear-tiers";
 import {
   DEFAULT_LOOT_PREFS_STATE,
   LOOT_PREFS_STORAGE_KEY,
@@ -154,9 +166,12 @@ import {
   optimizeLootPrefsForMonster,
   plannerAllowedPool,
   type DenseCompareRowViewModel,
+  type CalculationWarningViewModel,
+  type MonsterCardViewModel,
   type PlannerGearPoolEditorViewModel,
   type PlannerPanelViewModel,
   type LootDropRowViewModel,
+  type LootPriceHistoryItemContext,
   formatNumber,
   monsterOptions,
   spellOptions,
@@ -184,6 +199,13 @@ const lootSettingsStorageOptions = {
   key: LOOT_SETTINGS_STORAGE_KEY,
   version: LOOT_SETTINGS_VERSION,
   schema: LootSettingsByMonsterSchema,
+  storage
+};
+
+const hiddenGearTiersStorageOptions = {
+  key: HIDDEN_GEAR_TIERS_STORAGE_KEY,
+  version: HIDDEN_GEAR_TIERS_VERSION,
+  schema: HiddenGearTiersStateSchema,
   storage
 };
 
@@ -220,6 +242,11 @@ function loadInitialLootPrefs(): LootPrefsState {
 function loadInitialLootSettings(): LootSettingsByMonsterState {
   const persisted = loadPersisted(lootSettingsStorageOptions);
   return persisted.status === "loaded" ? persisted.value : DEFAULT_LOOT_SETTINGS_STATE;
+}
+
+function loadInitialHiddenGearTiers(): HiddenGearTiersState {
+  const persisted = loadPersisted(hiddenGearTiersStorageOptions);
+  return persisted.status === "loaded" ? persisted.value : DEFAULT_HIDDEN_GEAR_TIERS_STATE;
 }
 
 function loadInitialPriceHistory(): BrowserPriceHistoryState {
@@ -366,6 +393,17 @@ const FOOD_PER_KILL_OVERRIDE_OPTIONS: SelectOption[] = [
   { id: "off", label: "Off" },
   { id: "on", label: "On" }
 ];
+
+const BANK_TIME_MODE_OPTIONS: SelectOption[] = [
+  { id: "auto", label: "Auto" },
+  { id: "manual", label: "Manual" }
+];
+
+const FOOD_OPTIONS: SelectOption[] = Object.entries(FOOD).map(([id, food]) => ({
+  id,
+  label: food.name,
+  hint: food.heal > 0 ? `heals ${food.heal}` : "no carried food"
+}));
 
 const PLANNER_METRIC_OPTIONS: Array<{ id: PlannerMetric; label: string }> = PLANNER_METRICS.map(
   (metric) => ({
@@ -628,6 +666,15 @@ function optionalPercent(value: number | null): string {
   return value === null ? "-" : signedPercent(value);
 }
 
+function optionalNumber(value: number | null, digits = 0): string {
+  return value === null ? "-" : formatNumber(value, digits);
+}
+
+function selectedOptionLabel(options: readonly SelectOption[], ids: readonly string[]): string {
+  const value = ids.find((id) => id !== "none") ?? "none";
+  return optionLabel(options, value);
+}
+
 function moverTone(row: PriceHistoryMoverRow): string | undefined {
   if (row.gpDelta === null || row.gpDelta === 0) return undefined;
   return row.gpDelta > 0 ? "gain" : "loss";
@@ -649,6 +696,154 @@ function metricList(items: DisplayMetric[]) {
       <strong className={item.tone}>{item.value}</strong>
     </div>
   ));
+}
+
+function tripMetricGroup(title: string, items: DisplayMetric[]) {
+  return (
+    <section className="trip-output-group" aria-label={`${title} trip summary`} key={title}>
+      <h3>{title}</h3>
+      {metricList(items)}
+    </section>
+  );
+}
+
+function CalculationWarningSummary({
+  warnings,
+  label
+}: {
+  warnings: readonly CalculationWarningViewModel[];
+  label: string;
+}) {
+  if (!warnings.length) return null;
+  const visible = warnings.slice(0, 4);
+  return (
+    <div className="calculation-warnings" role="status" aria-label={label}>
+      <strong>Price warnings</strong>
+      {visible.map((warning) => (
+        <span className={warning.severity} key={`${warning.code}:${warning.message}`}>
+          {warning.message}
+        </span>
+      ))}
+      {warnings.length > visible.length && <span>{formatNumber(warnings.length - visible.length)} more</span>}
+    </div>
+  );
+}
+
+function MonsterCardPanel({
+  card,
+  monsterOptions,
+  selectedMonsterId,
+  dropFilter,
+  onTargetChange,
+  onDropFilterChange
+}: {
+  card: MonsterCardViewModel;
+  monsterOptions: SelectOption[];
+  selectedMonsterId: string;
+  dropFilter: string;
+  onTargetChange: (monsterId: string) => void;
+  onDropFilterChange: (value: string) => void;
+}) {
+  const dropFilterId = useId();
+  const setup = card.setupOverview;
+  const setupRows: DisplayMetric[] = [
+    { label: "Weapon", value: setup.weapon.label },
+    setup.ammo ? { label: "Ammo", value: setup.ammo.label } : null,
+    setup.spell ? { label: "Spell", value: setup.spell.label } : null,
+    { label: "Style", value: setup.styleLabel },
+    {
+      label: "Attack type",
+      value: setup.attackType ? setup.attackType.toString() : "-"
+    },
+    { label: "Prayer", value: selectedOptionLabel(PRAYER_OPTIONS, setup.prayerIds) },
+    { label: "Boost", value: selectedOptionLabel(BOOST_OPTIONS, setup.boostIds) },
+    { label: "Speed", value: `${formatNumber(setup.attackSpeedSec, 1)}s` },
+    { label: "Accuracy", value: signedInteger(setup.accuracyBonus) },
+    { label: "Damage", value: signedInteger(setup.damageBonus) },
+    { label: "Sustained", value: yesNo(setup.sustained) },
+    { label: "Ring", value: setup.ring?.label ?? "-" }
+  ].filter((row): row is DisplayMetric => row !== null);
+
+  return (
+    <aside className="monster-rail" aria-label="Monster card">
+      <section className="monster-card-panel">
+        <div className="section-title-row">
+          <div>
+            <h2>{card.monsterName}</h2>
+            <span className="monster-card-subtitle">{card.monsterId}</span>
+          </div>
+          <span
+            className={`status-pill ${card.setupBadge.tone === "custom" ? "ready" : ""}`}
+            aria-label="Current setup state"
+          >
+            {card.setupBadge.label}
+          </span>
+        </div>
+
+        <div className="monster-card-controls" aria-label="Monster target controls">
+          <SearchableSelectField
+            label="Target"
+            value={selectedMonsterId}
+            options={monsterOptions}
+            onChange={onTargetChange}
+            searchPlaceholder="Search monsters"
+          />
+          <div className="field">
+            <label htmlFor={dropFilterId}>Drop filter</label>
+            <input
+              id={dropFilterId}
+              type="search"
+              value={dropFilter}
+              placeholder="Drop"
+              onChange={(event) => onDropFilterChange(event.target.value)}
+            />
+          </div>
+        </div>
+
+        <section className="monster-card-section" aria-label="Monster stats">
+          <h3>Stats</h3>
+          <dl className="monster-stat-grid">
+            {card.stats.map((stat) => (
+              <div key={stat.key} className={stat.missing ? "missing" : undefined}>
+                <dt>{stat.label}</dt>
+                <dd>{optionalNumber(stat.value)}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+
+        <section className="monster-card-section" aria-label="Monster defence">
+          <h3>Defence</h3>
+          <ul className="monster-defence-list">
+            {card.defenceRows.map((row) => (
+              <li
+                key={row.key}
+                className={row.active ? "active" : undefined}
+                aria-current={row.active ? "true" : undefined}
+                data-defence-key={row.key}
+              >
+                <span>{row.label}</span>
+                <strong>{optionalNumber(row.value)}</strong>
+                {row.active && <em>Active</em>}
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section className="monster-card-section" aria-label="Monster setup overview">
+          <h3>Setup overview</h3>
+          <dl className="monster-setup-grid">
+            {setupRows.map((row) => (
+              <div key={row.label}>
+                <dt>{row.label}</dt>
+                <dd>{row.value}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+      </section>
+    </aside>
+  );
 }
 
 function legacyMigrationSummaryItems(report: LegacySetupMigrationReport): string[] {
@@ -1020,6 +1215,8 @@ export function App() {
     useState<LootPrefsState>(loadInitialLootPrefs);
   const [lootSettingsByMonster, setLootSettingsByMonster] =
     useState<LootSettingsByMonsterState>(loadInitialLootSettings);
+  const [hiddenGearTiers, setHiddenGearTiers] =
+    useState<HiddenGearTiersState>(loadInitialHiddenGearTiers);
   const [priceHistory, setPriceHistory] =
     useState<BrowserPriceHistoryState>(loadInitialPriceHistory);
   const [plannerState, setPlannerState] = useState<PlannerUiState>(loadInitialPlannerUiState);
@@ -1180,6 +1377,11 @@ export function App() {
   }, [lootSettingsByMonster, readyToPersist]);
 
   useEffect(() => {
+    if (!readyToPersist) return;
+    savePersisted(hiddenGearTiersStorageOptions, hiddenGearTiers);
+  }, [hiddenGearTiers, readyToPersist]);
+
+  useEffect(() => {
     if (!readyToPersist || priceHistory.snapshots.length === 0) return;
     savePersisted(priceHistoryStorageOptions, priceHistory);
   }, [priceHistory, readyToPersist]);
@@ -1202,6 +1404,76 @@ export function App() {
     () => lootSettingsForMonster(lootSettingsByMonster, form.monsterId),
     [form.monsterId, lootSettingsByMonster]
   );
+  const priceHistorySummary = useMemo(
+    () => summarizePriceHistory(priceHistory, context?.priceSet ?? null),
+    [context?.priceSet, priceHistory]
+  );
+  const priceHistorySnapshotOptions = useMemo<SelectOption[]>(
+    () =>
+      priceHistory.snapshots.map((snapshot) => ({
+        id: priceHistorySnapshotKey(snapshot),
+        label: `${snapshot.label} - ${snapshot.capturedAt}`
+      })),
+    [priceHistory]
+  );
+  const priceHistoryItemLabels = useMemo<Record<string, string>>(() => {
+    if (!context) return {};
+    return Object.fromEntries(
+      Object.entries(context.gameData.items).map(([itemId, item]) => [itemId, item.name])
+    );
+  }, [context]);
+  const effectiveEconomySnapshotKey = priceHistorySnapshotOptions.some(
+    (option) => option.id === economySnapshotKey
+  )
+    ? economySnapshotKey
+    : (priceHistorySnapshotOptions[0]?.id ?? "");
+  const priceHistoryMovers = useMemo(
+    () =>
+      analyzePriceHistoryMovers(priceHistory, {
+        baselineMode: economyBaselineMode,
+        baselineSnapshotKey: effectiveEconomySnapshotKey,
+        itemFilter: economyItemFilter,
+        itemLabels: priceHistoryItemLabels,
+        sort: economySort
+      }),
+    [
+      economyBaselineMode,
+      economyItemFilter,
+      effectiveEconomySnapshotKey,
+      economySort,
+      priceHistory,
+      priceHistoryItemLabels
+    ]
+  );
+  const lootPriceHistoryMovers = useMemo(
+    () =>
+      analyzePriceHistoryMovers(priceHistory, {
+        baselineMode: economyBaselineMode,
+        baselineSnapshotKey: effectiveEconomySnapshotKey,
+        itemLabels: priceHistoryItemLabels,
+        sort: { key: "item", direction: "asc" }
+      }),
+    [economyBaselineMode, effectiveEconomySnapshotKey, priceHistory, priceHistoryItemLabels]
+  );
+  const lootPriceHistoryByItem = useMemo<Record<string, LootPriceHistoryItemContext>>(() => {
+    const latestLabel = lootPriceHistoryMovers.latest?.label ?? null;
+    const baselineLabel = lootPriceHistoryMovers.baseline?.label ?? null;
+    return Object.fromEntries(
+      lootPriceHistoryMovers.rows.map((row) => [
+        row.itemId,
+        {
+          itemId: row.itemId,
+          itemLabel: row.itemLabel,
+          latestPrice: row.latestPrice,
+          baselinePrice: row.baselinePrice,
+          gpDelta: row.gpDelta,
+          percentDelta: row.percentDelta,
+          latestLabel,
+          baselineLabel
+        }
+      ])
+    );
+  }, [lootPriceHistoryMovers]);
 
   const viewModel = useMemo(
     () =>
@@ -1211,10 +1483,26 @@ export function App() {
             context,
             cannonByMonster,
             currentLootPrefs,
-            lootSettingsByMonster
+            lootSettingsByMonster,
+            {
+              lootPriceHistoryByItem,
+              monsterCard: {
+                setupMode,
+                hasCustomSetup: customSetupsByMonster[form.monsterId] != null
+              }
+            }
           )
         : null,
-    [cannonByMonster, context, currentLootPrefs, form, lootSettingsByMonster]
+    [
+      cannonByMonster,
+      context,
+      currentLootPrefs,
+      customSetupsByMonster,
+      form,
+      lootPriceHistoryByItem,
+      lootSettingsByMonster,
+      setupMode
+    ]
   );
   const derivedViewModel = useMemo(
     () =>
@@ -1262,47 +1550,6 @@ export function App() {
   const canApplyHiscores = hiscoresPreviewRows.some((row) => row.canApply);
   const marketAvailable = marketStatus?.available === true;
   const marketStatusText = statusText(marketStatus, marketAvailable);
-  const priceHistorySummary = useMemo(
-    () => summarizePriceHistory(priceHistory, context?.priceSet ?? null),
-    [context?.priceSet, priceHistory]
-  );
-  const priceHistorySnapshotOptions = useMemo<SelectOption[]>(
-    () =>
-      priceHistory.snapshots.map((snapshot) => ({
-        id: priceHistorySnapshotKey(snapshot),
-        label: `${snapshot.label} - ${snapshot.capturedAt}`
-      })),
-    [priceHistory]
-  );
-  const priceHistoryItemLabels = useMemo<Record<string, string>>(() => {
-    if (!context) return {};
-    return Object.fromEntries(
-      Object.entries(context.gameData.items).map(([itemId, item]) => [itemId, item.name])
-    );
-  }, [context]);
-  const effectiveEconomySnapshotKey = priceHistorySnapshotOptions.some(
-    (option) => option.id === economySnapshotKey
-  )
-    ? economySnapshotKey
-    : (priceHistorySnapshotOptions[0]?.id ?? "");
-  const priceHistoryMovers = useMemo(
-    () =>
-      analyzePriceHistoryMovers(priceHistory, {
-        baselineMode: economyBaselineMode,
-        baselineSnapshotKey: effectiveEconomySnapshotKey,
-        itemFilter: economyItemFilter,
-        itemLabels: priceHistoryItemLabels,
-        sort: economySort
-      }),
-    [
-      economyBaselineMode,
-      economyItemFilter,
-      effectiveEconomySnapshotKey,
-      economySort,
-      priceHistory,
-      priceHistoryItemLabels
-    ]
-  );
 
   const monsters = useMemo(() => (context ? monsterOptions(context.gameData) : []), [context]);
   const styles = useMemo(
@@ -1310,14 +1557,25 @@ export function App() {
     [context, form.combatStyle, form.weaponId]
   );
   const weaponSelectOptions = useMemo<SelectOption[]>(
-    () => (context ? weaponOptions(context.gameData, form.combatStyle) : []),
-    [context, form.combatStyle]
+    () =>
+      context
+        ? filterHiddenGearTierOptions(
+            weaponOptions(context.gameData, form.combatStyle),
+            hiddenGearTiers,
+            form.weaponId
+          )
+        : [],
+    [context, form.combatStyle, form.weaponId, hiddenGearTiers]
   );
   const ammoSelectOptions = useMemo<SelectOption[]>(() => {
     if (!context) return [];
     const weapon = context.gameData.weapons[form.weaponId];
-    return ammoOptions(context.gameData, weapon?.sub === "thrown" ? "thrown" : "arrow");
-  }, [context, form.weaponId]);
+    return filterHiddenGearTierOptions(
+      ammoOptions(context.gameData, weapon?.sub === "thrown" ? "thrown" : "arrow"),
+      hiddenGearTiers,
+      form.ammoId
+    );
+  }, [context, form.ammoId, form.weaponId, hiddenGearTiers]);
   const spellSelectOptions = useMemo<SelectOption[]>(
     () => (context ? spellOptions(context.gameData) : []),
     [context]
@@ -1326,10 +1584,17 @@ export function App() {
     () =>
       context
         ? (Object.fromEntries(
-            EQUIPMENT_SLOTS.map((slot) => [slot, equipmentSlotOptions(context.gameData, slot)])
+            EQUIPMENT_SLOTS.map((slot) => [
+              slot,
+              filterHiddenGearTierOptions(
+                equipmentSlotOptions(context.gameData, slot),
+                hiddenGearTiers,
+                form.gear[slot] ?? "none"
+              )
+            ])
           ) as Record<EquipmentSlot, SelectOption[]>)
         : emptyGearSelectOptions(),
-    [context]
+    [context, form.gear, hiddenGearTiers]
   );
   const currentWeapon = context?.gameData.weapons[form.weaponId] ?? null;
   const currentWeaponTwoHanded = currentWeapon?.twoHand === true;
@@ -1345,18 +1610,23 @@ export function App() {
     [context, form.ammoId, form.combatStyle, form.gear, form.weaponId]
   );
   const specialAttackOptions = useMemo<SelectOption[]>(
-    () => [
-      { id: "none", label: "None" },
-      ...(context
-        ? supportedSpecialAttacksForCombatStyle(form.combatStyle, context.gameData).map(
-            (attack) => ({
-              id: attack.weaponId,
-              label: context.gameData.weapons[attack.weaponId]?.name ?? attack.weaponId
-            })
-          )
-        : [])
-    ],
-    [context, form.combatStyle]
+    () =>
+      filterHiddenGearTierOptions(
+        [
+          { id: "none", label: "None" },
+          ...(context
+            ? supportedSpecialAttacksForCombatStyle(form.combatStyle, context.gameData).map(
+                (attack) => ({
+                  id: attack.weaponId,
+                  label: context.gameData.weapons[attack.weaponId]?.name ?? attack.weaponId
+                })
+              )
+            : [])
+        ],
+        hiddenGearTiers,
+        form.specialAttack.weaponId
+      ),
+    [context, form.combatStyle, form.specialAttack.weaponId, hiddenGearTiers]
   );
   const specialAttackMeta = useMemo(
     () =>
@@ -1370,12 +1640,16 @@ export function App() {
   const arrowAmmoOptions = useMemo<SelectOption[]>(
     () =>
       context
-        ? Object.entries(context.gameData.ammo)
-            .filter(([, ammo]) => ammo.kind === "arrow")
-            .map(([id, ammo]) => ({ id, label: ammo.name }))
-            .sort((left, right) => left.label.localeCompare(right.label))
+        ? filterHiddenGearTierOptions(
+            Object.entries(context.gameData.ammo)
+              .filter(([, ammo]) => ammo.kind === "arrow")
+              .map(([id, ammo]) => ({ id, label: ammo.name }))
+              .sort((left, right) => left.label.localeCompare(right.label)),
+            hiddenGearTiers,
+            form.specialAttack.ammoId !== "none" ? form.specialAttack.ammoId : form.ammoId
+          )
         : [],
-    [context]
+    [context, form.ammoId, form.specialAttack.ammoId, hiddenGearTiers]
   );
   const plannerStateForCompute = useMemo(
     () => normalizePlannerUiState(plannerState),
@@ -1473,19 +1747,27 @@ export function App() {
     });
   };
 
+  const acceptPriceSet = (priceSet: PriceSet, acceptedAt: Date, nextStatus: string) => {
+    setContext((current) => (current ? { ...current, priceSet } : current));
+    setPriceHistory((current) => appendAcceptedPriceSetToHistory(current, priceSet, acceptedAt));
+    setPriceLabel(priceSet.label);
+    setStatus(nextStatus);
+    setMarketNotice({ tone: "success", message: `${nextStatus}: ${priceSet.label}` });
+    setError(null);
+  };
+
   const importPrices = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !context) return;
     try {
       const priceSet = parsePriceSetFileText(await readBrowserFileText(file, 1_000_000));
-      const acceptedAt = new Date();
-      setContext({ ...context, priceSet });
-      setPriceHistory((current) => appendAcceptedPriceSetToHistory(current, priceSet, acceptedAt));
-      setPriceLabel(priceSet.label);
-      setStatus("Imported price set");
-      setError(null);
+      acceptPriceSet(priceSet, new Date(), "Imported price set");
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : String(caught));
+      const message = caught instanceof Error ? caught.message : String(caught);
+      setMarketNotice({
+        tone: "error",
+        message: `Price import failed: ${message.replace(/\s+/g, " ").slice(0, 240)}`
+      });
     } finally {
       event.target.value = "";
     }
@@ -1745,6 +2027,9 @@ export function App() {
   const updatePlannerOnlyCurrentGear = (onlyCurrentGear: boolean) =>
     setPlannerState((current) => normalizePlannerUiState({ ...current, onlyCurrentGear }));
 
+  const updatePlannerAverageOverSession = (averageOverSession: boolean) =>
+    setPlannerState((current) => normalizePlannerUiState({ ...current, averageOverSession }));
+
   const updatePlannerGearPoolItem = (
     slot: PlannerGearSlot,
     itemId: string,
@@ -1875,6 +2160,21 @@ export function App() {
         ? "respawn-bound"
         : "active";
   const incoming = viewModel.trip.trip.incoming;
+  const foodSummary = optionLabel(FOOD_OPTIONS, form.trip.foodKey);
+  const bankTimeMode = form.trip.bankSeconds == null ? "auto" : "manual";
+  const bankSecondsValue =
+    form.trip.bankSeconds ?? Math.max(0, Math.round(viewModel.trip.trip.bankSeconds));
+  const bankTimeSummary =
+    form.trip.bankSeconds == null
+      ? `Auto ${formatNumber(viewModel.trip.trip.bankSeconds)}s`
+      : `Manual ${formatNumber(form.trip.bankSeconds)}s`;
+  const recoverAmmoApplies = form.combatStyle === "ranged";
+  const recoverAmmoSummary = recoverAmmoApplies ? yesNo(form.trip.recoverAmmo) : "Ranged only";
+  const dbaRestoreSummary = dbaSpecActive
+    ? yesNo(form.trip.dbaRestore)
+    : "Requires DBA special";
+  const runeSlotsApplies = form.combatStyle === "magic";
+  const runeSlotsSummary = runeSlotsApplies ? formatNumber(form.trip.runeSlots) : "Magic only";
   const foodCountMode = form.trip.foodCount == null ? "auto" : "manual";
   const foodCountValue =
     form.trip.foodCount ?? Math.max(0, Math.round(viewModel.trip.trip.slots.autoFoodCount));
@@ -1968,6 +2268,9 @@ export function App() {
   const potionPartsSummary = viewModel.trip.trip.slots.potionParts.length
     ? viewModel.trip.trip.slots.potionParts.join(", ")
     : "-";
+  const potionCarrySummary = form.trip.singleDose
+    ? `${formatNumber(form.trip.potionDoses)} doses/type`
+    : `${formatNumber(form.trip.potionSets)} vials/type`;
   const setCannonForCurrentMonster = (patch: Partial<CannonByMonsterState[string]>) => {
     setCannonByMonster((current) => {
       const previous = current[form.monsterId] ?? DEFAULT_CANNON_SETTINGS;
@@ -2104,6 +2407,19 @@ export function App() {
       : plannerComputedState.metric === "dps" || plannerComputedState.metric === "balanced"
         ? signedDecimal(plannerMetricDelta, 2)
         : formatDelta(plannerMetricDelta);
+  const activePriceSet = context?.priceSet ?? null;
+  const activePriceSetCreatedAtMs = activePriceSet ? Date.parse(activePriceSet.createdAt) : NaN;
+  const activePriceSetAgeSeconds =
+    activePriceSet && Number.isFinite(activePriceSetCreatedAtMs)
+      ? Math.max(0, Math.floor((Date.now() - activePriceSetCreatedAtMs) / 1000))
+      : null;
+  const activePriceSetItemCount = activePriceSet
+    ? Object.keys(activePriceSet.itemPrices).length
+    : 0;
+  const activePriceSetAlchCount = activePriceSet
+    ? Object.keys(activePriceSet.alchValues).length
+    : 0;
+  const priceDataStatusMessage = marketNotice?.message ?? status;
 
   return (
     <main className="app-shell">
@@ -2601,6 +2917,15 @@ export function App() {
                 {metric("SUPPLY/KILL", formatNumber(viewModel.trip.supply.supplyCostPerKill))}
                 {metric("GP/KILL", formatNumber(viewModel.trip.gpPerKill))}
               </section>
+              <div
+                className="calculation-warning-slot"
+                hidden={activeTab !== "stats" && activeTab !== "compare"}
+              >
+                <CalculationWarningSummary
+                  warnings={viewModel.moneyWarnings}
+                  label="Result price warnings"
+                />
+              </div>
 
               <section
                 className="equipment-pane"
@@ -2961,6 +3286,54 @@ export function App() {
                     }
                   ])}
                 </div>
+                <CalculationWarningSummary
+                  warnings={viewModel.moneyWarnings}
+                  label="Loot price warnings"
+                />
+                <section className="loot-composition" aria-label="Loot value composition">
+                  <div className="loot-section-heading">
+                    <h3>Loot value composition</h3>
+                    <span>{formatNumber(viewModel.lootSummary.valueComposition.displayedGpPerKill, 1)} GP/kill</span>
+                  </div>
+                  <table className="loot-composition-table">
+                    <thead>
+                      <tr>
+                        <th>Contributor</th>
+                        <th>Action</th>
+                        <th className="numeric">GP/kill</th>
+                        <th className="numeric">Share</th>
+                        <th>State</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {viewModel.lootSummary.valueComposition.rows.length === 0 ? (
+                        <tr>
+                          <td colSpan={5}>No positive loot value</td>
+                        </tr>
+                      ) : (
+                        viewModel.lootSummary.valueComposition.rows.map((row) => (
+                          <tr key={row.rowId ?? "other-drops"}>
+                            <td>
+                              <span>{row.name}</span>
+                              {row.childCount > 0 && <small>{formatNumber(row.childCount)} nested rows</small>}
+                            </td>
+                            <td>{row.actionLabel}</td>
+                            <td className="numeric">{formatNumber(row.gpPerKill, 1)}</td>
+                            <td className="numeric">
+                              {row.shareOfPositivePct === null
+                                ? "-"
+                                : `${formatNumber(row.shareOfPositivePct, 1)}%`}
+                            </td>
+                            <td>{row.stateLabel ?? (row.isOther ? "Tail" : "-")}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                  {viewModel.lootSummary.valueComposition.note && (
+                    <p className="loot-composition-note">{viewModel.lootSummary.valueComposition.note}</p>
+                  )}
+                </section>
                 <div className="loot-table-wrap">
                   <table className="loot-table" aria-label="Current monster drops">
                     <thead>
@@ -2983,10 +3356,19 @@ export function App() {
                         </tr>
                       ) : (
                         viewModel.lootRows.map((row) => (
-                          <tr key={row.rowId} className={row.isOverride ? "active" : undefined}>
+                          <tr
+                            key={row.rowId}
+                            className={[
+                              row.isOverride ? "active" : null,
+                              row.stateLabel ? "loot-row-attention" : null
+                            ]
+                              .filter((item): item is string => item !== null)
+                              .join(" ")}
+                          >
                             <td className="loot-name-cell">
                               <span>{row.name}</span>
                               <small>{row.key ?? row.tag ?? row.rowId}</small>
+                              {row.stateLabel && <small className="loot-state">{row.stateLabel}</small>}
                             </td>
                             <td>
                               <select
@@ -3007,36 +3389,153 @@ export function App() {
                             <td className="numeric">
                               {formatDelta(row.selectedDeltaNetGpPerHour)}
                             </td>
-                            <td className="loot-impact-list">
-                              {row.actionImpacts.map((impact) => (
-                                <span key={impact.action}>
-                                  {actionLabel(impact.action)}{" "}
-                                  {formatDelta(impact.deltaNetGpPerHour)}
-                                </span>
-                              ))}
+                            <td className="loot-impact-cell">
+                              <details className="loot-row-disclosure">
+                                <summary>Compare actions</summary>
+                                <table className="loot-impact-table" aria-label={`Action impact for ${row.name}`}>
+                                  <thead>
+                                    <tr>
+                                      <th>Action</th>
+                                      <th className="numeric">Net GP/hr</th>
+                                      <th className="numeric">Delta</th>
+                                      <th className="numeric">Row GP/kill</th>
+                                      <th>Notes</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {row.actionImpacts.map((impact) => (
+                                      <tr key={impact.action}>
+                                        <td>
+                                          <span>{impact.label}</span>
+                                          <small>
+                                            {[
+                                              impact.isSelected ? "selected" : null,
+                                              impact.isDefault ? "default" : null
+                                            ]
+                                              .filter((item): item is string => item !== null)
+                                              .join(" / ") || "-"}
+                                          </small>
+                                        </td>
+                                        <td className="numeric">
+                                          {formatNumber(impact.effectiveNetGpPerHour)}
+                                        </td>
+                                        <td className="numeric">{formatDelta(impact.deltaNetGpPerHour)}</td>
+                                        <td className="numeric">
+                                          {formatNumber(impact.gpPerKillContribution, 1)}
+                                        </td>
+                                        <td>
+                                          {[impact.stateLabel, ...impact.notes]
+                                            .filter((item): item is string => !!item)
+                                            .join("; ") || "-"}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </details>
                             </td>
-                            <td className="numeric">{formatNumber(row.evGp, 1)}</td>
+                            <td className="numeric">{formatNumber(row.effectiveEvGp, 1)}</td>
                             <td className="numeric">{formatNumber(row.chance * 100, 2)}%</td>
                             <td className="numeric">{formatNumber(row.qtyAvg, 1)}</td>
                             <td className="numeric">{formatNumber(row.price)}</td>
                             <td>
-                              {row.expandedRows.length > 0 ? (
-                                <details>
-                                  <summary>{formatNumber(row.expandedRows.length)} rows</summary>
-                                  <div className="loot-detail-grid">
-                                    {row.expandedRows.slice(0, 8).map((detail) => (
-                                      <span key={`${row.rowId}-${detail.label}`}>
-                                        {detail.label}
-                                        {detail.price == null
-                                          ? ""
-                                          : ` ${formatNumber(detail.price)}`}
-                                      </span>
+                              <details className="loot-row-disclosure">
+                                <summary>
+                                  {row.expandedRows.length > 0
+                                    ? `${formatNumber(row.expandedRows.length)} nested rows`
+                                    : "Value details"}
+                                </summary>
+                                <div className="loot-row-detail-panel">
+                                  <dl className="loot-value-facts">
+                                    {row.valueDetails.map((detail) => (
+                                      <div className={detail.tone} key={`${row.rowId}-${detail.label}`}>
+                                        <dt>{detail.label}</dt>
+                                        <dd>{detail.value}</dd>
+                                      </div>
                                     ))}
+                                  </dl>
+                                  <div
+                                    className={[
+                                      "loot-history-context",
+                                      row.historyContext.tracked ? null : "empty"
+                                    ]
+                                      .filter((item): item is string => item !== null)
+                                      .join(" ")}
+                                    aria-label={`Local price history for ${row.name}`}
+                                  >
+                                    <div className="loot-history-heading">
+                                      <strong>Local history</strong>
+                                      <span>{row.historyContext.statusLabel}</span>
+                                    </div>
+                                    {row.historyContext.tracked ? (
+                                      <dl className="loot-history-facts">
+                                        <div>
+                                          <dt>Latest</dt>
+                                          <dd>{optionalPrice(row.historyContext.latestPrice)}</dd>
+                                        </div>
+                                        <div>
+                                          <dt>Baseline</dt>
+                                          <dd>{optionalPrice(row.historyContext.baselinePrice)}</dd>
+                                        </div>
+                                        <div>
+                                          <dt>Delta</dt>
+                                          <dd>{optionalDelta(row.historyContext.gpDelta)}</dd>
+                                        </div>
+                                        <div>
+                                          <dt>Percent</dt>
+                                          <dd>{optionalPercent(row.historyContext.percentDelta)}</dd>
+                                        </div>
+                                      </dl>
+                                    ) : (
+                                      <small>
+                                        {row.historyContext.itemId
+                                          ? `Item ${row.historyContext.itemId} is not in local history`
+                                          : "This parent row has no item key"}
+                                      </small>
+                                    )}
                                   </div>
-                                </details>
-                              ) : (
-                                "-"
-                              )}
+                                  {row.expandedRows.length > 0 && (
+                                    <table className="loot-nested-table" aria-label={`Nested rows for ${row.name}`}>
+                                      <thead>
+                                        <tr>
+                                          <th>Child</th>
+                                          <th>Key/tag</th>
+                                          <th className="numeric">Weight</th>
+                                          <th className="numeric">Chance</th>
+                                          <th className="numeric">Qty</th>
+                                          <th className="numeric">Price</th>
+                                          <th className="numeric">EV share</th>
+                                          <th>Notes</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {row.expandedRows.map((detail) => (
+                                          <tr key={`${row.rowId}-${detail.label}`}>
+                                            <td>{detail.label}</td>
+                                            <td>{detail.key ?? detail.tag ?? "-"}</td>
+                                            <td className="numeric">{detail.weightLabel ?? "-"}</td>
+                                            <td className="numeric">
+                                              {detail.chance === null
+                                                ? "-"
+                                                : `${formatNumber(detail.chance * 100, 2)}%`}
+                                            </td>
+                                            <td className="numeric">{detail.qtyLabel ?? "-"}</td>
+                                            <td className="numeric">
+                                              {detail.price === null ? "-" : formatNumber(detail.price)}
+                                            </td>
+                                            <td className="numeric">
+                                              {detail.evGp === null
+                                                ? "-"
+                                                : `${formatNumber(detail.evGp, 1)} gp`}
+                                            </td>
+                                            <td>{detail.notes.join("; ") || "-"}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  )}
+                                </div>
+                              </details>
                             </td>
                           </tr>
                         ))
@@ -3056,6 +3555,151 @@ export function App() {
                   <span className="status-pill">{tripStatus}</span>
                 </div>
                 <div className="trip-body">
+                  <SearchableSelectField
+                    label="Food"
+                    value={form.trip.foodKey}
+                    options={FOOD_OPTIONS}
+                    searchPlaceholder="Search food"
+                    onChange={(foodKey) =>
+                      setFormSafe((current) =>
+                        updateForm(current, {
+                          trip: { ...current.trip, foodKey }
+                        })
+                      )
+                    }
+                  />
+                  <SelectField
+                    label="Bank time"
+                    value={bankTimeMode}
+                    options={BANK_TIME_MODE_OPTIONS}
+                    onChange={(mode) =>
+                      setFormSafe((current) =>
+                        updateForm(current, {
+                          trip: {
+                            ...current.trip,
+                            bankSeconds:
+                              mode === "manual"
+                                ? Math.max(0, Math.min(3600, bankSecondsValue))
+                                : null
+                          }
+                        })
+                      )
+                    }
+                  />
+                  <NumberField
+                    label="Bank sec"
+                    value={bankSecondsValue}
+                    min={0}
+                    max={3600}
+                    disabled={bankTimeMode === "auto"}
+                    onChange={(bankSeconds) =>
+                      setFormSafe((current) =>
+                        updateForm(current, {
+                          trip: { ...current.trip, bankSeconds }
+                        })
+                      )
+                    }
+                  />
+                  <label className="toggle">
+                    <input
+                      type="checkbox"
+                      checked={form.trip.singleDose}
+                      onChange={(event) =>
+                        setFormSafe((current) =>
+                          updateForm(current, {
+                            trip: { ...current.trip, singleDose: event.target.checked }
+                          })
+                        )
+                      }
+                    />
+                    <span>Single-dose</span>
+                  </label>
+                  <NumberField
+                    label="Potion vials"
+                    value={form.trip.potionSets}
+                    min={0}
+                    max={28}
+                    disabled={form.trip.singleDose}
+                    onChange={(potionSets) =>
+                      setFormSafe((current) =>
+                        updateForm(current, {
+                          trip: { ...current.trip, potionSets }
+                        })
+                      )
+                    }
+                  />
+                  <NumberField
+                    label="Potion doses"
+                    value={form.trip.potionDoses}
+                    min={0}
+                    max={112}
+                    disabled={!form.trip.singleDose}
+                    onChange={(potionDoses) =>
+                      setFormSafe((current) =>
+                        updateForm(current, {
+                          trip: { ...current.trip, potionDoses }
+                        })
+                      )
+                    }
+                  />
+                  <label className="toggle">
+                    <input
+                      type="checkbox"
+                      checked={form.trip.teleport}
+                      onChange={(event) =>
+                        setFormSafe((current) =>
+                          updateForm(current, {
+                            trip: { ...current.trip, teleport: event.target.checked }
+                          })
+                        )
+                      }
+                    />
+                    <span>Teleport item</span>
+                  </label>
+                  <label className="toggle">
+                    <input
+                      type="checkbox"
+                      checked={recoverAmmoApplies && form.trip.recoverAmmo}
+                      disabled={!recoverAmmoApplies}
+                      onChange={(event) =>
+                        setFormSafe((current) =>
+                          updateForm(current, {
+                            trip: { ...current.trip, recoverAmmo: event.target.checked }
+                          })
+                        )
+                      }
+                    />
+                    <span>Recover ammo</span>
+                  </label>
+                  <label className="toggle">
+                    <input
+                      type="checkbox"
+                      checked={dbaSpecActive && form.trip.dbaRestore}
+                      disabled={!dbaSpecActive}
+                      onChange={(event) =>
+                        setFormSafe((current) =>
+                          updateForm(current, {
+                            trip: { ...current.trip, dbaRestore: event.target.checked }
+                          })
+                        )
+                      }
+                    />
+                    <span>DBA restore</span>
+                  </label>
+                  <NumberField
+                    label="Rune slots"
+                    value={form.trip.runeSlots}
+                    min={0}
+                    max={28}
+                    disabled={!runeSlotsApplies}
+                    onChange={(runeSlots) =>
+                      setFormSafe((current) =>
+                        updateForm(current, {
+                          trip: { ...current.trip, runeSlots }
+                        })
+                      )
+                    }
+                  />
                   <SelectField
                     label="Safespot"
                     value={safespotControlValue(form.trip.safespot)}
@@ -3323,128 +3967,193 @@ export function App() {
                       )
                     }
                   />
-                  <div className="trip-output" aria-label="Trip summary">
-                    {metricList([
-                      { label: "Safespot", value: safespotSummary },
-                      { label: "Protect", value: optionLabel(PROTECT_OPTIONS, form.trip.protect) },
-                      { label: "Prayer block", value: yesNo(incoming.protected) },
-                      {
-                        label: "Prayer mode",
-                        value: optionLabel(PRAYER_MODE_OPTIONS, form.trip.prayerMode)
-                      },
-                      { label: "Restore", value: prayerRestoreSummary },
-                      { label: "Prayer carried", value: prayerCarriedSummary },
-                      {
-                        label: "Prayer/kill",
-                        value: formatNumber(viewModel.trip.trip.prayerPerKill, 2)
-                      },
-                      {
-                        label: "Prayer slots",
-                        value: formatNumber(viewModel.trip.trip.prayerSlots)
-                      },
-                      {
-                        label: "Max kills prayer",
-                        value: finiteMetric(viewModel.trip.trip.maxKillsPrayer, 1)
-                      },
-                      {
-                        label: "Prayer dose",
-                        value: viewModel.trip.trip.prayerPointsPerDose
-                          ? formatNumber(viewModel.trip.trip.prayerPointsPerDose)
-                          : "-"
-                      },
-                      {
-                        label: "Altar sec",
-                        value: viewModel.trip.trip.altarOn
-                          ? formatNumber(viewModel.trip.trip.altarSeconds)
-                          : "-"
-                      },
-                      {
-                        label: "Altar/kill",
-                        value: viewModel.trip.trip.altarOn
-                          ? `${formatNumber(viewModel.trip.trip.altarSecPerKill, 2)}s`
-                          : "-"
-                      },
-                      { label: "Antifire", value: yesNo(form.trip.antifire) },
-                      { label: "Antipoison", value: yesNo(form.trip.antipoison) },
-                      { label: "Scarce spot", value: yesNo(form.trip.scarceSpot) },
-                      { label: "Scarce status", value: scarceStatus },
-                      {
-                        label: "Spot max K/hr",
-                        value: form.trip.scarceSpot
-                          ? formatNumber(viewModel.trip.trip.scarce.maxKph)
-                          : "-"
-                      },
-                      {
-                        label: "Food count",
-                        value: formatNumber(viewModel.trip.trip.slots.foodCount)
-                      },
-                      {
-                        label: "Auto food",
-                        value: formatNumber(viewModel.trip.trip.slots.autoFoodCount)
-                      },
-                      {
-                        label: "Food left",
-                        value: formatNumber(viewModel.trip.trip.slots.foodLeftAtEnd, 1)
-                      },
-                      { label: "HP/kill", value: formatNumber(incoming.hpPerKill, 2) },
-                      { label: "Dragonfire", value: formatNumber(incoming.dragonfire, 2) },
-                      { label: "Poison", value: formatNumber(incoming.poison ?? 0, 2) },
-                      {
-                        label: "Food/kill",
-                        value: formatNumber(viewModel.trip.trip.foodPerKill, 2)
-                      },
-                      {
-                        label: "Kills/trip",
-                        value: formatNumber(viewModel.trip.trip.killsPerTrip, 1)
-                      },
-                      { label: "Effective K/hr", value: formatNumber(viewModel.trip.effectiveKph) },
-                      {
-                        label: "Reserve slots",
-                        value: formatNumber(viewModel.trip.trip.slots.reserve)
-                      },
-                      {
-                        label: "Reserve parts",
-                        value: reservePartsSummary
-                      },
-                      {
-                        label: "Potion slots",
-                        value: formatNumber(viewModel.trip.trip.slots.potionSlots)
-                      },
-                      {
-                        label: "Potion parts",
-                        value: potionPartsSummary
-                      },
-                      {
-                        label: "Loot capacity",
-                        value: formatNumber(viewModel.trip.trip.slots.lootCapacity)
-                      },
-                      {
-                        label: "Free at start",
-                        value: formatNumber(viewModel.trip.trip.slots.freeAtStart)
-                      },
-                      {
-                        label: "Recoil rings",
-                        value: recoilRingEquipped ? formatNumber(form.trip.recoilRings) : "No ring"
-                      },
-                      {
-                        label: "Recoil spares",
-                        value: viewModel.trip.trip.recoilOn
-                          ? formatNumber(viewModel.trip.trip.recoilSpares)
-                          : "-"
-                      },
-                      {
-                        label: "Recoil/kill",
-                        value: viewModel.trip.trip.recoilOn
-                          ? `${formatNumber(viewModel.trip.trip.recoilDmgPerKill, 1)} dmg`
-                          : "-"
-                      },
-                      {
-                        label: "Recoil gp/kill",
-                        value: viewModel.trip.trip.recoilOn
-                          ? formatNumber(viewModel.trip.trip.recoilCostPerKill)
-                          : "-"
-                      }
-                    ])}
+                  <div className="trip-output grouped" aria-label="Trip summary">
+                    {[
+                      tripMetricGroup("Survival", [
+                        { label: "Safespot", value: safespotSummary },
+                        {
+                          label: "Protect",
+                          value: optionLabel(PROTECT_OPTIONS, form.trip.protect)
+                        },
+                        { label: "Prayer block", value: yesNo(incoming.protected) },
+                        { label: "HP/kill", value: formatNumber(incoming.hpPerKill, 2) },
+                        { label: "Dragonfire", value: formatNumber(incoming.dragonfire, 2) },
+                        { label: "Poison", value: formatNumber(incoming.poison ?? 0, 2) },
+                        { label: "Antifire", value: yesNo(form.trip.antifire) },
+                        { label: "Antipoison", value: yesNo(form.trip.antipoison) }
+                      ]),
+                      tripMetricGroup("Prayer", [
+                        {
+                          label: "Prayer mode",
+                          value: optionLabel(PRAYER_MODE_OPTIONS, form.trip.prayerMode)
+                        },
+                        { label: "Restore", value: prayerRestoreSummary },
+                        { label: "Prayer carried", value: prayerCarriedSummary },
+                        {
+                          label: "Prayer/kill",
+                          value: formatNumber(viewModel.trip.trip.prayerPerKill, 2)
+                        },
+                        {
+                          label: "Prayer slots",
+                          value: formatNumber(viewModel.trip.trip.prayerSlots)
+                        },
+                        {
+                          label: "Max kills prayer",
+                          value: finiteMetric(viewModel.trip.trip.maxKillsPrayer, 1)
+                        },
+                        {
+                          label: "Prayer dose",
+                          value: viewModel.trip.trip.prayerPointsPerDose
+                            ? formatNumber(viewModel.trip.trip.prayerPointsPerDose)
+                            : "-"
+                        },
+                        {
+                          label: "Altar sec",
+                          value: viewModel.trip.trip.altarOn
+                            ? formatNumber(viewModel.trip.trip.altarSeconds)
+                            : "-"
+                        },
+                        {
+                          label: "Altar/kill",
+                          value: viewModel.trip.trip.altarOn
+                            ? `${formatNumber(viewModel.trip.trip.altarSecPerKill, 2)}s`
+                            : "-"
+                        }
+                      ]),
+                      tripMetricGroup("Food", [
+                        { label: "Food", value: foodSummary },
+                        {
+                          label: "Food count",
+                          value: formatNumber(viewModel.trip.trip.slots.foodCount)
+                        },
+                        {
+                          label: "Auto food",
+                          value: formatNumber(viewModel.trip.trip.slots.autoFoodCount)
+                        },
+                        {
+                          label: "Food left",
+                          value: formatNumber(viewModel.trip.trip.slots.foodLeftAtEnd, 1)
+                        },
+                        {
+                          label: "Food/kill",
+                          value: formatNumber(viewModel.trip.trip.foodPerKill, 2)
+                        }
+                      ]),
+                      tripMetricGroup("Inventory reserve", [
+                        { label: "Teleport", value: form.trip.teleport ? "1 slot" : "Off" },
+                        { label: "Ammo recovery", value: recoverAmmoSummary },
+                        { label: "DBA restore", value: dbaRestoreSummary },
+                        { label: "Rune slots", value: runeSlotsSummary },
+                        {
+                          label: "Reserve slots",
+                          value: formatNumber(viewModel.trip.trip.slots.reserve)
+                        },
+                        {
+                          label: "Reserve parts",
+                          value: reservePartsSummary
+                        },
+                        {
+                          label: "Loot capacity",
+                          value: formatNumber(viewModel.trip.trip.slots.lootCapacity)
+                        },
+                        {
+                          label: "Free at start",
+                          value: formatNumber(viewModel.trip.trip.slots.freeAtStart)
+                        }
+                      ]),
+                      tripMetricGroup("Potion slots", [
+                        { label: "Potion carry", value: potionCarrySummary },
+                        {
+                          label: "Potion slots",
+                          value: formatNumber(viewModel.trip.trip.slots.potionSlots)
+                        },
+                        {
+                          label: "Potion parts",
+                          value: potionPartsSummary
+                        },
+                        {
+                          label: "Potion gp/trip",
+                          value: formatNumber(viewModel.trip.trip.potionCostPerTrip),
+                          tone: "gold"
+                        },
+                        {
+                          label: "Potion gp/kill",
+                          value: formatNumber(viewModel.trip.trip.potionCostPerKill),
+                          tone: "gold"
+                        }
+                      ]),
+                      tripMetricGroup("Scarce cap", [
+                        { label: "Scarce spot", value: yesNo(form.trip.scarceSpot) },
+                        { label: "Scarce status", value: scarceStatus },
+                        {
+                          label: "Spot max K/hr",
+                          value: form.trip.scarceSpot
+                            ? formatNumber(viewModel.trip.trip.scarce.maxKph)
+                            : "-"
+                        }
+                      ]),
+                      tripMetricGroup("Recoil", [
+                        {
+                          label: "Recoil rings",
+                          value: recoilRingEquipped
+                            ? formatNumber(form.trip.recoilRings)
+                            : "No ring"
+                        },
+                        {
+                          label: "Recoil spares",
+                          value: viewModel.trip.trip.recoilOn
+                            ? formatNumber(viewModel.trip.trip.recoilSpares)
+                            : "-"
+                        },
+                        {
+                          label: "Recoil/kill",
+                          value: viewModel.trip.trip.recoilOn
+                            ? `${formatNumber(viewModel.trip.trip.recoilDmgPerKill, 1)} dmg`
+                            : "-"
+                        },
+                        {
+                          label: "Recoil gp/kill",
+                          value: viewModel.trip.trip.recoilOn
+                            ? formatNumber(viewModel.trip.trip.recoilCostPerKill)
+                            : "-",
+                          tone: "gold"
+                        }
+                      ]),
+                      tripMetricGroup("Outcome", [
+                        { label: "Bank time", value: bankTimeSummary },
+                        {
+                          label: "Kills/trip",
+                          value: formatNumber(viewModel.trip.trip.killsPerTrip, 1)
+                        },
+                        {
+                          label: "Trip length",
+                          value: Number.isFinite(viewModel.trip.trip.tripMinutes)
+                            ? `${formatNumber(viewModel.trip.trip.tripMinutes, 1)}m`
+                            : "-"
+                        },
+                        {
+                          label: "Effective K/hr",
+                          value: formatNumber(viewModel.trip.effectiveKph)
+                        },
+                        {
+                          label: "Supply/kill",
+                          value: formatNumber(viewModel.trip.supply.supplyCostPerKill),
+                          tone: "gold"
+                        },
+                        {
+                          label: "Ammo/kill",
+                          value:
+                            viewModel.trip.supply.ammoPerKill > 0
+                              ? formatNumber(viewModel.trip.supply.ammoPerKill, 2)
+                              : "-"
+                        },
+                        {
+                          label: "Effective net GP/hr",
+                          value: formatNumber(viewModel.trip.effectiveNetGpPerHour),
+                          tone: "gold"
+                        }
+                      ])
+                    ]}
                   </div>
                 </div>
               </section>
@@ -3677,12 +4386,11 @@ export function App() {
                       />
                       <span>Only current gear</span>
                     </label>
-                    <label className="toggle planner-mode-toggle disabled">
+                    <label className="toggle planner-mode-toggle">
                       <input
                         type="checkbox"
                         checked={plannerState.averageOverSession}
-                        disabled
-                        readOnly
+                        onChange={(event) => updatePlannerAverageOverSession(event.target.checked)}
                       />
                       <span>Avg over session</span>
                     </label>
@@ -3999,6 +4707,87 @@ export function App() {
                 aria-label={activeTab === "economy" ? "Economy" : "Live services"}
                 hidden={activeTab !== "economy" && activeTab !== "settings"}
               >
+                {activeTab === "settings" && (
+                  <section className="service-group price-data-panel" aria-label="Price data settings">
+                    <div className="section-title-row">
+                      <h2>Price data</h2>
+                      <span className={`status-pill ${activePriceSet ? "ready" : ""}`}>
+                        {activePriceSet ? activePriceSet.source : "empty"}
+                      </span>
+                    </div>
+                    <div className="price-history-summary" aria-label="Active PriceSet summary">
+                      <span>Label {activePriceSet?.label ?? priceLabel}</span>
+                      <span>Source {activePriceSet?.source ?? "-"}</span>
+                      <span>Created {activePriceSet?.createdAt ?? "-"}</span>
+                      <span>Age {formatAge(activePriceSetAgeSeconds)}</span>
+                      <span>Item prices {formatNumber(activePriceSetItemCount)}</span>
+                      <span>Alch values {formatNumber(activePriceSetAlchCount)}</span>
+                      <span>Status {status}</span>
+                    </div>
+                    <div className="market-sync-bar">
+                      <label className="file-button">
+                        Import PriceSet
+                        <input type="file" accept="application/json,.json" onChange={importPrices} />
+                      </label>
+                    </div>
+                    <p
+                      className={`inline-status ${marketNotice?.tone ?? "neutral"}`}
+                      role={marketNotice?.tone === "error" ? "alert" : "status"}
+                    >
+                      {priceDataStatusMessage}
+                    </p>
+                  </section>
+                )}
+                {activeTab === "settings" && (
+                  <section className="service-group hidden-tier-panel" aria-label="Hidden gear tiers">
+                    <div className="section-title-row">
+                      <h2>Gear menu</h2>
+                      <span
+                        className={`status-pill ${
+                          Object.values(hiddenGearTiers).some(Boolean) ? "ready" : ""
+                        }`}
+                      >
+                        {formatNumber(Object.values(hiddenGearTiers).filter(Boolean).length)} hidden
+                      </span>
+                    </div>
+                    <p className="inline-status neutral">
+                      Hidden tiers are removed from weapon, ammo, spec and equipment pickers.
+                      Current selections and None stay visible.
+                    </p>
+                    <div className="gear-tier-grid" aria-label="Gear tier visibility">
+                      {GEAR_TIER_DEFS.map((tier) => (
+                        <label className="tier-toggle" key={tier.id}>
+                          <span>
+                            {"description" in tier
+                              ? tier.description
+                              : `Hide ${tier.label.toLowerCase()} gear`}
+                          </span>
+                          <input
+                            type="checkbox"
+                            checked={!!hiddenGearTiers[tier.id]}
+                            onChange={(event) =>
+                              setHiddenGearTiers((current) =>
+                                setHiddenGearTier(current, tier.id, event.target.checked)
+                              )
+                            }
+                          />
+                        </label>
+                      ))}
+                    </div>
+                    <div className="market-sync-bar">
+                      <button type="button" onClick={() => setHiddenGearTiers(hideAllGearTiers())}>
+                        Hide all listed tiers
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!Object.values(hiddenGearTiers).some(Boolean)}
+                        onClick={() => setHiddenGearTiers(DEFAULT_HIDDEN_GEAR_TIERS_STATE)}
+                      >
+                        Show all tiers
+                      </button>
+                    </div>
+                  </section>
+                )}
                 <section className="service-group" aria-label="Market sync">
                   <div className="section-title-row">
                     <h2>Market</h2>
@@ -4055,6 +4844,10 @@ export function App() {
                     </span>
                     <span>Baseline {priceHistoryMovers.baselineLabel}</span>
                   </div>
+                  <CalculationWarningSummary
+                    warnings={viewModel.moneyWarnings}
+                    label="Economy price warnings"
+                  />
                   {marketNotice && (
                     <p
                       className={`inline-status ${marketNotice.tone}`}
@@ -4396,6 +5189,14 @@ export function App() {
             </section>
           </section>
         </section>
+        <MonsterCardPanel
+          card={viewModel.monsterCard}
+          monsterOptions={monsters}
+          selectedMonsterId={form.monsterId}
+          dropFilter={denseCompare.dropFilter}
+          onTargetChange={selectTarget}
+          onDropFilterChange={setDenseDropFilter}
+        />
       </section>
     </main>
   );

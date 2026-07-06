@@ -149,6 +149,43 @@
           }
         ]
       }
+    },
+    {
+      "id": "boosted_sustained_strength_path",
+      "expected": {
+        "combatStyle": "melee",
+        "metric": "xph",
+        "totalXp": 22327,
+        "start": {
+          "dps": 2.120256,
+          "metricValue": 26801.522444,
+          "weaponId": "rune_scimitar",
+          "spellId": null
+        },
+        "end": {
+          "skill": "strength",
+          "to": 52,
+          "dps": 2.172243,
+          "metricValue": 27376.574745,
+          "weaponId": "rune_scimitar",
+          "spellId": null
+        },
+        "phases": [
+          {
+            "skill": "strength",
+            "from": 50,
+            "to": 52,
+            "xp": 22327,
+            "cumXp": 22327,
+            "startDps": 2.120256,
+            "endDps": 2.172243,
+            "startMetric": 26801.522444,
+            "endMetric": 27376.574745,
+            "unlocks": []
+          }
+        ],
+        "unlocks": []
+      }
     }
   ]
 }

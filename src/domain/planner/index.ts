@@ -65,6 +65,13 @@ export interface PlannerOptions {
   maxLevels?: number;
 }
 
+const MANUAL_REQUIREMENT_POLICY_WARNING: SimulationWarning = {
+  code: "manual-planner-requirement-policy",
+  severity: "info",
+  message:
+    "Planner item requirements use the current manual requirement policy until generated requirements are accepted."
+};
+
 export interface PlannerEvaluation {
   request: SimulationRequest;
   combat: SimulationResult;
@@ -560,7 +567,7 @@ export function buildPlan(
     (skill) => targets[skill] != null && targets[skill]! > baseRequest.levels[skill]
   );
   const startXp = startingXp(baseRequest.levels, allSkills, options.startXp);
-  const warnings = plannerPoolWarnings(pool, context);
+  const warnings = [MANUAL_REQUIREMENT_POLICY_WARNING, ...plannerPoolWarnings(pool, context)];
   const refs =
     metric === "balanced"
       ? balancedRefs(input, context, baseRequest, metric, pool, options.lockGear)

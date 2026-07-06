@@ -1,11 +1,15 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import ts from "typescript";
+import { ZodError } from "zod";
 import { lookupItemPrice, collectMissingPriceWarnings } from "../domain/economy";
 import {
+  DataReliabilityError,
   createGameDataSnapshotFromLegacy,
   createPriceSetFromLegacyGameData,
+  parseJsonWithDuplicateKeyCheck,
   type LegacySnapshotInput
-} from "../data/legacy-adapter";
+} from "../data";
 import {
   PRICE_SET_IMPORT_MAX_BYTES,
   PriceHistorySchema,
@@ -16,8 +20,12 @@ import {
 } from "../data/schemas";
 import { createLegacyRuntime } from "./helpers/legacy-sim";
 
+function readTextFile(fileName: string): string {
+  return readFileSync(join(process.cwd(), fileName), "utf8");
+}
+
 function readJsonFile(fileName: string): unknown {
-  return JSON.parse(readFileSync(join(process.cwd(), fileName), "utf8"));
+  return parseJsonWithDuplicateKeyCheck(readTextFile(fileName), { source: fileName });
 }
 
 function expectPriceSetError(
@@ -32,6 +40,91 @@ function expectPriceSetError(
     return error as PriceSetValidationError;
   }
   throw new Error(`Expected PriceSetValidationError with code ${code}`);
+}
+
+function expectDataReliabilityError(
+  action: () => unknown,
+  code: DataReliabilityError["code"]
+): DataReliabilityError {
+  try {
+    action();
+  } catch (error) {
+    expect(error).toBeInstanceOf(DataReliabilityError);
+    expect((error as DataReliabilityError).code).toBe(code);
+    return error as DataReliabilityError;
+  }
+  throw new Error(`Expected DataReliabilityError with code ${code}`);
+}
+
+function expectGameDataSchemaError(action: () => unknown): ZodError {
+  try {
+    action();
+  } catch (error) {
+    expect(error).toBeInstanceOf(ZodError);
+    return error as ZodError;
+  }
+  throw new Error("Expected ZodError");
+}
+
+function minimalLegacyInput(loot: unknown): LegacySnapshotInput {
+  return {
+    gameData: {
+      MONSTERS: [{ id: "rat", name: "Rat", hp: 2, loot }] as Array<Record<string, unknown>>,
+      ITEM_PRICES: { bones: 1, coins: 1 },
+      ALCH_VALUES: {}
+    },
+    simEngine: {
+      WEAPONS: {},
+      ARROWS: {},
+      SPELLS: {}
+    },
+    equipment: {
+      SLOT_DEFS: []
+    }
+  };
+}
+
+function jsPropertyName(property: ts.ObjectLiteralElementLike): string | null {
+  if (!("name" in property) || property.name === undefined) return null;
+  const name = property.name;
+  if (ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name)) {
+    return name.text;
+  }
+  return null;
+}
+
+function findDuplicateObjectLiteralKeys(sourceText: string, sourceLabel: string): string[] {
+  const sourceFile = ts.createSourceFile(
+    sourceLabel,
+    sourceText,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.JS
+  );
+  const issues: string[] = [];
+
+  const visit = (node: ts.Node) => {
+    if (ts.isObjectLiteralExpression(node)) {
+      const seen = new Map<string, number>();
+      for (const property of node.properties) {
+        const key = jsPropertyName(property);
+        if (key === null) continue;
+        const previous = seen.get(key);
+        if (previous !== undefined) {
+          const { line, character } = sourceFile.getLineAndCharacterOfPosition(property.getStart());
+          issues.push(
+            `${sourceLabel}:${line + 1}:${character + 1} duplicates object key '${key}' first seen at property ${previous + 1}`
+          );
+        } else {
+          seen.set(key, seen.size);
+        }
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+
+  visit(sourceFile);
+  return issues;
 }
 
 describe("validated game data snapshots", () => {
@@ -65,6 +158,65 @@ describe("validated game data snapshots", () => {
     expect(priceSet.itemPrices).not.toHaveProperty("_randomherb_avg");
     expect(priceSet.alchValues).not.toHaveProperty("_randomherb_avg");
   });
+
+  it("rejects duplicate legacy monster ids before object conversion can hide them", () => {
+    const runtime = createLegacyRuntime();
+    const duplicatedMonster = { ...runtime.GameData.MONSTERS[0], id: "chicken" };
+    const error = expectDataReliabilityError(
+      () =>
+        createGameDataSnapshotFromLegacy({
+          gameData: {
+            ...runtime.GameData,
+            MONSTERS: [...runtime.GameData.MONSTERS, duplicatedMonster]
+          },
+          simEngine: runtime.SimEngine,
+          equipment: runtime.Equipment as unknown as LegacySnapshotInput["equipment"]
+        }),
+      "duplicate_ids"
+    );
+
+    expect(error.issues.join("\n")).toContain("chicken");
+    expect(error.message).not.toContain(process.cwd());
+  });
+
+  it.each([
+    ["missing name", [{ key: "bones", chance: 1, qtyAvg: 1 }], "name"],
+    ["missing chance", [{ name: "Bones", key: "bones", qtyAvg: 1 }], "chance"],
+    ["chance over one", [{ name: "Bones", key: "bones", chance: 1.25, qtyAvg: 1 }], "chance"],
+    ["missing qtyAvg", [{ name: "Bones", key: "bones", chance: 1 }], "qtyAvg"],
+    ["negative qtyAvg", [{ name: "Bones", key: "bones", chance: 1, qtyAvg: -1 }], "qtyAvg"],
+    [
+      "malformed nested expand row",
+      [
+        {
+          name: "Random table",
+          chance: 0.5,
+          qtyAvg: 1,
+          _expand: [{ weight: 1, price: 10 }]
+        }
+      ],
+      "_expand"
+    ],
+    [
+      "empty nested expand row",
+      [
+        {
+          name: "Random table",
+          chance: 0.5,
+          qtyAvg: 1,
+          _expand: [{ name: "Empty row" }]
+        }
+      ],
+      "_expand"
+    ]
+  ])("rejects malformed loot entries: %s", (_caseName, loot, expectedPath) => {
+    const error = expectGameDataSchemaError(() =>
+      createGameDataSnapshotFromLegacy(minimalLegacyInput(loot))
+    );
+    const issueText = JSON.stringify(error.issues);
+    expect(issueText).toContain(expectedPath);
+    expect(issueText).not.toContain(process.cwd());
+  });
 });
 
 describe("price file schemas", () => {
@@ -82,6 +234,17 @@ describe("price file schemas", () => {
     expect(priceSet.itemPrices).not.toHaveProperty("_scraped_at");
     expect(priceHistory.length).toBeGreaterThan(0);
     expect(priceHistory[0]?.prices.rune_scimitar).toBeGreaterThan(0);
+  });
+
+  it("gates committed raw data files for duplicate keys before object parsing", () => {
+    expect(() => readJsonFile("prices.json")).not.toThrow();
+    expect(() => readJsonFile("alch.json")).not.toThrow();
+    expect(() => readJsonFile("price-history.json")).not.toThrow();
+  });
+
+  it("detects duplicate object keys in JavaScript source fixtures", () => {
+    expect(findDuplicateObjectLiteralKeys("const data = { lobster: 200, lobster: 250 };", "fixture"))
+      .toEqual(["fixture:1:30 duplicates object key 'lobster' first seen at property 1"]);
   });
 
   it("rejects malformed imported PriceSet JSON with sanitized errors", () => {
@@ -120,6 +283,36 @@ describe("price file schemas", () => {
     expect(issueText).toContain("itemPrices.shark");
     expect(issueText).not.toContain(process.cwd());
     expect(validationError.message).not.toContain(process.cwd());
+  });
+
+  it("rejects duplicate keys in imported PriceSet JSON before JSON.parse drops values", () => {
+    const duplicateJson = `{
+      "id": "manual-check",
+      "label": "Manual check",
+      "source": "manual",
+      "createdAt": "2026-07-06",
+      "itemPrices": { "lobster": 200, "lobster": 250 },
+      "alchValues": { "lobster": 0 }
+    }`;
+
+    const error = expectPriceSetError(() => parsePriceSetJson(duplicateJson), "duplicate_keys");
+    expect(error.issues.join("\n")).toContain("itemPrices.lobster");
+    expect(error.issues.join("\n")).not.toContain(process.cwd());
+    expect(error.message).not.toContain(process.cwd());
+  });
+
+  it("detects duplicate raw data keys in synthetic fixtures", () => {
+    const error = expectDataReliabilityError(
+      () =>
+        parseJsonWithDuplicateKeyCheck(
+          `{"items":{"bones":{"name":"Bones"},"bones":{"name":"Other bones"}}}`,
+          { source: "synthetic game data" }
+        ),
+      "duplicate_keys"
+    );
+
+    expect(error.issues.join("\n")).toContain("items.bones");
+    expect(error.message).not.toContain(process.cwd());
   });
 });
 

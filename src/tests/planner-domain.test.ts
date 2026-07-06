@@ -24,6 +24,12 @@ interface PlannerGoldenFixture {
 
 const fixtures = fixtureSet as PlannerGoldenFixture;
 const fixtureById = new Map(fixtures.cases.map((testCase) => [testCase.id, testCase.expected]));
+const V1_PLANNER_ACCEPTANCE_CASE_IDS = [
+  "melee_rune_scimitar_attack_unlock",
+  "ranged_yew_shortbow_unlock",
+  "magic_fire_bolt_unlock",
+  "boosted_sustained_strength_path"
+] as const;
 
 describe("planner requirements and candidate pools", () => {
   it("keeps gear eligibility as explicit planner policy", () => {
@@ -122,9 +128,49 @@ describe("planner domain scoring", () => {
 
     expect(plan.warnings.map((warning) => warning.code)).toContain("missing-planner-weapon");
   });
+
+  it("surfaces the manual item requirement policy until generated requirements are accepted", () => {
+    const { runtime, context } = createPlannerRuntime();
+    const input = plannerInputFromDefinition(runtime, {
+      id: "planner_manual_requirement_policy",
+      description: "Planner manual requirement policy warning",
+      combatType: "melee",
+      monsterId: "giant",
+      weapon: "rune_scimitar",
+      style: "aggressive",
+      levels: { attack: 40, strength: 40, defence: 40, ranged: 1, magic: 1, prayer: 1 },
+      prayers: ["none"],
+      boosts: ["none"],
+      trip: { foodKey: "none", teleport: false, bankSeconds: 0, prayerMode: "none" }
+    });
+
+    const plan = buildPlan(input, context, { targets: { strength: 41 }, maxLevels: 1 });
+
+    expect(plan.warnings).toContainEqual(
+      expect.objectContaining({
+        code: "manual-planner-requirement-policy",
+        severity: "info",
+        message: expect.stringContaining("manual requirement policy")
+      })
+    );
+  });
 });
 
 describe("planner golden plans", () => {
+  it("locks the V1 rewrite acceptance golden case set", () => {
+    expect(PLANNER_GOLDEN_CASES.map((testCase) => testCase.id)).toEqual([
+      ...V1_PLANNER_ACCEPTANCE_CASE_IDS
+    ]);
+    expect([...fixtureById.keys()]).toEqual([...V1_PLANNER_ACCEPTANCE_CASE_IDS]);
+
+    const boosted = PLANNER_GOLDEN_CASES.find(
+      (testCase) => testCase.id === "boosted_sustained_strength_path"
+    );
+    expect(boosted?.definition.boosts).toEqual(["super_att", "super_str"]);
+    expect(boosted?.definition.sustained).toBe(false);
+    expect(boosted?.options.sustained).toBe(true);
+  });
+
   for (const testCase of PLANNER_GOLDEN_CASES) {
     it(`matches ${testCase.id}`, () => {
       const { runtime, context } = createPlannerRuntime();

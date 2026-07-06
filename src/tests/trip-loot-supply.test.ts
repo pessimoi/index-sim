@@ -192,6 +192,40 @@ describe("trip/loot/supply unit rules", () => {
     );
   });
 
+  it("surfaces structured warnings when jewel table prices use aliases or fallbacks", () => {
+    const runtime = createLegacyRuntime();
+    const context = domainContextFromLegacy(runtime);
+    const { uncut_sapphire: _uncutSapphire, ...withoutCanonicalSapphire } =
+      context.priceSet.itemPrices;
+    const aliasContext: SimulationContext = {
+      ...context,
+      priceSet: {
+        ...context.priceSet,
+        itemPrices: { ...withoutCanonicalSapphire, sapphire: 451 }
+      }
+    };
+    const aliasResult = evaluateLoot(context.gameData.monsters.giant, aliasContext);
+
+    expect(aliasResult.warnings.map((warning) => warning.code)).toContain("price-alias-used");
+    expect(aliasResult.warnings.map((warning) => warning.message).join("\n")).toContain(
+      "uncut_sapphire"
+    );
+
+    const { sapphire: _sapphire, ...withoutSapphireAlias } = withoutCanonicalSapphire;
+    const fallbackContext: SimulationContext = {
+      ...context,
+      priceSet: {
+        ...context.priceSet,
+        itemPrices: withoutSapphireAlias
+      }
+    };
+    const fallbackResult = evaluateLoot(context.gameData.monsters.giant, fallbackContext);
+
+    expect(fallbackResult.warnings.map((warning) => warning.code)).toContain(
+      "price-fallback-used"
+    );
+  });
+
   it("bounds cannon target and respawn settings inside the domain", () => {
     const runtime = createLegacyRuntime();
     const context = domainContextFromLegacy(runtime);

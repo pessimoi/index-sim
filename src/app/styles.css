@@ -251,7 +251,7 @@ th {
   display: grid;
   flex: 1;
   gap: 0.9rem;
-  grid-template-columns: minmax(240px, 280px) minmax(0, 1fr);
+  grid-template-columns: minmax(240px, 280px) minmax(0, 1fr) minmax(280px, 320px);
   min-height: 0;
   min-width: 0;
 }
@@ -276,6 +276,144 @@ th {
 
 .sidebar-section:last-child {
   border-bottom: 0;
+}
+
+.monster-rail {
+  border-left: 1px solid #26303d;
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+  padding-left: 0.9rem;
+}
+
+.monster-card-panel {
+  display: grid;
+  gap: 0.85rem;
+  min-width: 0;
+}
+
+.monster-card-subtitle {
+  color: #aeb9c8;
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  margin-top: 0.15rem;
+  overflow-wrap: anywhere;
+  text-transform: uppercase;
+}
+
+.monster-card-controls {
+  border-bottom: 1px solid #26303d;
+  display: grid;
+  gap: 0.65rem;
+  min-width: 0;
+  padding-bottom: 0.85rem;
+}
+
+.monster-card-section {
+  border-bottom: 1px solid #26303d;
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+  padding-bottom: 0.85rem;
+}
+
+.monster-card-section:last-child {
+  border-bottom: 0;
+}
+
+.monster-card-section h3 {
+  color: #aeb9c8;
+  font-size: 0.72rem;
+  letter-spacing: 0;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.monster-stat-grid,
+.monster-setup-grid {
+  display: grid;
+  gap: 0.4rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+  min-width: 0;
+}
+
+.monster-stat-grid div,
+.monster-setup-grid div {
+  border: 1px solid #26303d;
+  border-radius: 6px;
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+  padding: 0.45rem 0.5rem;
+}
+
+.monster-stat-grid dt,
+.monster-setup-grid dt {
+  color: #aeb9c8;
+  font-size: 0.66rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+  text-transform: uppercase;
+}
+
+.monster-stat-grid dd,
+.monster-setup-grid dd {
+  color: #eef2f7;
+  font-size: 0.86rem;
+  font-weight: 700;
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.monster-stat-grid .missing dd {
+  color: #6d7785;
+}
+
+.monster-defence-list {
+  display: grid;
+  gap: 0.35rem;
+  list-style: none;
+  margin: 0;
+  min-width: 0;
+  padding: 0;
+}
+
+.monster-defence-list li {
+  align-items: center;
+  border: 1px solid #26303d;
+  border-radius: 6px;
+  display: grid;
+  gap: 0.4rem;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  min-height: 2.1rem;
+  min-width: 0;
+  padding: 0.35rem 0.5rem;
+}
+
+.monster-defence-list li.active {
+  background: #182f2b;
+  border-color: #2c7d66;
+}
+
+.monster-defence-list span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.monster-defence-list strong {
+  color: #eef2f7;
+  font-variant-numeric: tabular-nums;
+}
+
+.monster-defence-list em {
+  color: #93e8c8;
+  font-size: 0.66rem;
+  font-style: normal;
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
 .sidebar-metrics {
@@ -620,6 +758,75 @@ th {
   min-width: 0;
 }
 
+.loot-composition {
+  border: 1px solid #26303d;
+  border-radius: 8px;
+  display: grid;
+  gap: 0.45rem;
+  min-width: 0;
+  overflow: auto;
+  padding: 0.55rem;
+}
+
+.loot-section-heading {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.loot-section-heading h3 {
+  font-size: 0.86rem;
+  margin: 0;
+}
+
+.loot-section-heading span,
+.loot-composition-note {
+  color: #aeb9c8;
+  font-size: 0.76rem;
+}
+
+.loot-composition-note {
+  margin: 0;
+}
+
+.loot-composition-table,
+.loot-impact-table,
+.loot-nested-table {
+  border-collapse: collapse;
+  font-size: 0.74rem;
+  font-variant-numeric: tabular-nums;
+  width: 100%;
+}
+
+.loot-composition-table th,
+.loot-composition-table td,
+.loot-impact-table th,
+.loot-impact-table td,
+.loot-nested-table th,
+.loot-nested-table td {
+  border-top: 1px solid #26303d;
+  padding: 0.3rem 0.35rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.loot-composition-table td span,
+.loot-composition-table td small,
+.loot-impact-table td span,
+.loot-impact-table td small {
+  display: block;
+}
+
+.loot-composition-table td small,
+.loot-impact-table td small {
+  color: #6d7785;
+  font-size: 0.68rem;
+  margin-top: 0.12rem;
+}
+
 .loot-table-wrap {
   max-height: 22rem;
   min-width: 0;
@@ -643,8 +850,18 @@ th {
   background: #18342d;
 }
 
+.loot-table tr.loot-row-attention {
+  background: rgba(206, 166, 79, 0.1);
+}
+
 .loot-table th.numeric,
-.loot-table td.numeric {
+.loot-table td.numeric,
+.loot-composition-table th.numeric,
+.loot-composition-table td.numeric,
+.loot-impact-table th.numeric,
+.loot-impact-table td.numeric,
+.loot-nested-table th.numeric,
+.loot-nested-table td.numeric {
   text-align: right;
 }
 
@@ -661,6 +878,10 @@ th {
   color: #6d7785;
   font-size: 0.68rem;
   margin-top: 0.12rem;
+}
+
+.loot-name-cell .loot-state {
+  color: #e8c26a;
 }
 
 .action-select {
@@ -691,6 +912,103 @@ th {
   margin-top: 0.3rem;
 }
 
+.loot-impact-cell {
+  min-width: 28rem;
+}
+
+.loot-row-disclosure summary {
+  color: #d7dee8;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.loot-row-detail-panel {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 0.45rem;
+  min-width: 32rem;
+}
+
+.loot-value-facts {
+  display: grid;
+  gap: 0.25rem;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  margin: 0;
+}
+
+.loot-value-facts div {
+  border-top: 1px solid #26303d;
+  min-width: 0;
+  padding-top: 0.25rem;
+}
+
+.loot-value-facts dt {
+  color: #6d7785;
+  font-size: 0.68rem;
+}
+
+.loot-value-facts dd {
+  color: #eef2f7;
+  margin: 0.1rem 0 0;
+}
+
+.loot-value-facts .warning dd {
+  color: #e8c26a;
+}
+
+.loot-value-facts .muted dd {
+  color: #aeb9c8;
+}
+
+.loot-history-context {
+  border-top: 1px solid #26303d;
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+  padding-top: 0.4rem;
+}
+
+.loot-history-context.empty {
+  color: #7f8b9a;
+}
+
+.loot-history-heading {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.loot-history-heading strong {
+  color: #eef2f7;
+  font-size: 0.78rem;
+}
+
+.loot-history-heading span,
+.loot-history-context small {
+  color: #aeb9c8;
+  font-size: 0.7rem;
+}
+
+.loot-history-facts {
+  display: grid;
+  gap: 0.3rem;
+  grid-template-columns: repeat(auto-fit, minmax(85px, 1fr));
+  margin: 0;
+}
+
+.loot-history-facts dt {
+  color: #6d7785;
+  font-size: 0.66rem;
+}
+
+.loot-history-facts dd {
+  color: #eef2f7;
+  margin: 0.08rem 0 0;
+}
+
 .trip-body {
   align-items: start;
   display: grid;
@@ -705,6 +1023,31 @@ th {
   grid-column: 1 / -1;
   grid-template-columns: repeat(auto-fit, minmax(105px, 1fr));
   min-width: 0;
+}
+
+.trip-output.grouped {
+  align-items: start;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.trip-output-group {
+  align-content: start;
+  border-top: 1px solid #26303d;
+  display: grid;
+  gap: 0.45rem;
+  grid-template-columns: repeat(auto-fit, minmax(105px, 1fr));
+  min-width: 0;
+  padding-top: 0.55rem;
+}
+
+.trip-output-group h3 {
+  color: #d6dee9;
+  font-size: 0.78rem;
+  font-weight: 700;
+  grid-column: 1 / -1;
+  letter-spacing: 0;
+  margin: 0;
+  text-transform: uppercase;
 }
 
 .trip-output .metric {
@@ -1101,6 +1444,42 @@ th {
   gap: 0.35rem;
 }
 
+.calculation-warning-slot {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.calculation-warnings {
+  align-items: start;
+  border-left: 2px solid #d6a82e;
+  color: #d7bd77;
+  display: grid;
+  font-size: 0.76rem;
+  gap: 0.25rem;
+  line-height: 1.35;
+  min-width: 0;
+  padding-left: 0.65rem;
+}
+
+.calculation-warnings strong {
+  color: #f1c45b;
+  font-size: 0.72rem;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.calculation-warnings span {
+  overflow-wrap: anywhere;
+}
+
+.calculation-warnings .info {
+  color: #aeb9c8;
+}
+
+.calculation-warnings .error {
+  color: #ffb4b4;
+}
+
 .service-group {
   min-width: 0;
 }
@@ -1450,6 +1829,33 @@ th {
   margin: 0.7rem 0 0;
 }
 
+.gear-tier-grid {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  margin-top: 0.75rem;
+}
+
+.tier-toggle {
+  align-items: center;
+  background: #151b24;
+  border: 1px solid #2b3544;
+  border-radius: 6px;
+  color: #d8dee8;
+  cursor: pointer;
+  display: flex;
+  font-size: 0.82rem;
+  gap: 0.7rem;
+  justify-content: space-between;
+  min-height: 2.35rem;
+  padding: 0.5rem 0.65rem;
+}
+
+.tier-toggle:has(input:checked) {
+  border-color: #7c6536;
+  color: #ffd58a;
+}
+
 .economy-pane {
   display: grid;
   gap: 1rem;
@@ -1717,6 +2123,19 @@ th {
     max-height: none;
     padding: 0 0 0.9rem;
   }
+
+  .monster-rail {
+    border-left: 0;
+    border-top: 1px solid #26303d;
+    max-height: none;
+    padding: 0.9rem 0 0;
+  }
+
+  .active-pane {
+    border-bottom: 1px solid #26303d;
+    max-height: 72vh;
+    padding-bottom: 0.9rem;
+  }
 }
 
 @media (max-width: 620px) {
@@ -1760,6 +2179,8 @@ th {
   .level-grid,
   .gear-grid,
   .toggle-grid,
+  .monster-stat-grid,
+  .monster-setup-grid,
   .planner-targets,
   .planner-skill-row,
   .planner-toggle-row,

@@ -107,5 +107,38 @@ export const PLANNER_GOLDEN_CASES: readonly PlannerGoldenCaseDefinition[] = [
       },
       maxLevels: 10
     }
+  },
+  {
+    id: "boosted_sustained_strength_path",
+    description: "Boosted sustained melee training remains deterministic on the V1 rewrite path.",
+    definition: {
+      id: "planner_boosted_sustained_strength_path",
+      description: "Planner boosted sustained strength path",
+      combatType: "melee",
+      monsterId: "mossgiant",
+      weapon: "rune_scimitar",
+      style: "aggressive",
+      levels: { attack: 50, strength: 50, defence: 45, ranged: 1, magic: 1, prayer: 31 },
+      gear: {
+        ...BASIC_GEAR,
+        amulet: "amu_power",
+        body: "rune_chainbody",
+        legs: "rune_platelegs"
+      },
+      prayers: ["ultimate_strength"],
+      boosts: ["super_att", "super_str"],
+      sustained: false,
+      trip: { foodKey: "lobster", teleport: false, bankSeconds: 0, prayerMode: "none" }
+    },
+    options: {
+      metric: "xph",
+      targets: { strength: 52 },
+      sustained: true,
+      pool: {
+        weapon: ["rune_scimitar"],
+        ...EMPTY_ARMOUR_POOL
+      },
+      maxLevels: 10
+    }
   }
 ];

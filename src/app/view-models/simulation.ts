@@ -15,6 +15,7 @@ import {
   type PlannerTransition
 } from "@/domain/planner";
 import type {
+  AttackType,
   BonusKey,
   CombatStyle,
   EquipmentItemDefinition,
@@ -22,7 +23,8 @@ import type {
   EntityId,
   GameDataSnapshot,
   SimulationContext,
-  SimulationRequest
+  SimulationRequest,
+  SimulationWarning
 } from "@/domain/shared";
 import {
   simulateTripLootSupply,
@@ -54,18 +56,22 @@ import {
   formToSimulationRequest,
   formToTripPolicy,
   type CombatSetupFormState,
-  type CustomSetupsByMonsterState
+  type CustomSetupsByMonsterState,
+  type SetupMode
 } from "../state/ui-state";
 
 export interface SimulationViewModel {
   request: SimulationRequest;
   combat: ReturnType<typeof simulateCombat>;
+  monsterCard: MonsterCardViewModel;
   trip: TripLootSupplyResult;
   playerEffectiveXpPerHour: number;
   cannonEffectiveXpPerHour: number;
   effectiveXpPerHour: number;
   totalXpPerHour: number;
   warnings: string[];
+  calculationWarnings: CalculationWarningViewModel[];
+  moneyWarnings: CalculationWarningViewModel[];
   topLoot: Array<{
     name: string;
     pref: string;
@@ -78,13 +84,176 @@ export interface SimulationViewModel {
     defaultEffectiveNetGpPerHour: number;
     currentDeltaNetGpPerHour: number;
     overrideCount: number;
+    valueComposition: LootValueCompositionViewModel;
   };
+}
+
+export type MonsterCardStatKey =
+  | "combat"
+  | "hitpoints"
+  | "attack"
+  | "strength"
+  | "defence"
+  | "magic"
+  | "attackSpeed";
+
+export interface MonsterCardStatViewModel {
+  key: MonsterCardStatKey;
+  label: string;
+  value: number | null;
+  missing: boolean;
+}
+
+export type MonsterCardDefenceKey = "stab" | "slash" | "crush" | "range" | "magic";
+export type MonsterCardDefenceField =
+  | "defStab"
+  | "defSlash"
+  | "defCrush"
+  | "defRange"
+  | "defMagic";
+
+export interface MonsterCardDefenceRowViewModel {
+  key: MonsterCardDefenceKey;
+  label: string;
+  field: MonsterCardDefenceField;
+  value: number | null;
+  active: boolean;
+  missing: boolean;
+}
+
+export interface MonsterCardSetupBadgeViewModel {
+  mode: SetupMode;
+  label: string;
+  tone: "default" | "custom";
+  hasCustomSetup: boolean;
+}
+
+export interface MonsterCardNamedSelectionViewModel {
+  id: EntityId;
+  label: string;
+}
+
+export interface MonsterCardSetupOverviewViewModel {
+  combatStyle: CombatStyle;
+  styleId: EntityId;
+  styleLabel: string;
+  attackType: AttackType | "ranged" | "magic" | null;
+  weapon: MonsterCardNamedSelectionViewModel;
+  ammo: MonsterCardNamedSelectionViewModel | null;
+  spell: MonsterCardNamedSelectionViewModel | null;
+  accuracyBonus: number;
+  damageBonus: number;
+  attackSpeedSec: number;
+  prayerIds: EntityId[];
+  boostIds: EntityId[];
+  sustained: boolean;
+  ring: MonsterCardNamedSelectionViewModel | null;
+  summary: string[];
+}
+
+export interface MonsterCardViewModel {
+  monsterId: EntityId;
+  monsterName: string;
+  stats: MonsterCardStatViewModel[];
+  defenceRows: MonsterCardDefenceRowViewModel[];
+  activeDefenceField: MonsterCardDefenceField | null;
+  activeDefenceKey: MonsterCardDefenceKey | null;
+  setupBadge: MonsterCardSetupBadgeViewModel;
+  setupOverview: MonsterCardSetupOverviewViewModel;
+}
+
+export interface MonsterCardViewModelOptions {
+  setupMode?: SetupMode;
+  hasCustomSetup?: boolean;
+}
+
+export interface SimulationViewModelOptions {
+  includeLootRows?: boolean;
+  monsterCard?: MonsterCardViewModelOptions;
+  lootPriceHistoryByItem?: Record<string, LootPriceHistoryItemContext | undefined>;
+}
+
+export interface CalculationWarningViewModel {
+  code: string;
+  severity: SimulationWarning["severity"];
+  message: string;
 }
 
 export interface LootActionImpactViewModel {
   action: LootAction;
+  label: string;
   effectiveNetGpPerHour: number;
   deltaNetGpPerHour: number;
+  gpPerKillContribution: number;
+  isSelected: boolean;
+  isDefault: boolean;
+  stateLabel: string | null;
+  notes: string[];
+}
+
+export interface LootValueCompositionRowViewModel {
+  rowId: string | null;
+  name: string;
+  action: LootAction | null;
+  actionLabel: string;
+  gpPerKill: number;
+  shareOfPositivePct: number | null;
+  stateLabel: string | null;
+  childCount: number;
+  isOther: boolean;
+}
+
+export interface LootValueCompositionViewModel {
+  rows: LootValueCompositionRowViewModel[];
+  positiveGpPerKill: number;
+  displayedGpPerKill: number;
+  residualGpPerKill: number;
+  note: string | null;
+}
+
+export interface LootExpandedRowViewModel {
+  label: string;
+  key: string | null;
+  tag: string | null;
+  weight: number | null;
+  weightLabel: string | null;
+  chance: number | null;
+  qty: number | null;
+  qtyLabel: string | null;
+  price: number | null;
+  evGp: number | null;
+  shareOfParentPct: number | null;
+  notes: string[];
+}
+
+export interface LootDropValueDetailViewModel {
+  label: string;
+  value: string;
+  tone: "default" | "warning" | "muted";
+}
+
+export interface LootPriceHistoryItemContext {
+  itemId: string;
+  itemLabel?: string;
+  latestPrice: number | null;
+  baselinePrice: number | null;
+  gpDelta: number | null;
+  percentDelta: number | null;
+  latestLabel: string | null;
+  baselineLabel: string | null;
+}
+
+export interface LootPriceHistoryContextViewModel {
+  itemId: string | null;
+  itemLabel: string;
+  tracked: boolean;
+  latestPrice: number | null;
+  baselinePrice: number | null;
+  gpDelta: number | null;
+  percentDelta: number | null;
+  latestLabel: string | null;
+  baselineLabel: string | null;
+  statusLabel: string;
 }
 
 export interface LootDropRowViewModel {
@@ -97,7 +266,10 @@ export interface LootDropRowViewModel {
   price: number;
   saleValue: number;
   evGp: number;
+  effectiveEvGp: number;
+  stateLabel: string | null;
   pref: LootAction;
+  prefLabel: string;
   defaultPref: LootAction;
   availableActions: LootAction[];
   actionImpacts: LootActionImpactViewModel[];
@@ -106,11 +278,9 @@ export interface LootDropRowViewModel {
   prayerXp: number;
   alchValue: number;
   slotFrac: number;
-  expandedRows: Array<{
-    label: string;
-    weight: string | null;
-    price: number | null;
-  }>;
+  expandedRows: LootExpandedRowViewModel[];
+  valueDetails: LootDropValueDetailViewModel[];
+  historyContext: LootPriceHistoryContextViewModel;
 }
 
 export interface LootOptimizeResult {
@@ -193,11 +363,197 @@ const OPTION_BONUS_KEYS: BonusKey[] = [
   "magDmg",
   "prayer"
 ];
+const MONSTER_CARD_DEFENCE_ROWS = [
+  { key: "stab", label: "Stab defence", field: "defStab" },
+  { key: "slash", label: "Slash defence", field: "defSlash" },
+  { key: "crush", label: "Crush defence", field: "defCrush" },
+  { key: "range", label: "Ranged defence", field: "defRange" },
+  { key: "magic", label: "Magic defence", field: "defMagic" }
+] satisfies Array<{
+  key: MonsterCardDefenceKey;
+  label: string;
+  field: MonsterCardDefenceField;
+}>;
 
 export interface SelectOptionViewModel {
   id: EntityId;
   label: string;
   hint?: string;
+}
+
+function nullableNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function monsterNumber(
+  monster: GameDataSnapshot["monsters"][string],
+  key: keyof GameDataSnapshot["monsters"][string]
+): number | null {
+  return nullableNumber(monster[key]);
+}
+
+function namedSelection(
+  id: EntityId | undefined,
+  label: string | undefined
+): MonsterCardNamedSelectionViewModel {
+  return {
+    id: id ?? "none",
+    label: label ?? id ?? "None"
+  };
+}
+
+function monsterCardSetupBadge(
+  options: MonsterCardViewModelOptions = {}
+): MonsterCardSetupBadgeViewModel {
+  const mode = options.setupMode ?? "default";
+  const hasCustomSetup = options.hasCustomSetup ?? mode === "custom";
+  if (mode === "custom") {
+    return { mode, label: "Custom setup", tone: "custom", hasCustomSetup };
+  }
+  return {
+    mode,
+    label: hasCustomSetup ? "Default setup (custom saved)" : "Default setup",
+    tone: "default",
+    hasCustomSetup
+  };
+}
+
+function activeMonsterDefenceField(value: string): MonsterCardDefenceField | null {
+  return MONSTER_CARD_DEFENCE_ROWS.some((row) => row.field === value)
+    ? (value as MonsterCardDefenceField)
+    : null;
+}
+
+function createMonsterCardStats(
+  monster: GameDataSnapshot["monsters"][string]
+): MonsterCardStatViewModel[] {
+  const rows = [
+    { key: "combat", label: "Combat", value: monsterNumber(monster, "level") },
+    { key: "hitpoints", label: "HP", value: monsterNumber(monster, "hp") },
+    { key: "attack", label: "Attack", value: monsterNumber(monster, "attack") },
+    { key: "strength", label: "Strength", value: monsterNumber(monster, "strength") },
+    { key: "defence", label: "Defence", value: monsterNumber(monster, "defLevel") },
+    { key: "magic", label: "Magic", value: monsterNumber(monster, "magicLevel") },
+    { key: "attackSpeed", label: "Attack speed", value: monsterNumber(monster, "attackSpeed") }
+  ] satisfies Array<Omit<MonsterCardStatViewModel, "missing">>;
+
+  return rows.map((row) => ({ ...row, missing: row.value == null }));
+}
+
+function createMonsterCardDefenceRows(
+  monster: GameDataSnapshot["monsters"][string],
+  activeField: MonsterCardDefenceField | null
+): MonsterCardDefenceRowViewModel[] {
+  return MONSTER_CARD_DEFENCE_ROWS.map((row) => {
+    const value = monsterNumber(monster, row.field);
+    return {
+      ...row,
+      value,
+      active: row.field === activeField,
+      missing: value == null
+    };
+  });
+}
+
+function styleLabelForRequest(request: SimulationRequest, gameData: GameDataSnapshot): string {
+  return (
+    styleOptions(gameData, request.combatStyle, request.loadout.weaponId).find(
+      (option) => option.id === request.styleId
+    )?.label ?? request.styleId
+  );
+}
+
+function createMonsterCardSetupOverview(
+  request: SimulationRequest,
+  context: SimulationContext,
+  combat: ReturnType<typeof simulateCombat>
+): MonsterCardSetupOverviewViewModel {
+  const gameData = context.gameData;
+  const weaponId = request.loadout.weaponId;
+  const weapon = gameData.weapons[weaponId];
+  const ammoId = request.loadout.ammoId;
+  const ammo =
+    request.combatStyle === "ranged" && ammoId && ammoId !== "none"
+      ? namedSelection(ammoId, gameData.ammo[ammoId]?.name)
+      : null;
+  const spell =
+    request.combatStyle === "magic" && request.spellId
+      ? namedSelection(request.spellId, gameData.spells[request.spellId]?.name)
+      : null;
+  const ringId = request.loadout.gear.ring;
+  const ring =
+    ringId && ringId !== "none"
+      ? namedSelection(ringId, gameData.equipment.ring?.[ringId]?.name)
+      : null;
+  const attackType =
+    request.combatStyle === "melee"
+      ? (combat.debug.attackType ?? null)
+      : request.combatStyle === "ranged"
+        ? "ranged"
+        : "magic";
+  const styleLabel = styleLabelForRequest(request, gameData);
+  const summary = [
+    `Weapon: ${weapon?.name ?? weaponId}`,
+    ammo ? `Ammo: ${ammo.label}` : null,
+    spell ? `Spell: ${spell.label}` : null,
+    `Style: ${styleLabel}`,
+    `ACC ${signedBonus(combat.debug.accuracyBonus)}`,
+    `DMG ${signedBonus(combat.debug.damageBonus)}`,
+    `Speed ${formatNumber(combat.attackSpeedSec, 1)}s`
+  ].filter((item): item is string => item != null);
+
+  return {
+    combatStyle: request.combatStyle,
+    styleId: request.styleId,
+    styleLabel,
+    attackType,
+    weapon: namedSelection(weaponId, weapon?.name),
+    ammo,
+    spell,
+    accuracyBonus: combat.debug.accuracyBonus,
+    damageBonus: combat.debug.damageBonus,
+    attackSpeedSec: combat.attackSpeedSec,
+    prayerIds: [...request.prayers.keys],
+    boostIds: [...request.boosts.keys],
+    sustained: !!request.sustained,
+    ring,
+    summary
+  };
+}
+
+function monsterCardFromResult(
+  request: SimulationRequest,
+  context: SimulationContext,
+  combat: ReturnType<typeof simulateCombat>,
+  options: MonsterCardViewModelOptions = {}
+): MonsterCardViewModel {
+  const monster = context.gameData.monsters[request.monsterId];
+  if (!monster) throw new Error(`Unknown monster id: ${request.monsterId}`);
+
+  const activeField = activeMonsterDefenceField(combat.debug.defenceField);
+  const defenceRows = createMonsterCardDefenceRows(monster, activeField);
+  const activeDefenceKey = defenceRows.find((row) => row.active)?.key ?? null;
+
+  return {
+    monsterId: monster.id,
+    monsterName: monster.name,
+    stats: createMonsterCardStats(monster),
+    defenceRows,
+    activeDefenceField: activeField,
+    activeDefenceKey,
+    setupBadge: monsterCardSetupBadge(options),
+    setupOverview: createMonsterCardSetupOverview(request, context, combat)
+  };
+}
+
+export function createMonsterCardViewModel(
+  form: CombatSetupFormState,
+  context: SimulationContext,
+  options: MonsterCardViewModelOptions = {}
+): MonsterCardViewModel {
+  const request = formToSimulationRequest(form, context.gameData);
+  const combat = simulateCombat(request, context);
+  return monsterCardFromResult(request, context, combat, options);
 }
 
 function uniqueLootActions(actions: LootAction[]): LootAction[] {
@@ -218,21 +574,287 @@ function availableLootActions(
   return uniqueLootActions(actions);
 }
 
-function expandedRows(drop: LootBreakdownEntry): LootDropRowViewModel["expandedRows"] {
+function lootActionLabel(action: LootAction): string {
+  return action === "unid" ? "Unid" : action.charAt(0).toUpperCase() + action.slice(1);
+}
+
+function lootRowStateLabel(drop: Pick<LootBreakdownEntry, "_eaten" | "_displaced">): string | null {
+  if (drop._eaten) return "Eaten as food";
+  if (drop._displaced) return "Displaced by inventory";
+  return null;
+}
+
+function effectiveDropEvGp(drop: LootBreakdownEntry): number {
+  return drop._displaced ? 0 : drop.evGp;
+}
+
+function finiteNumberField(record: Record<string, unknown>, key: string): number | null {
+  const value = record[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function stringField(record: Record<string, unknown>, key: string): string | null {
+  const value = record[key];
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function expandedRows(drop: LootBreakdownEntry): LootExpandedRowViewModel[] {
   if (!Array.isArray(drop._expand)) return [];
-  return drop._expand.map((row, index) => {
+  const normalized = drop._expand.map((row, index) => {
     const record = row as Record<string, unknown>;
+    const weight = finiteNumberField(record, "weight");
+    const stringWeight = stringField(record, "weight");
+    const chance = finiteNumberField(record, "chance");
+    const qty = finiteNumberField(record, "qtyAvg") ?? finiteNumberField(record, "qty");
+    const price = finiteNumberField(record, "price");
+
     return {
       label: typeof record.name === "string" ? record.name : `Row ${index + 1}`,
-      weight:
-        typeof record.weight === "number"
-          ? formatNumber(record.weight)
-          : typeof record.weight === "string"
-            ? record.weight
+      key: stringField(record, "key"),
+      tag: stringField(record, "tag"),
+      weight,
+      weightLabel:
+        weight !== null
+          ? formatNumber(weight)
+          : stringWeight !== null
+            ? stringWeight
             : null,
-      price: typeof record.price === "number" && Number.isFinite(record.price) ? record.price : null
+      chance,
+      qty,
+      qtyLabel: qty !== null ? formatNumber(qty, 2) : null,
+      price,
+      evGp: null,
+      shareOfParentPct: null,
+      notes: [
+        record.talisman === true ? "Talisman band" : null,
+        record.mega === true ? "Nested mega-rare table" : null
+      ].filter((note): note is string => note !== null)
     };
   });
+
+  const totalWeight = normalized.reduce((sum, row) => sum + (row.weight ?? 0), 0);
+  const weightedValues = normalized.map((row) =>
+    row.weight !== null && row.price !== null ? row.weight * row.price : 0
+  );
+  const totalWeightedValue = weightedValues.reduce((sum, value) => sum + value, 0);
+  const canDeriveWeightedShare =
+    totalWeight > 0 &&
+    totalWeightedValue > 0 &&
+    effectiveDropEvGp(drop) > 0 &&
+    drop.pref !== "unid" &&
+    drop.pref !== "alch" &&
+    drop.pref !== "bury" &&
+    drop.pref !== "skip";
+
+  return normalized.map((row, index) => {
+    const weightChance = row.weight !== null && totalWeight > 0 ? row.weight / totalWeight : null;
+    const share =
+      canDeriveWeightedShare && weightedValues[index] > 0
+        ? weightedValues[index] / totalWeightedValue
+        : null;
+
+    return {
+      ...row,
+      chance: row.chance ?? weightChance,
+      evGp: share === null ? null : effectiveDropEvGp(drop) * share,
+      shareOfParentPct: share === null ? null : share * 100
+    };
+  });
+}
+
+function lootValueDetails(drop: LootBreakdownEntry): LootDropValueDetailViewModel[] {
+  const effectiveEvGp = effectiveDropEvGp(drop);
+  const rows: LootDropValueDetailViewModel[] = [
+    { label: "Post-trip EV/kill", value: `${formatNumber(effectiveEvGp, 1)} gp`, tone: "default" },
+    { label: "Sale value", value: `${formatNumber(drop.saleValue)} gp`, tone: "muted" },
+    { label: "Alch value", value: `${formatNumber(drop.alchValue)} gp`, tone: "muted" },
+    { label: "Slot fraction", value: formatNumber(drop.slotFrac, 2), tone: "muted" }
+  ];
+
+  if (drop._displaced) {
+    rows.push({
+      label: "Pre-displacement EV",
+      value: `${formatNumber(drop.evGp, 1)} gp`,
+      tone: "warning"
+    });
+  }
+  if (drop.prayerXp > 0) {
+    rows.push({
+      label: "Bury prayer XP",
+      value: `${formatNumber(drop.chance * drop.qtyAvg * drop.prayerXp, 1)} xp/kill`,
+      tone: "muted"
+    });
+  }
+  const stateLabel = lootRowStateLabel(drop);
+  if (stateLabel) rows.push({ label: "Trip state", value: stateLabel, tone: "warning" });
+
+  return rows;
+}
+
+function cleanNullableNumber(value: number | null): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function lootPriceHistoryContext(
+  drop: LootBreakdownEntry,
+  historyByItem: SimulationViewModelOptions["lootPriceHistoryByItem"] = {}
+): LootPriceHistoryContextViewModel {
+  const itemId = drop.key ?? null;
+  if (!itemId) {
+    return {
+      itemId: null,
+      itemLabel: drop.name,
+      tracked: false,
+      latestPrice: null,
+      baselinePrice: null,
+      gpDelta: null,
+      percentDelta: null,
+      latestLabel: null,
+      baselineLabel: null,
+      statusLabel: "No item key"
+    };
+  }
+
+  const history = historyByItem[itemId];
+  if (!history) {
+    return {
+      itemId,
+      itemLabel: drop.name,
+      tracked: false,
+      latestPrice: null,
+      baselinePrice: null,
+      gpDelta: null,
+      percentDelta: null,
+      latestLabel: null,
+      baselineLabel: null,
+      statusLabel: "No local history"
+    };
+  }
+
+  return {
+    itemId,
+    itemLabel: history.itemLabel ?? drop.name,
+    tracked: true,
+    latestPrice: cleanNullableNumber(history.latestPrice),
+    baselinePrice: cleanNullableNumber(history.baselinePrice),
+    gpDelta: cleanNullableNumber(history.gpDelta),
+    percentDelta: cleanNullableNumber(history.percentDelta),
+    latestLabel: history.latestLabel,
+    baselineLabel: history.baselineLabel,
+    statusLabel: "Tracked locally"
+  };
+}
+
+function actionImpactNotes(
+  action: LootAction,
+  drop: LootBreakdownEntry,
+  natureRuneCost: number
+): string[] {
+  const notes: string[] = [];
+  const rollsPerKill = drop.chance * drop.qtyAvg;
+
+  if (action === "bury" && drop.isBone && drop.prayerXp > 0) {
+    notes.push(`${formatNumber(rollsPerKill * drop.prayerXp, 1)} prayer XP/kill`);
+  }
+  if (action === "alch") {
+    notes.push(`${formatNumber(Math.max(0, drop.alchValue - natureRuneCost))} gp/item after rune`);
+    notes.push(`${formatNumber(rollsPerKill, 2)} casts/kill`);
+  }
+  if (action === "unid" && drop.isHerb) notes.push("Uses unidentified herb value");
+  if (action === "value" && drop.isHerb) notes.push("Keeps high-value herb rolls");
+  if (action === "value" && drop.tag === "gem") notes.push("Keeps high-value jewel rolls");
+  if (action === "skip") notes.push("Leaves the parent row out");
+  return notes;
+}
+
+function createLootValueComposition(trip: TripLootSupplyResult): LootValueCompositionViewModel {
+  const positiveDrops = trip.lootBreakdown
+    .map((drop) => ({
+      drop,
+      contribution: effectiveDropEvGp(drop)
+    }))
+    .filter((entry) => entry.contribution > 0)
+    .sort((left, right) => right.contribution - left.contribution);
+  const positiveGpPerKill = positiveDrops.reduce((sum, entry) => sum + entry.contribution, 0);
+  const visibleDrops = positiveDrops.slice(0, 8);
+  const hiddenDrops = positiveDrops.slice(8);
+  const rows: LootValueCompositionRowViewModel[] = visibleDrops.map(({ drop, contribution }) => ({
+    rowId: drop.rowId,
+    name: drop.name,
+    action: drop.pref,
+    actionLabel: lootActionLabel(drop.pref),
+    gpPerKill: contribution,
+    shareOfPositivePct: positiveGpPerKill > 0 ? (contribution / positiveGpPerKill) * 100 : null,
+    stateLabel: lootRowStateLabel(drop),
+    childCount: Array.isArray(drop._expand) ? drop._expand.length : 0,
+    isOther: false
+  }));
+  const otherGpPerKill = hiddenDrops.reduce((sum, entry) => sum + entry.contribution, 0);
+
+  if (otherGpPerKill > 0) {
+    rows.push({
+      rowId: null,
+      name: "Other drops",
+      action: null,
+      actionLabel: "Mixed",
+      gpPerKill: otherGpPerKill,
+      shareOfPositivePct:
+        positiveGpPerKill > 0 ? (otherGpPerKill / positiveGpPerKill) * 100 : null,
+      stateLabel: null,
+      childCount: hiddenDrops.reduce(
+        (sum, entry) => sum + (Array.isArray(entry.drop._expand) ? entry.drop._expand.length : 0),
+        0
+      ),
+      isOther: true
+    });
+  }
+
+  const residualGpPerKill = trip.gpPerKill - positiveGpPerKill;
+  const note =
+    Math.abs(residualGpPerKill) >= 0.05
+      ? `Displayed GP/kill differs by ${formatNumber(residualGpPerKill, 1)} gp because trip state or zero-value rows are applied outside the positive-contributor list.`
+      : null;
+
+  return {
+    rows,
+    positiveGpPerKill,
+    displayedGpPerKill: trip.gpPerKill,
+    residualGpPerKill,
+    note
+  };
+}
+
+const MONEY_WARNING_CODES = new Set([
+  "missing-price",
+  "missing-alch-value",
+  "price-alias-used",
+  "price-fallback-used",
+  "approximate-data-source"
+]);
+
+function warningViewModel(warning: SimulationWarning): CalculationWarningViewModel {
+  return {
+    code: warning.code,
+    severity: warning.severity,
+    message: warning.message.replace(/\s+/g, " ").slice(0, 240)
+  };
+}
+
+function calculationWarningViewModels(
+  warnings: readonly SimulationWarning[]
+): CalculationWarningViewModel[] {
+  const seen = new Set<string>();
+  const out: CalculationWarningViewModel[] = [];
+
+  for (const warning of warnings) {
+    const item = warningViewModel(warning);
+    const key = `${item.code}:${item.message}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
+  }
+
+  return out;
 }
 
 function tripInputFor(
@@ -271,7 +893,8 @@ function createLootRows(
   input: TripLootSupplyInput,
   context: SimulationContext,
   currentTrip: TripLootSupplyResult,
-  lootPrefs: Record<string, LootAction | string | undefined>
+  lootPrefs: Record<string, LootAction | string | undefined>,
+  lootPriceHistoryByItem: SimulationViewModelOptions["lootPriceHistoryByItem"] = {}
 ): {
   rows: LootDropRowViewModel[];
   defaultEffectiveNetGpPerHour: number;
@@ -293,10 +916,17 @@ function createLootRows(
       const candidatePrefs: Record<string, LootAction> =
         action === defaultDrop.pref ? {} : { [drop.rowId]: action };
       const candidate = simulateWithLootPrefs(input, context, candidatePrefs);
+      const candidateDrop = candidate.lootBreakdown.find((entry) => entry.rowId === drop.rowId) ?? drop;
       return {
         action,
+        label: lootActionLabel(action),
         effectiveNetGpPerHour: candidate.effectiveNetGpPerHour,
-        deltaNetGpPerHour: candidate.effectiveNetGpPerHour - defaultTrip.effectiveNetGpPerHour
+        deltaNetGpPerHour: candidate.effectiveNetGpPerHour - defaultTrip.effectiveNetGpPerHour,
+        gpPerKillContribution: effectiveDropEvGp(candidateDrop),
+        isSelected: action === drop.pref,
+        isDefault: action === defaultDrop.pref,
+        stateLabel: lootRowStateLabel(candidateDrop),
+        notes: actionImpactNotes(action, candidateDrop, natureRuneCost)
       };
     });
     const selectedImpact = actionImpacts.find((impact) => impact.action === drop.pref);
@@ -311,7 +941,10 @@ function createLootRows(
       price: drop.price,
       saleValue: drop.saleValue,
       evGp: drop.evGp,
+      effectiveEvGp: effectiveDropEvGp(drop),
+      stateLabel: lootRowStateLabel(drop),
       pref: drop.pref,
+      prefLabel: lootActionLabel(drop.pref),
       defaultPref: defaultDrop.pref,
       availableActions,
       actionImpacts,
@@ -320,7 +953,9 @@ function createLootRows(
       prayerXp: drop.prayerXp,
       alchValue: drop.alchValue,
       slotFrac: drop.slotFrac,
-      expandedRows: expandedRows(drop)
+      expandedRows: expandedRows(drop),
+      valueDetails: lootValueDetails(drop),
+      historyContext: lootPriceHistoryContext(drop, lootPriceHistoryByItem)
     };
   });
 
@@ -456,7 +1091,7 @@ export function createSimulationViewModel(
   cannonByMonster: CannonByMonsterState = {},
   lootPrefs: Record<string, LootAction | string | undefined> = {},
   lootSettingsByMonster: LootSettingsByMonsterState = {},
-  options: { includeLootRows?: boolean } = {}
+  options: SimulationViewModelOptions = {}
 ): SimulationViewModel {
   const request = formToSimulationRequest(form, context.gameData);
   const combat = simulateCombat(request, context);
@@ -484,17 +1119,24 @@ export function createSimulationViewModel(
           currentDeltaNetGpPerHour: 0,
           overrideCount: 0
         }
-      : createLootRows(tripInput, context, trip, lootPrefs);
+      : createLootRows(tripInput, context, trip, lootPrefs, options.lootPriceHistoryByItem);
+  const calculationWarnings = calculationWarningViewModels([...combat.warnings, ...trip.warnings]);
+  const moneyWarnings = calculationWarnings.filter((warning) =>
+    MONEY_WARNING_CODES.has(warning.code)
+  );
 
   return {
     request,
     combat,
+    monsterCard: monsterCardFromResult(request, context, combat, options.monsterCard),
     trip,
     playerEffectiveXpPerHour,
     cannonEffectiveXpPerHour,
     effectiveXpPerHour,
     totalXpPerHour,
-    warnings: [...combat.warnings, ...trip.warnings].map((warning) => warning.message),
+    warnings: calculationWarnings.map((warning) => warning.message),
+    calculationWarnings,
+    moneyWarnings,
     topLoot: trip.lootBreakdown
       .filter((drop) => drop.evGp > 0 || drop.prayerXp > 0)
       .sort((left, right) => right.evGp - left.evGp)
@@ -510,7 +1152,8 @@ export function createSimulationViewModel(
     lootSummary: {
       defaultEffectiveNetGpPerHour: lootRows.defaultEffectiveNetGpPerHour,
       currentDeltaNetGpPerHour: lootRows.currentDeltaNetGpPerHour,
-      overrideCount: lootRows.overrideCount
+      overrideCount: lootRows.overrideCount,
+      valueComposition: createLootValueComposition(trip)
     }
   };
 }
@@ -864,7 +1507,7 @@ export function createPlannerDomainAdapter(
       startXp: state.currentXp,
       pool,
       lockGear: state.onlyCurrentGear,
-      sustained: form.sustained,
+      sustained: state.averageOverSession,
       maxLevels: 120
     },
     state,

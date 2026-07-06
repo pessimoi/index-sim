@@ -8,6 +8,15 @@ import {
   toggleDenseCompareMonsterIrrelevant
 } from "../app/state/dense-compare";
 import {
+  HIDDEN_GEAR_TIERS_STORAGE_KEY,
+  HIDDEN_GEAR_TIERS_VERSION,
+  HiddenGearTiersStateSchema,
+  filterHiddenGearTierOptions,
+  gearTierForItemId,
+  hideAllGearTiers,
+  setHiddenGearTier
+} from "../app/state/hidden-gear-tiers";
+import {
   LOOT_PREFS_STORAGE_KEY,
   LOOT_PREFS_VERSION,
   LootPrefsStateSchema,
@@ -56,19 +65,83 @@ const legacyManualOverrideFormShape = withoutKeys(DEFAULT_FORM_STATE, ["manualOv
 
 const legacyTripShape = withoutKeys(DEFAULT_FORM_STATE.trip, [
   "altarSeconds",
+  "bankSeconds",
+  "dbaRestore",
   "foodCount",
   "foodPerKillOverride",
+  "potionDoses",
+  "potionSets",
   "prayerPotionDoses",
   "prayerPotionSets",
   "protect",
   "recoilRings",
+  "runeSlots",
   "safespot",
   "scarceSpot",
+  "singleDose",
   "targetsAtSpot",
   "respawnSeconds"
 ] as const);
 
 describe("versioned rewrite persistence", () => {
+  it("classifies hidden gear tiers without mixing black d-hide and black metal", () => {
+    expect(gearTierForItemId("bronze_sword")).toBe("bronze");
+    expect(gearTierForItemId("black_full_helm")).toBe("black");
+    expect(gearTierForItemId("black_dhide_body")).toBeNull();
+    expect(gearTierForItemId("green_dhide_body")).toBe("green_dhide");
+    expect(gearTierForItemId("leather_body")).toBe("leather");
+    expect(gearTierForItemId("wizard_robe_top")).toBe("mage_1def");
+    expect(gearTierForItemId("yew_longbow")).toBe("low_bows");
+    expect(gearTierForItemId("magic_shortbow")).toBeNull();
+    expect(gearTierForItemId("unknown_future_item")).toBeNull();
+  });
+
+  it("filters hidden gear tiers while preserving none and the current value", () => {
+    const hidden = setHiddenGearTier({}, "bronze", true);
+    const options = [
+      { id: "none", label: "None" },
+      { id: "bronze_sword", label: "Bronze sword" },
+      { id: "iron_sword", label: "Iron sword" }
+    ];
+
+    expect(filterHiddenGearTierOptions(options, hidden, "bronze_sword")).toEqual(options);
+    expect(filterHiddenGearTierOptions(options, hidden, "iron_sword")).toEqual([
+      { id: "none", label: "None" },
+      { id: "iron_sword", label: "Iron sword" }
+    ]);
+  });
+
+  it("saves and loads versioned hidden gear tier preferences", () => {
+    const storage = createMemoryStorage();
+    const options = {
+      key: HIDDEN_GEAR_TIERS_STORAGE_KEY,
+      version: HIDDEN_GEAR_TIERS_VERSION,
+      schema: HiddenGearTiersStateSchema,
+      storage,
+      now: () => new Date("2026-07-06T12:00:00.000Z")
+    };
+    const hidden = setHiddenGearTier(hideAllGearTiers(), "bronze", false);
+
+    savePersisted(options, hidden);
+    const loaded = loadPersisted(options);
+
+    expect(loaded.status).toBe("loaded");
+    if (loaded.status === "loaded") {
+      expect(loaded.value.bronze).toBeUndefined();
+      expect(loaded.value.iron).toBe(true);
+      expect(Object.keys(loaded.value)).not.toContain("dragon");
+    }
+  });
+
+  it("rejects unknown hidden gear tier keys from persisted state", () => {
+    expect(() =>
+      HiddenGearTiersStateSchema.parse({
+        bronze: true,
+        dragon: true
+      })
+    ).toThrow();
+  });
+
   it("saves and loads a versioned setup envelope", () => {
     const storage = createMemoryStorage();
     const options = {
@@ -354,6 +427,44 @@ describe("versioned rewrite persistence", () => {
     }
   });
 
+  it("persists potion, auto-bank and reserve trip controls in the rewrite setup envelope", () => {
+    const storage = createMemoryStorage();
+    const options = {
+      key: REWRITE_SETUP_STORAGE_KEY,
+      version: REWRITE_SETUP_VERSION,
+      schema: SavedSetupSchema,
+      storage,
+      now: () => new Date("2026-07-05T12:00:00.000Z")
+    };
+    const setup = savedSetupFromForm({
+      ...DEFAULT_FORM_STATE,
+      trip: {
+        ...DEFAULT_FORM_STATE.trip,
+        bankSeconds: null,
+        dbaRestore: false,
+        potionDoses: 6,
+        potionSets: 2,
+        runeSlots: 4,
+        singleDose: true
+      }
+    });
+
+    savePersisted(options, setup);
+    const loaded = loadPersisted(options);
+
+    expect(loaded.status).toBe("loaded");
+    if (loaded.status === "loaded") {
+      expect(loaded.value.form.trip).toMatchObject({
+        bankSeconds: null,
+        dbaRestore: false,
+        potionDoses: 6,
+        potionSets: 2,
+        runeSlots: 4,
+        singleDose: true
+      });
+    }
+  });
+
   it("persists manual prayer restore trip controls in the rewrite setup envelope", () => {
     const storage = createMemoryStorage();
     const options = {
@@ -505,15 +616,21 @@ describe("versioned rewrite persistence", () => {
     });
 
     expect(parsed.data.form.trip).toMatchObject({
+      bankSeconds: null,
+      dbaRestore: true,
       safespot: null,
       protect: "none",
       recoilRings: 1,
       foodCount: null,
       foodPerKillOverride: null,
+      potionDoses: 4,
+      potionSets: 1,
       prayerPotionSets: null,
       prayerPotionDoses: null,
+      runeSlots: 2,
       altarSeconds: null,
       scarceSpot: false,
+      singleDose: false,
       targetsAtSpot: null,
       respawnSeconds: null
     });
@@ -647,13 +764,19 @@ describe("versioned rewrite persistence", () => {
           trip: {
             ...DEFAULT_FORM_STATE.trip,
             altarSeconds: -1,
+            bankSeconds: -1,
+            dbaRestore: "no",
             foodCount: 99,
             foodPerKillOverride: -0.5,
+            potionDoses: 999,
+            potionSets: -1,
             prayerPotionDoses: "many",
             prayerPotionSets: -2,
             protect: "ranged",
             recoilRings: 0,
+            runeSlots: -2,
             scarceSpot: "yes",
+            singleDose: "yes",
             targetsAtSpot: 0,
             respawnSeconds: 9999
           }
@@ -663,13 +786,19 @@ describe("versioned rewrite persistence", () => {
 
     expect(parsed.data.form.trip).toMatchObject({
       altarSeconds: null,
+      bankSeconds: null,
+      dbaRestore: true,
       foodCount: null,
       foodPerKillOverride: null,
+      potionDoses: 4,
+      potionSets: 1,
       prayerPotionDoses: null,
       prayerPotionSets: null,
       protect: "none",
       recoilRings: 1,
+      runeSlots: 2,
       scarceSpot: false,
+      singleDose: false,
       targetsAtSpot: null,
       respawnSeconds: null
     });

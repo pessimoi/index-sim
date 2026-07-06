@@ -61,6 +61,10 @@ async function resultMetricSnapshot(page: Page) {
   return metricSnapshot(page.getByLabel("Simulation results"), RESULT_NUMERIC_LABELS);
 }
 
+function activeMonsterDefence(card: Locator) {
+  return card.getByLabel("Monster defence").locator('[aria-current="true"]');
+}
+
 async function denseNumericSnapshot(table: Locator, rowName: RegExp) {
   const row = table.getByRole("row", { name: rowName });
   await expect(row).toBeVisible();
@@ -85,6 +89,15 @@ test("loads the dense combat spreadsheet root", async ({ page }) => {
   await expect(page.getByLabel("Workbench shell")).toBeVisible();
   await expect(page.getByLabel("Player sidebar")).toBeVisible();
   await expect(page.getByLabel("Workbench center")).toBeVisible();
+  await expect(page.getByLabel("Monster card")).toBeVisible();
+  const sidebarBox = await page.getByLabel("Player sidebar").boundingBox();
+  const centerBox = await page.getByLabel("Workbench center").boundingBox();
+  const cardBox = await page.getByLabel("Monster card").boundingBox();
+  expect(sidebarBox).not.toBeNull();
+  expect(centerBox).not.toBeNull();
+  expect(cardBox).not.toBeNull();
+  expect(centerBox!.x).toBeGreaterThan(sidebarBox!.x);
+  expect(cardBox!.x).toBeGreaterThan(centerBox!.x);
   await expect(page.getByLabel("Workbench tabs").getByRole("button")).toHaveText([
     "Stats",
     "Melee",
@@ -102,6 +115,10 @@ test("loads the dense combat spreadsheet root", async ({ page }) => {
   await expect(page.getByLabel("Dense combat spreadsheet")).toBeVisible();
   await expect(page.getByLabel("Combat setup")).toBeVisible();
   await expect(page.getByLabel("Simulation results")).toBeVisible();
+  await expect(page.getByLabel("Monster stats")).toBeVisible();
+  await expect(activeMonsterDefence(page.getByLabel("Monster card"))).toContainText(
+    "Slash defence"
+  );
   await expect(page.getByRole("table", { name: "All monsters" })).toBeVisible();
   await expect(page.getByText("All monsters")).toBeVisible();
   await expect(page.getByText("DPS").first()).toBeVisible();
@@ -117,6 +134,61 @@ test("loads the dense combat spreadsheet root", async ({ page }) => {
   await expect(page.getByText("/api/scrape")).toHaveCount(0);
 });
 
+test("switches the target through MonsterCard and keeps shell state in sync", async ({ page }) => {
+  await page.goto("/");
+  const card = page.getByLabel("Monster card");
+  const table = page.getByRole("table", { name: "All monsters" });
+  const beforeMetrics = await resultMetricSnapshot(page);
+
+  await expect(card.getByRole("heading", { name: "Giant" })).toBeVisible();
+  await expect(card.getByLabel("Current setup state")).toContainText("Default setup");
+  await card.getByLabel("Target", { exact: true }).selectOption("rock_crab");
+
+  await expect(page.getByLabel("Setup context").getByRole("heading", { name: "Rock Crab" }))
+    .toBeVisible();
+  await expect(card.getByRole("heading", { name: "Rock Crab" })).toBeVisible();
+  const afterMetrics = await resultMetricSnapshot(page);
+  expect(Object.keys(beforeMetrics).some((key) => beforeMetrics[key] !== afterMetrics[key])).toBe(
+    true
+  );
+
+  const rockCrabRow = table.getByRole("row", { name: /Rock Crab/ });
+  await expect(rockCrabRow.locator("td").first()).toContainText(">");
+
+  await card.getByLabel("Drop filter", { exact: true }).fill("big_bones");
+  await expect(page.locator("#dense-drop-filter")).toHaveValue("big_bones");
+});
+
+test("updates MonsterCard active defence for melee stance, ranged and magic", async ({ page }) => {
+  await page.goto("/");
+  const card = page.getByLabel("Monster card");
+
+  await expect(activeMonsterDefence(card)).toContainText("Slash defence");
+  await page.getByLabel("STYLE", { exact: true }).selectOption("controlled");
+  await expect(activeMonsterDefence(card)).toContainText("Stab defence");
+
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Ranged" }).click();
+  await expect(activeMonsterDefence(card)).toContainText("Ranged defence");
+
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Magic" }).click();
+  await expect(activeMonsterDefence(card)).toContainText("Magic defence");
+});
+
+test("places MonsterCard after the active pane on mobile", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.goto("/");
+
+  const shellOrder = await page.locator(".workbench-shell > *").evaluateAll((nodes) =>
+    nodes.map((node) => node.getAttribute("aria-label"))
+  );
+  expect(shellOrder).toEqual(["Player sidebar", "Workbench center", "Monster card"]);
+
+  const card = page.getByLabel("Monster card");
+  await expect(card).toBeVisible();
+  await expect(card.getByLabel("Target", { exact: true })).toBeVisible();
+  await expect(activeMonsterDefence(card)).toBeVisible();
+});
+
 test("recomputes the Planner tab workflow from visible planner controls", async ({ page }) => {
   await page.goto("/");
   await page.getByLabel("Workbench tabs").getByRole("button", { name: "Planner" }).click();
@@ -129,7 +201,9 @@ test("recomputes the Planner tab workflow from visible planner controls", async 
   await expect(planner.getByLabel("Planner gear timeline")).toBeVisible();
   await expect(planner.getByRole("table", { name: "Planner training order" })).toBeVisible();
 
-  await expect(planner.getByLabel("Avg over session")).toBeDisabled();
+  await planner.getByLabel("Avg over session").uncheck();
+  await expect(planner.getByText("pending")).toBeVisible();
+  await planner.getByLabel("Avg over session").check();
   await planner.getByLabel("Only current gear").check();
   await planner.getByLabel("Only current gear").uncheck();
   await planner.getByLabel("Planner pool Iron scimitar").uncheck();
@@ -147,11 +221,13 @@ test("recomputes the Planner tab workflow from visible planner controls", async 
   await expect(planner.getByLabel("Planner summary")).toContainText("Steps");
   await expect(planner.getByRole("img", { name: "DPS vs cumulative XP chart" })).toBeVisible();
   await expect(planner.getByLabel("Planner gear timeline")).toContainText(/XP|No gear unlocks/);
+  await expect(planner.getByLabel("Planner warnings")).toContainText("manual requirement policy");
 
   await page.waitForFunction(() => {
     const saved = window.localStorage.getItem("index-sim:planner-ui") ?? "";
     return (
       saved.includes('"metric":"dps"') &&
+      saved.includes('"averageOverSession":true') &&
       saved.includes('"strength":274000') &&
       saved.includes('"strength":63') &&
       saved.includes('"attack":true') &&
@@ -271,8 +347,8 @@ test("reviews and imports compatible legacy setup data", async ({ page }) => {
       DPS: "3.06",
       "MAX HIT": "14.0",
       "HIT %": "78.7%",
-      "XP/HR": "21,226",
-      "GP/HR NET": "-285,402",
+      "XP/HR": "17,756",
+      "GP/HR NET": "-238,749",
       "KILLS/HR": "109",
       "GP/KILL": "613",
       "SUPPLY/KILL": "5,292"
@@ -537,6 +613,51 @@ test("edits combat equipment panes and persists style-specific selections", asyn
   ).toHaveValue("fire_wave");
 });
 
+test("filters hidden gear tiers while keeping current selections", async ({ page }) => {
+  await page.goto("/");
+  const tabs = page.getByLabel("Workbench tabs");
+
+  await tabs.getByRole("button", { name: "Melee" }).click();
+  const meleePane = page.getByLabel("Equipment loadout");
+  await meleePane.getByLabel("Body", { exact: true }).selectOption("iron_platebody");
+
+  await tabs.getByRole("button", { name: "Settings" }).click();
+  const settings = page.locator('[aria-label="Hidden gear tiers"]');
+  await expect(settings).toContainText("Gear menu");
+  await settings.getByLabel("Hide iron gear").check();
+  await expect(settings).toContainText("1 hidden");
+
+  await tabs.getByRole("button", { name: "Melee" }).click();
+  await expect(meleePane.getByLabel("Body", { exact: true })).toHaveValue("iron_platebody");
+  const helmOptions = await meleePane.getByLabel("Helm", { exact: true }).locator("option").allTextContents();
+  const bodyOptions = await meleePane.getByLabel("Body", { exact: true }).locator("option").allTextContents();
+  expect(helmOptions.join("\n")).not.toContain("Iron full helm");
+  expect(bodyOptions.join("\n")).toContain("Iron platebody");
+  expect(bodyOptions.join("\n")).toContain("None");
+
+  await page.waitForFunction(() => {
+    const setup = window.localStorage.getItem("index-sim:rewrite-setup") ?? "";
+    const hidden = window.localStorage.getItem("index-sim:hidden-gear-tiers") ?? "";
+    return setup.includes('"body":"iron_platebody"') && hidden.includes('"iron":true');
+  });
+
+  await page.reload();
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Settings" }).click();
+  await expect(
+    page.locator('[aria-label="Hidden gear tiers"]').getByLabel("Hide iron gear")
+  ).toBeChecked();
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Melee" }).click();
+  const reloadedMeleePane = page.getByLabel("Equipment loadout");
+  await expect(reloadedMeleePane.getByLabel("Body", { exact: true })).toHaveValue(
+    "iron_platebody"
+  );
+  const reloadedHelmOptions = await reloadedMeleePane
+    .getByLabel("Helm", { exact: true })
+    .locator("option")
+    .allTextContents();
+  expect(reloadedHelmOptions.join("\n")).not.toContain("Iron full helm");
+});
+
 test("creates, restores and removes monster-specific custom setups", async ({ page }) => {
   await page.goto("/");
   const tabs = page.getByLabel("Workbench tabs");
@@ -649,7 +770,7 @@ test("filters dense compare rows and persists hidden monsters", async ({ page })
   await expect.poll(async () => table.locator("tbody tr").count()).toBeGreaterThan(8);
 
   const unfilteredCount = await table.locator("tbody tr").count();
-  await page.getByLabel("Drop filter").fill("big_bones");
+  await page.getByLabel("Monster comparison").getByLabel("Drop filter").fill("big_bones");
   await expect(table).toContainText("Giant");
   await expect.poll(async () => table.locator("tbody tr").count()).toBeLessThan(unfilteredCount);
   await page.getByRole("button", { name: "Reset filters" }).click();
@@ -768,17 +889,17 @@ test("matches browser-rendered dense numeric snapshots", async ({ page }) => {
       dps: "1.96",
       ttk: "45.6s",
       killsPerHour: "73",
-      xpPerHour: "16,742",
+      xpPerHour: "14,525",
       gpPerKill: "646",
       gpPerHour: "47,327",
-      netGpPerHour: "-224,605"
+      netGpPerHour: "-194,861"
     },
     rangedSafespotResults: {
       DPS: "1.96",
       "MAX HIT": "10.0",
       "HIT %": "70.6%",
-      "XP/HR": "16,742",
-      "GP/HR NET": "-224,605",
+      "XP/HR": "14,525",
+      "GP/HR NET": "-194,861",
       "KILLS/HR": "73",
       "GP/KILL": "646",
       "SUPPLY/KILL": "5,315"
@@ -789,17 +910,17 @@ test("matches browser-rendered dense numeric snapshots", async ({ page }) => {
       dps: "2.24",
       ttk: "32.3s",
       killsPerHour: "326",
-      xpPerHour: "45,989",
+      xpPerHour: "37,421",
       gpPerKill: "89",
       gpPerHour: "28,904",
-      netGpPerHour: "-394,490"
+      netGpPerHour: "-320,994"
     },
     cannonRangedResults: {
       DPS: "2.24",
       "MAX HIT": "10.0",
       "HIT %": "80.7%",
-      "XP/HR": "45,989",
-      "GP/HR NET": "-394,490",
+      "XP/HR": "37,421",
+      "GP/HR NET": "-320,994",
       "KILLS/HR": "326",
       "GP/KILL": "89",
       "SUPPLY/KILL": "1,929"
@@ -810,8 +931,8 @@ test("matches browser-rendered dense numeric snapshots", async ({ page }) => {
       "Balls/hr": "1,861",
       "Balls/kill": "4.41",
       "Cannon Ranged XP/hr": "45,075",
-      "Effective XP/hr": "45,989",
-      "Effective net GP/hr": "-394,490",
+      "Effective XP/hr": "37,421",
+      "Effective net GP/hr": "-320,994",
       "Ball cost/hr": "335,006",
       "Ball cost/kill": "793",
       "Ball price": "180",
@@ -990,6 +1111,133 @@ test("updates manual food controls and recoil ring count", async ({ page }) => {
   await expect(reloadedTrip.getByLabel("Recoil rings")).toHaveValue("6");
 });
 
+test("updates trip food, banking and inventory reserve controls across styles", async ({ page }) => {
+  await page.goto("/");
+  const tabs = page.getByLabel("Workbench tabs");
+
+  await tabs.getByRole("button", { name: "Trip" }).click();
+  const trip = page.locator('section[aria-label="Trip assumptions"]');
+  const summary = page.locator('[aria-label="Trip summary"]');
+
+  await expect(trip.getByLabel("Food", { exact: true })).toHaveValue("lobster");
+  await expect(trip.getByLabel("Bank time")).toHaveValue("auto");
+  await expect(trip.getByLabel("Bank sec")).toBeDisabled();
+  await expect(trip.getByLabel("Recover ammo")).toBeDisabled();
+  await expect(trip.getByLabel("DBA restore")).toBeDisabled();
+  await expect(trip.getByLabel("Rune slots")).toBeDisabled();
+
+  await trip.getByLabel("Food", { exact: true }).selectOption("swordfish");
+  await trip.getByLabel("Bank time").selectOption("manual");
+  await expect(trip.getByLabel("Bank sec")).toBeEnabled();
+  await trip.getByLabel("Bank sec").fill("120");
+  await trip.getByLabel("Teleport item").uncheck();
+
+  await expect(summary).toContainText("Swordfish");
+  await expect(summary).toContainText("Manual 120s");
+  await expect(summary).toContainText("Teleport");
+  await expect(summary).toContainText("Off");
+
+  await tabs.getByRole("button", { name: "Ranged" }).click();
+  await tabs.getByRole("button", { name: "Trip" }).click();
+  await expect(trip.getByLabel("Recover ammo")).toBeEnabled();
+  await trip.getByLabel("Recover ammo").uncheck();
+  await expect(summary).toContainText("Ammo recovery");
+
+  await tabs.getByRole("button", { name: "Melee" }).click();
+  await page.getByLabel("Boost", { exact: true }).selectOption("dba_spec");
+  await tabs.getByRole("button", { name: "Trip" }).click();
+  await expect(trip.getByLabel("DBA restore")).toBeEnabled();
+  await trip.getByLabel("DBA restore").uncheck();
+  await expect(summary).toContainText("DBA restore");
+
+  await tabs.getByRole("button", { name: "Magic" }).click();
+  await tabs.getByRole("button", { name: "Trip" }).click();
+  await expect(trip.getByLabel("Rune slots")).toBeEnabled();
+  await trip.getByLabel("Rune slots").fill("4");
+  await expect(summary).toContainText("Rune slots");
+
+  await page.waitForFunction(() => {
+    const saved = window.localStorage.getItem("index-sim:rewrite-setup") ?? "";
+    return (
+      saved.includes('"foodKey":"swordfish"') &&
+      saved.includes('"bankSeconds":120') &&
+      saved.includes('"teleport":false') &&
+      saved.includes('"recoverAmmo":false') &&
+      saved.includes('"dbaRestore":false') &&
+      saved.includes('"runeSlots":4')
+    );
+  });
+
+  await page.reload();
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Trip" }).click();
+  const reloadedTrip = page.locator('section[aria-label="Trip assumptions"]');
+  await expect(reloadedTrip.getByLabel("Food", { exact: true })).toHaveValue("swordfish");
+  await expect(reloadedTrip.getByLabel("Bank time")).toHaveValue("manual");
+  await expect(reloadedTrip.getByLabel("Bank sec")).toHaveValue("120");
+  await expect(reloadedTrip.getByLabel("Teleport item")).not.toBeChecked();
+
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Ranged" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Trip" }).click();
+  await expect(reloadedTrip.getByLabel("Recover ammo")).toBeEnabled();
+  await expect(reloadedTrip.getByLabel("Recover ammo")).not.toBeChecked();
+
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Melee" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Trip" }).click();
+  await expect(reloadedTrip.getByLabel("DBA restore")).toBeEnabled();
+  await expect(reloadedTrip.getByLabel("DBA restore")).not.toBeChecked();
+
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Magic" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Trip" }).click();
+  await expect(reloadedTrip.getByLabel("Rune slots")).toBeEnabled();
+  await expect(reloadedTrip.getByLabel("Rune slots")).toHaveValue("4");
+});
+
+test("updates trip potion carry controls and grouped potion summary", async ({ page }) => {
+  await page.goto("/");
+  const tabs = page.getByLabel("Workbench tabs");
+  await tabs.getByRole("button", { name: "Melee" }).click();
+  await page.getByLabel("Boost", { exact: true }).selectOption("super_att");
+  await tabs.getByRole("button", { name: "Trip" }).click();
+
+  const trip = page.locator('section[aria-label="Trip assumptions"]');
+  const summary = page.locator('[aria-label="Trip summary"]');
+
+  await expect(trip.getByLabel("Single-dose")).not.toBeChecked();
+  await expect(trip.getByLabel("Potion vials")).toBeEnabled();
+  await expect(trip.getByLabel("Potion doses")).toBeDisabled();
+  await trip.getByLabel("Potion vials").fill("2");
+
+  await expect(summary).toContainText("Potion slots");
+  await expect(summary).toContainText("Potion carry");
+  await expect(summary).toContainText("2 vials/type");
+  await expect(summary).toContainText("Potion parts");
+
+  await trip.getByLabel("Single-dose").check();
+  await expect(trip.getByLabel("Potion vials")).toBeDisabled();
+  await expect(trip.getByLabel("Potion doses")).toBeEnabled();
+  await trip.getByLabel("Potion doses").fill("6");
+  await expect(summary).toContainText("6 doses/type");
+  await page.waitForFunction(() => {
+    const saved = window.localStorage.getItem("index-sim:rewrite-setup") ?? "";
+    return (
+      saved.includes('"singleDose":true') &&
+      saved.includes('"potionSets":2') &&
+      saved.includes('"potionDoses":6') &&
+      saved.includes('"boosts":["super_att"]')
+    );
+  });
+
+  await page.reload();
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Trip" }).click();
+  const reloadedTrip = page.locator('section[aria-label="Trip assumptions"]');
+  await expect(reloadedTrip.getByLabel("Single-dose")).toBeChecked();
+  await expect(reloadedTrip.getByLabel("Potion vials")).toBeDisabled();
+  await expect(reloadedTrip.getByLabel("Potion doses")).toHaveValue("6");
+  await expect(page.locator('[aria-label="Potion slots trip summary"]')).toContainText(
+    "6 doses/type"
+  );
+});
+
 test("updates prayer restore detail controls and keeps the trip summary visible", async ({
   page
 }) => {
@@ -1117,6 +1365,47 @@ test("updates current monster loot actions, reset and optimize", async ({ page }
   await expect(page.locator('[aria-label="Loot action summary"]')).toBeVisible();
 });
 
+test("shows loot value composition, nested detail and action impact detail", async ({ page }) => {
+  await page.goto("/");
+  await page.getByLabel("TARGET", { exact: true }).selectOption("firegiant");
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Loot" }).click();
+
+  const loot = page.locator('section[aria-label="Current monster loot"]');
+  const composition = loot.getByLabel("Loot value composition");
+  const table = page.getByRole("table", { name: "Current monster drops" });
+  await expect(loot).toBeVisible();
+  await expect(composition).toContainText("Other drops");
+  await expect(composition).toContainText("GP/kill");
+
+  const bigBonesRow = table.getByRole("row", { name: /Big bones/ }).first();
+  await bigBonesRow.scrollIntoViewIfNeeded();
+  await bigBonesRow.locator("details").first().locator("summary").click();
+  await expect(page.getByRole("table", { name: /Action impact for Big bones/ })).toContainText(
+    "selected"
+  );
+  await expect(page.getByRole("table", { name: /Action impact for Big bones/ })).toContainText(
+    "prayer XP/kill"
+  );
+  await bigBonesRow.locator("details").last().locator("summary").click();
+  await expect(page.getByLabel("Local price history for Big bones")).toContainText(
+    "No local history"
+  );
+
+  await page.getByLabel(/Action for Big bones/).first().selectOption("loot");
+  await expect(composition).toContainText("Big bones");
+  await expect(composition).toContainText("Loot");
+
+  const nestedRow = table.getByRole("row", { name: /Random herb/ }).first();
+  await nestedRow.scrollIntoViewIfNeeded();
+  await nestedRow.locator("details").last().locator("summary").click();
+  await expect(page.getByRole("table", { name: /Nested rows for Random herb/ })).toContainText(
+    "Ranarr"
+  );
+  await expect(page.getByRole("table", { name: /Nested rows for Random herb/ })).toContainText(
+    "Weight"
+  );
+});
+
 test("matches browser-rendered numeric snapshots for loot action and trip overrides", async ({
   page
 }) => {
@@ -1185,7 +1474,7 @@ test("matches browser-rendered numeric snapshots for loot action and trip overri
       "Food count": "4",
       "Food/kill": "0.50",
       "Kills/trip": "6.1",
-      "Effective K/hr": "60",
+      "Effective K/hr": "45",
       "Recoil/kill": "4.5 dmg",
       "Recoil gp/kill": "168"
     },
@@ -1193,8 +1482,8 @@ test("matches browser-rendered numeric snapshots for loot action and trip overri
       DPS: "2.59",
       "MAX HIT": "16.4",
       "HIT %": "75.5%",
-      "XP/HR": "26,655",
-      "GP/HR NET": "-117,895",
+      "XP/HR": "20,093",
+      "GP/HR NET": "-88,872",
       "KILLS/HR": "80",
       "GP/KILL": "1,624",
       "SUPPLY/KILL": "3,587"
@@ -1204,6 +1493,12 @@ test("matches browser-rendered numeric snapshots for loot action and trip overri
 
 test("matches browser-rendered numeric snapshots for imported price sets", async ({ page }) => {
   await page.goto("/");
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Settings" }).click();
+  const settings = page.locator('[aria-label="Price data settings"]');
+  const priceSetSummary = settings.locator('[aria-label="Active PriceSet summary"]');
+  await expect(settings).toContainText("Price data");
+  await expect(priceSetSummary).toContainText(/Item prices [0-9,]+/);
+  await expect(priceSetSummary).toContainText(/Alch values [0-9,]+/);
 
   const importedPriceSet = {
     id: "manual-browser-snapshot",
@@ -1214,9 +1509,9 @@ test("matches browser-rendered numeric snapshots for imported price sets", async
     alchValues: { big_bones: 0, lobster: 0 }
   };
 
-  await page
+  await settings
     .locator("label.file-button")
-    .filter({ hasText: "Import prices" })
+    .filter({ hasText: "Import PriceSet" })
     .locator('input[type="file"]')
     .setInputFiles({
       name: "manual-browser-snapshot-prices.json",
@@ -1224,7 +1519,21 @@ test("matches browser-rendered numeric snapshots for imported price sets", async
       buffer: Buffer.from(JSON.stringify(importedPriceSet))
     });
 
+  await expect(priceSetSummary).toContainText("Label Imported fixture prices");
+  await expect(priceSetSummary).toContainText("Source manual");
+  await expect(priceSetSummary).toContainText("Item prices 2");
+  await expect(priceSetSummary).toContainText("Alch values 2");
+  await expect(priceSetSummary).toContainText("Status Imported price set");
+  await expect(settings).toContainText("Imported price set: Imported fixture prices");
   await expect(page.locator(".topbar")).toContainText("Imported fixture prices");
+
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Compare" }).click();
+  await expect(page.locator('[aria-label="Result price warnings"]')).toContainText(
+    "Price warnings"
+  );
+  await expect(page.locator('[aria-label="Result price warnings"]')).toContainText(
+    "using fallback"
+  );
   const importedPrices = await resultMetricSnapshot(page);
 
   expect({
@@ -1241,6 +1550,16 @@ test("matches browser-rendered numeric snapshots for imported price sets", async
       "SUPPLY/KILL": "1,184"
     }
   });
+
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Loot" }).click();
+  await expect(page.locator('[aria-label="Loot price warnings"]')).toContainText(
+    "Price warnings"
+  );
+
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Economy" }).click();
+  await expect(page.locator('[aria-label="Economy price warnings"]')).toContainText(
+    "Price warnings"
+  );
 });
 
 test("looks up hiscores through the same-origin API and applies previewed levels", async ({
@@ -1474,6 +1793,18 @@ test("analyzes and manages browser-local price history in Economy", async ({ pag
   await expect(page.getByLabel("Top fallers")).toContainText("Big bones");
   await expect(page.getByRole("table", { name: "Price movers" })).toContainText("Lobster");
   await expect(page.getByRole("table", { name: "Price movers" })).toContainText("Big bones");
+
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Loot" }).click();
+  const bigBonesRow = page.getByRole("table", { name: "Current monster drops" }).getByRole("row", {
+    name: /Big bones/
+  });
+  await bigBonesRow.locator("details").last().locator("summary").click();
+  const localHistory = page.getByLabel("Local price history for Big bones");
+  await expect(localHistory).toContainText("Tracked locally");
+  await expect(localHistory).toContainText("350");
+  await expect(localHistory).toContainText("500");
+  await expect(localHistory).toContainText("-150");
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Economy" }).click();
 
   await page.getByLabel("Item filter").fill("bones");
   await expect(page.getByRole("table", { name: "Price movers" })).toContainText("Big bones");

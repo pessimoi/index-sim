@@ -7,6 +7,7 @@ import {
   type ItemDefinition,
   type PriceSet
 } from "../domain/shared";
+import { assertUniqueRecordIds } from "./reliability";
 import { parseGameDataSnapshot } from "./schemas/game-data";
 import { createPriceSetFromLegacyRecords } from "./schemas/price-set";
 
@@ -172,6 +173,7 @@ export function createPriceSetFromLegacyGameData(input: LegacyPriceSetInput): Pr
 
 export function createGameDataSnapshotFromLegacy(input: LegacySnapshotInput): GameDataSnapshot {
   const provenance = input.provenance ?? LEGACY_DATA_PROVENANCE;
+  assertUniqueRecordIds(input.gameData.MONSTERS, { label: "legacy monsters" });
   const equipment = createEquipmentRegistry(input.equipment);
   const priceSet = createPriceSetFromLegacyGameData({
     gameData: input.gameData,

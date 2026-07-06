@@ -9,6 +9,7 @@ import {
 
 export const NumericSchema = z.number().finite();
 export const NonNegativeNumberSchema = NumericSchema.min(0);
+export const ProbabilitySchema = NonNegativeNumberSchema.max(1);
 export const EntityIdSchema = z.string().min(1);
 
 export const DataProvenanceSchema = z.object({
@@ -49,11 +50,42 @@ export const ItemDefinitionSchema: z.ZodType<ItemDefinition> = z.object({
   notes: z.string().min(1).optional()
 });
 
+export const DropExpansionEntrySchema = z
+  .object({
+    name: z.string().min(1),
+    key: EntityIdSchema.optional(),
+    weight: z.union([NonNegativeNumberSchema, z.string().min(1)]).optional(),
+    chance: ProbabilitySchema.optional(),
+    qty: NonNegativeNumberSchema.optional(),
+    qtyAvg: NonNegativeNumberSchema.optional(),
+    price: NonNegativeNumberSchema.optional(),
+    tag: z.string().min(1).optional(),
+    talisman: z.boolean().optional(),
+    mega: z.boolean().optional()
+  })
+  .passthrough()
+  .superRefine((entry, ctx) => {
+    if (
+      entry.key === undefined &&
+      entry.weight === undefined &&
+      entry.chance === undefined &&
+      entry.qty === undefined &&
+      entry.qtyAvg === undefined &&
+      entry.price === undefined &&
+      entry.tag === undefined
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        message: "nested loot row must include key, weight, chance, quantity, price or tag detail"
+      });
+    }
+  });
+
 export const DropDefinitionSchema = z
   .object({
     name: z.string().min(1),
     key: EntityIdSchema.optional(),
-    chance: NonNegativeNumberSchema,
+    chance: ProbabilitySchema,
     qtyAvg: NonNegativeNumberSchema,
     price: NonNegativeNumberSchema.optional(),
     alchValue: NonNegativeNumberSchema.optional(),
@@ -62,7 +94,7 @@ export const DropDefinitionSchema = z
     prayerXp: NonNegativeNumberSchema.optional(),
     provenance: DataProvenanceSchema.optional(),
     notes: z.string().min(1).optional(),
-    _expand: z.array(z.record(z.string(), z.unknown())).optional()
+    _expand: z.array(DropExpansionEntrySchema).optional()
   })
   .passthrough();
 

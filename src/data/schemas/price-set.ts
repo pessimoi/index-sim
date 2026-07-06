@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { type PriceSet } from "../../domain/shared";
+import { DataReliabilityError, assertNoDuplicateJsonKeys } from "../reliability";
 import {
   DataProvenanceSchema,
   EntityIdSchema,
@@ -35,7 +36,11 @@ export const PriceHistorySchema = z.array(PriceHistorySnapshotSchema);
 export type ValidatedPriceSet = z.infer<typeof PriceSetSchema>;
 export type ValidatedPriceHistory = z.infer<typeof PriceHistorySchema>;
 
-export type PriceSetValidationErrorCode = "body_too_large" | "invalid_json" | "validation_failed";
+export type PriceSetValidationErrorCode =
+  | "body_too_large"
+  | "duplicate_keys"
+  | "invalid_json"
+  | "validation_failed";
 
 export class PriceSetValidationError extends Error {
   readonly code: PriceSetValidationErrorCode;
@@ -137,8 +142,16 @@ export function parsePriceSetJson(jsonText: string, options: { maxBytes?: number
 
   let parsed: unknown;
   try {
+    assertNoDuplicateJsonKeys(jsonText, { source: "Price set import" });
     parsed = JSON.parse(jsonText);
-  } catch {
+  } catch (error) {
+    if (error instanceof DataReliabilityError && error.code === "duplicate_keys") {
+      throw new PriceSetValidationError(
+        "duplicate_keys",
+        "Price set import contains duplicate JSON keys",
+        error.issues
+      );
+    }
     throw new PriceSetValidationError("invalid_json", "Price set import is not valid JSON");
   }
 

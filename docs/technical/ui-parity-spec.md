@@ -1,7 +1,7 @@
 # UI Parity Specification
 
 - Status: implementation target specification
-- Date: 2026-07-05
+- Date: 2026-07-06
 - Owner: technical docs
 - Product inventory: [../product/feature-inventory.md](../product/feature-inventory.md)
 - Legacy UI source: `views.jsx` and `planner.jsx`
@@ -243,11 +243,12 @@ Required behavior:
 - The tab bar is horizontally scrollable instead of wrapping into unrelated rows.
 - UI density should stay close to legacy: compact metrics, tables, h-strip section headers and searchable selects.
 
-Current implementation note: the rewrite now has a workbench shell foundation
-around the dense spreadsheet flow. It includes a left PlayerSidebar, center
-setup context bar, horizontally scrollable legacy-order TabBar and active pane
-routing. This slice is intentionally two-zone: the right-side MonsterCard,
-independent rail scrolling polish and final default-pane decision remain open.
+Current implementation note: the rewrite now has the three-zone workbench shell:
+left PlayerSidebar, center setup context bar plus horizontally scrollable
+legacy-order TabBar and active pane routing, and a right-side MonsterCard rail.
+The left rail, center pane and MonsterCard rail have independent scroll
+containers on desktop. On mobile the zones stack in workflow order, with
+MonsterCard after the active pane. The final default-pane decision remains open.
 
 ### Mobile shell
 
@@ -363,6 +364,15 @@ Required controls and displays:
 - Monster stats: combat, HP, defence/attack values and active defence highlight.
 - Equipment overview: weapon/ammo/spell, active attack/damage bonus, speed, prayers, potions, sustained mode and ring effects.
 
+Current implementation note: the root rewrite now renders MonsterCard in the
+right desktop rail and after the active pane on mobile. It uses the app-level
+MonsterCard view-model for current target stats, active defence row from
+`SimulationResult.debug.defenceField`, default/custom setup badge and compact
+weapon/ammo/spell setup overview. Target search/select uses the same target
+switch path as SetupBar so custom setups restore consistently. Drop filtering
+shares the dense compare `dropFilter` state instead of creating a second filter
+truth. Full visual regression coverage remains outside this slice.
+
 ### Stats
 
 Required content:
@@ -426,7 +436,131 @@ Required content:
 - Prayer XP from burying.
 - Loot value composition section.
 
-Current implementation note: the root rewrite UI exposes a full current-target drop table with stable row-id based action overrides, versioned rewrite-owned loot preference persistence, reset current monster, deterministic bounded optimize for net GP/hr, per-action net GP/hr impact, rewrite-owned per-monster loot settings and a browser-local accepted-price history summary. Available actions are restricted to meaningful row/action pairs: bones can bury, herbs can unid/value, gem rows can value and alch is exposed only when the current monster's high-alch setting is enabled and profitable. Per-monster loot settings persist separately from row preferences and currently cover high-alch enablement, auto/manual kill overhead seconds and underground/overground talisman spot. Nested rows have a compact expandable preview. The Economy tab now owns full browser-local price-history analysis, Snapshot now and confirmed Clear history; fuller nested-table loot/economy workflows remain separate parity steps.
+Current implementation note: the root rewrite UI exposes a full current-target drop table with stable row-id based action overrides, versioned rewrite-owned loot preference persistence, reset current monster, deterministic bounded optimize for net GP/hr, readable per-action net GP/hr detail, a loot value composition section, full nested drop detail for `_expand` rows, browser-local accepted price-history context in Loot row detail, rewrite-owned per-monster loot settings and a browser-local accepted-price history summary. Available actions are restricted to meaningful row/action pairs: bones can bury, herbs can unid/value, gem rows can value and alch is exposed only when the current monster's high-alch setting is enabled and profitable. Per-monster loot settings persist separately from row preferences and currently cover high-alch enablement, auto/manual kill overhead seconds and underground/overground talisman spot. The Loot UI labels trip-layer eaten-food and inventory-displaced rows instead of silently presenting pre-trip values. The Economy tab now owns full browser-local price-history analysis, Snapshot now and confirmed Clear history; live market provider work, shared/server history and full legacy price-history migration remain separate decision-boundary steps.
+
+#### Loot/Economy nested workflow parity slice
+
+This slice finishes the visible nested loot/economy workflow that remains open
+after the current drop action table, per-monster loot settings and browser-local
+Economy tab. It must make loot value composition inspectable without requiring
+users to infer how GP/kill, effective net GP/hr or action choices were produced.
+
+Source and status:
+
+- Source: backlog item for remaining Loot/economy parity plus this UI parity
+  spec's Loot and Economy requirements.
+- Feature inventory status: `Loot/economy summary` is `Osittainen`.
+- Current state: the drop table, action selection, per-action net GP/hr impact,
+  full nested drop detail, loot value composition, trip-state row labels,
+  browser-local history context in Loot row detail and Economy price-history tab
+  exist. Remaining work in this area is outside this slice unless a later goal
+  accepts live provider, shared history or full legacy price-history migration
+  decisions.
+
+In scope:
+
+- Expand nested drop rows into full detail tables for tagged rows such as random
+  jewels, herbs, caskets and ultra-rare tables.
+- Add a loot value composition section that shows the top contributors to the
+  current target's loot value and the remaining tail.
+- Make action impact per drop readable as a small comparison table or detail
+  panel instead of only compact inline chips.
+- Reuse the active `PriceSet`, current `lootBreakdown`, `actionImpacts`,
+  rewrite-owned loot prefs and browser-local Economy history state.
+
+Out of scope:
+
+- Live market provider work, upstream selection or production hosting.
+- Server-side or shared price history.
+- Full legacy price-history migration.
+- Per-child action overrides inside nested tables unless the domain later creates
+  stable child row ids and an accepted preference schema.
+
+User experience requirements:
+
+- The Loot tab must keep the current toolbar for high-alch, overhead, talisman
+  spot, reset and optimize controls.
+- A `Loot value composition` section must be visible near the drop table. It
+  should show at least the top 8 positive contributors by GP/kill, each row's
+  selected action, GP/kill contribution, share of positive loot value and a final
+  `Other drops` row when remaining contributors exist.
+- The composition section must use the same post-action `evGp` values that feed
+  `TripLootSupplyResult.gpPerKill`. If the trip layer has marked a row as eaten
+  food or displaced by inventory pressure, the section must label that row rather
+  than silently showing the pre-trip value.
+- Composition totals should match displayed `Loot GP/kill` within rounding. If
+  rounding or negative/zero-value rows prevent an exact match, show the residual
+  only as a small display note, not as a separate calculation source.
+- Parent drop rows with `_expand` data must open a full nested detail table, not
+  a capped preview. The detail table should show child name, weight or chance
+  when available, item key/tag when available, unit or row price when available,
+  and the child share of the parent EV when it can be derived from numeric
+  weights.
+- Nested detail rows are explanatory in this slice. The parent row remains the
+  action and persistence owner.
+- Action impact details must show every available action for the parent row with
+  action label, resulting effective net GP/hr, delta versus default, selected
+  marker and default marker.
+- Action-specific detail should be shown where applicable: bury prayer XP, alch
+  value minus nature rune cost, alch casts per kill, `unid` herb valuation,
+  `value` high-value table valuation and skip/loot inventory effect notes.
+- If an action is not available, it should be omitted from the action selector.
+  A disabled explanatory row is acceptable only when it gives a concrete reason
+  such as high-alch being off or alch profit being non-positive.
+- Missing price or approximate-data warnings from the domain should remain
+  visible near the affected row or in the row details.
+- Economy history context may be shown only from browser-local accepted history:
+  latest price, baseline price and local delta for the row item when the item is
+  tracked. Do not call a live service from this workflow.
+
+View-model requirements:
+
+- Extend `LootDropRowViewModel` or adjacent view-model data rather than deriving
+  nested display math directly in React markup.
+- Preserve stable parent `rowId` ownership for `index-sim:loot-prefs`.
+- Add composition rows derived from the current `TripLootSupplyResult` with:
+  parent row id, display name, selected action, GP/kill contribution, share,
+  optional state flags for eaten/displaced rows and optional child-count metadata.
+- Expand nested rows from `_expand` into full display records with normalized
+  numeric weight/price fields when present and raw display strings otherwise.
+- Action impact view models should include enough metadata for selected/default
+  markers and action-specific notes without recalculating simulation results in
+  the React component.
+- Keep all new UI state, such as open detail rows or selected detail panels,
+  separate from `SimulationRequest`. Persist it only if a clear user workflow
+  requires it; if persisted, use a versioned rewrite-owned UI state key.
+
+Acceptance criteria:
+
+- For a monster with random herb, random jewel, casket or ultra-rare rows, the
+  user can open the parent row and inspect every nested child row available in
+  `_expand`.
+- The user can identify the top loot contributors and see how much each selected
+  action contributes to GP/kill.
+- Changing a drop action updates the selected action marker, row delta, action
+  impact detail and loot value composition without changing unrelated row prefs.
+- High-alch enablement changes available alch actions and action details for the
+  current monster while preserving per-monster setting persistence.
+- Browser-local Economy history, when present, enriches visible row context
+  without requiring a network provider and without mutating price history.
+- The workflow remains usable on mobile/tablet by keeping the main drop table
+  horizontally scrollable and rendering nested/action details as contained
+  disclosure panels or dialogs.
+
+Validation target:
+
+- Unit/view-model tests cover composition totals, top contributor/tail grouping,
+  full nested row expansion, action impact metadata and eaten/displaced row
+  labels.
+- Existing trip/loot/supply parity tests continue to pass without changing
+  domain GP/hr semantics.
+- Playwright smoke opens Loot, expands a nested row, changes an action and checks
+  that composition/action impact text updates.
+- If Economy-history context is added to Loot rows, unit tests use local
+  `PriceHistoryState` fixtures and must not call live services.
+- Implementation validation should include `npm run typecheck`, focused unit
+  tests, relevant Playwright smoke coverage when browser behavior changes and
+  `git diff --check`.
 
 ### Trip
 
@@ -444,7 +578,7 @@ Required content:
 - Food-per-kill override.
 - Trip outcome, effective rates, supply rates, ammo and prayer drain details.
 
-Current implementation note: the rewrite state/schema now models `safespot`, `protect`, `recoilRings`, `foodCount`, `foodPerKillOverride`, `prayerPotionSets`, `prayerPotionDoses`, `altarSeconds`, `scarceSpot`, `targetsAtSpot` and `respawnSeconds`, and maps active restore-mode/scarce values into `TripPolicy` without adding Trip fields to `SimulationRequest`. The root UI exposes safespot Auto/On/Off, protect prayer, antifire, antipoison, prayer restore auto/manual vials/manual doses, altar timing, scarce/AFK target count and respawn seconds, food-count auto/manual, food-per-kill override and recoil ring count when ring of recoil is equipped. The domain applies enabled scarce/respawn limits to effective trip rates before prayer-per-kill is calculated. The Cannon pane can link its target count and respawn seconds into the same Trip sparse state, so cannon-at-spot sparse assumptions are visible in the Cannon workflow instead of hidden in generic Trip state. The Trip summary shows active survival, prayer restore, prayer carried, max kills from prayer, prayer points per dose, food and recoil assumptions, respawn-bound status, inventory reserve slots/parts, potion slots/parts, loot capacity and free-at-start details. Fuller legacy trip-control placement/wording remains a separate parity step.
+Current implementation note: the rewrite state/schema now models `bankSeconds` as a nullable auto/manual value plus `potionSets`, `potionDoses`, `singleDose`, `dbaRestore`, `runeSlots`, `safespot`, `protect`, `recoilRings`, `foodCount`, `foodPerKillOverride`, `prayerPotionSets`, `prayerPotionDoses`, `altarSeconds`, `scarceSpot`, `targetsAtSpot` and `respawnSeconds`, and maps active Trip assumptions into `TripPolicy` without adding Trip fields to `SimulationRequest`. Version 3 rewrite setup envelopes remain backward compatible because newly modeled fields default through the Zod schema, and legacy auto bank time imports as `bankSeconds: null`. The root UI exposes food selector, bank time Auto/Manual seconds, single-dose toggle, general potion vials/doses, teleport item, ranged ammo recovery, DBA restore when melee DBA special boost is active, magic rune slots, safespot Auto/On/Off, protect prayer, antifire, antipoison, prayer restore auto/manual vials/manual doses, altar timing, scarce/AFK target count and respawn seconds, food-count auto/manual, food-per-kill override and recoil ring count when ring of recoil is equipped. Non-applicable reserve controls stay visible in disabled/read-only form for the current combat style or setup. The domain applies enabled scarce/respawn limits to effective trip rates before prayer-per-kill is calculated. The Cannon pane can link its target count and respawn seconds into the same Trip sparse state, so cannon-at-spot sparse assumptions are visible in the Cannon workflow instead of hidden in generic Trip state. The Trip summary is grouped by survival, prayer, food, inventory reserve, potion slots, scarce cap, recoil and outcome/effective rates, and shows selected food, bank time, teleport reserve, ammo recovery, DBA restore, rune slots, active survival, prayer restore, prayer carried, max kills from prayer, prayer points per dose, food and recoil assumptions, respawn-bound status, inventory reserve slots/parts, potion carry/slots/parts/costs, loot capacity, free-at-start details, supply/kill, ammo/kill and effective net GP/hr. Open question: should the archived legacy UI `potRec` heuristic be promoted into a domain-owned general potion recommendation/apply contract, or remain legacy-only UI evidence? The rewrite does not yet expose that general recommendation because this slice avoids copying legacy UI-owned trip math back into the React view.
 
 ### Cannon
 
@@ -479,7 +613,7 @@ Required content:
 - Preserve the legacy planner UI flow: optimize-for display, future weapons toggle, avg-over-session toggle, only-current-gear toggle, live/pause/recompute controls, skill locks, current XP fields, target fields, notes, summary metrics, order of training, gear timeline, DPS vs cumulative XP chart and gear pool editor.
 - Planner UI state must be versioned and persisted separately from pure domain input.
 
-Current implementation note: `src/app/state/planner.ts` now owns version 1 of the rewrite Planner UI state contract under `index-sim:planner-ui`. The state covers metric, target levels, current XP values, skill locks, avg-over-session, only-current-gear and gear-pool restrictions. `src/app/view-models/simulation.ts` adapts that state into `src/domain/planner` input/options and validates gear-pool ids against the active `GameDataSnapshot`/default planner pool. The workbench Planner tab now exposes the visible workflow for optimize metric, current XP, target levels, skill locks, only-current-gear, explicit Recompute, summary metrics, training order, unlock summary, gear pool editor, gear timeline, DPS-vs-cumulative-XP chart and empty/error states. Recompute snapshots the Planner UI state into a calculation state and does not mutate combat setup, target monster, loadout or price state. The gear pool editor only narrows the current non-hypothetical default planner pool; it does not enable future/hypothetical gear or choose a generated requirement source. Legacy `sim_planner_v1` is detect/review-only until a separate migration decision exists: the migration UX reports that Planner data was found, warns that it is not imported, keeps it on Import/Keep, preserves existing `index-sim:planner-ui` state and removes it only through confirmed Clear with the other known legacy keys. Full legacy Planner migration, active avg-over-session semantics and legacy planner numeric parity remain open.
+Current implementation note: `src/app/state/planner.ts` now owns version 1 of the rewrite Planner UI state contract under `index-sim:planner-ui`. The state covers metric, target levels, current XP values, skill locks, avg-over-session, only-current-gear and gear-pool restrictions. `src/app/view-models/simulation.ts` adapts that state into `src/domain/planner` input/options and validates gear-pool ids against the active `GameDataSnapshot`/default planner pool. The workbench Planner tab now exposes the visible workflow for optimize metric, current XP, target levels, skill locks, active avg-over-session, only-current-gear, explicit Recompute, summary metrics, training order, unlock summary, gear pool editor, gear timeline, DPS-vs-cumulative-XP chart and empty/error states. Recompute snapshots the Planner UI state into a calculation state and does not mutate combat setup, target monster, loadout or price state; changing avg-over-session marks the Planner pending until Recompute. Avg-over-session maps to the domain Planner `sustained` option independently of the combat setup sustained control. Planner output also surfaces an info warning that item requirements use the current manual policy until generated requirements are accepted. The V1 Planner acceptance line is the rewrite replacement line, backed by deterministic domain golden fixtures for melee unlock, ranged unlock, magic spell unlock and boosted sustained training plus the visible Planner smoke. The gear pool editor only narrows the current non-hypothetical default planner pool; it does not enable future/hypothetical gear or choose a generated requirement source. Legacy `sim_planner_v1` is detect/review-only until a separate migration decision exists: the migration UX reports that Planner data was found, warns that it is not imported, keeps it on Import/Keep, preserves existing `index-sim:planner-ui` state and removes it only through confirmed Clear with the other known legacy keys. Full legacy Planner migration, generated requirement source/future-hypothetical gear policy and legacy planner numeric parity remain open.
 
 ### Economy
 
@@ -505,6 +639,8 @@ Required content:
 - Market sync controls following [live-integrations-spec.md](live-integrations-spec.md).
 - Service-aware `available`, `unavailable` or disabled-runtime state for live sync when the accepted integration endpoint or provider is unavailable. Production copy must not point users to `run_sim.py`.
 
+Current implementation note: Settings now has a Price data panel that shows the active `PriceSet` label, source, created timestamp, age, item price count, alch value count and current import/status notice. Its import control uses the same validated `parsePriceSetFileText` path as the existing topbar shortcut, accepts only the current `PriceSet` schema and updates the active price set, browser-local accepted price history, topbar price label/status and visible notice. The topbar import remains a shortcut. Economy remains the owner of browser-local price-history analysis. Settings also has a Gear menu panel backed by the rewrite-owned versioned `index-sim:hidden-gear-tiers` state. It can hide the accepted metal, d-hide, leather, low-bow and 1 defence magic tier groups from weapon, ammo, special-attack and equipment pickers while preserving `None` and the current selected item. Legacy `sim_hidden_tiers_v1` remains review-only and is not auto-migrated into the rewrite-owned state.
+
 ## Implementation Phases
 
 ### Phase A: dense spreadsheet parity
@@ -522,10 +658,10 @@ Required content:
 
 Current implementation note: partially complete. The root rewrite now has the
 workbench shell foundation with PlayerSidebar, setup context bar, legacy-order
-TabBar and active pane routing for existing Stats, combat-style setup, Compare,
-Loot, Trip, Cannon and Economy/Settings surfaces. Duel and Planner are visible
-as planned tab destinations only. MonsterCard scaffolding and independent rail
-scroll evidence remain open.
+TabBar, active pane routing for existing Stats, combat-style setup, Compare,
+Loot, Trip, Cannon and Economy/Settings surfaces, and a visible right-side
+MonsterCard rail. Duel and Planner are visible as planned tab destinations
+only. Full visual regression remains open.
 
 ### Phase C: setup and equipment parity
 
@@ -540,9 +676,10 @@ stash/restore is implemented in versioned setup state. Dedicated Melee, Ranged
 and Magic equipment panes now cover searchable weapon, ammo, spell and gear
 selectors plus bonus summaries and two-handed shield locking. SetupBar now
 covers rewrite-owned monster-specific custom setup create/edit/remove, manual
-accuracy/damage/speed overrides and target switch restore. Best-in-slot actions,
-hidden-tier settings, legacy custom setup migration and MonsterCard
-target/equipment overview remain open.
+accuracy/damage/speed overrides and target switch restore. MonsterCard now
+adds target search, shared drop filter, active defence highlight and compact
+equipment overview in the right rail. Best-in-slot actions and legacy custom
+setup migration remain open.
 
 ### Phase D: main workflow parity
 
@@ -552,7 +689,7 @@ target/equipment overview remain open.
 ### Phase E: missing tab parity
 
 - Add Cannon, Duel, Economy and Settings parity, subject to product decisions for live sync and price history.
-- Add persisted UI state for duel snapshots, planner config, hidden tiers, relevance and per-monster maps.
+- Add persisted UI state for duel snapshots, planner config, relevance and per-monster maps.
 
 ### Phase F: replacement hardening
 

@@ -616,11 +616,30 @@ function priceFromKeys(
   priceSet: PriceSet,
   keys: readonly EntityId[],
   fallback = 0,
-  qty = 1
+  qty = 1,
+  warnings?: SimulationWarning[],
+  label?: string
 ): number {
-  for (const key of keys) {
+  const canonicalKey = keys[0];
+  for (const [index, key] of keys.entries()) {
     const price = priceSet.itemPrices[key];
-    if (asNumeric(price) !== undefined) return price * qty;
+    if (asNumeric(price) !== undefined) {
+      if (warnings && index > 0 && canonicalKey) {
+        addWarningOnce(warnings, {
+          code: "price-alias-used",
+          severity: "info",
+          message: `Using alias price '${key}' for ${label ?? canonicalKey}; canonical price '${canonicalKey}' is missing.`
+        });
+      }
+      return price * qty;
+    }
+  }
+  if (warnings && canonicalKey) {
+    addWarningOnce(warnings, {
+      code: "price-fallback-used",
+      severity: "warning",
+      message: `Missing price '${canonicalKey}' for ${label ?? canonicalKey}; using fallback ${fallback}.`
+    });
   }
   return fallback * qty;
 }
@@ -771,10 +790,10 @@ function flattenLoot(entries: readonly DropEntry[] | undefined): DropDefinition[
   return out;
 }
 
-function herbStats(priceSet: PriceSet) {
+function herbStats(priceSet: PriceSet, warnings?: SimulationWarning[]) {
   const rows = HERB_TABLE.map((row) => ({
     ...row,
-    price: priceFromKeys(priceSet, row.keys, row.fallback)
+    price: priceFromKeys(priceSet, row.keys, row.fallback, 1, warnings, `${row.name} herb`)
   }));
   const ev = rows.reduce((sum, row) => sum + row.weight * row.price, 0) / 128;
   const highEv =
@@ -785,17 +804,24 @@ function herbStats(priceSet: PriceSet) {
   return { ev, highEv, keepFrac };
 }
 
-function megaEv(priceSet: PriceSet): number {
+function megaEv(priceSet: PriceSet, warnings?: SimulationWarning[]): number {
   return (
     MEGA_TABLE.reduce(
-      (sum, row) => sum + row.weight * priceFromKeys(priceSet, row.keys, row.fallback),
+      (sum, row) =>
+        sum +
+        row.weight * priceFromKeys(priceSet, row.keys, row.fallback, 1, warnings, "mega-rare table"),
       0
     ) / 128
   );
 }
 
-function jewelStats(priceSet: PriceSet, spot: JewelSpot, legendsComplete: boolean) {
-  const mega = megaEv(priceSet);
+function jewelStats(
+  priceSet: PriceSet,
+  spot: JewelSpot,
+  legendsComplete: boolean,
+  warnings?: SimulationWarning[]
+) {
+  const mega = megaEv(priceSet, warnings);
   const talisman =
     spot === "overground"
       ? { name: "Nature talisman", key: "nature_talisman", fallback: 15000 }
@@ -803,13 +829,20 @@ function jewelStats(priceSet: PriceSet, spot: JewelSpot, legendsComplete: boolea
   const rows = [
     ...JEWEL_BANDS.map((band) => ({
       ...band,
-      price: priceFromKeys(priceSet, band.keys, band.fallback, band.qty ?? 1)
+      price: priceFromKeys(
+        priceSet,
+        band.keys,
+        band.fallback,
+        band.qty ?? 1,
+        warnings,
+        `${band.name} jewel table`
+      )
     })),
     {
       name: talisman.name,
       lo: legendsComplete ? 62 : 61,
       hi: 65,
-      price: priceFromKeys(priceSet, [talisman.key], talisman.fallback)
+      price: priceFromKeys(priceSet, [talisman.key], talisman.fallback, 1, warnings, talisman.name)
     },
     ...(legendsComplete
       ? [
@@ -854,25 +887,33 @@ function jewelStats(priceSet: PriceSet, spot: JewelSpot, legendsComplete: boolea
   };
 }
 
-function ultraRareEv(priceSet: PriceSet, jewelBaseEv: number, mega: number): number {
+function ultraRareEv(
+  priceSet: PriceSet,
+  jewelBaseEv: number,
+  mega: number,
+  warnings?: SimulationWarning[]
+): number {
   const rows = [
-    { weight: 3, price: priceFromKeys(priceSet, ["naturerune"], 180, 67) },
-    { weight: 2, price: priceFromKeys(priceSet, ["adamant_javelin"], 50, 20) },
-    { weight: 2, price: priceFromKeys(priceSet, ["deathrune"], 200, 45) },
-    { weight: 2, price: priceFromKeys(priceSet, ["lawrune"], 240, 45) },
-    { weight: 2, price: priceFromKeys(priceSet, ["rune_arrow"], 160, 42) },
-    { weight: 2, price: priceFromKeys(priceSet, ["steel_arrow"], 18, 150) },
-    { weight: 3, price: priceFromKeys(priceSet, ["rune_2h"], 38000) },
-    { weight: 3, price: priceFromKeys(priceSet, ["rune_battleaxe"], 25000) },
-    { weight: 2, price: priceFromKeys(priceSet, ["rune_sq_shield"], 21000) },
-    { weight: 1, price: priceFromKeys(priceSet, ["dragon_med_helm"], 60000) },
-    { weight: 1, price: priceFromKeys(priceSet, ["rune_kiteshield"], 32000) },
+    { weight: 3, price: priceFromKeys(priceSet, ["naturerune"], 180, 67, warnings, "ultra-rare table") },
+    {
+      weight: 2,
+      price: priceFromKeys(priceSet, ["adamant_javelin"], 50, 20, warnings, "ultra-rare table")
+    },
+    { weight: 2, price: priceFromKeys(priceSet, ["deathrune"], 200, 45, warnings, "ultra-rare table") },
+    { weight: 2, price: priceFromKeys(priceSet, ["lawrune"], 240, 45, warnings, "ultra-rare table") },
+    { weight: 2, price: priceFromKeys(priceSet, ["rune_arrow"], 160, 42, warnings, "ultra-rare table") },
+    { weight: 2, price: priceFromKeys(priceSet, ["steel_arrow"], 18, 150, warnings, "ultra-rare table") },
+    { weight: 3, price: priceFromKeys(priceSet, ["rune_2h"], 38000, 1, warnings, "ultra-rare table") },
+    { weight: 3, price: priceFromKeys(priceSet, ["rune_battleaxe"], 25000, 1, warnings, "ultra-rare table") },
+    { weight: 2, price: priceFromKeys(priceSet, ["rune_sq_shield"], 21000, 1, warnings, "ultra-rare table") },
+    { weight: 1, price: priceFromKeys(priceSet, ["dragon_med_helm"], 60000, 1, warnings, "ultra-rare table") },
+    { weight: 1, price: priceFromKeys(priceSet, ["rune_kiteshield"], 32000, 1, warnings, "ultra-rare table") },
     { weight: 21, price: 3000 },
-    { weight: 20, price: priceFromKeys(priceSet, ["tooth_half_key"], 110000) },
-    { weight: 20, price: priceFromKeys(priceSet, ["loop_half_key"], 81200) },
-    { weight: 5, price: priceFromKeys(priceSet, ["runite_bar"], 6500) },
-    { weight: 2, price: priceFromKeys(priceSet, ["dragonstone"], 16000) },
-    { weight: 2, price: priceFromKeys(priceSet, ["silver_ore"], 62, 100) },
+    { weight: 20, price: priceFromKeys(priceSet, ["tooth_half_key"], 110000, 1, warnings, "ultra-rare table") },
+    { weight: 20, price: priceFromKeys(priceSet, ["loop_half_key"], 81200, 1, warnings, "ultra-rare table") },
+    { weight: 5, price: priceFromKeys(priceSet, ["runite_bar"], 6500, 1, warnings, "ultra-rare table") },
+    { weight: 2, price: priceFromKeys(priceSet, ["dragonstone"], 16000, 1, warnings, "ultra-rare table") },
+    { weight: 2, price: priceFromKeys(priceSet, ["silver_ore"], 62, 100, warnings, "ultra-rare table") },
     { weight: 20, price: jewelBaseEv },
     { weight: 15, price: mega }
   ];
@@ -882,21 +923,40 @@ function ultraRareEv(priceSet: PriceSet, jewelBaseEv: number, mega: number): num
 function adjustDropPrices(
   drop: DropDefinition,
   priceSet: PriceSet,
-  options: LootContextOptions
+  options: LootContextOptions,
+  warnings?: SimulationWarning[]
 ): DropDefinition {
-  const herbs = herbStats(priceSet);
-  const jewels = jewelStats(
-    priceSet,
-    options.jewelSpot ?? "underground",
-    options.legendsComplete !== false
-  );
   if (drop.tag === "gem") {
+    const jewels = jewelStats(
+      priceSet,
+      options.jewelSpot ?? "underground",
+      options.legendsComplete !== false,
+      warnings
+    );
     return { ...drop, price: options.ringOfWealth ? jewels.rowEv : jewels.baseEv };
   }
-  if (drop.tag === "herb") return { ...drop, price: herbs.ev };
-  if (drop.tag === "ultrarare")
-    return { ...drop, price: ultraRareEv(priceSet, jewels.baseEv, jewels.mega) };
-  if (drop.tag === "mega") return { ...drop, price: jewels.mega };
+  if (drop.tag === "herb") {
+    const herbs = herbStats(priceSet, warnings);
+    return { ...drop, price: herbs.ev };
+  }
+  if (drop.tag === "ultrarare") {
+    const jewels = jewelStats(
+      priceSet,
+      options.jewelSpot ?? "underground",
+      options.legendsComplete !== false,
+      warnings
+    );
+    return { ...drop, price: ultraRareEv(priceSet, jewels.baseEv, jewels.mega, warnings) };
+  }
+  if (drop.tag === "mega") {
+    const jewels = jewelStats(
+      priceSet,
+      options.jewelSpot ?? "underground",
+      options.legendsComplete !== false,
+      warnings
+    );
+    return { ...drop, price: jewels.mega };
+  }
   return drop;
 }
 
@@ -1108,16 +1168,25 @@ export function evaluateLoot(
 ): LootEvaluation {
   const warnings: SimulationWarning[] = [];
   const priceSet = context.priceSet;
-  const herbs = herbStats(priceSet);
-  const jewels = jewelStats(
-    priceSet,
-    options.jewelSpot ?? "underground",
-    options.legendsComplete !== false
-  );
   const lootPrefs = options.lootPrefs ?? {};
   const alchAllowed = !!options.alching;
   const natCost = priceSet.itemPrices.naturerune ?? NATURE_RUNE_FALLBACK;
   const herbUnidGp = priceSet.itemPrices.unidentified_guam ?? 15;
+  let cachedHerbs: ReturnType<typeof herbStats> | undefined;
+  let cachedJewels: ReturnType<typeof jewelStats> | undefined;
+  const getHerbs = () => {
+    cachedHerbs ??= herbStats(priceSet, warnings);
+    return cachedHerbs;
+  };
+  const getJewels = () => {
+    cachedJewels ??= jewelStats(
+      priceSet,
+      options.jewelSpot ?? "underground",
+      options.legendsComplete !== false,
+      warnings
+    );
+    return cachedJewels;
+  };
   let gpPerKill = 0;
   let prayerXpPerKill = 0;
   let alchCastsPerKill = 0;
@@ -1125,7 +1194,7 @@ export function evaluateLoot(
 
   for (const [rowIndex, rawDrop] of flattenLoot(monster.loot).entries()) {
     const rowId = lootPreferenceKey(rawDrop, rowIndex);
-    const drop = adjustDropPrices(rawDrop, priceSet, options);
+    const drop = adjustDropPrices(rawDrop, priceSet, options, warnings);
     const isBone = bonePrayerXp(drop.name) > 0;
     const isHerb = drop.tag === "herb";
     itemApproximationWarning(context.gameData, drop.key, warnings);
@@ -1177,11 +1246,11 @@ export function evaluateLoot(
     else if (pref === "unid") unitGp = isHerb ? herbUnidGp : saleValue;
     else if (pref === "value") {
       unitGp = isHerb
-        ? herbs.highEv
+        ? getHerbs().highEv
         : drop.tag === "gem"
           ? options.ringOfWealth
-            ? jewels.rowHighEv
-            : jewels.baseHighEv
+            ? getJewels().rowHighEv
+            : getJewels().baseHighEv
           : saleValue;
     } else if (pref === "alch") unitGp = Math.max(0, dropAlch - natCost);
     else unitGp = bulkDead ? Math.max(0, dropAlch - natCost) : saleValue;
@@ -1191,9 +1260,9 @@ export function evaluateLoot(
 
     let slotFrac = 1;
     if (pref === "value") {
-      if (isHerb) slotFrac = herbs.keepFrac;
+      if (isHerb) slotFrac = getHerbs().keepFrac;
       else if (drop.tag === "gem") {
-        slotFrac = options.ringOfWealth ? jewels.rowKeepFrac : jewels.baseKeepFrac;
+        slotFrac = options.ringOfWealth ? getJewels().rowKeepFrac : getJewels().baseKeepFrac;
       }
     }
     if (pref === "alch") alchCastsPerKill += drop.chance * drop.qtyAvg;

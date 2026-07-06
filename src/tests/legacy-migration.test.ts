@@ -44,6 +44,7 @@ describe("legacy storage migration foundation", () => {
     const review = createLegacyStorageKeyReview([
       LEGACY_INPUT_STORAGE_KEY,
       "sim_scraped_keys_v1",
+      "sim_hidden_tiers_v1",
       "sim_loot_comp_open"
     ]);
 
@@ -81,6 +82,12 @@ describe("legacy storage migration foundation", () => {
           disposition: "review-only",
           found: false,
           clearDeletes: false
+        }),
+        expect.objectContaining({
+          key: "sim_hidden_tiers_v1",
+          disposition: "review-only",
+          found: true,
+          clearDeletes: true
         })
       ])
     );
@@ -117,9 +124,14 @@ describe("legacy storage migration foundation", () => {
           foodKey: "shark",
           teleport: false,
           bankSeconds: 130,
+          potionSets: 2,
+          potionDoses: 6,
+          singleDose: true,
+          dbaRestore: false,
           prayerMode: "altar",
           alching: true,
           recoverAmmo: false,
+          runeSlots: 3,
           antifire: true,
           antipoison: true,
           safespot: false,
@@ -162,9 +174,14 @@ describe("legacy storage migration foundation", () => {
         foodKey: "shark",
         teleport: false,
         bankSeconds: 130,
+        potionSets: 2,
+        potionDoses: 6,
+        singleDose: true,
+        dbaRestore: false,
         prayerMode: "altar",
         alching: true,
         recoverAmmo: false,
+        runeSlots: 3,
         antifire: true,
         antipoison: true,
         safespot: false,
@@ -185,6 +202,11 @@ describe("legacy storage migration foundation", () => {
         "styleId",
         "gear.body",
         "trip.foodKey",
+        "trip.potionSets",
+        "trip.potionDoses",
+        "trip.singleDose",
+        "trip.dbaRestore",
+        "trip.runeSlots",
         "trip.protect",
         "trip.altarSeconds"
       ])
@@ -280,10 +302,15 @@ describe("legacy storage migration foundation", () => {
         prayer: 43,
         trip: {
           bankSeconds: -1,
+          potionSets: -1,
+          potionDoses: 113,
+          singleDose: "yes",
+          dbaRestore: "no",
           recoilRings: 29,
           foodCount: 7,
           foodPerKillOverride: Number.NaN,
           prayerPotionDoses: 112,
+          runeSlots: 29,
           altarSeconds: 3601
         }
       })
@@ -302,10 +329,15 @@ describe("legacy storage migration foundation", () => {
     });
     expect(report.setup?.trip).toMatchObject({
       bankSeconds: DEFAULT_FORM_STATE.trip.bankSeconds,
+      potionSets: DEFAULT_FORM_STATE.trip.potionSets,
+      potionDoses: DEFAULT_FORM_STATE.trip.potionDoses,
+      singleDose: DEFAULT_FORM_STATE.trip.singleDose,
+      dbaRestore: DEFAULT_FORM_STATE.trip.dbaRestore,
       recoilRings: DEFAULT_FORM_STATE.trip.recoilRings,
       foodCount: 7,
       foodPerKillOverride: DEFAULT_FORM_STATE.trip.foodPerKillOverride,
       prayerPotionDoses: 112,
+      runeSlots: DEFAULT_FORM_STATE.trip.runeSlots,
       altarSeconds: DEFAULT_FORM_STATE.trip.altarSeconds
     });
     expect(report.skippedFields).toEqual(
@@ -313,11 +345,32 @@ describe("legacy storage migration foundation", () => {
         { field: "levels.attack", reason: "expected an integer level from 1 to 99" },
         { field: "levels.defence", reason: "expected an integer level from 1 to 99" },
         { field: "levels.magic", reason: "expected an integer level from 1 to 99" },
-        { field: "trip.bankSeconds", reason: "expected an integer from 0 to 3600" },
+        { field: "trip.bankSeconds", reason: "expected null or an integer from 0 to 3600" },
+        { field: "trip.potionSets", reason: "expected an integer from 0 to 28" },
+        { field: "trip.potionDoses", reason: "expected an integer from 0 to 112" },
+        { field: "trip.singleDose", reason: "expected a boolean" },
+        { field: "trip.dbaRestore", reason: "expected a boolean" },
         { field: "trip.recoilRings", reason: "expected an integer from 1 to 28" },
+        { field: "trip.runeSlots", reason: "expected an integer from 0 to 28" },
         { field: "trip.altarSeconds", reason: "expected null or an integer from 0 to 3600" }
       ])
     );
+  });
+
+  it("imports legacy auto bank time as the rewrite trip auto state", () => {
+    const storage = createMemoryStorage({
+      [LEGACY_INPUT_STORAGE_KEY]: JSON.stringify({
+        combatType: "melee",
+        trip: {
+          bankSeconds: null
+        }
+      })
+    });
+
+    const report = inspectLegacySetupMigration({ storage, gameData });
+
+    expect(report.setup?.trip.bankSeconds).toBeNull();
+    expect(report.importedFields).toContain("trip.bankSeconds");
   });
 
   it("does not write to legacy or rewrite storage keys while inspecting migration state", () => {
