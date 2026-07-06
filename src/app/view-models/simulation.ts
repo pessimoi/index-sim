@@ -1,4 +1,11 @@
-import { computeCombatXpBreakdown, simulateCombat, weaponStances } from "@/domain/combat";
+import {
+  computeCombatXpBreakdown,
+  createHitDistribution,
+  simulateCombat,
+  weaponStances,
+  type CombatXpBreakdown,
+  type CombatXpKey
+} from "@/domain/combat";
 import {
   buildPlan,
   defaultPool,
@@ -41,6 +48,11 @@ import {
   type DenseCompareSortState,
   type DenseCompareUiState
 } from "../state/dense-compare";
+import {
+  MAX_DUEL_SNAPSHOTS,
+  normalizeDuelSnapshotsState,
+  type DuelSnapshotsState
+} from "../state/duel-snapshots";
 import { lootSettingsForMonster, type LootSettingsByMonsterState } from "../state/loot-settings";
 import {
   PLANNER_GEAR_SLOTS,
@@ -55,6 +67,7 @@ import {
   type CannonByMonsterState,
   formToSimulationRequest,
   formToTripPolicy,
+  normalizeFormState,
   type CombatSetupFormState,
   type CustomSetupsByMonsterState,
   type SetupMode
@@ -63,6 +76,9 @@ import {
 export interface SimulationViewModel {
   request: SimulationRequest;
   combat: ReturnType<typeof simulateCombat>;
+  hitDistribution: HitDistributionViewModel;
+  xpRouting: XpRoutingViewModel;
+  tripBankingSummary: StatsTripBankingSummaryViewModel;
   monsterCard: MonsterCardViewModel;
   trip: TripLootSupplyResult;
   playerEffectiveXpPerHour: number;
@@ -86,6 +102,62 @@ export interface SimulationViewModel {
     overrideCount: number;
     valueComposition: LootValueCompositionViewModel;
   };
+}
+
+export interface HitDistributionBucketViewModel {
+  id: string;
+  label: string;
+  ariaLabel: string;
+  probability: number;
+  percentLabel: string;
+  widthPercent: number;
+  isMiss: boolean;
+  isMaxHit: boolean;
+}
+
+export interface HitDistributionViewModel {
+  hitChance: number;
+  averageHit: number;
+  maxHit: number;
+  peakMaxHit: number;
+  probabilityTotal: number;
+  hitChanceLabel: string;
+  averageHitLabel: string;
+  maxHitLabel: string;
+  buckets: HitDistributionBucketViewModel[];
+}
+
+export type XpRoutingRowStatus = "modeled" | "partial" | "not-modeled";
+
+export interface XpRoutingRowViewModel {
+  id: string;
+  label: string;
+  value: string;
+  xpPerHour: number | null;
+  status: XpRoutingRowStatus;
+  statusLabel: string;
+  note: string;
+}
+
+export interface XpRoutingViewModel {
+  effectiveXpPerHour: number;
+  totalXpPerHour: number;
+  effectiveXpPerHourLabel: string;
+  totalXpPerHourLabel: string;
+  rows: XpRoutingRowViewModel[];
+}
+
+export interface StatsTripBankingSummaryRowViewModel {
+  id: string;
+  label: string;
+  value: string;
+  numericValue: number | null;
+  note: string;
+  tone: "default" | "gold" | "teal" | "muted";
+}
+
+export interface StatsTripBankingSummaryViewModel {
+  rows: StatsTripBankingSummaryRowViewModel[];
 }
 
 export type MonsterCardStatKey =
@@ -302,6 +374,56 @@ export interface CompareRowViewModel {
   bound: string;
 }
 
+export type DuelComparisonRowSource = "live" | "snapshot";
+
+export interface DuelComparisonRowDeltasViewModel {
+  dps: number;
+  effectiveXpPerHour: number;
+  effectiveNetGpPerHour: number;
+  gpPerXp: number | null;
+}
+
+export interface DuelComparisonBestMarkersViewModel {
+  effectiveXpPerHour: boolean;
+  effectiveNetGpPerHour: boolean;
+  gpPerXp: boolean;
+}
+
+export interface DuelComparisonRowViewModel {
+  id: string;
+  snapshotId: EntityId | null;
+  source: DuelComparisonRowSource;
+  name: string;
+  monsterId: EntityId;
+  monsterName: string;
+  combatStyle: CombatStyle;
+  loadoutLabel: string;
+  maxHit: number;
+  dps: number;
+  hitChance: number;
+  ttkSec: number;
+  killsPerTrip: number;
+  killsPerHour: number;
+  effectiveXpPerHour: number;
+  effectiveNetGpPerHour: number;
+  gpPerXp: number | null;
+  supplyCostPerHour: number;
+  bound: string;
+  warnings: string[];
+  deltas: DuelComparisonRowDeltasViewModel;
+  best: DuelComparisonBestMarkersViewModel;
+}
+
+export interface DuelComparisonViewModel {
+  monsterId: EntityId;
+  monsterName: string;
+  snapshotCount: number;
+  snapshotLimit: number;
+  liveRow: DuelComparisonRowViewModel;
+  snapshotRows: DuelComparisonRowViewModel[];
+  rows: DuelComparisonRowViewModel[];
+}
+
 export type DenseCompareRowMarkerId = "custom" | "alch" | "overhead" | "hidden" | "target";
 
 export interface DenseCompareRowMarkerViewModel {
@@ -332,6 +454,22 @@ export interface DenseCompareRowViewModel {
   netGpPerHour: number;
   bound: string;
 }
+
+export type DenseCompareScaleTone = "positive" | "negative" | "neutral";
+
+export interface DenseCompareScaleCellViewModel {
+  value: number;
+  widthPercent: number;
+  tone: DenseCompareScaleTone;
+  ariaLabel: string;
+}
+
+export interface DenseCompareScaleRowViewModel {
+  xpPerHour: DenseCompareScaleCellViewModel;
+  netGpPerHour: DenseCompareScaleCellViewModel;
+}
+
+export type DenseCompareScaleViewModel = Record<EntityId, DenseCompareScaleRowViewModel>;
 
 const denseCompareSortValue: Record<
   DenseCompareSortKey,
@@ -381,6 +519,24 @@ export interface SelectOptionViewModel {
   hint?: string;
 }
 
+export interface GearQuickActionViewModel {
+  itemId: EntityId;
+  itemLabel: string;
+  disabled: boolean;
+  reason: string;
+}
+
+export interface GearQuickActionInput {
+  gameData: GameDataSnapshot;
+  slot: EquipmentSlot;
+  combatStyle: CombatStyle;
+  weaponId: EntityId;
+  styleId: EntityId;
+  currentItemId: EntityId;
+  options: readonly SelectOptionViewModel[];
+  shieldLocked?: boolean;
+}
+
 function nullableNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
@@ -422,6 +578,87 @@ function activeMonsterDefenceField(value: string): MonsterCardDefenceField | nul
   return MONSTER_CARD_DEFENCE_ROWS.some((row) => row.field === value)
     ? (value as MonsterCardDefenceField)
     : null;
+}
+
+function meleeAttackBonusKey(attackType: AttackType): "stabAtt" | "slashAtt" | "crushAtt" {
+  if (attackType === "stab") return "stabAtt";
+  if (attackType === "crush") return "crushAtt";
+  return "slashAtt";
+}
+
+function gearQuickActionScore(
+  item: EquipmentItemDefinition,
+  combatStyle: CombatStyle,
+  attackType: AttackType
+): number {
+  if (combatStyle === "melee") {
+    return (item[meleeAttackBonusKey(attackType)] ?? 0) + (item.str ?? 0) * 2;
+  }
+  if (combatStyle === "ranged") {
+    return (item.rngAtt ?? 0) + (item.rngStr ?? 0) * 2;
+  }
+  return (item.magAtt ?? 0) + (item.magDmg ?? 0) * 2;
+}
+
+export function gearQuickActionForSlot(input: GearQuickActionInput): GearQuickActionViewModel {
+  if (input.shieldLocked) {
+    return {
+      itemId: "none",
+      itemLabel: "None",
+      disabled: true,
+      reason: "Shield locked by two-handed weapon"
+    };
+  }
+
+  const activeStance = weaponStances(input.weaponId, input.gameData).find(
+    (stance) => stance.id === input.styleId
+  );
+  const attackType = input.combatStyle === "melee" ? (activeStance?.type ?? "slash") : "slash";
+  const candidates = input.options.flatMap((option) => {
+    const item =
+      option.id === "none"
+        ? { name: "None" }
+        : input.gameData.equipment[input.slot]?.[option.id];
+    if (!item) return [];
+    return [
+      {
+        id: option.id,
+        label: option.label,
+        score: gearQuickActionScore(item, input.combatStyle, attackType)
+      }
+    ];
+  });
+  const current = candidates.find((candidate) => candidate.id === input.currentItemId);
+  const best = candidates.reduce<(typeof candidates)[number] | null>((selected, candidate) => {
+    if (!selected) return candidate;
+    if (candidate.score > selected.score) return candidate;
+    if (candidate.score < selected.score) return selected;
+    if (candidate.id === input.currentItemId) return candidate;
+    if (selected.id === input.currentItemId) return selected;
+    const labelCompare = candidate.label.localeCompare(selected.label);
+    if (labelCompare < 0) return candidate;
+    if (labelCompare > 0) return selected;
+    return candidate.id.localeCompare(selected.id) < 0 ? candidate : selected;
+  }, null);
+
+  if (!best) {
+    return {
+      itemId: input.currentItemId,
+      itemLabel: "None",
+      disabled: true,
+      reason: "No visible gear options"
+    };
+  }
+
+  const currentIsBest = best.id === input.currentItemId;
+  return {
+    itemId: best.id,
+    itemLabel: best.label,
+    disabled: currentIsBest,
+    reason: currentIsBest
+      ? `Best visible option: ${current?.label ?? best.label}`
+      : `Apply ${best.label}`
+  };
 }
 
 function createMonsterCardStats(
@@ -1085,6 +1322,323 @@ function createDenseCompareRowMarkers(row: {
   return markers;
 }
 
+const XP_SKILL_LABELS: Record<CombatXpKey, string> = {
+  att: "Attack",
+  str: "Strength",
+  def: "Defence",
+  rng: "Ranged",
+  mag: "Magic",
+  hp: "Hitpoints"
+};
+
+const XP_SKILL_ORDER: CombatXpKey[] = ["att", "str", "def", "rng", "mag", "hp"];
+
+const PROTECTION_LABELS: Record<NonNullable<CombatSetupFormState["trip"]["protect"]>, string> = {
+  none: "None",
+  melee: "Protect from Melee",
+  missiles: "Protect from Missiles",
+  magic: "Protect from Magic"
+};
+
+function xpRoutingRow(input: {
+  id: string;
+  label: string;
+  xpPerHour: number | null;
+  status: XpRoutingRowStatus;
+  note: string;
+}): XpRoutingRowViewModel {
+  return {
+    ...input,
+    value: input.xpPerHour == null ? "-" : formatNumber(input.xpPerHour),
+    statusLabel:
+      input.status === "modeled"
+        ? "modeled"
+        : input.status === "partial"
+          ? "partial"
+          : "not modeled"
+  };
+}
+
+function createXpRoutingViewModel(input: {
+  xp: CombatXpBreakdown;
+  trip: TripLootSupplyResult;
+  playerEffectiveXpPerHour: number;
+  cannonEffectiveXpPerHour: number;
+  effectiveXpPerHour: number;
+  totalXpPerHour: number;
+}): XpRoutingViewModel {
+  const rows: XpRoutingRowViewModel[] = [
+    xpRoutingRow({
+      id: "player-combat",
+      label: "Player combat XP/hr",
+      xpPerHour: input.playerEffectiveXpPerHour,
+      status: "modeled",
+      note: "Direct player combat XP contributing to effective XP/hr."
+    })
+  ];
+
+  if (input.cannonEffectiveXpPerHour > 0) {
+    rows.push(
+      xpRoutingRow({
+        id: "cannon-ranged",
+        label: "Cannon ranged XP/hr",
+        xpPerHour: input.cannonEffectiveXpPerHour,
+        status: "modeled",
+        note: "Separate cannon ranged XP row after trip efficiency."
+      })
+    );
+  }
+
+  for (const key of XP_SKILL_ORDER) {
+    const xpPerKill = input.xp.skillXpPerKill[key] ?? 0;
+    if (xpPerKill <= 0) continue;
+    rows.push(
+      xpRoutingRow({
+        id: `skill-${key}`,
+        label: XP_SKILL_LABELS[key],
+        xpPerHour: xpPerKill * input.trip.effectiveKph,
+        status: "modeled",
+        note: "Skill row from the rewrite-owned combat XP breakdown."
+      })
+    );
+  }
+
+  rows.push(
+    xpRoutingRow({
+      id: "prayer",
+      label: "Prayer XP/hr",
+      xpPerHour: input.trip.prayerXpPerHour,
+      status: "partial",
+      note: "Trip loot prayer XP is surfaced, but full total-XP parity remains partial."
+    }),
+    xpRoutingRow({
+      id: "alch",
+      label: "Magic (alch) XP/hr",
+      xpPerHour: null,
+      status: "not-modeled",
+      note:
+        input.trip.alchCastsPerKill > 0
+          ? `${formatNumber(input.trip.alchCastsPerKill, 2)} alch casts/kill tracked; XP row is not yet domain-owned.`
+          : "High-alch Magic XP is not yet domain-owned in rewrite XP routing."
+    })
+  );
+
+  return {
+    effectiveXpPerHour: input.effectiveXpPerHour,
+    totalXpPerHour: input.totalXpPerHour,
+    effectiveXpPerHourLabel: formatNumber(input.effectiveXpPerHour),
+    totalXpPerHourLabel: formatNumber(input.totalXpPerHour),
+    rows
+  };
+}
+
+function finiteMinutesLabel(minutes: number): string {
+  return Number.isFinite(minutes) ? `${formatNumber(minutes, 1)}m` : "unlimited";
+}
+
+function finiteSecondsLabel(seconds: number): string {
+  return Number.isFinite(seconds) ? `${formatNumber(seconds)}s` : "unlimited";
+}
+
+function statsTripRow(input: {
+  id: string;
+  label: string;
+  value: string;
+  numericValue?: number | null;
+  note?: string;
+  tone?: StatsTripBankingSummaryRowViewModel["tone"];
+}): StatsTripBankingSummaryRowViewModel {
+  return {
+    id: input.id,
+    label: input.label,
+    value: input.value,
+    numericValue: input.numericValue ?? null,
+    note: input.note ?? "",
+    tone: input.tone ?? "default"
+  };
+}
+
+function safespotStateLabel(form: CombatSetupFormState, trip: TripLootSupplyResult): string {
+  if (trip.trip.incoming.safespot) return form.trip.safespot == null ? "Auto safespot" : "On";
+  return form.trip.safespot === false ? "Off" : "No safespot";
+}
+
+function protectionStateLabel(form: CombatSetupFormState, trip: TripLootSupplyResult): string {
+  const requested = PROTECTION_LABELS[form.trip.protect ?? "none"];
+  if (trip.trip.incoming.protected) return `${requested} active`;
+  return requested === "None" ? "None" : `${requested} not blocking`;
+}
+
+function createTripBankingSummaryViewModel(
+  form: CombatSetupFormState,
+  trip: TripLootSupplyResult
+): StatsTripBankingSummaryViewModel {
+  const currentBound = trip.trip.scarce.respawnBound ? "respawn-bound" : trip.trip.bound;
+
+  return {
+    rows: [
+      statsTripRow({
+        id: "kills-trip",
+        label: "Kills/trip",
+        value: formatNumber(trip.trip.killsPerTrip, 1),
+        numericValue: trip.trip.killsPerTrip
+      }),
+      statsTripRow({
+        id: "trip-length",
+        label: "Trip length",
+        value: finiteMinutesLabel(trip.trip.tripMinutes),
+        numericValue: trip.trip.tripMinutes
+      }),
+      statsTripRow({
+        id: "bank-time",
+        label: "Bank time",
+        value: finiteSecondsLabel(trip.trip.bankSeconds),
+        numericValue: trip.trip.bankSeconds
+      }),
+      statsTripRow({
+        id: "effective-kills-hour",
+        label: "Effective kills/hr",
+        value: formatNumber(trip.effectiveKph),
+        numericValue: trip.effectiveKph,
+        tone: "teal"
+      }),
+      statsTripRow({
+        id: "supply-kill",
+        label: "Supply/kill",
+        value: formatNumber(trip.supply.supplyCostPerKill),
+        numericValue: trip.supply.supplyCostPerKill,
+        tone: "gold"
+      }),
+      statsTripRow({
+        id: "net-gp-hour",
+        label: "Net GP/hr",
+        value: formatNumber(trip.effectiveNetGpPerHour),
+        numericValue: trip.effectiveNetGpPerHour,
+        note: "After trip and banking efficiency.",
+        tone: "gold"
+      }),
+      statsTripRow({
+        id: "trip-bound",
+        label: "Current trip bound",
+        value: currentBound,
+        note: trip.trip.scarce.respawnBound
+          ? "Scarce/respawn cap limits effective rate."
+          : "Selected by the current Trip model."
+      }),
+      statsTripRow({
+        id: "safespot-state",
+        label: "Safespot",
+        value: safespotStateLabel(form, trip),
+        note: trip.trip.incoming.safespotAuto ? "Auto-derived from combat style or target." : ""
+      }),
+      statsTripRow({
+        id: "protection-state",
+        label: "Protection",
+        value: protectionStateLabel(form, trip),
+        note: trip.trip.incoming.protected ? "Incoming damage blocked by protection prayer." : ""
+      })
+    ]
+  };
+}
+
+function createHitDistributionViewModel(
+  combat: ReturnType<typeof simulateCombat>
+): HitDistributionViewModel {
+  const distribution = createHitDistribution({
+    hitChance: combat.hitChance,
+    averageHit: combat.avgHit,
+    maxHit: combat.maxHit,
+    peakMaxHit: combat.peakMaxHit
+  });
+  const maxProbability = Math.max(...distribution.buckets.map((bucket) => bucket.probability), 0);
+
+  return {
+    hitChance: distribution.hitChance,
+    averageHit: distribution.averageHit,
+    maxHit: distribution.maxHit,
+    peakMaxHit: distribution.peakMaxHit,
+    probabilityTotal: distribution.probabilityTotal,
+    hitChanceLabel: `${formatNumber(distribution.hitChance * 100, 1)}%`,
+    averageHitLabel: formatNumber(distribution.averageHit, 2),
+    maxHitLabel: formatNumber(distribution.maxHit, 1),
+    buckets: distribution.buckets.map((bucket) => {
+      const percentLabel = `${formatNumber(bucket.probability * 100, 1)}%`;
+      const damageText = bucket.isMiss
+        ? "miss or zero damage"
+        : bucket.minDamage === bucket.maxDamage
+          ? `${bucket.minDamage} damage`
+          : `${bucket.minDamage} to ${bucket.maxDamage} damage`;
+      return {
+        id: bucket.id,
+        label: bucket.label,
+        ariaLabel: `${damageText}: ${percentLabel}${
+          bucket.isMaxHit ? ", max hit bucket" : ""
+        }`,
+        probability: bucket.probability,
+        percentLabel,
+        widthPercent:
+          maxProbability > 0 ? Math.max(3, (bucket.probability / maxProbability) * 100) : 0,
+        isMiss: bucket.isMiss,
+        isMaxHit: bucket.isMaxHit
+      };
+    })
+  };
+}
+
+function finitePositiveMax(values: number[]): number {
+  return Math.max(0, ...values.filter((value) => Number.isFinite(value) && value > 0));
+}
+
+function scalePercent(value: number, maxValue: number): number {
+  if (!Number.isFinite(value) || !Number.isFinite(maxValue) || maxValue <= 0) return 0;
+  return Math.max(0, Math.min(100, (value / maxValue) * 100));
+}
+
+export function createDenseCompareScaleModel(
+  rows: DenseCompareRowViewModel[]
+): DenseCompareScaleViewModel {
+  const maxXp = finitePositiveMax(rows.map((row) => row.xpPerHour));
+  const maxPositiveNetGp = finitePositiveMax(rows.map((row) => row.netGpPerHour));
+  const maxNegativeNetGp = finitePositiveMax(
+    rows.map((row) => (row.netGpPerHour < 0 ? Math.abs(row.netGpPerHour) : 0))
+  );
+
+  return Object.fromEntries(
+    rows.map((row) => {
+      const netTone: DenseCompareScaleTone =
+        row.netGpPerHour > 0 ? "positive" : row.netGpPerHour < 0 ? "negative" : "neutral";
+      const netWidth =
+        row.netGpPerHour < 0
+          ? scalePercent(Math.abs(row.netGpPerHour), maxNegativeNetGp)
+          : scalePercent(row.netGpPerHour, maxPositiveNetGp);
+
+      return [
+        row.monsterId,
+        {
+          xpPerHour: {
+            value: row.xpPerHour,
+            widthPercent: scalePercent(row.xpPerHour, maxXp),
+            tone: row.xpPerHour > 0 ? "positive" : "neutral",
+            ariaLabel: `${row.monsterName} XP/hr ${formatNumber(row.xpPerHour)}, scaled to visible rows`
+          },
+          netGpPerHour: {
+            value: row.netGpPerHour,
+            widthPercent: netWidth,
+            tone: netTone,
+            ariaLabel: `${row.monsterName} net GP/hr ${formatNumber(row.netGpPerHour)}, ${
+              netTone === "negative"
+                ? "loss"
+                : netTone === "positive"
+                  ? "profit"
+                  : "break-even"
+            } scaled to visible rows`
+          }
+        }
+      ];
+    })
+  );
+}
+
 export function createSimulationViewModel(
   form: CombatSetupFormState,
   context: SimulationContext,
@@ -1128,6 +1682,16 @@ export function createSimulationViewModel(
   return {
     request,
     combat,
+    hitDistribution: createHitDistributionViewModel(combat),
+    xpRouting: createXpRoutingViewModel({
+      xp,
+      trip,
+      playerEffectiveXpPerHour,
+      cannonEffectiveXpPerHour,
+      effectiveXpPerHour,
+      totalXpPerHour
+    }),
+    tripBankingSummary: createTripBankingSummaryViewModel(form, trip),
     monsterCard: monsterCardFromResult(request, context, combat, options.monsterCard),
     trip,
     playerEffectiveXpPerHour,
@@ -1155,6 +1719,165 @@ export function createSimulationViewModel(
       overrideCount: lootRows.overrideCount,
       valueComposition: createLootValueComposition(trip)
     }
+  };
+}
+
+type DuelComparisonBaseRowViewModel = Omit<DuelComparisonRowViewModel, "deltas" | "best">;
+
+function gpPerXpValue(effectiveNetGpPerHour: number, effectiveXpPerHour: number): number | null {
+  return effectiveXpPerHour > 0 ? effectiveNetGpPerHour / effectiveXpPerHour : null;
+}
+
+function duelLoadoutLabel(vm: SimulationViewModel): string {
+  const overview = vm.monsterCard.setupOverview;
+  const parts = [overview.combatStyle, overview.weapon.label];
+  if (overview.ammo) parts.push(overview.ammo.label);
+  if (overview.spell) parts.push(overview.spell.label);
+  if (overview.prayerIds.length > 0) {
+    parts.push(`${overview.prayerIds.length} prayer${overview.prayerIds.length === 1 ? "" : "s"}`);
+  }
+  if (overview.boostIds.length > 0) {
+    parts.push(`${overview.boostIds.length} boost${overview.boostIds.length === 1 ? "" : "s"}`);
+  }
+  if (overview.sustained) parts.push("sustained");
+  return parts.join(" · ");
+}
+
+function duelBaseRowFromSimulation(
+  id: string,
+  source: DuelComparisonRowSource,
+  snapshotId: EntityId | null,
+  name: string,
+  vm: SimulationViewModel
+): DuelComparisonBaseRowViewModel {
+  return {
+    id,
+    snapshotId,
+    source,
+    name,
+    monsterId: vm.request.monsterId,
+    monsterName: vm.monsterCard.monsterName,
+    combatStyle: vm.request.combatStyle,
+    loadoutLabel: duelLoadoutLabel(vm),
+    maxHit: vm.combat.maxHit,
+    dps: vm.combat.effectiveDps,
+    hitChance: vm.combat.hitChance,
+    ttkSec: vm.combat.ttkSec,
+    killsPerTrip: vm.trip.trip.killsPerTrip,
+    killsPerHour: vm.trip.killsPerHour,
+    effectiveXpPerHour: vm.effectiveXpPerHour,
+    effectiveNetGpPerHour: vm.trip.effectiveNetGpPerHour,
+    gpPerXp: gpPerXpValue(vm.trip.effectiveNetGpPerHour, vm.effectiveXpPerHour),
+    supplyCostPerHour: vm.trip.supply.supplyCostPerKill * vm.trip.effectiveKph,
+    bound: vm.trip.trip.bound,
+    warnings: vm.warnings
+  };
+}
+
+function finiteBest(values: ReadonlyArray<number | null>): number | null {
+  const finiteValues = values.filter((value): value is number => value != null && isFinite(value));
+  if (!finiteValues.length) return null;
+  return Math.max(...finiteValues);
+}
+
+function isBestDuelValue(
+  value: number | null,
+  best: number | null,
+  rowCount: number,
+  tolerance = 0.000001
+): boolean {
+  return value != null && best != null && rowCount > 1 && value >= best - tolerance;
+}
+
+export function createDuelComparisonViewModel(
+  form: CombatSetupFormState,
+  duelSnapshots: DuelSnapshotsState,
+  context: SimulationContext,
+  cannonByMonster: CannonByMonsterState = {},
+  lootPrefsByMonster: Record<string, Record<string, LootAction | string | undefined>> = {},
+  lootSettingsByMonster: LootSettingsByMonsterState = {}
+): DuelComparisonViewModel {
+  const currentForm = normalizeFormState(form);
+  const currentMonsterId = currentForm.monsterId;
+  const currentLootPrefs = lootPrefsByMonster[currentMonsterId] ?? {};
+  const normalizedSnapshots = normalizeDuelSnapshotsState(duelSnapshots).snapshots;
+  const liveVm = createSimulationViewModel(
+    currentForm,
+    context,
+    cannonByMonster,
+    currentLootPrefs,
+    lootSettingsByMonster,
+    { includeLootRows: false }
+  );
+  const liveBaseRow = duelBaseRowFromSimulation(
+    "duel-live",
+    "live",
+    null,
+    "Live loadout",
+    liveVm
+  );
+  const snapshotBaseRows = normalizedSnapshots.map((snapshot) => {
+    const snapshotForm = normalizeFormState({
+      ...snapshot.form,
+      monsterId: currentMonsterId
+    });
+    const vm = createSimulationViewModel(
+      snapshotForm,
+      context,
+      cannonByMonster,
+      currentLootPrefs,
+      lootSettingsByMonster,
+      { includeLootRows: false }
+    );
+    return duelBaseRowFromSimulation(
+      `duel-snapshot:${snapshot.id}`,
+      "snapshot",
+      snapshot.id,
+      snapshot.name,
+      vm
+    );
+  });
+  const baseRows = [liveBaseRow, ...snapshotBaseRows];
+  const bestEffectiveXpPerHour = finiteBest(baseRows.map((row) => row.effectiveXpPerHour));
+  const bestEffectiveNetGpPerHour = finiteBest(baseRows.map((row) => row.effectiveNetGpPerHour));
+  const bestGpPerXp = finiteBest(baseRows.map((row) => row.gpPerXp));
+  const rows = baseRows.map((row) => ({
+    ...row,
+    deltas: {
+      dps: row.dps - liveBaseRow.dps,
+      effectiveXpPerHour: row.effectiveXpPerHour - liveBaseRow.effectiveXpPerHour,
+      effectiveNetGpPerHour: row.effectiveNetGpPerHour - liveBaseRow.effectiveNetGpPerHour,
+      gpPerXp:
+        row.gpPerXp != null && liveBaseRow.gpPerXp != null
+          ? row.gpPerXp - liveBaseRow.gpPerXp
+          : null
+    },
+    best: {
+      effectiveXpPerHour: isBestDuelValue(
+        row.effectiveXpPerHour,
+        bestEffectiveXpPerHour,
+        baseRows.length,
+        0.5
+      ),
+      effectiveNetGpPerHour: isBestDuelValue(
+        row.effectiveNetGpPerHour,
+        bestEffectiveNetGpPerHour,
+        baseRows.length,
+        0.5
+      ),
+      gpPerXp: isBestDuelValue(row.gpPerXp, bestGpPerXp, baseRows.length)
+    }
+  }));
+  const [liveRow, ...snapshotRows] = rows;
+
+  return {
+    monsterId: currentMonsterId,
+    monsterName: liveVm.monsterCard.monsterName,
+    snapshotCount: normalizedSnapshots.length,
+    snapshotLimit: MAX_DUEL_SNAPSHOTS,
+    liveRow,
+    snapshotRows,
+    rows
   };
 }
 

@@ -14,17 +14,23 @@ import {
   DEFAULT_DENSE_COMPARE_STATE,
   DEFAULT_DENSE_COMPARE_SORT_STATE
 } from "../app/state/dense-compare";
+import { MAX_DUEL_SNAPSHOTS, createDuelSnapshot } from "../app/state/duel-snapshots";
 import {
   ammoOptions,
   createCompareRows,
   createDenseCompareRows,
+  createDenseCompareScaleModel,
+  createDuelComparisonViewModel,
   createMonsterCardViewModel,
   createPlannerViewModel,
   createSimulationViewModel,
   equipmentSlotOptions,
+  formatNumber,
+  gearQuickActionForSlot,
   optimizeLootPrefsForMonster,
   spellOptions,
   sortDenseCompareRows,
+  type DenseCompareRowViewModel,
   weaponOptions
 } from "../app/view-models/simulation";
 
@@ -134,6 +140,24 @@ describe("rewrite UI view models", () => {
     expect(context.gameData.monsters[request.monsterId]).toBeDefined();
   });
 
+  it("maps normalized multi-prayer and multi-boost selections into SimulationRequest", () => {
+    const request = formToSimulationRequest({
+      ...DEFAULT_FORM_STATE,
+      prayers: ["none", "clarity", "incredible", "ultimate", "unknown_prayer"],
+      boosts: ["none", "super_att", "super_str", "magic", "unknown_boost"]
+    });
+    const emptyRequest = formToSimulationRequest({
+      ...DEFAULT_FORM_STATE,
+      prayers: ["none", "unknown_prayer"],
+      boosts: ["none", "unknown_boost"]
+    });
+
+    expect(request.prayers.keys).toEqual(["incredible", "ultimate"]);
+    expect(request.boosts.keys).toEqual(["super_att", "super_str", "magic"]);
+    expect(emptyRequest.prayers.keys).toEqual(["none"]);
+    expect(emptyRequest.boosts.keys).toEqual(["none"]);
+  });
+
   it("builds searchable loadout option view models from the validated game snapshot", async () => {
     const { context } = await loadBundledLegacyContext();
 
@@ -169,6 +193,88 @@ describe("rewrite UI view models", () => {
         expect.objectContaining({ id: "fire_wave", hint: expect.stringContaining("base") })
       ])
     );
+  });
+
+  it("selects deterministic visible gear quick actions for the active combat style", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const helmOptions = equipmentSlotOptions(context.gameData, "helm");
+    const bodyOptions = equipmentSlotOptions(context.gameData, "body");
+
+    const meleeHelm = gearQuickActionForSlot({
+      gameData: context.gameData,
+      slot: "helm",
+      combatStyle: "melee",
+      weaponId: "rune_scimitar",
+      styleId: "aggressive",
+      currentItemId: "rune_full_helm",
+      options: helmOptions
+    });
+    const rangedHelm = gearQuickActionForSlot({
+      gameData: context.gameData,
+      slot: "helm",
+      combatStyle: "ranged",
+      weaponId: "magic_shortbow",
+      styleId: "rapid",
+      currentItemId: "rune_full_helm",
+      options: helmOptions
+    });
+    const magicHelm = gearQuickActionForSlot({
+      gameData: context.gameData,
+      slot: "helm",
+      combatStyle: "magic",
+      weaponId: "staff_of_fire",
+      styleId: "accurate",
+      currentItemId: "rune_full_helm",
+      options: helmOptions
+    });
+    const currentTie = gearQuickActionForSlot({
+      gameData: context.gameData,
+      slot: "body",
+      combatStyle: "melee",
+      weaponId: "rune_scimitar",
+      styleId: "aggressive",
+      currentItemId: "rune_platebody",
+      options: bodyOptions
+    });
+
+    expect(meleeHelm).toMatchObject({ itemId: "berserker_helm", disabled: false });
+    expect(rangedHelm).toMatchObject({ itemId: "robin_hood_hat", disabled: false });
+    expect(magicHelm).toMatchObject({ itemId: "farseer_helm", disabled: false });
+    expect(currentTie).toMatchObject({ itemId: "rune_platebody", disabled: true });
+  });
+
+  it("limits gear quick actions to the supplied visible candidates and shield lock", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const hiddenBestOptions = equipmentSlotOptions(context.gameData, "helm").filter(
+      (option) => option.id !== "berserker_helm"
+    );
+    const hiddenBest = gearQuickActionForSlot({
+      gameData: context.gameData,
+      slot: "helm",
+      combatStyle: "melee",
+      weaponId: "rune_scimitar",
+      styleId: "aggressive",
+      currentItemId: "rune_full_helm",
+      options: hiddenBestOptions
+    });
+    const lockedShield = gearQuickActionForSlot({
+      gameData: context.gameData,
+      slot: "shield",
+      combatStyle: "melee",
+      weaponId: "dragon_halberd",
+      styleId: "aggressive",
+      currentItemId: "rune_kite",
+      options: equipmentSlotOptions(context.gameData, "shield"),
+      shieldLocked: true
+    });
+
+    expect(hiddenBest.itemId).not.toBe("berserker_helm");
+    expect(hiddenBest).toMatchObject({ itemId: "warrior_helm", disabled: false });
+    expect(lockedShield).toMatchObject({
+      itemId: "none",
+      disabled: true,
+      reason: "Shield locked by two-handed weapon"
+    });
   });
 
   it("clears and locks shield state when a two-handed weapon is selected", async () => {
@@ -671,6 +777,49 @@ describe("rewrite UI view models", () => {
     expect(dbaNoRestore.trip.trip.slots.potionParts).not.toContain("1 restore");
   });
 
+  it("exposes potion carry recommendation without adding it to SimulationRequest", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const vialMode = createSimulationViewModel(
+      {
+        ...DEFAULT_FORM_STATE,
+        trip: { ...DEFAULT_FORM_STATE.trip, potionSets: 0, singleDose: false }
+      },
+      context
+    );
+    const singleDoseMode = createSimulationViewModel(
+      {
+        ...DEFAULT_FORM_STATE,
+        trip: { ...DEFAULT_FORM_STATE.trip, potionDoses: 0, singleDose: true }
+      },
+      context
+    );
+    const noBoost = createSimulationViewModel(
+      {
+        ...DEFAULT_FORM_STATE,
+        boosts: ["none"],
+        trip: { ...DEFAULT_FORM_STATE.trip, potionSets: 0, singleDose: false }
+      },
+      context
+    );
+
+    expect(vialMode.request).not.toHaveProperty("potionRecommendation");
+    expect(vialMode.trip.potionRecommendation).toMatchObject({
+      active: true,
+      recommendedVials: 1,
+      matched: false
+    });
+    expect(singleDoseMode.trip.potionRecommendation).toMatchObject({
+      active: true,
+      recommendedDoses: 1,
+      matched: false
+    });
+    expect(noBoost.trip.potionRecommendation).toMatchObject({
+      active: false,
+      recommendedVials: 0,
+      recommendedDoses: 0
+    });
+  });
+
   it("maps selected melee special attack into SimulationRequest only when valid", async () => {
     const { context } = await loadBundledLegacyContext();
     const form: CombatSetupFormState = {
@@ -841,6 +990,184 @@ describe("rewrite UI view models", () => {
     expect(compareRows).toHaveLength(3);
     expect(planner.ok).toBe(true);
     expect(planner.phases.length).toBeGreaterThan(0);
+  }, 15_000);
+
+  it("builds hit distribution histogram data from the combat result", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const result = createSimulationViewModel(DEFAULT_FORM_STATE, context);
+    const distribution = result.hitDistribution;
+    const probabilityTotal = distribution.buckets.reduce(
+      (sum, bucket) => sum + bucket.probability,
+      0
+    );
+    const missBucket = distribution.buckets[0]!;
+    const maxBucket = distribution.buckets.find((bucket) => bucket.isMaxHit);
+
+    expect(distribution.hitChance).toBe(result.combat.hitChance);
+    expect(distribution.averageHit).toBe(result.combat.avgHit);
+    expect(distribution.maxHit).toBe(result.combat.maxHit);
+    expect(distribution.hitChanceLabel).toBe(`${formatNumber(result.combat.hitChance * 100, 1)}%`);
+    expect(distribution.averageHitLabel).toBe(formatNumber(result.combat.avgHit, 2));
+    expect(distribution.maxHitLabel).toBe(formatNumber(result.combat.maxHit, 1));
+    expect(probabilityTotal).toBeCloseTo(1);
+    expect(distribution.probabilityTotal).toBeCloseTo(1);
+    expect(missBucket).toMatchObject({
+      id: "miss-zero",
+      label: "Miss / 0",
+      isMiss: true
+    });
+    expect(missBucket.ariaLabel).toContain("miss or zero damage");
+    expect(maxBucket).toBeDefined();
+    expect(maxBucket?.ariaLabel).toContain("max hit bucket");
+  }, 15_000);
+
+  it("builds Stats XP routing rows with player, skill and honest partial rows", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const result = createSimulationViewModel(DEFAULT_FORM_STATE, context);
+    const rows = new Map(result.xpRouting.rows.map((row) => [row.id, row]));
+    const skillRows = result.xpRouting.rows.filter((row) => row.id.startsWith("skill-"));
+
+    expect(result.xpRouting.effectiveXpPerHour).toBe(result.effectiveXpPerHour);
+    expect(result.xpRouting.totalXpPerHour).toBe(result.totalXpPerHour);
+    expect(result.xpRouting.effectiveXpPerHourLabel).toBe(formatNumber(result.effectiveXpPerHour));
+    expect(rows.get("player-combat")).toMatchObject({
+      label: "Player combat XP/hr",
+      xpPerHour: result.playerEffectiveXpPerHour,
+      status: "modeled"
+    });
+    expect(rows.has("cannon-ranged")).toBe(false);
+    expect(skillRows.length).toBeGreaterThan(0);
+    expect(rows.get("skill-hp")).toMatchObject({
+      label: "Hitpoints",
+      status: "modeled"
+    });
+    expect(rows.get("prayer")).toMatchObject({
+      label: "Prayer XP/hr",
+      xpPerHour: result.trip.prayerXpPerHour,
+      status: "partial",
+      statusLabel: "partial"
+    });
+    expect(rows.get("prayer")?.note).toContain("full total-XP parity remains partial");
+    expect(rows.get("alch")).toMatchObject({
+      label: "Magic (alch) XP/hr",
+      xpPerHour: null,
+      value: "-",
+      status: "not-modeled",
+      statusLabel: "not modeled"
+    });
+  }, 15_000);
+
+  it("adds the Stats cannon XP routing row only when cannon contributes", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const form = rangedDagannothForm();
+    const withoutCannon = createSimulationViewModel(form, context);
+    const withCannon = createSimulationViewModel(form, context, {
+      dagannoth: { enabled: true, targets: 6, respawnSec: 30 }
+    });
+    const withoutRows = new Map(withoutCannon.xpRouting.rows.map((row) => [row.id, row]));
+    const withRows = new Map(withCannon.xpRouting.rows.map((row) => [row.id, row]));
+
+    expect(withoutRows.has("cannon-ranged")).toBe(false);
+    expect(withRows.get("cannon-ranged")).toMatchObject({
+      label: "Cannon ranged XP/hr",
+      xpPerHour: withCannon.cannonEffectiveXpPerHour,
+      status: "modeled"
+    });
+    expect(withCannon.cannonEffectiveXpPerHour).toBeGreaterThan(0);
+  }, 15_000);
+
+  it("builds the Stats Trip and banking summary from the trip result", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const form = normalizeFormState({
+      ...DEFAULT_FORM_STATE,
+      trip: {
+        ...DEFAULT_FORM_STATE.trip,
+        bankSeconds: 150,
+        safespot: false,
+        protect: "melee"
+      }
+    });
+    const result = createSimulationViewModel(form, context);
+    const rows = new Map(result.tripBankingSummary.rows.map((row) => [row.id, row]));
+    const expectedBound = result.trip.trip.scarce.respawnBound
+      ? "respawn-bound"
+      : result.trip.trip.bound;
+
+    expect(rows.get("kills-trip")).toMatchObject({
+      label: "Kills/trip",
+      value: formatNumber(result.trip.trip.killsPerTrip, 1),
+      numericValue: result.trip.trip.killsPerTrip
+    });
+    expect(rows.get("trip-length")).toMatchObject({
+      label: "Trip length",
+      numericValue: result.trip.trip.tripMinutes
+    });
+    expect(rows.get("bank-time")).toMatchObject({
+      label: "Bank time",
+      value: "150s",
+      numericValue: 150
+    });
+    expect(rows.get("effective-kills-hour")?.numericValue).toBe(result.trip.effectiveKph);
+    expect(rows.get("supply-kill")?.numericValue).toBe(result.trip.supply.supplyCostPerKill);
+    expect(rows.get("net-gp-hour")?.numericValue).toBe(result.trip.effectiveNetGpPerHour);
+    expect(rows.get("trip-bound")?.value).toBe(expectedBound);
+    expect(rows.get("safespot-state")?.value).toBe("Off");
+    expect(rows.get("protection-state")?.value).toContain("active");
+  }, 15_000);
+
+  it("builds duel comparison rows for live and snapshots on the current monster", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const snapshotForm = normalizeFormState({
+      ...switchCombatStyleLoadout(DEFAULT_FORM_STATE, "ranged"),
+      monsterId: "firegiant",
+      weaponId: "magic_shortbow",
+      ammoId: "mith_arrow",
+      prayers: ["none"],
+      boosts: ["ranging"]
+    });
+    const snapshot = createDuelSnapshot("snap-ranged", "Ranged saved", snapshotForm);
+
+    const duel = createDuelComparisonViewModel(
+      DEFAULT_FORM_STATE,
+      { snapshots: [snapshot] },
+      context
+    );
+    const snapshotRow = duel.snapshotRows[0]!;
+
+    expect(duel).toMatchObject({
+      monsterId: DEFAULT_FORM_STATE.monsterId,
+      monsterName: context.gameData.monsters[DEFAULT_FORM_STATE.monsterId]?.name,
+      snapshotCount: 1,
+      snapshotLimit: MAX_DUEL_SNAPSHOTS
+    });
+    expect(duel.rows).toHaveLength(2);
+    expect(duel.liveRow).toMatchObject({
+      id: "duel-live",
+      source: "live",
+      snapshotId: null,
+      name: "Live loadout",
+      monsterId: DEFAULT_FORM_STATE.monsterId,
+      combatStyle: "melee"
+    });
+    expect(snapshotRow).toMatchObject({
+      source: "snapshot",
+      snapshotId: "snap-ranged",
+      name: "Ranged saved",
+      monsterId: DEFAULT_FORM_STATE.monsterId,
+      combatStyle: "ranged"
+    });
+    expect(snapshot.form.monsterId).toBe("firegiant");
+    expect(snapshotRow.dps).toBeGreaterThan(0);
+    expect(Number.isFinite(snapshotRow.effectiveXpPerHour)).toBe(true);
+    expect(Number.isFinite(snapshotRow.effectiveNetGpPerHour)).toBe(true);
+    expect(snapshotRow.deltas.dps).toBeCloseTo(snapshotRow.dps - duel.liveRow.dps);
+    expect(
+      duel.rows.some(
+        (row) =>
+          row.best.effectiveXpPerHour || row.best.effectiveNetGpPerHour || row.best.gpPerXp
+      )
+    ).toBe(true);
+    expect(JSON.stringify(snapshot)).not.toContain("effectiveXpPerHour");
   }, 15_000);
 
   it("builds full current-monster loot rows with stable duplicate-safe row ids", async () => {
@@ -1317,6 +1644,56 @@ describe("rewrite UI view models", () => {
     expect(nestedGemRows.some((row) => row.isActiveTarget)).toBe(true);
     expect(nestedGemRows.some((row) => !row.isActiveTarget)).toBe(true);
   }, 15_000);
+
+  it("scales dense compare XP and net GP affordances against the visible rows", () => {
+    const row = (
+      monsterId: string,
+      xpPerHour: number,
+      netGpPerHour: number
+    ): DenseCompareRowViewModel => ({
+      monsterId,
+      monsterName: monsterId,
+      monsterLevel: null,
+      isActiveTarget: false,
+      isForcedVisible: false,
+      isIrrelevant: false,
+      hasCustomSetup: false,
+      hasHighAlchOverride: false,
+      hasOverheadOverride: false,
+      markers: [],
+      hitChance: 0,
+      maxHit: 0,
+      dps: 0,
+      ttkSec: 0,
+      killsPerHour: 0,
+      xpPerHour,
+      gpPerKill: 0,
+      gpPerHour: 0,
+      netGpPerHour,
+      bound: "none"
+    });
+    const rows = [row("visible-low", 50, -100), row("visible-best", 200, 300), row("visible-loss", 100, -400)];
+    const scales = createDenseCompareScaleModel(rows);
+
+    expect(scales["visible-best"].xpPerHour).toMatchObject({
+      value: 200,
+      widthPercent: 100,
+      tone: "positive"
+    });
+    expect(scales["visible-low"].xpPerHour.widthPercent).toBeCloseTo(25);
+    expect(scales["visible-best"].netGpPerHour).toMatchObject({
+      value: 300,
+      widthPercent: 100,
+      tone: "positive"
+    });
+    expect(scales["visible-loss"].netGpPerHour).toMatchObject({
+      value: -400,
+      widthPercent: 100,
+      tone: "negative"
+    });
+    expect(scales["visible-low"].netGpPerHour.widthPercent).toBeCloseTo(25);
+    expect(scales["visible-loss"].netGpPerHour.ariaLabel).toContain("loss scaled to visible rows");
+  });
 
   it("hides irrelevant dense compare rows unless showIrrelevant is enabled", async () => {
     const { context } = await loadBundledLegacyContext();

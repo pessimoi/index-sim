@@ -77,6 +77,17 @@ import {
   type HiddenGearTiersState
 } from "./state/hidden-gear-tiers";
 import {
+  DEFAULT_DUEL_SNAPSHOTS_STATE,
+  DUEL_SNAPSHOTS_STORAGE_KEY,
+  DUEL_SNAPSHOTS_VERSION,
+  DuelSnapshotsStateSchema,
+  appendDuelSnapshot,
+  createDuelSnapshot,
+  removeDuelSnapshot,
+  renameDuelSnapshot,
+  type DuelSnapshotsState
+} from "./state/duel-snapshots";
+import {
   DEFAULT_LOOT_PREFS_STATE,
   LOOT_PREFS_STORAGE_KEY,
   LOOT_PREFS_VERSION,
@@ -126,24 +137,35 @@ import {
 } from "./state/planner";
 import {
   CannonSettingsSchema,
+  BOOST_SELECTION_OPTIONS,
   DEFAULT_CANNON_SETTINGS,
   DEFAULT_FORM_STATE,
   DEFAULT_MANUAL_OVERRIDES,
   DEFAULT_SPECIAL_ATTACK_STATE,
+  PRAYER_SELECTION_OPTIONS,
   REWRITE_SETUP_STORAGE_KEY,
   REWRITE_SETUP_VERSION,
   SavedSetupEnvelopeSchema,
   SavedSetupSchema,
   applyWeaponSelection,
+  extraBoostSelectionCount,
+  extraPrayerSelectionCount,
   formForMonsterSetup,
   normalizeFormState,
+  primaryBoostValue,
+  primaryPrayerValue,
   removeCustomSetupForMonster,
   savedSetupFromForm,
+  setPrimaryBoostSelection,
+  setPrimaryPrayerSelection,
   setCustomSetupForMonster,
   switchCombatStyleLoadout,
+  toggleBoostSelection,
+  togglePrayerSelection,
   type CannonByMonsterState,
   type CombatSetupFormState,
   type CustomSetupsByMonsterState,
+  type SetupSelectionOption,
   type SetupMode
 } from "./state/ui-state";
 import {
@@ -157,7 +179,10 @@ import {
 } from "./state/dense-compare";
 import {
   ammoOptions,
+  createDenseCompareScaleModel,
   createDenseCompareRows,
+  createDuelComparisonViewModel,
+  gearQuickActionForSlot,
   createPlannerGearPoolEditorViewModel,
   createPlannerPanelViewModel,
   createPlannerViewModel,
@@ -165,7 +190,9 @@ import {
   equipmentSlotOptions,
   optimizeLootPrefsForMonster,
   plannerAllowedPool,
+  type DenseCompareScaleCellViewModel,
   type DenseCompareRowViewModel,
+  type DuelComparisonRowViewModel,
   type CalculationWarningViewModel,
   type MonsterCardViewModel,
   type PlannerGearPoolEditorViewModel,
@@ -209,6 +236,13 @@ const hiddenGearTiersStorageOptions = {
   storage
 };
 
+const duelSnapshotsStorageOptions = {
+  key: DUEL_SNAPSHOTS_STORAGE_KEY,
+  version: DUEL_SNAPSHOTS_VERSION,
+  schema: DuelSnapshotsStateSchema,
+  storage
+};
+
 const priceHistoryStorageOptions = {
   key: PRICE_HISTORY_STORAGE_KEY,
   version: PRICE_HISTORY_VERSION,
@@ -247,6 +281,11 @@ function loadInitialLootSettings(): LootSettingsByMonsterState {
 function loadInitialHiddenGearTiers(): HiddenGearTiersState {
   const persisted = loadPersisted(hiddenGearTiersStorageOptions);
   return persisted.status === "loaded" ? persisted.value : DEFAULT_HIDDEN_GEAR_TIERS_STATE;
+}
+
+function loadInitialDuelSnapshots(): DuelSnapshotsState {
+  const persisted = loadPersisted(duelSnapshotsStorageOptions);
+  return persisted.status === "loaded" ? persisted.value : DEFAULT_DUEL_SNAPSHOTS_STATE;
 }
 
 function loadInitialPriceHistory(): BrowserPriceHistoryState {
@@ -330,29 +369,14 @@ const DEFENSIVE_BONUS_LABELS: Array<[keyof EquipmentBonuses, string]> = [
 ];
 
 const PRAYER_OPTIONS: SelectOption[] = [
-  "none",
-  "clarity",
-  "reflexes",
-  "incredible",
-  "burst",
-  "superhuman",
-  "ultimate",
-  "thick_skin",
-  "rock_skin",
-  "steel_skin"
-].map((id) => ({ id, label: id.replaceAll("_", " ") }));
+  { id: "none", label: "None" },
+  ...PRAYER_SELECTION_OPTIONS.map(({ id, label }) => ({ id, label }))
+];
 
 const BOOST_OPTIONS: SelectOption[] = [
-  "none",
-  "super_att",
-  "super_str",
-  "super_def",
-  "ranging",
-  "magic",
-  "chaos_gauntlets",
-  "dba_spec",
-  "restore"
-].map((id) => ({ id, label: id.replaceAll("_", " ") }));
+  { id: "none", label: "None" },
+  ...BOOST_SELECTION_OPTIONS.map(({ id, label }) => ({ id, label }))
+];
 
 const SAFESPOT_OPTIONS: SelectOption[] = [
   { id: "auto", label: "Auto" },
@@ -478,6 +502,29 @@ const DENSE_TABLE_COLUMNS: Array<{
   }
 ];
 
+type DenseScaleColumnKey = "xpPerHour" | "netGpPerHour";
+
+function isDenseScaleColumn(key: DenseCompareSortKey): key is DenseScaleColumnKey {
+  return key === "xpPerHour" || key === "netGpPerHour";
+}
+
+function DenseScaleCell({
+  value,
+  scale
+}: {
+  value: string;
+  scale: DenseCompareScaleCellViewModel;
+}) {
+  return (
+    <span className={`dense-scale-cell dense-scale-${scale.tone}`} aria-label={scale.ariaLabel}>
+      <span className="dense-scale-track" aria-hidden="true">
+        <span style={{ width: `${scale.widthPercent}%` }} />
+      </span>
+      <span className="dense-scale-number">{value}</span>
+    </span>
+  );
+}
+
 const WORKBENCH_TABS = [
   { id: "stats", label: "Stats" },
   { id: "melee", label: "Melee", combatStyle: "melee" },
@@ -555,14 +602,6 @@ function primaryLevelLabel(combatStyle: CombatStyle): string {
   if (combatStyle === "ranged") return "RNG";
   if (combatStyle === "magic") return "MAG";
   return "ATT";
-}
-
-function primaryPrayerValue(prayers: readonly string[]): string {
-  return prayers.find((prayer) => prayer !== "none") ?? "none";
-}
-
-function primaryBoostValue(boosts: readonly string[]): string {
-  return boosts.find((boost) => boost !== "none") ?? "none";
 }
 
 function safespotControlValue(value: boolean | null): string {
@@ -668,6 +707,33 @@ function optionalPercent(value: number | null): string {
 
 function optionalNumber(value: number | null, digits = 0): string {
   return value === null ? "-" : formatNumber(value, digits);
+}
+
+function gpPerXpDisplay(value: number | null): string {
+  return value == null || !Number.isFinite(value) ? "-" : formatNumber(value, 2);
+}
+
+function duelDeltaDisplay(value: number | null, digits = 0): string {
+  if (value === null) return "-";
+  return digits === 0 ? formatDelta(value) : signedDecimal(value, digits);
+}
+
+function duelSnapshotId(): string {
+  return `duel-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function defaultDuelSnapshotName(
+  vm: ReturnType<typeof createSimulationViewModel>,
+  snapshotCount: number
+): string {
+  const setup = vm.monsterCard.setupOverview;
+  if (setup.combatStyle === "magic" && setup.spell) return setup.spell.label;
+  if (setup.combatStyle === "ranged" && setup.ammo) return setup.ammo.label;
+  return setup.weapon.label || `Setup ${snapshotCount + 1}`;
+}
+
+function duelRowClass(row: DuelComparisonRowViewModel): string | undefined {
+  return row.source === "live" ? "duel-live-row" : undefined;
 }
 
 function selectedOptionLabel(options: readonly SelectOption[], ids: readonly string[]): string {
@@ -992,6 +1058,86 @@ function SelectField({
   );
 }
 
+function CompactSelectionSelectField({
+  label,
+  value,
+  options,
+  extraCount,
+  onChange
+}: {
+  label: string;
+  value: string;
+  options: Array<{ id: string; label: string }>;
+  extraCount: number;
+  onChange: (value: string) => void;
+}) {
+  const id = useId();
+  return (
+    <div className="field compact-selection-field">
+      <label htmlFor={id}>{label}</label>
+      <div className="compact-selection-control">
+        <select id={id} value={value} onChange={(event) => onChange(event.target.value)}>
+          {options.map((option) => (
+            <option key={option.id} value={option.id}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        {extraCount > 0 && (
+          <span className="selection-extra-badge" aria-label={`${extraCount} additional active`}>
+            +{formatNumber(extraCount)}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MultiSelectionField({
+  label,
+  options,
+  selectedIds,
+  onToggle
+}: {
+  label: string;
+  options: readonly SetupSelectionOption[];
+  selectedIds: readonly string[];
+  onToggle: (id: string, selected: boolean) => void;
+}) {
+  const selectedCount = selectedIds.length;
+  return (
+    <div className="selection-toggle-group">
+      <div className="selection-toggle-header">
+        <span>{label}</span>
+        <span className={`status-pill ${selectedCount ? "ready" : ""}`}>
+          {selectedCount ? `${formatNumber(selectedCount)} active` : "None"}
+        </span>
+      </div>
+      <div className="multi-selection-grid" aria-label={`${label} selections`}>
+        <label className="toggle">
+          <input
+            type="checkbox"
+            checked={selectedCount === 0}
+            onChange={(event) => onToggle("none", event.target.checked)}
+          />
+          <span>None</span>
+        </label>
+        {options.map((option) => (
+          <label className="toggle selection-toggle" key={option.id}>
+            <input
+              type="checkbox"
+              checked={selectedIds.includes(option.id)}
+              onChange={(event) => onToggle(option.id, event.target.checked)}
+            />
+            <span>{option.label}</span>
+            <small>{option.categoryLabel}</small>
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function SearchableSelectField({
   label,
   value,
@@ -1217,6 +1363,8 @@ export function App() {
     useState<LootSettingsByMonsterState>(loadInitialLootSettings);
   const [hiddenGearTiers, setHiddenGearTiers] =
     useState<HiddenGearTiersState>(loadInitialHiddenGearTiers);
+  const [duelSnapshots, setDuelSnapshots] =
+    useState<DuelSnapshotsState>(loadInitialDuelSnapshots);
   const [priceHistory, setPriceHistory] =
     useState<BrowserPriceHistoryState>(loadInitialPriceHistory);
   const [plannerState, setPlannerState] = useState<PlannerUiState>(loadInitialPlannerUiState);
@@ -1382,6 +1530,11 @@ export function App() {
   }, [hiddenGearTiers, readyToPersist]);
 
   useEffect(() => {
+    if (!readyToPersist) return;
+    savePersisted(duelSnapshotsStorageOptions, duelSnapshots);
+  }, [duelSnapshots, readyToPersist]);
+
+  useEffect(() => {
     if (!readyToPersist || priceHistory.snapshots.length === 0) return;
     savePersisted(priceHistoryStorageOptions, priceHistory);
   }, [priceHistory, readyToPersist]);
@@ -1517,6 +1670,28 @@ export function App() {
         : null,
     [cannonByMonster, context, currentLootPrefs, form, lootSettingsByMonster]
   );
+  const duelComparison = useMemo(
+    () =>
+      activeTab === "duel" && context
+        ? createDuelComparisonViewModel(
+            form,
+            duelSnapshots,
+            context,
+            cannonByMonster,
+            lootPrefsForGameData,
+            lootSettingsByMonster
+          )
+        : null,
+    [
+      activeTab,
+      cannonByMonster,
+      context,
+      duelSnapshots,
+      form,
+      lootPrefsForGameData,
+      lootSettingsByMonster
+    ]
+  );
   const denseCompareRows = useMemo(
     () =>
       context
@@ -1539,6 +1714,10 @@ export function App() {
       lootSettingsByMonster,
       lootPrefsForGameData
     ]
+  );
+  const denseCompareScale = useMemo(
+    () => createDenseCompareScaleModel(denseCompareRows),
+    [denseCompareRows]
   );
   const denseCompareTotalRows = context ? Object.keys(context.gameData.monsters).length : 0;
   const hiscoresPreviewRows = useMemo(
@@ -1598,6 +1777,40 @@ export function App() {
   );
   const currentWeapon = context?.gameData.weapons[form.weaponId] ?? null;
   const currentWeaponTwoHanded = currentWeapon?.twoHand === true;
+  const gearQuickActions = useMemo(
+    () =>
+      Object.fromEntries(
+        EQUIPMENT_SLOTS.map((slot) => [
+          slot,
+          context
+            ? gearQuickActionForSlot({
+                gameData: context.gameData,
+                slot,
+                combatStyle: form.combatStyle,
+                weaponId: form.weaponId,
+                styleId: form.styleId,
+                currentItemId: form.gear[slot] ?? "none",
+                options: gearSelectOptions[slot],
+                shieldLocked: slot === "shield" && currentWeaponTwoHanded
+              })
+            : {
+                itemId: "none",
+                itemLabel: "None",
+                disabled: true,
+                reason: "Game data loading"
+              }
+        ])
+      ) as Record<EquipmentSlot, ReturnType<typeof gearQuickActionForSlot>>,
+    [
+      context,
+      currentWeaponTwoHanded,
+      form.combatStyle,
+      form.gear,
+      form.styleId,
+      form.weaponId,
+      gearSelectOptions
+    ]
+  );
   const loadoutBonuses = useMemo(
     () =>
       context
@@ -2081,6 +2294,8 @@ export function App() {
   const primarySkill = primaryLevelKey(form.combatStyle);
   const selectedPrayer = primaryPrayerValue(form.prayers);
   const selectedBoost = primaryBoostValue(form.boosts);
+  const extraPrayerCount = extraPrayerSelectionCount(form.prayers);
+  const extraBoostCount = extraBoostSelectionCount(form.boosts);
   const selectedSpecialWeapon = specialAttackOptions.some(
     (option) => option.id === form.specialAttack.weaponId
   )
@@ -2113,6 +2328,37 @@ export function App() {
     : hasCurrentCustomSetup
       ? "Default setup - custom saved"
       : "Default setup";
+  const snapshotCurrentSetup = () => {
+    const snapshot = createDuelSnapshot(
+      duelSnapshotId(),
+      defaultDuelSnapshotName(viewModel, duelSnapshots.snapshots.length),
+      form
+    );
+    setDuelSnapshots((current) => appendDuelSnapshot(current, snapshot));
+    setStatus(`Snapshot saved: ${snapshot.name}`);
+  };
+  const commitDuelSnapshotName = (snapshotId: string, name: string): boolean => {
+    try {
+      setDuelSnapshots((current) => renameDuelSnapshot(current, snapshotId, name));
+      setStatus("Renamed Duel snapshot");
+      return true;
+    } catch {
+      setStatus("Snapshot name must not be empty");
+      return false;
+    }
+  };
+  const loadDuelSnapshot = (snapshotId: string) => {
+    const snapshot = duelSnapshots.snapshots.find((candidate) => candidate.id === snapshotId);
+    if (!snapshot) return;
+    const nextForm = normalizeFormState({ ...snapshot.form, monsterId: form.monsterId });
+    commitFormState(nextForm);
+    setStatus(`Loaded Duel snapshot: ${snapshot.name}`);
+  };
+  const deleteDuelSnapshot = (snapshotId: string) => {
+    const snapshot = duelSnapshots.snapshots.find((candidate) => candidate.id === snapshotId);
+    setDuelSnapshots((current) => removeDuelSnapshot(current, snapshotId));
+    setStatus(snapshot ? `Deleted Duel snapshot: ${snapshot.name}` : "Deleted Duel snapshot");
+  };
   const createCustomSetup = () => {
     const customForm = normalizeFormState(form);
     setCustomSetupsByMonster((current) => setCustomSetupForMonster(current, customForm));
@@ -2271,6 +2517,42 @@ export function App() {
   const potionCarrySummary = form.trip.singleDose
     ? `${formatNumber(form.trip.potionDoses)} doses/type`
     : `${formatNumber(form.trip.potionSets)} vials/type`;
+  const potionRecommendation = viewModel.trip.potionRecommendation;
+  const potionRecommendationStatus = !potionRecommendation.active
+    ? "Inactive"
+    : potionRecommendation.matched
+      ? "Matches recommendation"
+      : "Apply recommendation";
+  const potionRecommendationCarry = !potionRecommendation.active
+    ? "-"
+    : form.trip.singleDose
+      ? `${formatNumber(potionRecommendation.recommendedDoses)} dose${
+          potionRecommendation.recommendedDoses === 1 ? "" : "s"
+        }/type`
+      : `${formatNumber(potionRecommendation.recommendedVials)} vial${
+          potionRecommendation.recommendedVials === 1 ? "" : "s"
+        }/type`;
+  const potionRecommendationTrip =
+    potionRecommendation.tripMinutes == null
+      ? "-"
+      : `${formatNumber(potionRecommendation.tripMinutes, 1)}m`;
+  const potionRecommendationInterval =
+    potionRecommendation.repotIntervalMinutes == null
+      ? "-"
+      : `${formatNumber(potionRecommendation.repotIntervalMinutes, 1)}m`;
+  const applyPotionRecommendation = () => {
+    if (!potionRecommendation.active || potionRecommendation.matched) return;
+    setFormSafe((current) =>
+      updateForm(current, {
+        trip: {
+          ...current.trip,
+          ...(current.trip.singleDose
+            ? { potionDoses: potionRecommendation.recommendedDoses }
+            : { potionSets: potionRecommendation.recommendedVials })
+        }
+      })
+    );
+  };
   const setCannonForCurrentMonster = (patch: Partial<CannonByMonsterState[string]>) => {
     setCannonByMonster((current) => {
       const previous = current[form.monsterId] ?? DEFAULT_CANNON_SETTINGS;
@@ -2844,23 +3126,29 @@ export function App() {
                   options={styles}
                   onChange={(styleId) => setFormSafe((current) => updateForm(current, { styleId }))}
                 />
-                <SelectField
+                <CompactSelectionSelectField
                   label="PRAY"
                   value={selectedPrayer}
                   options={PRAYER_OPTIONS}
+                  extraCount={extraPrayerCount}
                   onChange={(prayer) =>
                     setFormSafe((current) =>
-                      updateForm(current, { prayers: prayer === "none" ? [] : [prayer] })
+                      updateForm(current, {
+                        prayers: setPrimaryPrayerSelection(current.prayers, prayer)
+                      })
                     )
                   }
                 />
-                <SelectField
+                <CompactSelectionSelectField
                   label="POT"
                   value={selectedBoost}
                   options={BOOST_OPTIONS}
+                  extraCount={extraBoostCount}
                   onChange={(boost) =>
                     setFormSafe((current) =>
-                      updateForm(current, { boosts: boost === "none" ? [] : [boost] })
+                      updateForm(current, {
+                        boosts: setPrimaryBoostSelection(current.boosts, boost)
+                      })
                     )
                   }
                 />
@@ -2928,6 +3216,129 @@ export function App() {
               </div>
 
               <section
+                className="stats-analysis-pane"
+                aria-label="Stats analysis"
+                hidden={activeTab !== "stats"}
+              >
+                <div className="stats-analysis-grid">
+                  <section className="stats-panel" aria-label="XP routing">
+                    <div className="section-title-row">
+                      <div>
+                        <h2>XP routing</h2>
+                        <span className="section-subtitle">Effective and skill rows</span>
+                      </div>
+                      <span className="status-pill ready">
+                        {viewModel.xpRouting.effectiveXpPerHourLabel} XP/hr
+                      </span>
+                    </div>
+                    <div
+                      className="xp-routing-chip-list"
+                      role="list"
+                      aria-label="XP routing chips"
+                    >
+                      {viewModel.xpRouting.rows.map((row) => (
+                        <div
+                          className={`xp-routing-chip ${row.status}`}
+                          role="listitem"
+                          aria-label={`${row.label}: ${row.value}; ${row.statusLabel}; ${row.note}`}
+                          key={row.id}
+                        >
+                          <span>{row.label}</span>
+                          <strong>{row.value}</strong>
+                          <em>{row.statusLabel}</em>
+                          <small>{row.note}</small>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section className="stats-panel" aria-label="Trip and banking summary">
+                    <div className="section-title-row">
+                      <div>
+                        <h2>Trip &amp; banking</h2>
+                        <span className="section-subtitle">Current effective-rate inputs</span>
+                      </div>
+                      <span className="status-pill ready">
+                        {formatNumber(viewModel.trip.effectiveKph)} K/hr
+                      </span>
+                    </div>
+                    <div className="stats-summary-table-wrap">
+                      <table
+                        className="stats-summary-table"
+                        aria-label="Trip and banking metrics"
+                      >
+                        <tbody>
+                          {viewModel.tripBankingSummary.rows.map((row) => (
+                            <tr className={row.tone} key={row.id}>
+                              <th scope="row">{row.label}</th>
+                              <td>{row.value}</td>
+                              <td>{row.note}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </section>
+                </div>
+
+                <section className="hit-distribution-panel" aria-label="Hit distribution">
+                  <div className="section-title-row">
+                    <div>
+                      <h2>Hit distribution</h2>
+                      <span className="section-subtitle">Normal player attack</span>
+                    </div>
+                    <span className="status-pill ready">
+                      {viewModel.hitDistribution.hitChanceLabel} hit
+                    </span>
+                  </div>
+                  <div className="hit-distribution-summary">
+                    {metricList([
+                      {
+                        label: "Hit chance",
+                        value: viewModel.hitDistribution.hitChanceLabel,
+                        tone: "teal"
+                      },
+                      {
+                        label: "Average hit",
+                        value: viewModel.hitDistribution.averageHitLabel
+                      },
+                      {
+                        label: "Max hit",
+                        value: viewModel.hitDistribution.maxHitLabel
+                      },
+                      {
+                        label: "Peak bucket",
+                        value: formatNumber(viewModel.hitDistribution.peakMaxHit)
+                      }
+                    ])}
+                  </div>
+                  <div
+                    className="hit-histogram"
+                    role="list"
+                    aria-label="Hit distribution buckets"
+                  >
+                    {viewModel.hitDistribution.buckets.map((bucket) => (
+                      <div
+                        className={`hit-bucket ${bucket.isMiss ? "miss" : ""} ${
+                          bucket.isMaxHit ? "max-hit" : ""
+                        }`}
+                        role="listitem"
+                        aria-label={bucket.ariaLabel}
+                        key={bucket.id}
+                      >
+                        <span className="hit-bucket-label">{bucket.label}</span>
+                        <span className="hit-bucket-bar" aria-hidden="true">
+                          <span style={{ width: `${bucket.widthPercent}%` }} />
+                        </span>
+                        <strong>{bucket.percentLabel}</strong>
+                        {bucket.isMaxHit && <em>max hit</em>}
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              </section>
+
+              <section
                 className="equipment-pane"
                 aria-label="Equipment loadout"
                 hidden={!COMBAT_STYLE_TAB_IDS.has(activeTab)}
@@ -2979,7 +3390,9 @@ export function App() {
                     options={PRAYER_OPTIONS}
                     onChange={(prayer) =>
                       setFormSafe((current) =>
-                        updateForm(current, { prayers: prayer === "none" ? [] : [prayer] })
+                        updateForm(current, {
+                          prayers: setPrimaryPrayerSelection(current.prayers, prayer)
+                        })
                       )
                     }
                   />
@@ -2989,7 +3402,33 @@ export function App() {
                     options={BOOST_OPTIONS}
                     onChange={(boost) =>
                       setFormSafe((current) =>
-                        updateForm(current, { boosts: boost === "none" ? [] : [boost] })
+                        updateForm(current, {
+                          boosts: setPrimaryBoostSelection(current.boosts, boost)
+                        })
+                      )
+                    }
+                  />
+                  <MultiSelectionField
+                    label="Prayer"
+                    options={PRAYER_SELECTION_OPTIONS}
+                    selectedIds={form.prayers}
+                    onToggle={(prayer, selected) =>
+                      setFormSafe((current) =>
+                        updateForm(current, {
+                          prayers: togglePrayerSelection(current.prayers, prayer, selected)
+                        })
+                      )
+                    }
+                  />
+                  <MultiSelectionField
+                    label="Boost"
+                    options={BOOST_SELECTION_OPTIONS}
+                    selectedIds={form.boosts}
+                    onToggle={(boost, selected) =>
+                      setFormSafe((current) =>
+                        updateForm(current, {
+                          boosts: toggleBoostSelection(current.boosts, boost, selected)
+                        })
                       )
                     }
                   />
@@ -3067,21 +3506,37 @@ export function App() {
                   </div>
                 </div>
                 <div className="equipment-slot-grid" aria-label="Equipment slots">
-                  {EQUIPMENT_SLOTS.map((slot) => (
-                    <SearchableSelectField
-                      key={slot}
-                      label={EQUIPMENT_SLOT_LABELS[slot]}
-                      value={
-                        slot === "shield" && currentWeaponTwoHanded
-                          ? "none"
-                          : (form.gear[slot] ?? "none")
-                      }
-                      options={gearSelectOptions[slot]}
-                      disabled={slot === "shield" && currentWeaponTwoHanded}
-                      onChange={(itemId) => setGearSelection(slot, itemId)}
-                      searchPlaceholder={`Search ${EQUIPMENT_SLOT_LABELS[slot].toLowerCase()}`}
-                    />
-                  ))}
+                  {EQUIPMENT_SLOTS.map((slot) => {
+                    const quickAction = gearQuickActions[slot];
+                    return (
+                      <div className="gear-quick-field" key={slot}>
+                        <SearchableSelectField
+                          label={EQUIPMENT_SLOT_LABELS[slot]}
+                          value={
+                            slot === "shield" && currentWeaponTwoHanded
+                              ? "none"
+                              : (form.gear[slot] ?? "none")
+                          }
+                          options={gearSelectOptions[slot]}
+                          disabled={slot === "shield" && currentWeaponTwoHanded}
+                          onChange={(itemId) => setGearSelection(slot, itemId)}
+                          searchPlaceholder={`Search ${EQUIPMENT_SLOT_LABELS[slot].toLowerCase()}`}
+                        />
+                        <button
+                          type="button"
+                          className="gear-quick-action"
+                          disabled={quickAction.disabled}
+                          title={quickAction.reason}
+                          aria-label={`Best ${EQUIPMENT_SLOT_LABELS[slot]}`}
+                          onClick={() => setGearSelection(slot, quickAction.itemId)}
+                        >
+                          {quickAction.reason === "Shield locked by two-handed weapon"
+                            ? "Locked"
+                            : "Best"}
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
                 {currentWeaponTwoHanded && (
                   <p className="inline-status neutral">Shield locked by two-handed weapon</p>
@@ -3642,6 +4097,50 @@ export function App() {
                       )
                     }
                   />
+                  <div
+                    className={`potion-recommendation ${
+                      !potionRecommendation.active
+                        ? "inactive"
+                        : potionRecommendation.matched
+                          ? "matched"
+                          : "needs-apply"
+                    }`}
+                    aria-label="Potion recommendation"
+                    aria-live="polite"
+                  >
+                    <div className="potion-recommendation-header">
+                      <span>Potion recommendation</span>
+                      <strong>{potionRecommendationStatus}</strong>
+                    </div>
+                    <dl className="potion-recommendation-metrics">
+                      <div>
+                        <dt>Recommended carry</dt>
+                        <dd>{potionRecommendationCarry}</dd>
+                      </div>
+                      <div>
+                        <dt>Repot interval</dt>
+                        <dd>{potionRecommendationInterval}</dd>
+                      </div>
+                      <div>
+                        <dt>Trip estimate</dt>
+                        <dd>{potionRecommendationTrip}</dd>
+                      </div>
+                    </dl>
+                    <p>{potionRecommendation.reason}</p>
+                    {potionRecommendation.warnings.map((warning) => (
+                      <p className="potion-recommendation-warning" key={warning}>
+                        {warning}
+                      </p>
+                    ))}
+                    <button
+                      type="button"
+                      className="potion-recommendation-apply"
+                      disabled={!potionRecommendation.active || potionRecommendation.matched}
+                      onClick={applyPotionRecommendation}
+                    >
+                      Apply recommendation
+                    </button>
+                  </div>
                   <label className="toggle">
                     <input
                       type="checkbox"
@@ -4344,10 +4843,131 @@ export function App() {
                 </div>
               </section>
 
-              <section className="placeholder-pane" aria-label="Duel" hidden={activeTab !== "duel"}>
-                <div className="section-title-row">
-                  <h2>Duel</h2>
-                  <span className="status-pill">planned</span>
+              <section className="duel-pane" aria-label="Duel" hidden={activeTab !== "duel"}>
+                <div className="table-toolbar duel-toolbar">
+                  <div>
+                    <h2>Setup duel</h2>
+                    <span>
+                      {duelComparison?.monsterName ?? currentMonster?.name ?? form.monsterId} -{" "}
+                      {duelSnapshots.snapshots.length} /{" "}
+                      {duelComparison?.snapshotLimit ?? 12} snapshots
+                    </span>
+                  </div>
+                  <div className="duel-controls" aria-label="Duel snapshot controls">
+                    <ReadOnlyField
+                      label="Current target"
+                      value={duelComparison?.monsterName ?? currentMonster?.name ?? form.monsterId}
+                    />
+                    <button
+                      type="button"
+                      onClick={snapshotCurrentSetup}
+                      disabled={
+                        duelComparison != null &&
+                        duelSnapshots.snapshots.length >= duelComparison.snapshotLimit
+                      }
+                    >
+                      Snapshot current setup
+                    </button>
+                  </div>
+                </div>
+
+                <div className="duel-table-wrap">
+                  <table className="duel-table" aria-label="Duel comparison">
+                    <thead>
+                      <tr>
+                        <th>Setup</th>
+                        <th>Loadout</th>
+                        <th className="numeric">Max</th>
+                        <th className="numeric">DPS</th>
+                        <th className="numeric">XP/hr</th>
+                        <th className="numeric">Net GP/hr</th>
+                        <th className="numeric">GP/XP</th>
+                        <th className="numeric">K/hr</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {duelComparison?.rows.map((row) => (
+                        <tr key={row.id} className={duelRowClass(row)}>
+                          <td className="duel-setup-cell">
+                            {row.source === "live" ? (
+                              <strong>Live setup</strong>
+                            ) : (
+                              <input
+                                aria-label={`Rename snapshot ${row.name}`}
+                                defaultValue={row.name}
+                                maxLength={80}
+                                onBlur={(event) => {
+                                  if (!row.snapshotId) return;
+                                  const accepted = commitDuelSnapshotName(
+                                    row.snapshotId,
+                                    event.currentTarget.value
+                                  );
+                                  if (!accepted) event.currentTarget.value = row.name;
+                                }}
+                                onKeyDown={(event) => {
+                                  if (event.key === "Enter") event.currentTarget.blur();
+                                  if (event.key === "Escape") {
+                                    event.currentTarget.value = row.name;
+                                    event.currentTarget.blur();
+                                  }
+                                }}
+                              />
+                            )}
+                            <span>{row.combatStyle}</span>
+                          </td>
+                          <td className="duel-loadout-cell" title={row.loadoutLabel}>
+                            {row.loadoutLabel}
+                          </td>
+                          <td className="numeric">{formatNumber(row.maxHit, 1)}</td>
+                          <td className="numeric">{formatNumber(row.dps, 2)}</td>
+                          <td className={`numeric ${row.best.effectiveXpPerHour ? "best" : ""}`}>
+                            <span>{formatNumber(row.effectiveXpPerHour)}</span>
+                            {row.best.effectiveXpPerHour && <em>best</em>}
+                            <small>{duelDeltaDisplay(row.deltas.effectiveXpPerHour)}</small>
+                          </td>
+                          <td
+                            className={`numeric ${row.best.effectiveNetGpPerHour ? "best" : ""}`}
+                          >
+                            <span>{formatNumber(row.effectiveNetGpPerHour)}</span>
+                            {row.best.effectiveNetGpPerHour && <em>best</em>}
+                            <small>{duelDeltaDisplay(row.deltas.effectiveNetGpPerHour)}</small>
+                          </td>
+                          <td className={`numeric ${row.best.gpPerXp ? "best" : ""}`}>
+                            <span>{gpPerXpDisplay(row.gpPerXp)}</span>
+                            {row.best.gpPerXp && <em>best</em>}
+                            <small>{duelDeltaDisplay(row.deltas.gpPerXp, 2)}</small>
+                          </td>
+                          <td className="numeric">{formatNumber(row.killsPerHour)}</td>
+                          <td>
+                            {row.snapshotId ? (
+                              <div className="duel-row-actions">
+                                <button
+                                  type="button"
+                                  onClick={() => loadDuelSnapshot(row.snapshotId!)}
+                                >
+                                  Load
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => deleteDuelSnapshot(row.snapshotId!)}
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="duel-live-marker">Active</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                      {duelComparison?.snapshotRows.length === 0 && (
+                        <tr className="duel-empty-row">
+                          <td colSpan={9}>No snapshots</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </section>
 
@@ -5132,53 +5752,66 @@ export function App() {
                               selectTarget(row.monsterId);
                             }}
                           >
-                            {DENSE_TABLE_COLUMNS.map((column) => (
-                              <td
-                                key={column.key}
-                                className={column.align === "right" ? "numeric" : "monster-cell"}
-                              >
-                                {column.key === "monsterName" && (
-                                  <span className="row-marker" aria-hidden="true">
-                                    {active ? ">" : ""}
-                                  </span>
-                                )}
-                                <span>{column.render(row)}</span>
-                                {column.key === "monsterName" && row.markers.length > 0 && (
-                                  <span className="row-state-markers">
-                                    {row.markers.map((marker) => {
-                                      const markerLabel = `${marker.ariaLabel} for ${row.monsterName}`;
-                                      return (
-                                        <span
-                                          key={marker.id}
-                                          className={`row-state-marker row-state-marker-${marker.id}`}
-                                          aria-label={markerLabel}
-                                          title={markerLabel}
-                                        >
-                                          {marker.label}
-                                        </span>
-                                      );
-                                    })}
-                                  </span>
-                                )}
-                                {column.key === "monsterName" && (
-                                  <button
-                                    type="button"
-                                    className="row-visibility-button"
-                                    aria-label={
-                                      row.isIrrelevant
-                                        ? `Mark ${row.monsterName} relevant`
-                                        : `Mark ${row.monsterName} irrelevant`
-                                    }
-                                    onClick={(event) => {
-                                      event.stopPropagation();
-                                      toggleDenseIrrelevant(row.monsterId);
-                                    }}
-                                  >
-                                    {row.isIrrelevant ? "Restore" : "Hide"}
-                                  </button>
-                                )}
-                              </td>
-                            ))}
+                            {DENSE_TABLE_COLUMNS.map((column) => {
+                              const scaleRow = denseCompareScale[row.monsterId];
+                              const scaleCell =
+                                scaleRow && isDenseScaleColumn(column.key)
+                                  ? scaleRow[column.key]
+                                  : null;
+                              return (
+                                <td
+                                  key={column.key}
+                                  className={`${column.align === "right" ? "numeric" : "monster-cell"} ${
+                                    scaleCell ? "dense-scale-td" : ""
+                                  }`}
+                                >
+                                  {column.key === "monsterName" && (
+                                    <span className="row-marker" aria-hidden="true">
+                                      {active ? ">" : ""}
+                                    </span>
+                                  )}
+                                  {scaleCell ? (
+                                    <DenseScaleCell value={column.render(row)} scale={scaleCell} />
+                                  ) : (
+                                    <span>{column.render(row)}</span>
+                                  )}
+                                  {column.key === "monsterName" && row.markers.length > 0 && (
+                                    <span className="row-state-markers">
+                                      {row.markers.map((marker) => {
+                                        const markerLabel = `${marker.ariaLabel} for ${row.monsterName}`;
+                                        return (
+                                          <span
+                                            key={marker.id}
+                                            className={`row-state-marker row-state-marker-${marker.id}`}
+                                            aria-label={markerLabel}
+                                            title={markerLabel}
+                                          >
+                                            {marker.label}
+                                          </span>
+                                        );
+                                      })}
+                                    </span>
+                                  )}
+                                  {column.key === "monsterName" && (
+                                    <button
+                                      type="button"
+                                      className="row-visibility-button"
+                                      aria-label={
+                                        row.isIrrelevant
+                                          ? `Mark ${row.monsterName} relevant`
+                                          : `Mark ${row.monsterName} irrelevant`
+                                      }
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        toggleDenseIrrelevant(row.monsterId);
+                                      }}
+                                    >
+                                      {row.isIrrelevant ? "Restore" : "Hide"}
+                                    </button>
+                                  )}
+                                </td>
+                              );
+                            })}
                           </tr>
                         );
                       })}

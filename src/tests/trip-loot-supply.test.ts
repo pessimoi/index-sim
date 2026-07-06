@@ -13,6 +13,7 @@ import {
   defaultLootAction,
   evaluateLoot,
   isStackable,
+  recommendPotionCarry,
   simulateTripLootSupply,
   type CannonSettings,
   type TripLootSupplyInput,
@@ -221,9 +222,7 @@ describe("trip/loot/supply unit rules", () => {
     };
     const fallbackResult = evaluateLoot(context.gameData.monsters.giant, fallbackContext);
 
-    expect(fallbackResult.warnings.map((warning) => warning.code)).toContain(
-      "price-fallback-used"
-    );
+    expect(fallbackResult.warnings.map((warning) => warning.code)).toContain("price-fallback-used");
   });
 
   it("bounds cannon target and respawn settings inside the domain", () => {
@@ -403,13 +402,118 @@ describe("trip/loot/supply unit rules", () => {
     expect(noPrayerPotions.trip.prayerSlots).toBe(0);
     expect(manualDoses.trip.prayerActive).toBe(true);
     expect(manualDoses.trip.prayerSlots).toBe(2);
-    expect(manualDoses.trip.maxKillsPrayer).toBeGreaterThan(
-      noPrayerPotions.trip.maxKillsPrayer
-    );
+    expect(manualDoses.trip.maxKillsPrayer).toBeGreaterThan(noPrayerPotions.trip.maxKillsPrayer);
     expect(altar.trip.altarOn).toBe(true);
     expect(altar.trip.altarSeconds).toBe(45);
     expect(altar.trip.altarSecPerKill).toBeGreaterThan(0);
     expect(altar.trip.prayerActive).toBe(false);
+  });
+
+  it("recommends general potion carry and reports vial match state", () => {
+    const runtime = createLegacyRuntime();
+    const context = domainContextFromLegacy(runtime);
+    const definition = definitionsById.get("melee_rune_scimitar_hill_giant_super_prayers");
+    expect(definition).toBeDefined();
+    if (!definition) throw new Error("Missing potion fixture definition");
+
+    const input = buildTripInput(runtime, definition, context);
+    const tripResult = simulateTripLootSupply(input, context);
+    const mismatch = recommendPotionCarry({
+      request: input.request,
+      trip: { ...input.trip, singleDose: false, potionSets: 0 },
+      cycleSec: tripResult.cycleSec,
+      killsPerTrip: tripResult.trip.killsPerTrip
+    });
+    const matched = recommendPotionCarry({
+      request: input.request,
+      trip: {
+        ...input.trip,
+        singleDose: false,
+        potionSets: mismatch.recommendedVials
+      },
+      cycleSec: tripResult.cycleSec,
+      killsPerTrip: tripResult.trip.killsPerTrip
+    });
+
+    expect(tripResult.potionRecommendation.active).toBe(true);
+    expect(mismatch).toMatchObject({
+      active: true,
+      recommendedVials: 1,
+      recommendedDoses: 1,
+      matched: false
+    });
+    expect(mismatch.tripMinutes).toBeGreaterThan(0);
+    expect(mismatch.repotIntervalMinutes).toBeGreaterThan(0);
+    expect(matched.matched).toBe(true);
+  });
+
+  it("recommends single-dose carry and scales above one vial for long trips", () => {
+    const runtime = createLegacyRuntime();
+    const context = domainContextFromLegacy(runtime);
+    const definition = definitionsById.get("melee_dba_sustained_moss_giant");
+    expect(definition).toBeDefined();
+    if (!definition) throw new Error("Missing long potion fixture definition");
+
+    const input = buildTripInput(runtime, definition, context);
+    const longTrip = recommendPotionCarry({
+      request: input.request,
+      trip: { ...input.trip, singleDose: true, potionDoses: 0 },
+      cycleSec: 60,
+      killsPerTrip: 121
+    });
+    const matched = recommendPotionCarry({
+      request: input.request,
+      trip: {
+        ...input.trip,
+        singleDose: true,
+        potionDoses: longTrip.recommendedDoses
+      },
+      cycleSec: 60,
+      killsPerTrip: 121
+    });
+
+    expect(longTrip.active).toBe(true);
+    expect(longTrip.recommendedDoses).toBeGreaterThan(4);
+    expect(longTrip.recommendedVials).toBeGreaterThan(1);
+    expect(longTrip.matched).toBe(false);
+    expect(matched.matched).toBe(true);
+  });
+
+  it("falls back safely without general boosts or finite trip length", () => {
+    const runtime = createLegacyRuntime();
+    const context = domainContextFromLegacy(runtime);
+    const definition = definitionsById.get("ranged_magic_shortbow_rock_crab_safespot");
+    expect(definition).toBeDefined();
+    if (!definition) throw new Error("Missing no-boost fixture definition");
+
+    const input = buildTripInput(runtime, definition, context);
+    const noBoost = recommendPotionCarry({
+      request: { ...input.request, sustained: true, repotThreshold: null },
+      trip: input.trip ?? {},
+      cycleSec: 60,
+      killsPerTrip: 10
+    });
+    const unsafeTrip = recommendPotionCarry({
+      request: {
+        ...input.request,
+        boosts: { keys: ["ranging"] },
+        sustained: true,
+        repotThreshold: null
+      },
+      trip: input.trip ?? {},
+      cycleSec: 60,
+      killsPerTrip: Infinity
+    });
+
+    expect(noBoost).toMatchObject({
+      active: false,
+      recommendedVials: 0,
+      recommendedDoses: 0,
+      matched: false
+    });
+    expect(noBoost.reason).toContain("No general combat potion boost");
+    expect(unsafeTrip.active).toBe(false);
+    expect(unsafeTrip.warnings.join(" ")).toContain("finite");
   });
 
   it("applies scarce spot respawn limits and exposes trip reserve details", () => {

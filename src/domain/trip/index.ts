@@ -1,4 +1,4 @@
-import { hitChance, TICK_SECONDS } from "../combat";
+import { hitChance, potionBoostedLevel, TICK_SECONDS, type PotionStatKey } from "../combat";
 import { sumEquipmentBonuses } from "../equipment";
 import {
   type CombatStyle,
@@ -17,6 +17,24 @@ import {
 export type LootAction = "skip" | "bury" | "alch" | "loot" | "unid" | "value";
 export type TripBound = "loot" | "food" | "overfull" | "prayer" | "recoil" | "respawn" | "none";
 export type JewelSpot = "underground" | "overground";
+
+export interface PotionCarryRecommendation {
+  active: boolean;
+  recommendedVials: number;
+  recommendedDoses: number;
+  tripMinutes: number | null;
+  repotIntervalMinutes: number | null;
+  matched: boolean;
+  reason: string;
+  warnings: string[];
+}
+
+export interface PotionCarryRecommendationInput {
+  request: SimulationRequest;
+  trip: TripPolicy;
+  cycleSec: number;
+  killsPerTrip: number;
+}
 
 interface FoodDefinition {
   name: string;
@@ -276,6 +294,7 @@ export interface TripLootSupplyResult {
   alchCastsPerKill: number;
   combatXpDamageFraction: number;
   playerAttackTimeSecPerKill: number;
+  potionRecommendation: PotionCarryRecommendation;
   cannon: CannonOverlayResult | null;
   lootBreakdown: LootBreakdownEntry[];
   trip: TripResult;
@@ -359,7 +378,7 @@ const PRAYERS: Record<EntityId, PrayerData> = {
   steel_skin: { def: 1.15, drain: 12 }
 };
 
-const POTION_CAT: Record<EntityId, string> = {
+const POTION_CAT: Record<EntityId, PotionStatKey> = {
   attack: "att",
   strength: "str",
   defence: "def",
@@ -370,13 +389,123 @@ const POTION_CAT: Record<EntityId, string> = {
   magic: "mag"
 };
 
-const CAT_POTION: Record<string, EntityId> = {
+const MAX_RECOMMENDED_POTION_VIALS = 28;
+const MAX_RECOMMENDED_POTION_DOSES = MAX_RECOMMENDED_POTION_VIALS * 4;
+
+const POTION_STAT_LEVEL: Record<PotionStatKey, keyof SimulationRequest["levels"]> = {
+  att: "attack",
+  str: "strength",
+  def: "defence",
+  rng: "ranged",
+  mag: "magic"
+};
+
+const CAT_POTION: Record<PotionStatKey, EntityId> = {
   att: "super_attack",
   str: "super_strength",
   def: "super_defence",
   rng: "ranging",
   mag: "magic"
 };
+
+function inactivePotionRecommendation(
+  reason: string,
+  warnings: string[] = []
+): PotionCarryRecommendation {
+  return {
+    active: false,
+    recommendedVials: 0,
+    recommendedDoses: 0,
+    tripMinutes: null,
+    repotIntervalMinutes: null,
+    matched: false,
+    reason,
+    warnings
+  };
+}
+
+export function recommendPotionCarry(
+  input: PotionCarryRecommendationInput
+): PotionCarryRecommendation {
+  if (!input.request.sustained) {
+    return inactivePotionRecommendation(
+      "Sustained boost averaging is off, so the trip cannot infer a repot cadence."
+    );
+  }
+
+  const selected = input.request.boosts.keys
+    .map((key) => ({ key, stat: POTION_CAT[key] }))
+    .filter((entry): entry is { key: EntityId; stat: PotionStatKey } => entry.stat != null)
+    .filter((entry) => !(isDbaSelected(input.request) && entry.stat === "str"));
+
+  if (!selected.length) {
+    return inactivePotionRecommendation("No general combat potion boost is selected.");
+  }
+
+  if (
+    !Number.isFinite(input.cycleSec) ||
+    input.cycleSec <= 0 ||
+    !Number.isFinite(input.killsPerTrip) ||
+    input.killsPerTrip <= 0
+  ) {
+    return inactivePotionRecommendation(
+      "Trip length is not finite enough for a carry recommendation.",
+      ["Set a finite food, loot, prayer, recoil or banking limit to enable this estimate."]
+    );
+  }
+
+  const tripMinutes = (input.cycleSec * input.killsPerTrip) / 60;
+  if (!Number.isFinite(tripMinutes) || tripMinutes <= 0) {
+    return inactivePotionRecommendation(
+      "Trip estimate is not finite enough for a carry recommendation.",
+      ["The recommendation stays inactive until active fighting time can be estimated."]
+    );
+  }
+
+  let repotIntervalMinutes = Infinity;
+  for (const { key, stat } of selected) {
+    const base = input.request.levels[POTION_STAT_LEVEL[stat]];
+    const peak = potionBoostedLevel(key, stat, base);
+    if (peak == null || peak <= base) continue;
+    const threshold =
+      input.request.repotThreshold != null
+        ? Math.max(base, Math.min(peak, input.request.repotThreshold))
+        : Math.max(base, peak - 10);
+    const boost = peak - base;
+    const interval = Math.max(1, peak - threshold || boost);
+    repotIntervalMinutes = Math.min(repotIntervalMinutes, interval);
+  }
+
+  if (!Number.isFinite(repotIntervalMinutes) || repotIntervalMinutes <= 0) {
+    return inactivePotionRecommendation("Selected boosts do not change a general combat stat.");
+  }
+
+  const rawDoses = Math.max(1, Math.ceil(tripMinutes / repotIntervalMinutes));
+  const cappedDoses = Math.min(MAX_RECOMMENDED_POTION_DOSES, rawDoses);
+  const cappedVials = Math.min(MAX_RECOMMENDED_POTION_VIALS, Math.ceil(cappedDoses / 4));
+  const singleDose = !!input.trip.singleDose;
+  const currentCarry = singleDose
+    ? Math.max(0, input.trip.potionDoses ?? 4)
+    : Math.max(0, input.trip.potionSets ?? 1);
+  const matched = currentCarry === (singleDose ? cappedDoses : cappedVials);
+  const warnings =
+    rawDoses > MAX_RECOMMENDED_POTION_DOSES
+      ? [
+          `Recommendation capped at ${MAX_RECOMMENDED_POTION_DOSES} doses (${MAX_RECOMMENDED_POTION_VIALS} vials) per potion type.`
+        ]
+      : [];
+
+  return {
+    active: true,
+    recommendedVials: cappedVials,
+    recommendedDoses: cappedDoses,
+    tripMinutes,
+    repotIntervalMinutes,
+    matched,
+    reason: `Based on ${Math.round(tripMinutes)} minutes of active fighting and the shortest selected repot interval.`,
+    warnings
+  };
+}
 
 const PRAYER_XP_PER_BONE: Record<string, number> = {
   bones: 4.5,
@@ -809,7 +938,8 @@ function megaEv(priceSet: PriceSet, warnings?: SimulationWarning[]): number {
     MEGA_TABLE.reduce(
       (sum, row) =>
         sum +
-        row.weight * priceFromKeys(priceSet, row.keys, row.fallback, 1, warnings, "mega-rare table"),
+        row.weight *
+          priceFromKeys(priceSet, row.keys, row.fallback, 1, warnings, "mega-rare table"),
       0
     ) / 128
   );
@@ -894,26 +1024,71 @@ function ultraRareEv(
   warnings?: SimulationWarning[]
 ): number {
   const rows = [
-    { weight: 3, price: priceFromKeys(priceSet, ["naturerune"], 180, 67, warnings, "ultra-rare table") },
+    {
+      weight: 3,
+      price: priceFromKeys(priceSet, ["naturerune"], 180, 67, warnings, "ultra-rare table")
+    },
     {
       weight: 2,
       price: priceFromKeys(priceSet, ["adamant_javelin"], 50, 20, warnings, "ultra-rare table")
     },
-    { weight: 2, price: priceFromKeys(priceSet, ["deathrune"], 200, 45, warnings, "ultra-rare table") },
-    { weight: 2, price: priceFromKeys(priceSet, ["lawrune"], 240, 45, warnings, "ultra-rare table") },
-    { weight: 2, price: priceFromKeys(priceSet, ["rune_arrow"], 160, 42, warnings, "ultra-rare table") },
-    { weight: 2, price: priceFromKeys(priceSet, ["steel_arrow"], 18, 150, warnings, "ultra-rare table") },
-    { weight: 3, price: priceFromKeys(priceSet, ["rune_2h"], 38000, 1, warnings, "ultra-rare table") },
-    { weight: 3, price: priceFromKeys(priceSet, ["rune_battleaxe"], 25000, 1, warnings, "ultra-rare table") },
-    { weight: 2, price: priceFromKeys(priceSet, ["rune_sq_shield"], 21000, 1, warnings, "ultra-rare table") },
-    { weight: 1, price: priceFromKeys(priceSet, ["dragon_med_helm"], 60000, 1, warnings, "ultra-rare table") },
-    { weight: 1, price: priceFromKeys(priceSet, ["rune_kiteshield"], 32000, 1, warnings, "ultra-rare table") },
+    {
+      weight: 2,
+      price: priceFromKeys(priceSet, ["deathrune"], 200, 45, warnings, "ultra-rare table")
+    },
+    {
+      weight: 2,
+      price: priceFromKeys(priceSet, ["lawrune"], 240, 45, warnings, "ultra-rare table")
+    },
+    {
+      weight: 2,
+      price: priceFromKeys(priceSet, ["rune_arrow"], 160, 42, warnings, "ultra-rare table")
+    },
+    {
+      weight: 2,
+      price: priceFromKeys(priceSet, ["steel_arrow"], 18, 150, warnings, "ultra-rare table")
+    },
+    {
+      weight: 3,
+      price: priceFromKeys(priceSet, ["rune_2h"], 38000, 1, warnings, "ultra-rare table")
+    },
+    {
+      weight: 3,
+      price: priceFromKeys(priceSet, ["rune_battleaxe"], 25000, 1, warnings, "ultra-rare table")
+    },
+    {
+      weight: 2,
+      price: priceFromKeys(priceSet, ["rune_sq_shield"], 21000, 1, warnings, "ultra-rare table")
+    },
+    {
+      weight: 1,
+      price: priceFromKeys(priceSet, ["dragon_med_helm"], 60000, 1, warnings, "ultra-rare table")
+    },
+    {
+      weight: 1,
+      price: priceFromKeys(priceSet, ["rune_kiteshield"], 32000, 1, warnings, "ultra-rare table")
+    },
     { weight: 21, price: 3000 },
-    { weight: 20, price: priceFromKeys(priceSet, ["tooth_half_key"], 110000, 1, warnings, "ultra-rare table") },
-    { weight: 20, price: priceFromKeys(priceSet, ["loop_half_key"], 81200, 1, warnings, "ultra-rare table") },
-    { weight: 5, price: priceFromKeys(priceSet, ["runite_bar"], 6500, 1, warnings, "ultra-rare table") },
-    { weight: 2, price: priceFromKeys(priceSet, ["dragonstone"], 16000, 1, warnings, "ultra-rare table") },
-    { weight: 2, price: priceFromKeys(priceSet, ["silver_ore"], 62, 100, warnings, "ultra-rare table") },
+    {
+      weight: 20,
+      price: priceFromKeys(priceSet, ["tooth_half_key"], 110000, 1, warnings, "ultra-rare table")
+    },
+    {
+      weight: 20,
+      price: priceFromKeys(priceSet, ["loop_half_key"], 81200, 1, warnings, "ultra-rare table")
+    },
+    {
+      weight: 5,
+      price: priceFromKeys(priceSet, ["runite_bar"], 6500, 1, warnings, "ultra-rare table")
+    },
+    {
+      weight: 2,
+      price: priceFromKeys(priceSet, ["dragonstone"], 16000, 1, warnings, "ultra-rare table")
+    },
+    {
+      weight: 2,
+      price: priceFromKeys(priceSet, ["silver_ore"], 62, 100, warnings, "ultra-rare table")
+    },
     { weight: 20, price: jewelBaseEv },
     { weight: 15, price: mega }
   ];
@@ -2188,6 +2363,12 @@ export function simulateTripLootSupply(
   }
 
   const supply = computeSupplyCosts(input, context, tripResult, playerAttackTimeSecPerKill, cannon);
+  const potionRecommendation = recommendPotionCarry({
+    request: input.request,
+    trip,
+    cycleSec,
+    killsPerTrip: tripResult.killsPerTrip
+  });
   const gpPerHour = gpPerKill * killsPerHour;
   const netGpPerHour = gpPerHour - supply.supplyCostPerKill * killsPerHour;
   const efficiency = isFinite(tripResult.efficiency) ? tripResult.efficiency : 1;
@@ -2209,6 +2390,7 @@ export function simulateTripLootSupply(
     alchCastsPerKill: lootEvaluation.alchCastsPerKill,
     combatXpDamageFraction,
     playerAttackTimeSecPerKill,
+    potionRecommendation,
     cannon,
     lootBreakdown: lootEvaluation.lootBreakdown,
     trip: tripResult,

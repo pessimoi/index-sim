@@ -83,6 +83,52 @@ async function denseNumericSnapshot(table: Locator, rowName: RegExp) {
   };
 }
 
+async function expectActiveDenseRow(table: Locator, rowName: RegExp) {
+  const row = table.getByRole("row", { name: rowName });
+  await expect(row).toBeVisible();
+  await expect(row).toHaveAttribute("aria-selected", "true");
+  await expect(row.locator("td").first()).toContainText(">");
+  return row;
+}
+
+async function expectPageWidthContained(page: Page) {
+  const metrics = await page.evaluate(() => ({
+    bodyScrollWidth: document.body.scrollWidth,
+    clientWidth: document.documentElement.clientWidth,
+    documentScrollWidth: document.documentElement.scrollWidth,
+    viewportWidth: window.innerWidth
+  }));
+
+  expect(metrics.documentScrollWidth).toBeLessThanOrEqual(metrics.clientWidth + 1);
+  expect(metrics.bodyScrollWidth).toBeLessThanOrEqual(metrics.clientWidth + 1);
+  expect(metrics.clientWidth).toBeLessThanOrEqual(metrics.viewportWidth);
+}
+
+async function expectInsideBox(container: Locator, target: Locator) {
+  const [containerBox, targetBox] = await Promise.all([
+    container.boundingBox(),
+    target.boundingBox()
+  ]);
+  expect(containerBox).not.toBeNull();
+  expect(targetBox).not.toBeNull();
+  expect(targetBox!.x).toBeGreaterThanOrEqual(containerBox!.x - 1);
+  expect(targetBox!.x + targetBox!.width).toBeLessThanOrEqual(
+    containerBox!.x + containerBox!.width + 1
+  );
+}
+
+async function denseTableOverflowMetrics(wrap: Locator) {
+  return wrap.evaluate((element) => {
+    const style = window.getComputedStyle(element);
+    return {
+      clientWidth: element.clientWidth,
+      overflowX: style.overflowX,
+      scrollLeft: element.scrollLeft,
+      scrollWidth: element.scrollWidth
+    };
+  });
+}
+
 test("loads the dense combat spreadsheet root", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "2004scape Combat Simulator" })).toBeVisible();
@@ -132,6 +178,67 @@ test("loads the dense combat spreadsheet root", async ({ page }) => {
   await expect(page.getByText("run_sim.py")).toHaveCount(0);
   await expect(page.getByText("/api/prices")).toHaveCount(0);
   await expect(page.getByText("/api/scrape")).toHaveCount(0);
+});
+
+test("shows Stats XP routing trip summary and hit distribution", async ({ page }) => {
+  await page.goto("/");
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Stats" }).click();
+
+  const analysis = page.getByLabel("Stats analysis");
+  await expect(analysis).toBeVisible();
+
+  const xpRouting = analysis.getByRole("region", { name: "XP routing", exact: true });
+  await expect(xpRouting).toBeVisible();
+  await expect(xpRouting.getByRole("list", { name: "XP routing chips" })).toContainText(
+    "Player combat XP/hr"
+  );
+  await expect(xpRouting).toContainText("Hitpoints");
+  await expect(xpRouting).toContainText("Prayer XP/hr");
+  await expect(xpRouting).toContainText("partial");
+  await expect(xpRouting).toContainText("Magic (alch) XP/hr");
+  await expect(xpRouting).toContainText("not modeled");
+  await expect(xpRouting).not.toContainText("Cannon ranged XP/hr");
+
+  const tripBanking = analysis.getByRole("region", {
+    name: "Trip and banking summary",
+    exact: true
+  });
+  await expect(tripBanking).toBeVisible();
+  const tripTable = tripBanking.getByRole("table", { name: "Trip and banking metrics" });
+  await expect(tripTable).toContainText("Kills/trip");
+  await expect(tripTable).toContainText("Trip length");
+  await expect(tripTable).toContainText("Bank time");
+  await expect(tripTable).toContainText("Current trip bound");
+  await expect(tripTable).toContainText("Safespot");
+  await expect(tripTable).toContainText("Protection");
+
+  const panel = analysis.getByRole("region", { name: "Hit distribution", exact: true });
+  await expect(panel.getByRole("heading", { name: "Hit distribution" })).toBeVisible();
+  await expect(panel).toContainText("Normal player attack");
+  await expect(panel).toContainText("Hit chance");
+  await expect(panel).toContainText("Average hit");
+  await expect(panel).toContainText("Max hit");
+
+  const histogram = panel.getByRole("list", { name: "Hit distribution buckets" });
+  await expect(histogram).toBeVisible();
+  await expect(histogram.getByRole("listitem", { name: /miss or zero damage/i })).toBeVisible();
+  await expect(histogram.getByRole("listitem", { name: /max hit bucket/i })).toBeVisible();
+  await expect(histogram).toContainText("max hit");
+
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Compare" }).click();
+  await page.getByLabel("TYPE", { exact: true }).selectOption("ranged");
+  await page.getByLabel("TARGET", { exact: true }).selectOption("dagannoth");
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Cannon" }).click();
+  const cannon = page.locator('section[aria-label="Cannon"]');
+  await cannon.getByLabel("Set up cannon").check();
+  await cannon.getByLabel("Mobs at spot").fill("6");
+  await cannon.getByLabel("Respawn").fill("30");
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Stats" }).click();
+  await expect(
+    analysis
+      .getByRole("list", { name: "XP routing chips" })
+      .getByRole("listitem", { name: /Cannon ranged XP\/hr/i })
+  ).toBeVisible();
 });
 
 test("switches the target through MonsterCard and keeps shell state in sync", async ({ page }) => {
@@ -189,6 +296,78 @@ test("places MonsterCard after the active pane on mobile", async ({ page }) => {
   await expect(activeMonsterDefence(card)).toBeVisible();
 });
 
+test("keeps Dense Compare mobile and tablet overflow contained", async ({ page }) => {
+  await page.addInitScript(() => window.localStorage.clear());
+
+  for (const viewport of [
+    { label: "mobile", width: 390, height: 800 },
+    { label: "tablet", width: 768, height: 900 }
+  ]) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto("/");
+
+    const setupStrip = page.getByLabel("Combat setup");
+    const metricStrip = page.getByLabel("Simulation results");
+    const comparePanel = page.getByLabel("Monster comparison");
+    const tableWrap = comparePanel.locator(".dense-table-wrap");
+    const table = page.getByRole("table", { name: "All monsters" });
+
+    await expect(setupStrip, `${viewport.label} setup strip`).toBeVisible();
+    await expect(metricStrip, `${viewport.label} metric strip`).toBeVisible();
+    await expect(comparePanel, `${viewport.label} compare panel`).toBeVisible();
+    await expect(table, `${viewport.label} dense table`).toBeVisible();
+    await expect.poll(async () => table.locator("tbody tr").count()).toBeGreaterThan(8);
+    await expect(table.locator("tbody tr").first()).toBeVisible();
+    await expect(table.locator("tbody tr").nth(1)).toBeVisible();
+    await expectPageWidthContained(page);
+
+    const initialOverflow = await denseTableOverflowMetrics(tableWrap);
+    expect(initialOverflow.scrollWidth).toBeGreaterThan(initialOverflow.clientWidth);
+    expect(["auto", "scroll"]).toContain(initialOverflow.overflowX);
+
+    const scrolledLeft = await tableWrap.evaluate((element) => {
+      element.scrollLeft = element.scrollWidth;
+      return element.scrollLeft;
+    });
+    expect(scrolledLeft).toBeGreaterThan(0);
+    await expectInsideBox(tableWrap, table.locator("tbody tr").first().locator("td").nth(9));
+
+    await tableWrap.evaluate((element) => {
+      element.scrollLeft = 0;
+      element.scrollTop = 96;
+    });
+    const [headerBox, firstVisibleBodyBox] = await Promise.all([
+      table.locator("thead").boundingBox(),
+      table.locator("tbody tr").first().boundingBox()
+    ]);
+    expect(headerBox).not.toBeNull();
+    expect(firstVisibleBodyBox).not.toBeNull();
+    expect(firstVisibleBodyBox!.y).toBeGreaterThanOrEqual(
+      headerBox!.y + headerBox!.height - 1
+    );
+
+    const activeRow = table.getByRole("row", { name: /Giant lvl 28/ });
+    await expectActiveDenseRow(table, /Giant lvl 28/);
+    await activeRow.getByRole("button", { name: /Mark .* irrelevant/ }).click();
+    await expect(activeRow.getByLabel("Marked irrelevant for Hill Giant")).toBeVisible();
+    await expect(
+      activeRow.getByLabel("Current target kept visible for Hill Giant")
+    ).toBeVisible();
+
+    await page.getByLabel("Monster filter").fill("rock crab");
+    await page
+      .getByLabel("Monster comparison")
+      .getByLabel("Drop filter")
+      .fill("very long impossible dragon bones and rune chainbody filter value");
+    await expect(activeRow).toBeVisible();
+    await expect(activeRow.locator("td").first()).toContainText(">");
+    await expect(
+      activeRow.getByLabel("Current target kept visible for Hill Giant")
+    ).toBeVisible();
+    await expectPageWidthContained(page);
+  }
+});
+
 test("recomputes the Planner tab workflow from visible planner controls", async ({ page }) => {
   await page.goto("/");
   await page.getByLabel("Workbench tabs").getByRole("button", { name: "Planner" }).click();
@@ -233,6 +412,80 @@ test("recomputes the Planner tab workflow from visible planner controls", async 
       saved.includes('"attack":true') &&
       saved.includes('"gearPool":{"weapon":') &&
       !saved.includes('"iron_scimitar"')
+    );
+  });
+});
+
+test("uses the Duel tab to snapshot rename load delete and persist setup comparisons", async ({
+  page
+}) => {
+  await page.goto("/");
+  const tabs = page.getByLabel("Workbench tabs");
+
+  await tabs.getByRole("button", { name: "Duel" }).click();
+  const duel = page.getByRole("region", { name: "Duel", exact: true });
+  await expect(duel).toBeVisible();
+  await expect(duel.getByRole("heading", { name: "Setup duel" })).toBeVisible();
+  await expect(duel).not.toContainText("planned");
+  await expect(duel.getByRole("table", { name: "Duel comparison" })).toContainText("GP/XP");
+
+  await duel.getByRole("button", { name: "Snapshot current setup" }).click();
+  const table = duel.getByRole("table", { name: "Duel comparison" });
+  await expect(table.getByRole("row", { name: /Live setup/ })).toBeVisible();
+  await expect(table.getByLabel(/Rename snapshot/)).toHaveCount(1);
+  await expect(table).toContainText("XP/hr");
+  await expect(table).toContainText("Net GP/hr");
+  await expect(table).toContainText("GP/XP");
+
+  const rename = table.getByLabel(/Rename snapshot/).first();
+  await rename.fill("Melee saved");
+  await rename.press("Enter");
+  await page.waitForFunction(() => {
+    const raw = window.localStorage.getItem("index-sim:duel-snapshots");
+    if (!raw) return false;
+    const saved = JSON.parse(raw);
+    return (
+      saved.version === 1 &&
+      saved.data?.snapshots?.[0]?.name === "Melee saved" &&
+      saved.data.snapshots[0]?.form?.combatStyle === "melee" &&
+      !raw.includes("effectiveXpPerHour")
+    );
+  });
+
+  await page.reload();
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Duel" }).click();
+  const reloadedDuel = page.getByRole("region", { name: "Duel", exact: true });
+  const reloadedTable = reloadedDuel.getByRole("table", { name: "Duel comparison" });
+  await expect(reloadedTable.getByLabel("Rename snapshot Melee saved")).toBeVisible();
+
+  await page
+    .getByLabel("Setup context")
+    .getByLabel("Monster", { exact: true })
+    .selectOption("rock_crab");
+  const combatType = page.getByLabel("Combat type");
+  await combatType.getByRole("button", { name: "ranged" }).click();
+  await expect(reloadedTable).toContainText("best");
+  await reloadedTable.getByRole("button", { name: "Load" }).click();
+  await expect(combatType.getByRole("button", { name: "melee" })).toHaveAttribute(
+    "aria-pressed",
+    "true"
+  );
+  await expect(page.getByLabel("Setup context").getByLabel("Monster", { exact: true })).toHaveValue(
+    "rock_crab"
+  );
+
+  await page.evaluate(() => window.localStorage.setItem("duel_unrelated_key", "keep"));
+  await reloadedTable.getByRole("button", { name: "Delete" }).click();
+  await expect(reloadedTable).toContainText("No snapshots");
+  await page.waitForFunction(() => {
+    const raw = window.localStorage.getItem("index-sim:duel-snapshots");
+    if (!raw) return false;
+    const saved = JSON.parse(raw);
+    return (
+      saved.version === 1 &&
+      Array.isArray(saved.data?.snapshots) &&
+      saved.data.snapshots.length === 0 &&
+      window.localStorage.getItem("duel_unrelated_key") === "keep"
     );
   });
 });
@@ -553,6 +806,55 @@ test("restores per-combat-style loadout edits when switching styles", async ({ p
   });
 });
 
+test("supports multi-prayer and multi-boost workbench controls with compact primary edits", async ({
+  page
+}) => {
+  await page.goto("/");
+  const tabs = page.getByLabel("Workbench tabs");
+  await tabs.getByRole("button", { name: "Melee" }).click();
+
+  const compactSetup = page.getByLabel("Combat setup");
+  const equipmentPane = page.getByLabel("Equipment loadout");
+  const prayerSelections = equipmentPane.getByLabel("Prayer selections");
+  const boostSelections = equipmentPane.getByLabel("Boost selections");
+
+  await expect(compactSetup.getByLabel("PRAY", { exact: true })).toHaveValue("ultimate");
+  await expect(compactSetup.getByLabel("POT", { exact: true })).toHaveValue("super_att");
+  await expect(compactSetup).toContainText("+1");
+
+  await prayerSelections.getByLabel(/steel skin/i).check();
+  await expect(prayerSelections.getByLabel(/steel skin/i)).toBeChecked();
+  await expect(compactSetup.getByLabel("PRAY", { exact: true })).toHaveValue("ultimate");
+  await expect(compactSetup).toContainText("+2");
+
+  await compactSetup.getByLabel("PRAY", { exact: true }).selectOption("reflexes");
+  await expect(prayerSelections.getByLabel(/reflexes/i)).toBeChecked();
+  await expect(prayerSelections.getByLabel(/incredible/i)).not.toBeChecked();
+  await expect(prayerSelections.getByLabel(/ultimate/i)).toBeChecked();
+  await expect(prayerSelections.getByLabel(/steel skin/i)).toBeChecked();
+  await expect(compactSetup.getByLabel("PRAY", { exact: true })).toHaveValue("reflexes");
+  await expect(compactSetup).toContainText("+2");
+
+  await boostSelections.getByLabel(/magic/i).check();
+  await compactSetup.getByLabel("POT", { exact: true }).selectOption("ranging");
+  await expect(boostSelections.getByLabel(/ranging/i)).toBeChecked();
+  await expect(boostSelections.getByLabel(/super att/i)).toBeChecked();
+  await expect(boostSelections.getByLabel(/super str/i)).toBeChecked();
+  await expect(boostSelections.getByLabel(/magic/i)).toBeChecked();
+  await expect(compactSetup.getByLabel("POT", { exact: true })).toHaveValue("ranging");
+  await expect(compactSetup).toContainText("+3");
+
+  await page.waitForFunction(() => {
+    const raw = window.localStorage.getItem("index-sim:rewrite-setup");
+    if (!raw) return false;
+    const saved = JSON.parse(raw);
+    return (
+      saved.data?.form?.prayers?.join("|") === "reflexes|ultimate|steel_skin" &&
+      saved.data?.form?.boosts?.join("|") === "ranging|super_att|super_str|magic"
+    );
+  });
+});
+
 test("edits combat equipment panes and persists style-specific selections", async ({ page }) => {
   await page.goto("/");
   const tabs = page.getByLabel("Workbench tabs");
@@ -611,6 +913,44 @@ test("edits combat equipment panes and persists style-specific selections", asyn
   await expect(
     page.getByLabel("Equipment loadout").getByLabel("Spell", { exact: true })
   ).toHaveValue("fire_wave");
+});
+
+test("applies gear quick actions for the active combat style", async ({ page }) => {
+  await page.goto("/");
+  const tabs = page.getByLabel("Workbench tabs");
+
+  await tabs.getByRole("button", { name: "Melee" }).click();
+  const meleePane = page.getByLabel("Equipment loadout");
+  await meleePane.getByRole("button", { name: "Best Helm" }).click();
+  await expect(meleePane.getByLabel("Helm", { exact: true })).toHaveValue("berserker_helm");
+  await meleePane.getByRole("button", { name: "Best Shield" }).click();
+  await expect(meleePane.getByLabel("Shield", { exact: true })).toHaveValue("unholy_book");
+  await meleePane.getByLabel("Weapon search").fill("dragon halberd");
+  await meleePane.getByLabel("Weapon", { exact: true }).selectOption("dragon_halberd");
+  await expect(meleePane.getByRole("button", { name: "Best Shield" })).toBeDisabled();
+  await expect(meleePane.getByLabel("Shield", { exact: true })).toHaveValue("none");
+
+  await tabs.getByRole("button", { name: "Ranged" }).click();
+  const rangedPane = page.getByLabel("Equipment loadout");
+  await rangedPane.getByRole("button", { name: "Best Body" }).click();
+  await expect(rangedPane.getByLabel("Body", { exact: true })).toHaveValue("black_dhide_body");
+
+  await tabs.getByRole("button", { name: "Magic" }).click();
+  const magicPane = page.getByLabel("Equipment loadout");
+  await magicPane.getByRole("button", { name: "Best Cape" }).click();
+  await expect(magicPane.getByLabel("Cape", { exact: true })).toHaveValue("god_cape");
+
+  await page.waitForFunction(() => {
+    const raw = window.localStorage.getItem("index-sim:rewrite-setup");
+    if (!raw) return false;
+    const saved = JSON.parse(raw);
+    return (
+      saved.data?.form?.perStyleLoadouts?.melee?.gear?.helm === "berserker_helm" &&
+      saved.data?.form?.perStyleLoadouts?.melee?.gear?.shield === "none" &&
+      saved.data?.form?.perStyleLoadouts?.ranged?.gear?.body === "black_dhide_body" &&
+      saved.data?.form?.perStyleLoadouts?.magic?.gear?.cape === "god_cape"
+    );
+  });
 });
 
 test("filters hidden gear tiers while keeping current selections", async ({ page }) => {
@@ -790,6 +1130,35 @@ test("filters dense compare rows and persists hidden monsters", async ({ page })
   await expect(table.getByRole("button", { name: "Mark Rock Crab irrelevant" })).toBeVisible();
 });
 
+test("shows dense XP and net GP scale indicators for visible rows", async ({ page }) => {
+  await page.goto("/");
+  const table = page.getByRole("table", { name: "All monsters" });
+
+  await expect.poll(async () => table.locator("tbody tr").count()).toBeGreaterThan(8);
+  const firstRow = table.locator("tbody tr").first();
+  const xpCell = firstRow.locator("td").nth(6);
+  const netGpCell = firstRow.locator("td").nth(9);
+
+  await expect(xpCell.locator(".dense-scale-number")).toHaveText(/\S/);
+  await expect(xpCell.locator(".dense-scale-track")).toBeVisible();
+  await expect(xpCell.locator(".dense-scale-cell")).toHaveAttribute(
+    "aria-label",
+    /XP\/hr .*scaled to visible rows/
+  );
+  await expect(netGpCell.locator(".dense-scale-number")).toHaveText(/\S/);
+  await expect(netGpCell.locator(".dense-scale-track")).toBeVisible();
+  await expect(netGpCell.locator(".dense-scale-cell")).toHaveAttribute(
+    "aria-label",
+    /net GP\/hr .*scaled to visible rows/
+  );
+  await expect(xpCell.locator(".dense-scale-track span")).toHaveAttribute("style", /width: \d/);
+
+  await page.getByLabel("Monster filter").fill("rock crab");
+  await expect(table.locator("tbody tr")).toHaveCount(2);
+  await expect(table.locator("tbody tr td:nth-child(7) .dense-scale-cell")).toHaveCount(2);
+  await expect(table.locator("tbody tr td:nth-child(10) .dense-scale-cell")).toHaveCount(2);
+});
+
 test("shows dense row markers for custom setup and per-monster loot settings", async ({ page }) => {
   await page.goto("/");
   const tabs = page.getByLabel("Workbench tabs");
@@ -939,6 +1308,238 @@ test("matches browser-rendered dense numeric snapshots", async ({ page }) => {
       "Cannonballs/trip": "69",
       "Ball gp/trip": "12,380",
       "K/hr uplift": "215.9%"
+    }
+  });
+});
+
+test("matches release-path dense numeric snapshots", async ({ page }) => {
+  await page.goto("/");
+  const tabs = page.getByLabel("Workbench tabs");
+  const table = page.getByRole("table", { name: "All monsters" });
+  await expect.poll(async () => table.locator("tbody tr").count()).toBeGreaterThan(8);
+
+  const meleeBaseline = await denseNumericSnapshot(table, /Giant lvl 28/);
+  const meleeBaselineResults = await resultMetricSnapshot(page);
+  await expectActiveDenseRow(table, /Giant lvl 28/);
+
+  await page.getByLabel("TARGET", { exact: true }).selectOption("chaos_dwarf");
+  await expect(page.getByLabel("TARGET", { exact: true })).toHaveValue("chaos_dwarf");
+  const meleeAlchRelevant = await denseNumericSnapshot(table, /Chaos Dwarf/);
+  const meleeAlchRelevantResults = await resultMetricSnapshot(page);
+  await expectActiveDenseRow(table, /Chaos Dwarf/);
+
+  await page.getByLabel("TYPE", { exact: true }).selectOption("ranged");
+  await expect(page.getByLabel("TYPE", { exact: true })).toHaveValue("ranged");
+  await page.getByLabel("TARGET", { exact: true }).selectOption("greater_demon");
+  await expect(page.getByLabel("TARGET", { exact: true })).toHaveValue("greater_demon");
+  await expect(table.getByRole("row", { name: /Greater Demon/ }).locator("td").nth(2)).toHaveText(
+    "10.0"
+  );
+  const rangedSafespot = await denseNumericSnapshot(table, /Greater Demon/);
+  const rangedSafespotResults = await resultMetricSnapshot(page);
+  await expectActiveDenseRow(table, /Greater Demon/);
+
+  await page.getByLabel("TARGET", { exact: true }).selectOption("dagannoth");
+  await tabs.getByRole("button", { name: "Cannon" }).click();
+  const cannon = page.locator('section[aria-label="Cannon"]');
+  await cannon.getByLabel("Set up cannon").check();
+  await cannon.getByLabel("Mobs at spot").fill("6");
+  await cannon.getByLabel("Respawn").fill("30");
+  await tabs.getByRole("button", { name: "Compare" }).click();
+  const rangedCannon = await denseNumericSnapshot(table, /Dagannoth \(lvl 74\)/);
+  const rangedCannonResults = await resultMetricSnapshot(page);
+  await expectActiveDenseRow(table, /Dagannoth \(lvl 74\)/);
+  expect(rangedCannon.netGpPerHour).toMatch(/^-/);
+
+  await page.getByLabel("TYPE", { exact: true }).selectOption("magic");
+  await expect(page.getByLabel("TYPE", { exact: true })).toHaveValue("magic");
+  await tabs.getByRole("button", { name: "Magic" }).click();
+  const magicPane = page.getByLabel("Equipment loadout");
+  await magicPane.getByLabel("Spell search").fill("fire wave");
+  await magicPane.getByLabel("Spell", { exact: true }).selectOption("fire_wave");
+  await page.getByLabel("TARGET", { exact: true }).selectOption("blue_dragon");
+  await tabs.getByRole("button", { name: "Compare" }).click();
+  await expect(table.getByRole("row", { name: /Blue Dragon/ }).locator("td").nth(2)).toHaveText(
+    "20.0"
+  );
+  const magicSafespot = await denseNumericSnapshot(table, /Blue Dragon/);
+  const magicSafespotResults = await resultMetricSnapshot(page);
+  await expectActiveDenseRow(table, /Blue Dragon/);
+
+  await page.getByLabel("TARGET", { exact: true }).selectOption("green_dragon");
+  const setupContext = page.getByLabel("Setup context");
+  await setupContext.getByRole("button", { name: "Create custom setup" }).click();
+  await tabs.getByRole("button", { name: "Melee" }).click();
+  await expect(page.getByLabel("TYPE", { exact: true })).toHaveValue("melee");
+  const meleePane = page.getByLabel("Equipment loadout");
+  await meleePane.getByLabel("Weapon search").fill("dragon halberd");
+  await meleePane.getByLabel("Weapon", { exact: true }).selectOption("dragon_halberd");
+  await tabs.getByRole("button", { name: "Loot" }).click();
+  const loot = page.locator('section[aria-label="Current monster loot"]');
+  await loot.getByLabel("High alch").selectOption("disabled");
+  await loot.getByLabel("Overhead", { exact: true }).selectOption("manual");
+  await loot.getByLabel("Overhead sec").fill("12.5");
+  await tabs.getByRole("button", { name: "Compare" }).click();
+  const customLootRow = table.getByRole("row", { name: /Green Dragon/ });
+  await expect(customLootRow.getByLabel("Custom setup for Green Dragon")).toBeVisible();
+  await expect(customLootRow.getByLabel("High alch override for Green Dragon")).toBeVisible();
+  await expect(customLootRow.getByLabel("Kill overhead override for Green Dragon")).toBeVisible();
+  await expect(customLootRow.locator("td").nth(2)).toHaveText("22.9");
+  const customLootSettings = await denseNumericSnapshot(table, /Green Dragon/);
+  const customLootSettingsResults = await resultMetricSnapshot(page);
+  await expectActiveDenseRow(table, /Green Dragon/);
+
+  await table.getByRole("button", { name: "NET GP/HR" }).click();
+  await page.getByLabel("Monster filter").fill("rock crab");
+  const forcedTargetRow = table.getByRole("row", { name: /Green Dragon/ });
+  await expect(forcedTargetRow).toBeVisible();
+  await expect(
+    forcedTargetRow.getByLabel("Current target kept visible for Green Dragon")
+  ).toBeVisible();
+  await expect(forcedTargetRow.locator("td").first()).toContainText(">");
+  await expect(table.getByRole("row", { name: /Rock Crab/ })).toBeVisible();
+
+  const releaseSnapshots = {
+    meleeBaseline,
+    meleeBaselineResults,
+    meleeAlchRelevant,
+    meleeAlchRelevantResults,
+    rangedSafespot,
+    rangedSafespotResults,
+    rangedCannon,
+    rangedCannonResults,
+    magicSafespot,
+    magicSafespotResults,
+    customLootSettings,
+    customLootSettingsResults
+  };
+
+  expect(releaseSnapshots).toEqual({
+    meleeBaseline: {
+      hit: "88.9%",
+      max: "16.4",
+      dps: "3.05",
+      ttk: "12.8s",
+      killsPerHour: "235",
+      xpPerHour: "21,573",
+      gpPerKill: "479",
+      gpPerHour: "112,417",
+      netGpPerHour: "-109,053"
+    },
+    meleeBaselineResults: {
+      DPS: "3.05",
+      "MAX HIT": "16.4",
+      "HIT %": "88.9%",
+      "XP/HR": "21,573",
+      "GP/HR NET": "-109,053",
+      "KILLS/HR": "235",
+      "GP/KILL": "479",
+      "SUPPLY/KILL": "1,187"
+    },
+    meleeAlchRelevant: {
+      hit: "82.1%",
+      max: "16.4",
+      dps: "2.81",
+      ttk: "23.2s",
+      killsPerHour: "140",
+      xpPerHour: "18,290",
+      gpPerKill: "463",
+      gpPerHour: "64,907",
+      netGpPerHour: "-117,343"
+    },
+    meleeAlchRelevantResults: {
+      DPS: "2.81",
+      "MAX HIT": "16.4",
+      "HIT %": "82.1%",
+      "XP/HR": "18,290",
+      "GP/HR NET": "-117,343",
+      "KILLS/HR": "140",
+      "GP/KILL": "463",
+      "SUPPLY/KILL": "2,028"
+    },
+    rangedSafespot: {
+      hit: "70.6%",
+      max: "10.0",
+      dps: "1.96",
+      ttk: "45.6s",
+      killsPerHour: "73",
+      xpPerHour: "14,525",
+      gpPerKill: "646",
+      gpPerHour: "47,327",
+      netGpPerHour: "-194,861"
+    },
+    rangedSafespotResults: {
+      DPS: "1.96",
+      "MAX HIT": "10.0",
+      "HIT %": "70.6%",
+      "XP/HR": "14,525",
+      "GP/HR NET": "-194,861",
+      "KILLS/HR": "73",
+      "GP/KILL": "646",
+      "SUPPLY/KILL": "5,315"
+    },
+    rangedCannon: {
+      hit: "80.7%",
+      max: "10.0",
+      dps: "2.24",
+      ttk: "32.3s",
+      killsPerHour: "326",
+      xpPerHour: "37,421",
+      gpPerKill: "89",
+      gpPerHour: "28,904",
+      netGpPerHour: "-320,994"
+    },
+    rangedCannonResults: {
+      DPS: "2.24",
+      "MAX HIT": "10.0",
+      "HIT %": "80.7%",
+      "XP/HR": "37,421",
+      "GP/HR NET": "-320,994",
+      "KILLS/HR": "326",
+      "GP/KILL": "89",
+      "SUPPLY/KILL": "1,929"
+    },
+    magicSafespot: {
+      hit: "35.7%",
+      max: "20.0",
+      dps: "1.19",
+      ttk: "1:33",
+      killsPerHour: "37",
+      xpPerHour: "21,210",
+      gpPerKill: "6,264",
+      gpPerHour: "233,556",
+      netGpPerHour: "-431,266"
+    },
+    magicSafespotResults: {
+      DPS: "1.19",
+      "MAX HIT": "20.0",
+      "HIT %": "35.7%",
+      "XP/HR": "21,210",
+      "GP/HR NET": "-431,266",
+      "KILLS/HR": "37",
+      "GP/KILL": "6,264",
+      "SUPPLY/KILL": "35,981"
+    },
+    customLootSettings: {
+      hit: "72.4%",
+      max: "22.9",
+      dps: "1.97",
+      ttk: "40.9s",
+      killsPerHour: "67",
+      xpPerHour: "8,443",
+      gpPerKill: "6,004",
+      gpPerHour: "404,685",
+      netGpPerHour: "53,064"
+    },
+    customLootSettingsResults: {
+      DPS: "1.97",
+      "MAX HIT": "22.9",
+      "HIT %": "72.4%",
+      "XP/HR": "8,443",
+      "GP/HR NET": "53,064",
+      "KILLS/HR": "67",
+      "GP/KILL": "6,004",
+      "SUPPLY/KILL": "4,118"
     }
   });
 });
@@ -1112,6 +1713,7 @@ test("updates manual food controls and recoil ring count", async ({ page }) => {
 });
 
 test("updates trip food, banking and inventory reserve controls across styles", async ({ page }) => {
+  test.setTimeout(45_000);
   await page.goto("/");
   const tabs = page.getByLabel("Workbench tabs");
 
@@ -1201,10 +1803,19 @@ test("updates trip potion carry controls and grouped potion summary", async ({ p
 
   const trip = page.locator('section[aria-label="Trip assumptions"]');
   const summary = page.locator('[aria-label="Trip summary"]');
+  const recommendation = trip.getByLabel("Potion recommendation");
 
   await expect(trip.getByLabel("Single-dose")).not.toBeChecked();
   await expect(trip.getByLabel("Potion vials")).toBeEnabled();
   await expect(trip.getByLabel("Potion doses")).toBeDisabled();
+  await expect(recommendation).toContainText("Potion recommendation");
+  await expect(recommendation).toContainText("Recommended carry");
+  await expect(recommendation).toContainText("Matches recommendation");
+  await trip.getByLabel("Potion vials").fill("0");
+  await expect(recommendation).toContainText("Apply recommendation");
+  await recommendation.getByRole("button", { name: "Apply recommendation" }).click();
+  await expect(trip.getByLabel("Potion vials")).toHaveValue("1");
+  await expect(recommendation).toContainText("Matches recommendation");
   await trip.getByLabel("Potion vials").fill("2");
 
   await expect(summary).toContainText("Potion slots");
@@ -1215,6 +1826,10 @@ test("updates trip potion carry controls and grouped potion summary", async ({ p
   await trip.getByLabel("Single-dose").check();
   await expect(trip.getByLabel("Potion vials")).toBeDisabled();
   await expect(trip.getByLabel("Potion doses")).toBeEnabled();
+  await expect(recommendation).toContainText("Apply recommendation");
+  await recommendation.getByRole("button", { name: "Apply recommendation" }).click();
+  await expect(trip.getByLabel("Potion doses")).toHaveValue("1");
+  await expect(recommendation).toContainText("Matches recommendation");
   await trip.getByLabel("Potion doses").fill("6");
   await expect(summary).toContainText("6 doses/type");
   await page.waitForFunction(() => {
@@ -1223,7 +1838,9 @@ test("updates trip potion carry controls and grouped potion summary", async ({ p
       saved.includes('"singleDose":true') &&
       saved.includes('"potionSets":2') &&
       saved.includes('"potionDoses":6') &&
-      saved.includes('"boosts":["super_att"]')
+      saved.includes('"prayerPotionSets":null') &&
+      saved.includes('"prayerPotionDoses":null') &&
+      saved.includes('"boosts":["super_att","super_str"]')
     );
   });
 

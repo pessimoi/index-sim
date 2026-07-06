@@ -18,7 +18,8 @@ const MAX_ATTACK_SPEED_SEC = 12;
 const MIN_MANUAL_BONUS = -250;
 const MAX_MANUAL_BONUS = 350;
 
-type StatKey = "att" | "str" | "def" | "rng" | "mag";
+export type PotionStatKey = "att" | "str" | "def" | "rng" | "mag";
+type StatKey = PotionStatKey;
 
 interface PrayerDefinition {
   att: number;
@@ -81,6 +82,33 @@ export interface SupportedSpecialAttack {
   weaponId: EntityId;
   combat: CombatStyle;
   requiresAmmo: boolean;
+}
+
+export interface HitDistributionInput {
+  hitChance: number;
+  averageHit: number;
+  maxHit: number;
+  peakMaxHit?: number;
+}
+
+export interface HitDistributionBucket {
+  id: string;
+  label: string;
+  minDamage: number;
+  maxDamage: number;
+  probability: number;
+  isMiss: boolean;
+  isMaxHit: boolean;
+}
+
+export interface HitDistribution {
+  hitChance: number;
+  missChance: number;
+  averageHit: number;
+  maxHit: number;
+  peakMaxHit: number;
+  probabilityTotal: number;
+  buckets: HitDistributionBucket[];
 }
 
 const PRAYERS: Record<EntityId, PrayerDefinition> = {
@@ -192,6 +220,17 @@ const POTIONS: Record<EntityId, PotionDefinition> = {
     apply: (_stat, level) => level
   }
 };
+
+export function potionBoostedLevel(
+  potionKey: EntityId,
+  stat: PotionStatKey,
+  level: number
+): number | null {
+  const potion = POTIONS[potionKey];
+  if (!potion || potionKey === "none" || potion.special) return null;
+  const boosted = Math.floor(potion.apply(stat, level));
+  return Number.isFinite(boosted) ? boosted : null;
+}
 
 const STYLES: Record<CombatStyle, Record<EntityId, StyleDefinition>> = {
   melee: {
@@ -464,6 +503,64 @@ export function hitChance(attackRoll: number, defenceRoll: number): number {
     return 1 - (defenceRoll + 2) / (2 * (attackRoll + 1));
   }
   return attackRoll / (2 * (defenceRoll + 1));
+}
+
+function clampProbability(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(1, value));
+}
+
+export function createHitDistribution(
+  input: HitDistributionInput,
+  maxDamageBuckets = 30
+): HitDistribution {
+  const hitChanceValue = clampProbability(input.hitChance);
+  const missChance = 1 - hitChanceValue;
+  const rawPeakMaxHit = Number.isFinite(input.peakMaxHit)
+    ? input.peakMaxHit!
+    : Number.isFinite(input.maxHit)
+      ? input.maxHit
+      : 0;
+  const peakMaxHit = Math.max(0, Math.round(rawPeakMaxHit));
+  const bucketLimit = Math.max(1, Math.floor(maxDamageBuckets));
+  const bucketWidth = peakMaxHit > bucketLimit ? Math.ceil(peakMaxHit / bucketLimit) : 1;
+  const perDamageProbability = peakMaxHit > 0 ? hitChanceValue / (peakMaxHit + 1) : 0;
+  const buckets: HitDistributionBucket[] = [
+    {
+      id: "miss-zero",
+      label: "Miss / 0",
+      minDamage: 0,
+      maxDamage: 0,
+      probability: peakMaxHit > 0 ? missChance + perDamageProbability : 1,
+      isMiss: true,
+      isMaxHit: peakMaxHit === 0
+    }
+  ];
+
+  for (let minDamage = 1; minDamage <= peakMaxHit; minDamage += bucketWidth) {
+    const maxDamage = Math.min(peakMaxHit, minDamage + bucketWidth - 1);
+    const damageCount = maxDamage - minDamage + 1;
+    const label = minDamage === maxDamage ? `${minDamage}` : `${minDamage}-${maxDamage}`;
+    buckets.push({
+      id: `damage-${minDamage}-${maxDamage}`,
+      label,
+      minDamage,
+      maxDamage,
+      probability: perDamageProbability * damageCount,
+      isMiss: false,
+      isMaxHit: maxDamage === peakMaxHit
+    });
+  }
+
+  return {
+    hitChance: hitChanceValue,
+    missChance,
+    averageHit: Number.isFinite(input.averageHit) ? input.averageHit : 0,
+    maxHit: Number.isFinite(input.maxHit) ? input.maxHit : 0,
+    peakMaxHit,
+    probabilityTotal: buckets.reduce((sum, bucket) => sum + bucket.probability, 0),
+    buckets
+  };
 }
 
 export function weaponStances(

@@ -34,6 +34,162 @@ const MAX_MANUAL_ATTACK_SPEED_SEC = 12;
 
 export type SetupMode = z.infer<typeof SetupModeSchema>;
 
+type SelectionCategory = "att" | "str" | "def" | "rng" | "mag" | "gauntlets" | "restore" | "special";
+
+export interface SetupSelectionOption {
+  id: EntityId;
+  label: string;
+  category: SelectionCategory;
+  categoryLabel: string;
+}
+
+export const PRAYER_SELECTION_OPTIONS = [
+  { id: "clarity", label: "clarity", category: "att", categoryLabel: "Attack" },
+  { id: "reflexes", label: "reflexes", category: "att", categoryLabel: "Attack" },
+  { id: "incredible", label: "incredible", category: "att", categoryLabel: "Attack" },
+  { id: "burst", label: "burst", category: "str", categoryLabel: "Strength" },
+  { id: "superhuman", label: "superhuman", category: "str", categoryLabel: "Strength" },
+  { id: "ultimate", label: "ultimate", category: "str", categoryLabel: "Strength" },
+  { id: "thick_skin", label: "thick skin", category: "def", categoryLabel: "Defence" },
+  { id: "rock_skin", label: "rock skin", category: "def", categoryLabel: "Defence" },
+  { id: "steel_skin", label: "steel skin", category: "def", categoryLabel: "Defence" }
+] satisfies SetupSelectionOption[];
+
+export const BOOST_SELECTION_OPTIONS = [
+  { id: "super_att", label: "super att", category: "att", categoryLabel: "Attack" },
+  { id: "super_str", label: "super str", category: "str", categoryLabel: "Strength" },
+  { id: "super_def", label: "super def", category: "def", categoryLabel: "Defence" },
+  { id: "ranging", label: "ranging", category: "rng", categoryLabel: "Ranged" },
+  { id: "magic", label: "magic", category: "mag", categoryLabel: "Magic" },
+  {
+    id: "chaos_gauntlets",
+    label: "chaos gauntlets",
+    category: "gauntlets",
+    categoryLabel: "Gauntlets"
+  },
+  { id: "dba_spec", label: "dba spec", category: "special", categoryLabel: "Special" },
+  { id: "restore", label: "restore", category: "restore", categoryLabel: "Restore" }
+] satisfies SetupSelectionOption[];
+
+const PRAYER_SELECTIONS_BY_ID = selectionOptionsById(PRAYER_SELECTION_OPTIONS);
+const BOOST_SELECTIONS_BY_ID = selectionOptionsById(BOOST_SELECTION_OPTIONS);
+
+function selectionOptionsById(
+  options: readonly SetupSelectionOption[]
+): Map<EntityId, SetupSelectionOption> {
+  return new Map(options.map((option) => [option.id, option]));
+}
+
+function normalizeSelection(
+  keys: readonly string[],
+  optionsById: ReadonlyMap<EntityId, SetupSelectionOption>
+): EntityId[] {
+  const normalized: EntityId[] = [];
+  const indexByCategory = new Map<SelectionCategory, number>();
+
+  for (const key of keys) {
+    if (key === "none") continue;
+    const option = optionsById.get(key);
+    if (!option) continue;
+    const existingIndex = indexByCategory.get(option.category);
+    if (existingIndex == null) {
+      indexByCategory.set(option.category, normalized.length);
+      normalized.push(option.id);
+    } else {
+      normalized[existingIndex] = option.id;
+    }
+  }
+
+  return normalized;
+}
+
+function setPrimarySelection(
+  keys: readonly string[],
+  id: string,
+  optionsById: ReadonlyMap<EntityId, SetupSelectionOption>
+): EntityId[] {
+  if (id === "none") return [];
+  const option = optionsById.get(id);
+  if (!option) return normalizeSelection(keys, optionsById);
+  return [
+    option.id,
+    ...normalizeSelection(keys, optionsById).filter((key) => {
+      const existing = optionsById.get(key);
+      return existing && existing.category !== option.category;
+    })
+  ];
+}
+
+function toggleSelection(
+  keys: readonly string[],
+  id: string,
+  selected: boolean,
+  optionsById: ReadonlyMap<EntityId, SetupSelectionOption>
+): EntityId[] {
+  if (id === "none") return selected ? [] : normalizeSelection(keys, optionsById);
+  const option = optionsById.get(id);
+  if (!option) return normalizeSelection(keys, optionsById);
+  const normalized = normalizeSelection(keys, optionsById);
+  if (!selected) return normalized.filter((key) => key !== option.id);
+
+  const existingIndex = normalized.findIndex(
+    (key) => optionsById.get(key)?.category === option.category
+  );
+  if (existingIndex === -1) return [...normalized, option.id];
+  return normalized.map((key, index) => (index === existingIndex ? option.id : key));
+}
+
+export function normalizePrayerSelection(keys: readonly string[]): EntityId[] {
+  return normalizeSelection(keys, PRAYER_SELECTIONS_BY_ID);
+}
+
+export function normalizeBoostSelection(keys: readonly string[]): EntityId[] {
+  return normalizeSelection(keys, BOOST_SELECTIONS_BY_ID);
+}
+
+export function primaryPrayerValue(prayers: readonly string[]): EntityId {
+  return normalizePrayerSelection(prayers)[0] ?? "none";
+}
+
+export function primaryBoostValue(boosts: readonly string[]): EntityId {
+  return normalizeBoostSelection(boosts)[0] ?? "none";
+}
+
+export function extraPrayerSelectionCount(prayers: readonly string[]): number {
+  return Math.max(0, normalizePrayerSelection(prayers).length - 1);
+}
+
+export function extraBoostSelectionCount(boosts: readonly string[]): number {
+  return Math.max(0, normalizeBoostSelection(boosts).length - 1);
+}
+
+export function setPrimaryPrayerSelection(prayers: readonly string[], id: string): EntityId[] {
+  return setPrimarySelection(prayers, id, PRAYER_SELECTIONS_BY_ID);
+}
+
+export function setPrimaryBoostSelection(boosts: readonly string[], id: string): EntityId[] {
+  return setPrimarySelection(boosts, id, BOOST_SELECTIONS_BY_ID);
+}
+
+export function togglePrayerSelection(
+  prayers: readonly string[],
+  id: string,
+  selected: boolean
+): EntityId[] {
+  return toggleSelection(prayers, id, selected, PRAYER_SELECTIONS_BY_ID);
+}
+
+export function toggleBoostSelection(
+  boosts: readonly string[],
+  id: string,
+  selected: boolean
+): EntityId[] {
+  return toggleSelection(boosts, id, selected, BOOST_SELECTIONS_BY_ID);
+}
+
+const PrayerSelectionSchema = z.array(z.string().min(1)).transform(normalizePrayerSelection);
+const BoostSelectionSchema = z.array(z.string().min(1)).transform(normalizeBoostSelection);
+
 export const PlayerLevelsSchema = z
   .object({
     attack: z.number().int().min(1).max(99),
@@ -149,8 +305,8 @@ export const CombatStyleLoadoutSchema = z
     spellId: z.string().min(1),
     styleId: z.string().min(1),
     gear: GearSchema,
-    prayers: z.array(z.string().min(1)),
-    boosts: z.array(z.string().min(1)),
+    prayers: PrayerSelectionSchema,
+    boosts: BoostSelectionSchema,
     sustained: z.boolean(),
     repotThreshold: z.number().int().min(1).max(120).nullable(),
     specialAttack: SpecialAttackFormSchema,
@@ -263,8 +419,8 @@ export const CombatSetupFormSchema = z
     styleId: z.string().min(1),
     levels: PlayerLevelsSchema,
     gear: GearSchema,
-    prayers: z.array(z.string().min(1)),
-    boosts: z.array(z.string().min(1)),
+    prayers: PrayerSelectionSchema,
+    boosts: BoostSelectionSchema,
     sustained: z.boolean(),
     repotThreshold: z.number().int().min(1).max(120).nullable(),
     specialAttack: SpecialAttackFormSchema,

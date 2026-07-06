@@ -9,6 +9,7 @@ import {
   type LegacyRuntime
 } from "./helpers/legacy-sim";
 import {
+  createHitDistribution,
   hitChance,
   maxHitMagic,
   maxHitMelee,
@@ -144,6 +145,29 @@ describe("pure combat formulas", () => {
     expect(maxHitMagic(20, 0)).toBe(20);
     expect(hitChance(10_000, 5_000)).toBeCloseTo(0.7499500049995);
     expect(hitChance(5_000, 10_000)).toBeCloseTo(0.24997500249975);
+  });
+
+  it("builds a bounded hit distribution with miss and max-hit buckets", () => {
+    const distribution = createHitDistribution({
+      hitChance: 0.75,
+      averageHit: 7.5,
+      maxHit: 20,
+      peakMaxHit: 20
+    });
+    const miss = distribution.buckets[0]!;
+    const max = distribution.buckets.at(-1)!;
+
+    expect(miss).toMatchObject({
+      id: "miss-zero",
+      label: "Miss / 0",
+      minDamage: 0,
+      maxDamage: 0,
+      isMiss: true
+    });
+    expect(miss.probability).toBeCloseTo(0.25 + 0.75 / 21);
+    expect(max).toMatchObject({ label: "20", isMaxHit: true });
+    expect(max.probability).toBeCloseTo(0.75 / 21);
+    expect(distribution.probabilityTotal).toBeCloseTo(1);
   });
 
   it("resolves melee stance ids through the equipped weapon", () => {

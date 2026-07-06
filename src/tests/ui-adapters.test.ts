@@ -8,6 +8,17 @@ import {
   toggleDenseCompareMonsterIrrelevant
 } from "../app/state/dense-compare";
 import {
+  DEFAULT_DUEL_SNAPSHOTS_STATE,
+  DUEL_SNAPSHOTS_STORAGE_KEY,
+  DUEL_SNAPSHOTS_VERSION,
+  DuelSnapshotsStateSchema,
+  MAX_DUEL_SNAPSHOTS,
+  appendDuelSnapshot,
+  createDuelSnapshot,
+  removeDuelSnapshot,
+  renameDuelSnapshot
+} from "../app/state/duel-snapshots";
+import {
   HIDDEN_GEAR_TIERS_STORAGE_KEY,
   HIDDEN_GEAR_TIERS_VERSION,
   HiddenGearTiersStateSchema,
@@ -45,10 +56,14 @@ import {
   SavedSetupSchema,
   formForMonsterSetup,
   normalizeFormState,
+  setPrimaryBoostSelection,
+  setPrimaryPrayerSelection,
   removeCustomSetupForMonster,
   savedSetupFromForm,
   setCustomSetupForMonster,
-  switchCombatStyleLoadout
+  switchCombatStyleLoadout,
+  toggleBoostSelection,
+  togglePrayerSelection
 } from "../app/state/ui-state";
 
 function withoutKeys<T extends object, K extends keyof T>(
@@ -167,6 +182,160 @@ describe("versioned rewrite persistence", () => {
     expect(loaded.value).toEqual(setup);
   });
 
+  it("saves and loads versioned duel snapshots separately from rewrite setup state", () => {
+    const storage = createMemoryStorage();
+    const options = {
+      key: DUEL_SNAPSHOTS_STORAGE_KEY,
+      version: DUEL_SNAPSHOTS_VERSION,
+      schema: DuelSnapshotsStateSchema,
+      storage,
+      now: () => new Date("2026-07-06T12:00:00.000Z")
+    };
+    const rangedForm = normalizeFormState({
+      ...switchCombatStyleLoadout(DEFAULT_FORM_STATE, "ranged"),
+      ammoId: "none",
+      prayers: ["none"],
+      boosts: ["ranging"]
+    });
+    const state = appendDuelSnapshot(
+      DEFAULT_DUEL_SNAPSHOTS_STATE,
+      createDuelSnapshot("snap-1", "  Rune   arrows  ", rangedForm)
+    );
+
+    const envelope = savePersisted(options, state);
+    const loaded = loadPersisted(options);
+    const rewriteSetupResult = loadPersisted({
+      key: REWRITE_SETUP_STORAGE_KEY,
+      version: REWRITE_SETUP_VERSION,
+      schema: SavedSetupSchema,
+      storage
+    });
+    const serialized = JSON.stringify(envelope.data);
+
+    expect(envelope).toMatchObject({
+      version: DUEL_SNAPSHOTS_VERSION,
+      savedAt: "2026-07-06T12:00:00.000Z"
+    });
+    expect(loaded.status).toBe("loaded");
+    if (loaded.status === "loaded") {
+      expect(loaded.value.snapshots).toHaveLength(1);
+      expect(loaded.value.snapshots[0]).toMatchObject({
+        id: "snap-1",
+        name: "Rune arrows",
+        form: {
+          combatStyle: "ranged",
+          ammoId: "rune_arrow",
+          boosts: ["ranging"]
+        }
+      });
+    }
+    expect(rewriteSetupResult.status).toBe("missing");
+    expect(serialized).not.toContain("effectiveXpPerHour");
+    expect(serialized).not.toContain("SimulationResult");
+  });
+
+  it("rejects oversized or computed duel snapshot payloads from persisted state", () => {
+    const baseSnapshot = createDuelSnapshot("snap-0", "Baseline", DEFAULT_FORM_STATE);
+    const oversizedPayload = {
+      version: DUEL_SNAPSHOTS_VERSION,
+      savedAt: "2026-07-06T12:00:00.000Z",
+      data: {
+        snapshots: Array.from({ length: MAX_DUEL_SNAPSHOTS + 1 }, (_, index) => ({
+          ...baseSnapshot,
+          id: `snap-${index}`
+        }))
+      }
+    };
+    const storage = createMemoryStorage({
+      [DUEL_SNAPSHOTS_STORAGE_KEY]: JSON.stringify(oversizedPayload)
+    });
+    const loaded = loadPersisted({
+      key: DUEL_SNAPSHOTS_STORAGE_KEY,
+      version: DUEL_SNAPSHOTS_VERSION,
+      schema: DuelSnapshotsStateSchema,
+      storage
+    });
+
+    expect(loaded.status).toBe("invalid");
+    expect(() =>
+      DuelSnapshotsStateSchema.parse({
+        snapshots: [{ ...baseSnapshot, result: { effectiveXpPerHour: 123 } }]
+      })
+    ).toThrow();
+  });
+
+  it("keeps duel snapshot helpers normalized and capped for app mutations", () => {
+    const state = Array.from({ length: MAX_DUEL_SNAPSHOTS + 2 }, (_, index) =>
+      createDuelSnapshot(`snap-${index}`, `Setup ${index}`, DEFAULT_FORM_STATE)
+    ).reduce(
+      (nextState, snapshot) => appendDuelSnapshot(nextState, snapshot),
+      DEFAULT_DUEL_SNAPSHOTS_STATE
+    );
+    const renamed = renameDuelSnapshot(state, "snap-13", "  Fire    Wave  ");
+    const removed = removeDuelSnapshot(renamed, "snap-13");
+
+    expect(state.snapshots).toHaveLength(MAX_DUEL_SNAPSHOTS);
+    expect(state.snapshots[0].id).toBe("snap-2");
+    expect(state.snapshots.at(-1)?.id).toBe("snap-13");
+    expect(renamed.snapshots.at(-1)?.name).toBe("Fire Wave");
+    expect(removed.snapshots.map((snapshot) => snapshot.id)).not.toContain("snap-13");
+  });
+
+  it("keeps derived potion recommendations out of persisted setup state", () => {
+    const setup = savedSetupFromForm({
+      ...DEFAULT_FORM_STATE,
+      trip: {
+        ...DEFAULT_FORM_STATE.trip,
+        potionSets: 3,
+        potionDoses: 7,
+        singleDose: true,
+        prayerPotionSets: 2,
+        prayerPotionDoses: null
+      }
+    });
+    const serialized = JSON.stringify(setup);
+
+    expect(serialized).toContain('"potionSets":3');
+    expect(serialized).toContain('"potionDoses":7');
+    expect(serialized).toContain('"prayerPotionSets":2');
+    expect(serialized).not.toContain("potionRecommendation");
+  });
+
+  it("normalizes multi-prayer and multi-boost selections without losing compatible categories", () => {
+    const normalized = normalizeFormState({
+      ...DEFAULT_FORM_STATE,
+      prayers: ["none", "clarity", "incredible", "ultimate", "future_prayer"],
+      boosts: ["none", "super_att", "future_boost", "super_str", "magic", "magic"]
+    });
+
+    expect(normalized.prayers).toEqual(["incredible", "ultimate"]);
+    expect(normalized.boosts).toEqual(["super_att", "super_str", "magic"]);
+    expect(setPrimaryPrayerSelection(normalized.prayers, "steel_skin")).toEqual([
+      "steel_skin",
+      "incredible",
+      "ultimate"
+    ]);
+    expect(setPrimaryBoostSelection(normalized.boosts, "ranging")).toEqual([
+      "ranging",
+      "super_att",
+      "super_str",
+      "magic"
+    ]);
+    expect(togglePrayerSelection(["clarity", "ultimate"], "reflexes", true)).toEqual([
+      "reflexes",
+      "ultimate"
+    ]);
+    expect(toggleBoostSelection(["super_att", "super_str"], "super_def", true)).toEqual([
+      "super_att",
+      "super_str",
+      "super_def"
+    ]);
+    expect(toggleBoostSelection(["super_att", "super_str"], "super_att", false)).toEqual([
+      "super_str"
+    ]);
+    expect(togglePrayerSelection(["steel_skin"], "none", true)).toEqual([]);
+  });
+
   it("stashes and restores per-combat-style loadouts while keeping shared setup fields", () => {
     const melee = normalizeFormState({
       ...DEFAULT_FORM_STATE,
@@ -208,7 +377,7 @@ describe("versioned rewrite persistence", () => {
     expect(restoredMelee.perStyleLoadouts.ranged).toMatchObject({
       weaponId: "magic_shortbow",
       ammoId: "rune_arrow",
-      prayers: ["none"],
+      prayers: [],
       boosts: ["ranging"],
       sustained: true,
       repotThreshold: 80,
