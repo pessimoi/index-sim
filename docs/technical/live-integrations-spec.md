@@ -61,7 +61,7 @@ MVP behavior:
 - preserves missing-price warnings instead of silently mutating fallback data
 - updates browser-local price history only after a validated price set is accepted by the UI
 
-Current implementation note: the rewrite UI now exposes current-monster and all-supported sync controls in the Loot and economy panel. It calls the same-origin market API through `src/adapters/market`, validates the returned `MarketSyncResponse` and swaps the selected explicit `PriceSet` only after validation succeeds. A validated imported or synced `PriceSet` records a capped browser-local snapshot in `index-sim:price-history` after the UI accepts it as active; failed imports, failed syncs and invalid payloads do not update that history. The default repo provider remains disabled until an authoritative market upstream is accepted.
+Current implementation note: the rewrite UI now exposes current-monster and all-supported sync controls in the Loot and Economy panes. It calls the same-origin market API through `src/adapters/market`, validates the returned `MarketSyncResponse` and swaps the selected explicit `PriceSet` only after validation succeeds. A validated imported or synced `PriceSet` records a capped browser-local snapshot in `index-sim:price-history` after the UI accepts it as active; failed imports, failed syncs and invalid payloads do not update that history. The Economy tab can also capture the currently active validated `PriceSet` with Snapshot now, analyze local movers against Previous, First or an explicit snapshot baseline and clear only the local history key after confirmation. The default repo provider remains disabled until an authoritative market upstream is accepted.
 
 ## Non-goals for the first implementation
 
@@ -339,7 +339,7 @@ Suggested keys:
 
 All persisted values must use the existing `PersistedEnvelope<T>` pattern.
 
-Current implementation note: `index-sim:price-history` stores a versioned rewrite-owned envelope containing capped snapshots with `capturedAt`, `sourcePriceSetId`, `label` and `itemPrices`. It does not store upstream origins, source slugs, raw response bodies, player names or secrets.
+Current implementation note: `index-sim:price-history` stores a versioned rewrite-owned envelope containing capped snapshots with `capturedAt`, `sourcePriceSetId`, `label` and `itemPrices`. It does not store upstream origins, source slugs, raw response bodies, player names or secrets. The current Economy UI reads this local envelope for summary and movers analysis, and its Clear history action removes only this key.
 
 Legacy compatibility note: the user-facing legacy import flow can read `sim_hiscore_player` into the rewrite-owned last-player key after current hiscores validation, and can convert compatible `sim_prices_v1` + `sim_alch_v1` + `sim_scraped_at_v1` data into an explicit imported `PriceSet` after price schema and known-item validation. Import keeps the legacy keys. `sim_price_history_v1` is detected and reported but not migrated; server-managed or full legacy price history migration still needs a separate decision.
 

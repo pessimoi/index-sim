@@ -36,6 +36,7 @@ Use this log for choices that future agents must not re-litigate accidentally.
 | D-028 | 2026-07-06 | Use legacy golden parity as regression evidence, but allow documented LostCityRS-backed intentional deltas. | The old app can help find accidental changes, but it is not the final truth source for a full rewrite.                                                               |
 | D-029 | 2026-07-06 | The rewrite can replace the current app only after v1 features, parity/golden tests, performance budget and security checks pass. | Replacement needs a balanced acceptance gate without turning the rewrite into an endless full-edge-case proof project.                                               |
 | D-030 | 2026-07-06 | Legacy storage migration starts as non-writing detection plus a safe setup report, not silent auto-migration. | The rewrite can explain old local state later without deleting legacy keys or importing unvalidated planner, price, custom setup, compare, cannon or hidden-tier data. |
+| D-031 | 2026-07-06 | Ring-of-recoil XP attribution is an accepted rewrite intentional delta from legacy. | Legacy remains useful as a comparison value, but the rewrite may calculate this path anew: recoil is modeled in the trip layer for kill speed, capacity and supply cost, while combat XP stays attributed to direct player combat damage instead of being reduced by trip-layer recoil damage. |
 
 ## Recommended, not final implementation decisions
 

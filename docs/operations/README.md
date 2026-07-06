@@ -41,7 +41,7 @@ Current market run behavior:
 - Vite dev and preview expose same-origin `GET /api/market/status` and `POST /api/market/sync` through repo-owned middleware.
 - The default market provider is disabled, so local runs show the disabled service state unless a test or future runtime injects an approved provider.
 - The rewrite UI keeps JSON price import available as the offline fallback.
-- The rewrite UI stores accepted imported or synced price snapshots in browser-local `index-sim:price-history` using a versioned envelope. Clearing site data removes this local history; no server cleanup or migration is involved.
+- The rewrite UI stores accepted imported, synced or manually captured active price snapshots in browser-local `index-sim:price-history` using a versioned envelope. The Economy tab can analyze this local history with baseline movers, create Snapshot now entries and clear only this local history key after confirmation. Clearing site data also removes this local history; no server cleanup or migration is involved.
 - The rewrite UI can detect known legacy browser storage keys and show an import/keep/clear choice. Import writes only rewrite-owned setup, hiscores last-player, accepted price-history and dismissed keys and keeps legacy keys. Clear removes only known legacy keys after explicit user confirmation; no server cleanup, account context or tenant cleanup is involved.
 - No live market upstream, secret, account model, database, server-managed shared price history or scheduled job is configured in this repo.
 

@@ -1,7 +1,7 @@
 # Bug triage for golden fixtures
 
 - Status: current baseline triage
-- Date: 2026-07-05
+- Date: 2026-07-06
 - Sources: `PROJECT_REVIEW_NOTES.md`, `engine.js`, `trip.js`, `gamedata.js`, `equipment.js`
 
 This document separates known current behavior from rewrite decisions. No legacy behavior was fixed before capturing the current golden fixtures.
@@ -11,7 +11,7 @@ This document separates known current behavior from rewrite decisions. No legacy
 - Golden fixtures preserve the current `SimEngine.simulate()` behavior temporarily.
 - The fixture harness does not load `market.js`, `planner-core.js`, `views.jsx`, browser `localStorage` or live network data.
 - Bugs outside `SimEngine.simulate()` are triaged here but not locked as simulation parity.
-- No item below is an accepted intentional behavioral change unless a future decision records it in [decisions.md](decisions.md).
+- No item below is an accepted intentional behavioral change unless a decision records it in [decisions.md](decisions.md).
 
 ## Triage list
 
@@ -26,6 +26,7 @@ This document separates known current behavior from rewrite decisions. No legacy
 | Loot/Ring of Wealth  | Code/comment scope differs: Ring of Wealth affects `randomjewel`, not every rare table.                                                                            | Preserve; fixture includes `melee_green_dragon_antifire_ring_of_wealth`.       | Decide and document intended RoW scope before changing behavior.                                                                      |
 | Trip/incoming damage | Monster incoming damage can be underestimated where monster strength bonuses or max hits are incomplete.                                                           | Preserve; trip fixtures lock current model outputs.                            | Add explicit monster max-hit/provenance fields during data rewrite.                                                                   |
 | Trip/safespot        | Ranged, magic and halberd default to safespot and therefore zero incoming damage.                                                                                  | Preserve; fixtures include ranged, magic and halberd safespot cases.           | Decide whether auto-safespot remains default UX or becomes explicit input.                                                            |
+| XP/Recoil            | Legacy reduces combat XP/hr when ring-of-recoil damage contributes to kill speed, while the rewrite keeps combat XP attributed to direct player combat damage.       | Keep `melee_ring_recoil_fire_giant_food_trip` as comparison evidence only.     | Accepted intentional rewrite delta in [D-031](decisions.md); keep the diagnostic XP test rather than returning this fixture to parity. |
 | Specials             | Dragon halberd special applies the second hit to all targets because NPC size data is missing.                                                                     | Preserve; fixture includes `melee_dragon_halberd_rock_crab_small_target_spec`. | Add NPC size data or mark this as an intentional behavior change before fixing.                                                       |
 | Ammo/data            | Hardcoded `adamant_arrow` fallback can mask price-key problems.                                                                                                    | Preserve temporarily.                                                          | Move ammo prices into validated `PriceSet`.                                                                                           |
 | Drops/data           | Drop names and keys can disagree.                                                                                                                                  | Preserve current data in fixtures.                                             | Validate item ids and display names when moving to snapshots.                                                                         |

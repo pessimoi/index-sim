@@ -392,7 +392,7 @@ Required areas:
 - price-set lookup and missing-price warnings
 - planner gear eligibility and scoring
 
-Current implemented unit coverage includes combat/equipment rules in `src/tests/domain-core.test.ts`, data/economy validation in `src/tests/data-economy.test.ts`, trip/loot/supply rules in `src/tests/trip-loot-supply.test.ts`, planner rules in `src/tests/planner-domain.test.ts`, and rewrite UI/adapters in `src/tests/ui-view-model.test.ts` and `src/tests/ui-adapters.test.ts`.
+Current implemented unit coverage includes combat/equipment rules in `src/tests/domain-core.test.ts`, data/economy validation in `src/tests/data-economy.test.ts`, trip/loot/supply rules in `src/tests/trip-loot-supply.test.ts`, planner rules in `src/tests/planner-domain.test.ts`, Planner UI state/adapters in `src/tests/planner-ui-state.test.ts` and `src/tests/planner-ui-adapter.test.ts`, and rewrite UI/adapters in `src/tests/ui-view-model.test.ts` and `src/tests/ui-adapters.test.ts`.
 
 ### Schema tests
 
@@ -409,6 +409,7 @@ Current implemented schema coverage:
 - `src/tests/data-economy.test.ts` validates the adapted legacy game-data snapshot.
 - The same test validates committed `prices.json`, `alch.json` and `price-history.json`.
 - The same test rejects malformed imported `PriceSet` JSON and checks missing-price warnings.
+- `src/tests/planner-ui-state.test.ts` validates the versioned rewrite Planner UI state envelope, default state, invalid/version fallback and gear-pool id cleanup against the active planner pool.
 - `src/tests/ui-adapters.test.ts` validates the new rewrite setup envelope, invalid envelope/data rejection and version-mismatch behavior.
 - `src/tests/legacy-migration.test.ts` validates legacy storage detection, invalid legacy setup state handling, safe `sim_input_v3` setup mapping, compatible legacy hiscores player import, compatible legacy price/alch `PriceSet` creation, malformed/oversized/unknown price skips, price-history detection without mutation and known-key clearing behavior.
 - `src/tests/e2e/scaffold.spec.ts` covers the user-facing legacy import/keep/clear flow, including setup, last-player and explicit `PriceSet` import while preserving legacy setup, price, history and hiscores keys.
@@ -425,7 +426,7 @@ Current implemented schema coverage:
 - `src/tests/planner-domain.test.ts` verifies planner gear eligibility, candidate-weapon stance selection, missing future/unknown weapon handling and deterministic plan summaries.
 - `src/tests/fixtures/planner-golden.json` stores 3 golden plan summaries for melee, ranged and magic unlock paths.
 - Planner scoring uses `simulateCombat`, combat XP breakdowns and `simulateTripLootSupply`; it must not reimplement hit chance, max hit, equipment bonus or stance truth.
-- Planner UI wiring, saved planner state migration, full legacy planner parity and Web Worker performance remain future work.
+- Planner UI wiring now has a basic workbench tab path for metric, current XP, target levels, skill locks, Recompute, summary and training-order output. Gear pool editor, timeline/chart views, legacy planner state migration, full legacy planner parity and Web Worker performance remain future work.
 
 ### Browser tests
 
@@ -436,13 +437,13 @@ Playwright smoke tests cover:
 - setup and simulation result regions render
 - loot/economy, compare and planner regions render
 - changing combat style updates the visible setup path
+- Planner tab metric/current-XP/target/skill-lock/Recompute flow renders a training order and persists rewrite-owned Planner UI state
 
 Future Playwright smoke tests should cover:
 
 - user can select monster and loadout
 - changing key numeric inputs updates result values
 - compare view renders
-- planner view renders
 - price import error path is understandable
 
 ### Performance tests and budgets
