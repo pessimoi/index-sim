@@ -1,0 +1,72 @@
+import type { HiscoresResponse, HiscoresSkill } from "@/domain/shared";
+import { CombatSetupFormSchema, type CombatSetupFormState } from "./ui-state";
+
+const HISCORES_SKILL_ORDER: HiscoresSkill[] = [
+  "attack",
+  "strength",
+  "defence",
+  "hitpoints",
+  "prayer",
+  "ranged",
+  "magic"
+];
+
+const FORM_LEVEL_SKILLS = [
+  "attack",
+  "strength",
+  "defence",
+  "hitpoints",
+  "prayer",
+  "ranged",
+  "magic"
+] as const;
+type FormLevelSkill = (typeof FORM_LEVEL_SKILLS)[number];
+const FORM_LEVEL_SKILL_SET = new Set<HiscoresSkill>(FORM_LEVEL_SKILLS);
+
+export interface HiscoresPreviewRow {
+  skill: HiscoresSkill;
+  currentLevel: number | null;
+  fetchedLevel: number;
+  canApply: boolean;
+}
+
+function isFormLevelSkill(skill: HiscoresSkill): skill is FormLevelSkill {
+  return FORM_LEVEL_SKILL_SET.has(skill);
+}
+
+export function createHiscoresPreviewRows(
+  form: CombatSetupFormState,
+  response: HiscoresResponse
+): HiscoresPreviewRow[] {
+  return HISCORES_SKILL_ORDER.flatMap((skill) => {
+    const value = response.skills[skill];
+    if (!value) return [];
+    const canApply = isFormLevelSkill(skill);
+    return [
+      {
+        skill,
+        currentLevel: canApply ? form.levels[skill] : null,
+        fetchedLevel: value.level,
+        canApply
+      }
+    ];
+  });
+}
+
+export function countApplicableHiscoresSkills(response: HiscoresResponse): number {
+  return FORM_LEVEL_SKILLS.filter((skill) => response.skills[skill]?.level !== undefined).length;
+}
+
+export function applyHiscoresLevels(
+  form: CombatSetupFormState,
+  response: HiscoresResponse
+): CombatSetupFormState {
+  const levels = { ...form.levels };
+
+  for (const skill of FORM_LEVEL_SKILLS) {
+    const fetchedLevel = response.skills[skill]?.level;
+    if (fetchedLevel !== undefined) levels[skill] = fetchedLevel;
+  }
+
+  return CombatSetupFormSchema.parse({ ...form, levels });
+}

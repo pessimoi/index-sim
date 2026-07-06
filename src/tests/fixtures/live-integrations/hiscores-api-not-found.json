@@ -1,0 +1,13 @@
+{
+  "error": {
+    "code": "not-found",
+    "message": "Player was not found in the mocked hiscores fixture"
+  },
+  "warnings": [
+    {
+      "code": "mock-source",
+      "severity": "info",
+      "message": "Fixture response only; no live hiscores request was made"
+    }
+  ]
+}

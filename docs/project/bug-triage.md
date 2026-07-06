@@ -1,0 +1,40 @@
+# Bug triage for golden fixtures
+
+- Status: current baseline triage
+- Date: 2026-07-05
+- Sources: `PROJECT_REVIEW_NOTES.md`, `engine.js`, `trip.js`, `gamedata.js`, `equipment.js`
+
+This document separates known current behavior from rewrite decisions. No legacy behavior was fixed before capturing the current golden fixtures.
+
+## Fixture policy
+
+- Golden fixtures preserve the current `SimEngine.simulate()` behavior temporarily.
+- The fixture harness does not load `market.js`, `planner-core.js`, `views.jsx`, browser `localStorage` or live network data.
+- Bugs outside `SimEngine.simulate()` are triaged here but not locked as simulation parity.
+- No item below is an accepted intentional behavioral change unless a future decision records it in [decisions.md](decisions.md).
+
+## Triage list
+
+| Area                 | Known risk                                                                                                                                                         | Baseline handling                                                              | Rewrite follow-up                                                                                                                     |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Market sync          | Current monster price sync can crash on nested loot rows.                                                                                                          | Preserve temporarily; market sync is not loaded in golden fixtures.            | Fix before porting market import/sync behavior.                                                                                       |
+| Planner              | Planner can score candidate weapons with stale `accByType`.                                                                                                        | Preserve temporarily; planner is outside this fixture set.                     | Fix before planner golden fixtures or planner rewrite.                                                                                |
+| Planner              | Planner can select training stance ids based on the base weapon instead of candidate weapon.                                                                       | Preserve temporarily; planner is outside this fixture set.                     | Fix before planner golden fixtures or planner rewrite.                                                                                |
+| Operations/API       | Archived legacy UI references missing `run_sim.py` and legacy `/api/*` routes; production rewrite uses same-origin service states with disabled default providers. | Preserve archived legacy evidence outside golden fixtures.                     | Choose production runtime/upstreams and decide whether legacy `/api/prices`, `/api/scrape` or `/api/hiscores` shims are still needed. |
+| Economy/data         | Gem alias prices can update keys that EV code does not read.                                                                                                       | Preserve temporarily; no market sync in fixtures.                              | Normalize price keys before economy rewrite.                                                                                          |
+| Economy/data         | `SLUG_MAP` covers only part of the item universe.                                                                                                                  | Preserve temporarily; no live scrape in fixtures.                              | Replace with validated item-id mapping.                                                                                               |
+| Loot/Ring of Wealth  | Code/comment scope differs: Ring of Wealth affects `randomjewel`, not every rare table.                                                                            | Preserve; fixture includes `melee_green_dragon_antifire_ring_of_wealth`.       | Decide and document intended RoW scope before changing behavior.                                                                      |
+| Trip/incoming damage | Monster incoming damage can be underestimated where monster strength bonuses or max hits are incomplete.                                                           | Preserve; trip fixtures lock current model outputs.                            | Add explicit monster max-hit/provenance fields during data rewrite.                                                                   |
+| Trip/safespot        | Ranged, magic and halberd default to safespot and therefore zero incoming damage.                                                                                  | Preserve; fixtures include ranged, magic and halberd safespot cases.           | Decide whether auto-safespot remains default UX or becomes explicit input.                                                            |
+| Specials             | Dragon halberd special applies the second hit to all targets because NPC size data is missing.                                                                     | Preserve; fixture includes `melee_dragon_halberd_rock_crab_small_target_spec`. | Add NPC size data or mark this as an intentional behavior change before fixing.                                                       |
+| Ammo/data            | Hardcoded `adamant_arrow` fallback can mask price-key problems.                                                                                                    | Preserve temporarily.                                                          | Move ammo prices into validated `PriceSet`.                                                                                           |
+| Drops/data           | Drop names and keys can disagree.                                                                                                                                  | Preserve current data in fixtures.                                             | Validate item ids and display names when moving to snapshots.                                                                         |
+| Data literals        | Duplicate price/data object keys can hide earlier values.                                                                                                          | Preserve current parsed JavaScript behavior.                                   | Detect duplicates in generated data or source validation.                                                                             |
+| Alch data            | Zero alch values are not automatically loaded from external files.                                                                                                 | Preserve current embedded alch behavior.                                       | Make alch values part of validated economy data.                                                                                      |
+
+## Open decisions
+
+- Which known bugs should become intentional behavior changes in the rewrite?
+- Should any legacy bug be fixed before additional golden fixture captures?
+- Should planner behavior get separate golden fixtures before planner rewrite?
+- Should old `localStorage` keys be captured for migration tests?

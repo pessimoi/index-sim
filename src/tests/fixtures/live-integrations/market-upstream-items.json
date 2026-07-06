@@ -1,0 +1,14 @@
+[
+  {
+    "itemId": "lobster",
+    "sourceSlug": "lobster",
+    "item": { "highalch": 0 },
+    "history": [{ "price": 200 }, { "price": 220 }, { "price": 210 }]
+  },
+  {
+    "itemId": "rune_scimitar",
+    "sourceSlug": "rune_scimitar",
+    "item": { "highalch": 15360 },
+    "history": [{ "price": 23000 }, { "price": 22500 }, { "price": 23500 }]
+  }
+]

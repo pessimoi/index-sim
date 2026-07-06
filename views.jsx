@@ -4258,100 +4258,34 @@ function Spark({data, color}){
 // ARCHITECTURE BOARD
 // =======================================================================
 function ArchitectureBoard(){
+  const docs = [
+    ['Architecture', 'docs/technical/architecture.md'],
+    ['Rewrite spec', 'docs/technical/rewrite-spec.md'],
+    ['Operations', 'docs/operations/README.md'],
+    ['Decisions', 'docs/project/decisions.md'],
+  ];
   return (
     <div className="sim" style={{display:'flex', flexDirection:'column'}}>
       <Chrome crumbs={['workspace','docs','local-dev']} status="docs" />
       <div style={{padding:'18px 22px', flex:1, overflow:'auto'}} className="scroll">
-        <div style={{marginBottom:16}}>
-          <div style={{fontFamily:'var(--mono)', fontSize:11, color:'var(--text-3)', textTransform:'uppercase', letterSpacing:'.1em'}}>local-first architecture · v0.1</div>
-          <h1 style={{margin:'6px 0 4px', fontSize:24, color:'var(--text-0)', fontWeight:500}}>Run the whole stack on your machine.</h1>
-          <p style={{margin:0, color:'var(--text-2)', maxWidth:680, lineHeight:1.5}}>
-            One repo, three processes: a Python FastAPI engine, a Next.js front-end, and a polite scraper.
-            SQLite + a JSON snapshot of the Lost City data dir is the source of truth — no external services required to launch.
+        <div style={{marginBottom:18}}>
+          <div style={{fontFamily:'var(--mono)', fontSize:11, color:'var(--text-3)', textTransform:'uppercase', letterSpacing:'.1em'}}>architecture docs</div>
+          <h1 style={{margin:'6px 0 4px', fontSize:24, color:'var(--text-0)', fontWeight:500}}>Architecture notes moved to docs.</h1>
+          <p style={{margin:0, color:'var(--text-2)', maxWidth:760, lineHeight:1.5}}>
+            This legacy panel used to describe a Next.js, FastAPI and SQLite stack that is not present in this repository.
+            The current source of truth is the markdown documentation below.
           </p>
         </div>
-
-        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:14, marginBottom:18}}>
-          <ArchCard tag="frontend" title="apps/web · Next.js" port="3000" lines={[
-            'React 19 · server actions','TanStack Query → /api','Recharts for distributions','Tailwind + shadcn primitives',
-          ]} color="teal"/>
-          <ArchCard tag="api" title="services/engine · FastAPI" port="8000" lines={[
-            'POST /simulate · pure','GET  /monsters /items','GET  /compare?loadout=...','pydantic v2 schemas',
-          ]} color="amber"/>
-          <ArchCard tag="scraper" title="services/scraper · APScheduler" port="—" lines={[
-            'market.2004scape.org','1 req/s · backoff','writes to prices table','cron: every 30 min',
-          ]} color="gold"/>
-        </div>
-
-        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, marginBottom:18}}>
-          <ArchCard tag="db" title="packages/data · SQLite" port="file://" lines={[
-            'monsters, items, drops','price_history (long)','loadouts (saved)','sim_runs (cached)',
-          ]} color="blue"/>
-          <ArchCard tag="game-data" title="packages/lostcity-extract" port="—" lines={[
-            'pulls from LostCityRS/Content @ v274','parses *.npc, *.obj configs','emits JSON → seed.sqlite','one-shot · cached in CI',
-          ]} color="violet"/>
-        </div>
-
-        <div className="h-strip"><span className="title">Modules · combat engine</span><span className="meta">services/engine/sim/</span></div>
-        <table className="dense" style={{marginBottom:18}}>
-          <thead><tr><th>Module</th><th>Responsibility</th><th>Public surface</th></tr></thead>
-          <tbody>
-            <tr><td style={{color:'var(--teal)'}}>rolls.py</td><td>effective levels · attack/defence rolls (melee/ranged/magic)</td><td className="dim">eff_acc, eff_dmg, attack_roll, defence_roll</td></tr>
-            <tr><td style={{color:'var(--teal)'}}>damage.py</td><td>max hit per style · hit chance · distribution</td><td className="dim">max_hit_melee, max_hit_ranged, max_hit_magic, dist</td></tr>
-            <tr><td style={{color:'var(--teal)'}}>dps.py</td><td>average dps incl. attack speed + rapid mod</td><td className="dim">dps, time_to_kill</td></tr>
-            <tr><td style={{color:'var(--amber)'}}>prayers.py</td><td>prayer registry · per-stat multipliers + drain</td><td className="dim">PRAYERS, drain_per_min, available_for(type)</td></tr>
-            <tr><td style={{color:'var(--amber)'}}>potions.py</td><td>potion boost curves</td><td className="dim">POTIONS, apply</td></tr>
-            <tr><td style={{color:'var(--amber)'}}>spells.py</td><td>spell registry · base dmg, rune cost, lvl req</td><td className="dim">SPELLS, cast_cost</td></tr>
-            <tr><td style={{color:'var(--gold)'}}>loot.py</td><td>drop-table eval · ev per kill · monte carlo</td><td className="dim">expected_value, monte_carlo</td></tr>
-            <tr><td style={{color:'var(--gold)'}}>trip.py</td><td>inventory + supply consumption</td><td className="dim">trip_duration, supplies_per_kill</td></tr>
-            <tr><td style={{color:'var(--blue)'}}>compare.py</td><td>cartesian over loadouts × monsters</td><td className="dim">rank, frontier</td></tr>
-          </tbody>
-        </table>
-
-        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:14}}>
-          <div>
-            <div className="h-strip"><span className="title">Run locally</span></div>
-            <pre style={{margin:0, padding:'14px 16px', background:'#050507', border:'1px solid var(--border-2)', borderTop:0, fontFamily:'var(--mono)', fontSize:12, color:'var(--text-1)', lineHeight:1.7}}>
-{`$ git clone …/2004scape-sim && cd $_
-$ make seed          # parse LostCityRS/Content@v274 → sqlite
-$ make dev           # turbo: web + api + scraper
-  ↳ web      http://localhost:3000
-  ↳ api      http://localhost:8000
-  ↳ scraper  pid 41213 (every 30m)
-
-$ python -m sim.repl
-sim> simulate(type="ranged", lvl=80, target="dust_devil")
-  dps=2.41  xp/h=46.8k  gp/h=92k`}
-            </pre>
-          </div>
-          <div>
-            <div className="h-strip"><span className="title">Roadmap</span></div>
-            <ol style={{margin:0, padding:'12px 16px 12px 32px', background:'var(--bg-1)', border:'1px solid var(--border-2)', borderTop:0, color:'var(--text-1)', fontSize:12, lineHeight:1.8}}>
-              <li><b style={{color:'var(--teal)'}}>W1</b> · engine (melee · ranged · magic) + tests</li>
-              <li><b style={{color:'var(--teal)'}}>W2</b> · seed extract from LostCityRS/Content@v274</li>
-              <li><b style={{color:'var(--amber)'}}>W3</b> · FastAPI endpoints + schemas</li>
-              <li><b style={{color:'var(--amber)'}}>W4</b> · Next.js workbench (this prototype)</li>
-              <li><b style={{color:'var(--gold)'}}>W5</b> · scraper · prices · loot EV</li>
-              <li><b style={{color:'var(--blue)'}}>W6</b> · optimizer · gear search · prayer flicking</li>
-              <li><b style={{color:'var(--violet)'}}>W7+</b> · hiscores import · trip planner</li>
-            </ol>
-          </div>
+        <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))', gap:14}}>
+          {docs.map(([label, href]) => (
+            <a key={href} href={href} style={{display:'block', textDecoration:'none', color:'var(--text-0)', background:'var(--bg-1)', border:'1px solid var(--border-2)', borderRadius:4, padding:'14px 16px'}}>
+              <span style={{display:'block', fontFamily:'var(--mono)', fontSize:10, color:'var(--teal)', textTransform:'uppercase', letterSpacing:'.08em', marginBottom:6}}>open doc</span>
+              <strong style={{fontSize:15, fontWeight:500}}>{label}</strong>
+              <span style={{display:'block', fontFamily:'var(--mono)', fontSize:11, color:'var(--text-3)', marginTop:8}}>{href}</span>
+            </a>
+          ))}
         </div>
       </div>
-    </div>
-  );
-}
-function ArchCard({tag, title, port, lines, color}){
-  return (
-    <div style={{background:'var(--bg-1)', border:'1px solid var(--border-2)', borderRadius:4, padding:'12px 14px'}}>
-      <div style={{display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom:6}}>
-        <span style={{fontFamily:'var(--mono)', fontSize:10, textTransform:'uppercase', letterSpacing:'.08em', color:`var(--${color})`}}>{tag}</span>
-        <span style={{fontFamily:'var(--mono)', fontSize:10, color:'var(--text-3)'}}>{port}</span>
-      </div>
-      <div style={{fontFamily:'var(--mono)', fontSize:13, color:'var(--text-0)', marginBottom:8}}>{title}</div>
-      <ul style={{margin:0, padding:0, listStyle:'none', display:'grid', gap:4, fontSize:11, color:'var(--text-2)', fontFamily:'var(--mono)'}}>
-        {lines.map((l,i)=>(<li key={i}>· {l}</li>))}
-      </ul>
     </div>
   );
 }

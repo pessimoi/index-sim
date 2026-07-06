@@ -1,0 +1,154 @@
+{
+  "cases": [
+    {
+      "id": "melee_rune_scimitar_attack_unlock",
+      "expected": {
+        "combatStyle": "melee",
+        "metric": "xph",
+        "totalXp": 7523,
+        "start": {
+          "dps": 1.239326,
+          "metricValue": 15577.220901,
+          "weaponId": "adamant_scimitar",
+          "spellId": null
+        },
+        "end": {
+          "skill": "attack",
+          "to": 41,
+          "dps": 1.481538,
+          "metricValue": 18232.599809,
+          "weaponId": "rune_scimitar",
+          "spellId": null
+        },
+        "phases": [
+          {
+            "skill": "attack",
+            "from": 39,
+            "to": 41,
+            "xp": 7523,
+            "cumXp": 7523,
+            "startDps": 1.239326,
+            "endDps": 1.481538,
+            "startMetric": 15577.220901,
+            "endMetric": 18232.599809,
+            "unlocks": ["rune_scimitar"]
+          }
+        ],
+        "unlocks": [
+          {
+            "slot": "weapon",
+            "type": "unlock",
+            "itemId": "rune_scimitar",
+            "skill": "attack",
+            "level": 40,
+            "reqSkill": "attack",
+            "reqLevel": 40,
+            "cumXp": 3576,
+            "dpsBefore": 1.239326,
+            "dpsAfter": 1.473342
+          }
+        ]
+      }
+    },
+    {
+      "id": "ranged_yew_shortbow_unlock",
+      "expected": {
+        "combatStyle": "ranged",
+        "metric": "xph",
+        "totalXp": 7523,
+        "start": {
+          "dps": 1.567703,
+          "metricValue": 21269.920944,
+          "weaponId": "maple_shortbow",
+          "spellId": null
+        },
+        "end": {
+          "skill": "ranged",
+          "to": 41,
+          "dps": 1.848684,
+          "metricValue": 24833.6782,
+          "weaponId": "yew_shortbow",
+          "spellId": null
+        },
+        "phases": [
+          {
+            "skill": "ranged",
+            "from": 39,
+            "to": 41,
+            "xp": 7523,
+            "cumXp": 7523,
+            "startDps": 1.567703,
+            "endDps": 1.848684,
+            "startMetric": 21269.920944,
+            "endMetric": 24833.6782,
+            "unlocks": ["yew_shortbow"]
+          }
+        ],
+        "unlocks": [
+          {
+            "slot": "weapon",
+            "type": "unlock",
+            "itemId": "yew_shortbow",
+            "skill": "ranged",
+            "level": 40,
+            "reqSkill": "ranged",
+            "reqLevel": 40,
+            "cumXp": 3576,
+            "dpsBefore": 1.567703,
+            "dpsAfter": 1.582877
+          }
+        ]
+      }
+    },
+    {
+      "id": "magic_fire_bolt_unlock",
+      "expected": {
+        "combatStyle": "magic",
+        "metric": "xph",
+        "totalXp": 4591,
+        "start": {
+          "dps": 1.198869,
+          "metricValue": 18388.472533,
+          "weaponId": "staff_of_fire",
+          "spellId": "fire_strike"
+        },
+        "end": {
+          "skill": "magic",
+          "to": 36,
+          "dps": 1.807265,
+          "metricValue": 30068.018003,
+          "weaponId": "staff_of_fire",
+          "spellId": "fire_bolt"
+        },
+        "phases": [
+          {
+            "skill": "magic",
+            "from": 34,
+            "to": 36,
+            "xp": 4591,
+            "cumXp": 4591,
+            "startDps": 1.198869,
+            "endDps": 1.807265,
+            "startMetric": 18388.472533,
+            "endMetric": 30068.018003,
+            "unlocks": ["fire_bolt"]
+          }
+        ],
+        "unlocks": [
+          {
+            "slot": "spell",
+            "type": "unlock",
+            "itemId": "fire_bolt",
+            "skill": "magic",
+            "level": 35,
+            "reqSkill": "magic",
+            "reqLevel": 35,
+            "cumXp": 2182,
+            "dpsBefore": 1.198869,
+            "dpsAfter": 1.802886
+          }
+        ]
+      }
+    }
+  ]
+}

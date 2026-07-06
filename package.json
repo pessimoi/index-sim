@@ -1,0 +1,41 @@
+{
+  "name": "index-sim",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "$NODE node_modules/vite/bin/vite.js --config vite.config.ts",
+    "build": "$NODE node_modules/typescript/bin/tsc -b && $NODE node_modules/vite/bin/vite.js build --config vite.config.ts",
+    "preview": "$NODE node_modules/vite/bin/vite.js preview --config vite.config.ts",
+    "test": "$NODE node_modules/vitest/vitest.mjs run --config vitest.config.ts",
+    "test:golden": "$NODE node_modules/vitest/vitest.mjs run --config vitest.config.ts src/tests/legacy-golden.test.ts",
+    "test:watch": "$NODE node_modules/vitest/vitest.mjs --config vitest.config.ts",
+    "fixtures:capture": "$NODE node_modules/vite-node/vite-node.mjs --config vitest.config.ts scripts/capture-legacy-golden.ts",
+    "test:e2e": "playwright test",
+    "typecheck": "tsc -b",
+    "lint": "$NODE node_modules/eslint/bin/eslint.js .",
+    "format:check": "$NODE node_modules/prettier/bin/prettier.cjs --check ."
+  },
+  "dependencies": {
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.61.1",
+    "@types/node": "^26.1.0",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.2.0",
+    "eslint": "^10.6.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.3",
+    "jsdom": "^29.1.1",
+    "prettier": "^3.9.4",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.62.1",
+    "vite": "^7.3.6",
+    "vitest": "^3.2.6"
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "priceSet": {
+    "id": "mock-market-sync",
+    "label": "Mock market sync",
+    "source": "scraped",
+    "createdAt": "2026-07-05T12:00:05.000Z",
+    "itemPrices": {
+      "lobster": 210,
+      "rune_scimitar": 23000
+    },
+    "alchValues": {
+      "lobster": 0,
+      "rune_scimitar": 15360
+    },
+    "provenance": {
+      "source": "scraped",
+      "sourceRef": "markets.lostcity.rs",
+      "verifiedAt": "2026-07-05T12:00:05.000Z",
+      "notes": "Mock fixture only; no live market request was made"
+    }
+  },
+  "report": {
+    "requested": 3,
+    "updated": 2,
+    "skipped": 0,
+    "failed": 1,
+    "startedAt": "2026-07-05T12:00:00.000Z",
+    "finishedAt": "2026-07-05T12:00:05.000Z",
+    "source": {
+      "id": "markets.lostcity.rs",
+      "label": "Mock LostCity market",
+      "origin": "https://markets.lostcity.rs"
+    },
+    "items": [
+      {
+        "itemId": "lobster",
+        "sourceSlug": "lobster",
+        "status": "updated",
+        "price": 210,
+        "alchValue": 0,
+        "sampleSize": 3
+      },
+      {
+        "itemId": "rune_scimitar",
+        "sourceSlug": "rune_scimitar",
+        "status": "updated",
+        "price": 23000,
+        "alchValue": 15360,
+        "sampleSize": 3
+      },
+      {
+        "itemId": "dragon_bones",
+        "sourceSlug": "dragon_bones",
+        "status": "failed",
+        "reason": "Mock upstream timeout"
+      }
+    ],
+    "warnings": [
+      {
+        "code": "partial-market-sync",
+        "severity": "warning",
+        "message": "One mocked item failed; successful prices remain usable",
+        "itemId": "dragon_bones"
+      }
+    ]
+  }
+}

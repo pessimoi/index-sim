@@ -1,0 +1,19 @@
+{
+  "player": "Fixture Player",
+  "normalizedPlayer": "Fixture Player",
+  "source": {
+    "id": "mock-hiscores",
+    "label": "Mock hiscores fixture"
+  },
+  "fetchedAt": "2026-07-05T12:00:00.000Z",
+  "skills": {
+    "attack": { "level": 61, "xp": 333804, "rank": 1200 },
+    "strength": { "level": 64, "xp": 407015, "rank": 1100 },
+    "defence": { "level": 55, "xp": 166636, "rank": 1500 },
+    "hitpoints": { "level": 63, "xp": 368599, "rank": 1000 },
+    "prayer": { "level": 43, "xp": 50339, "rank": 1800 },
+    "ranged": { "level": 50, "xp": 101333, "rank": 1700 },
+    "magic": { "level": 57, "xp": 203254, "rank": 1600 }
+  },
+  "warnings": []
+}
