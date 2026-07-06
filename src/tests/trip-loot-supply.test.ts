@@ -377,6 +377,39 @@ describe("trip/loot/supply unit rules", () => {
     expect(altar.trip.altarSecPerKill).toBeGreaterThan(0);
     expect(altar.trip.prayerActive).toBe(false);
   });
+
+  it("applies scarce spot respawn limits and exposes trip reserve details", () => {
+    const runtime = createLegacyRuntime();
+    const context = domainContextFromLegacy(runtime);
+    const definition = definitionsById.get("ranged_magic_shortbow_rock_crab_safespot");
+    expect(definition).toBeDefined();
+    if (!definition) throw new Error("Missing scarce fixture definition");
+
+    const input = buildTripInput(runtime, definition, context);
+    const baseline = simulateTripLootSupply(input, context);
+    const scarce = simulateTripLootSupply(
+      {
+        ...input,
+        trip: {
+          ...input.trip,
+          teleport: true,
+          scarceSpot: true,
+          targetsAtSpot: 1,
+          respawnSeconds: 60
+        }
+      },
+      context
+    );
+
+    expect(scarce.trip.scarce.enabled).toBe(true);
+    expect(scarce.trip.scarce.targetsAtSpot).toBe(1);
+    expect(scarce.trip.scarce.respawnSeconds).toBe(60);
+    expect(scarce.trip.scarce.respawnBound).toBe(true);
+    expect(scarce.trip.effectiveKph).toBeLessThan(baseline.trip.effectiveKph);
+    expect(scarce.effectiveGpPerHour).toBeLessThan(baseline.effectiveGpPerHour);
+    expect(scarce.trip.slots.reserveParts).toContain("teleport");
+    expect(scarce.trip.slots.lootCapacity).toBeLessThanOrEqual(scarce.trip.slots.inv);
+  });
 });
 
 describe("trip/loot/supply parity with legacy golden fixtures", () => {

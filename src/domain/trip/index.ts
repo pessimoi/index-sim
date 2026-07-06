@@ -15,7 +15,7 @@ import {
 } from "../shared";
 
 export type LootAction = "skip" | "bury" | "alch" | "loot" | "unid" | "value";
-export type TripBound = "loot" | "food" | "overfull" | "prayer" | "recoil" | "none";
+export type TripBound = "loot" | "food" | "overfull" | "prayer" | "recoil" | "respawn" | "none";
 export type JewelSpot = "underground" | "overground";
 
 interface FoodDefinition {
@@ -59,6 +59,9 @@ export interface TripPolicy {
   safespot?: boolean;
   recoverAmmo?: boolean;
   recoilRings?: number;
+  scarceSpot?: boolean;
+  targetsAtSpot?: number | null;
+  respawnSeconds?: number | null;
 }
 
 export interface CannonSettings {
@@ -90,6 +93,15 @@ export interface CannonOverlayResult {
   idle: boolean;
   ballsPerTrip?: number;
   ballCostPerTrip?: number;
+}
+
+export interface TripScarceSpotResult {
+  enabled: boolean;
+  targetsAtSpot: number;
+  respawnSeconds: number;
+  spawnCycleSec: number;
+  maxKph: number;
+  respawnBound: boolean;
 }
 
 export interface TripLootSupplyInput {
@@ -167,6 +179,7 @@ export interface TripComputationContext {
   ringRecoil: boolean;
   recoilDmgPerKill: number;
   cannonOn: boolean;
+  scarce: TripScarceSpotResult;
 }
 
 export interface TripResult {
@@ -206,6 +219,7 @@ export interface TripResult {
   recoilCostPerKill: number;
   maxKillsRecoil: number;
   recoilDmgPerKill: number;
+  scarce: TripScarceSpotResult;
   incoming: IncomingDamageResult;
   eatenFood: Record<string, number>;
   slots: {
@@ -277,6 +291,8 @@ const CANNONBALL_PRICE_KEY = "mcannonball";
 const CANNONBALL_FALLBACK_PRICE = 180;
 const PROTECT_DRAIN = 12;
 const CHARGE_DURATION_SEC = 420;
+const DEFAULT_SCARCE_TARGETS = 1;
+const DEFAULT_RESPAWN_SEC = 60;
 
 export const FOOD: Record<EntityId, FoodDefinition> = {
   none: { name: "No food", heal: 0, priceKey: null },
@@ -936,6 +952,36 @@ function boundedNumber(value: unknown, fallback: number, min: number, max: numbe
 
 function monsterNumber(monster: MonsterDefinition, key: string): number | undefined {
   return asNumeric((monster as unknown as Record<string, unknown>)[key]);
+}
+
+function computeScarceSpot(
+  trip: TripPolicy,
+  monster: MonsterDefinition,
+  cycleSec: number
+): TripScarceSpotResult {
+  const monsterRespawnSec = Math.max(
+    1,
+    Math.round(monsterNumber(monster, "respawn") ?? DEFAULT_RESPAWN_SEC)
+  );
+  const targetsAtSpot = Math.round(
+    boundedNumber(trip.targetsAtSpot, DEFAULT_SCARCE_TARGETS, 1, 64)
+  );
+  const respawnSeconds =
+    trip.respawnSeconds == null
+      ? monsterRespawnSec
+      : Math.round(boundedNumber(trip.respawnSeconds, monsterRespawnSec, 1, 3600));
+  const spawnCycleSec = respawnSeconds / targetsAtSpot;
+  const maxKph = spawnCycleSec > 0 ? 3600 / spawnCycleSec : Infinity;
+  const enabled = trip.scarceSpot === true;
+
+  return {
+    enabled,
+    targetsAtSpot,
+    respawnSeconds,
+    spawnCycleSec,
+    maxKph,
+    respawnBound: enabled && spawnCycleSec > cycleSec + 1e-9
+  };
 }
 
 export function computeCannonOverlay(input: CannonComputationInput): CannonComputationResult {
@@ -1733,6 +1779,7 @@ export function computeTrip(
     recoilCostPerKill,
     maxKillsRecoil,
     recoilDmgPerKill,
+    scarce: tripContext.scarce,
     incoming,
     eatenFood,
     slots: {
@@ -1982,6 +2029,11 @@ export function simulateTripLootSupply(
     cycleSec += lootEvaluation.alchTimePerKill;
     killsPerHour = 3600 / cycleSec;
   }
+  const scarce = computeScarceSpot(trip, monster, cycleSec);
+  if (scarce.respawnBound) {
+    cycleSec = scarce.spawnCycleSec;
+    killsPerHour = scarce.maxKph;
+  }
   const prayerPerKill = prayerPerKillForCycle(input.request, context, cycleSec, trip);
   const tripContext: TripComputationContext = {
     monster,
@@ -1999,7 +2051,8 @@ export function simulateTripLootSupply(
     prayerLevel: input.request.levels.prayer,
     ringRecoil,
     recoilDmgPerKill,
-    cannonOn: !!cannon
+    cannonOn: !!cannon,
+    scarce
   };
   let tripResult = computeTrip(input.request, context, trip, tripContext);
   let gpPerKill = lootEvaluation.gpPerKill;

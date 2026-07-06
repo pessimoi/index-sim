@@ -41,6 +41,25 @@ export const LEGACY_STORAGE_KEYS = [
 
 export type LegacyStorageKey = (typeof LEGACY_STORAGE_KEYS)[number];
 
+export type LegacyStorageKeyMigrationDisposition =
+  | "migrate"
+  | "review-only"
+  | "intentional-reset"
+  | "legacy-only";
+
+export interface LegacyStorageKeyPolicy {
+  key: LegacyStorageKey;
+  label: string;
+  disposition: LegacyStorageKeyMigrationDisposition;
+  handling: string;
+  reason: string;
+}
+
+export interface LegacyStorageKeyReviewItem extends LegacyStorageKeyPolicy {
+  found: boolean;
+  clearDeletes: boolean;
+}
+
 export interface LegacyMigrationSkippedField {
   field: string;
   reason: string;
@@ -48,6 +67,7 @@ export interface LegacyMigrationSkippedField {
 
 export interface LegacySetupMigrationReport {
   foundKeys: LegacyStorageKey[];
+  keyReview: LegacyStorageKeyReviewItem[];
   importedFields: string[];
   skippedFields: LegacyMigrationSkippedField[];
   warnings: string[];
@@ -62,14 +82,23 @@ export interface LegacySetupMigrationOptions {
   maxInputBytes?: number;
   maxPriceBytes?: number;
   maxHiscoresBytes?: number;
+  maxPlannerBytes?: number;
 }
 
 const DEFAULT_MAX_LEGACY_INPUT_BYTES = 250_000;
 const DEFAULT_MAX_LEGACY_PRICE_BYTES = 1_000_000;
 const DEFAULT_MAX_LEGACY_HISCORES_BYTES = 200;
+const DEFAULT_MAX_LEGACY_PLANNER_BYTES = 250_000;
 const COMBAT_STYLES = ["melee", "ranged", "magic"] as const satisfies readonly CombatStyle[];
 const PROTECT_PRAYERS = ["none", "melee", "missiles", "magic"] as const;
 const PRAYER_MODES = ["potions", "altar", "none"] as const;
+const LEGACY_PRICE_HISTORY_KEYS = [
+  "sim_price_history_v1",
+  "sim_price_history_sanitized_v1",
+  "sim_price_history_sanitized_v2",
+  "sim_price_history_sanitized_v3",
+  "sim_price_history_sanitized_v4"
+] as const satisfies readonly LegacyStorageKey[];
 const IMPORT_SUPPORTED_LEGACY_KEYS = new Set<LegacyStorageKey>([
   LEGACY_INPUT_STORAGE_KEY,
   "sim_hiscore_player",
@@ -78,6 +107,130 @@ const IMPORT_SUPPORTED_LEGACY_KEYS = new Set<LegacyStorageKey>([
   "sim_scraped_at_v1",
   "sim_price_history_v1"
 ]);
+
+export const LEGACY_STORAGE_KEY_POLICIES = [
+  {
+    key: LEGACY_INPUT_STORAGE_KEY,
+    label: "Saved setup",
+    disposition: "migrate",
+    handling: "Compatible setup fields can be imported into rewrite setup state.",
+    reason: "The rewrite has versioned setup state and Zod validation for this subset."
+  },
+  {
+    key: "sim_planner_v1",
+    label: "Planner state",
+    disposition: "review-only",
+    handling:
+      "Detected only; no planner state is imported into rewrite Planner state in this flow.",
+    reason:
+      "Legacy planner parity and state migration policy are still open, so the key is kept unless the user confirms Clear."
+  },
+  {
+    key: "sim_loot_prefs_v1",
+    label: "Loot preferences",
+    disposition: "review-only",
+    handling: "Detected only; legacy loot preference row ids are not imported.",
+    reason: "Rewrite loot prefs exist, but legacy row-id compatibility is not accepted."
+  },
+  {
+    key: "sim_hidden_tiers_v1",
+    label: "Hidden gear tiers",
+    disposition: "review-only",
+    handling: "Detected only; hidden-tier state is not imported.",
+    reason: "Hidden-tier controls and migration policy are outside the current rewrite slice."
+  },
+  {
+    key: "sim_compare_sort_v1",
+    label: "Compare sort",
+    disposition: "review-only",
+    handling: "Detected only; legacy compare sort is not imported.",
+    reason: "Rewrite dense compare owns separate versioned sort state."
+  },
+  {
+    key: "sim_irrelevant_v1",
+    label: "Compare relevance",
+    disposition: "review-only",
+    handling: "Detected only; legacy irrelevant/relevance state is not imported.",
+    reason: "Rewrite relevance state exists, but legacy relevance migration policy is not accepted."
+  },
+  {
+    key: "sim_loot_comp_open",
+    label: "Loot compare drawer",
+    disposition: "legacy-only",
+    handling: "Kept only for the archived legacy runtime unless cleared.",
+    reason: "This is legacy UI presentation state with no rewrite import target."
+  },
+  {
+    key: "sim_prices_v1",
+    label: "Current prices",
+    disposition: "migrate",
+    handling: "Can be imported with the matching legacy alch map as an explicit PriceSet.",
+    reason: "The rewrite validates imported price/alch maps before accepting them."
+  },
+  {
+    key: "sim_alch_v1",
+    label: "Current alch values",
+    disposition: "migrate",
+    handling: "Can be imported with the matching legacy price map as an explicit PriceSet.",
+    reason: "The rewrite validates imported price/alch maps before accepting them."
+  },
+  {
+    key: "sim_scraped_at_v1",
+    label: "Price timestamp",
+    disposition: "migrate",
+    handling: "Used only as the created-at timestamp for a valid imported PriceSet.",
+    reason: "Timestamp metadata is bounded and does not introduce a new provider decision."
+  },
+  {
+    key: "sim_scraped_keys_v1",
+    label: "Scraped item keys",
+    disposition: "intentional-reset",
+    handling: "Not imported; clear removes it after confirmation.",
+    reason: "The rewrite does not persist legacy scrape-key metadata or source slugs."
+  },
+  {
+    key: "sim_price_history_v1",
+    label: "Legacy price history",
+    disposition: "review-only",
+    handling: "Detected only; full legacy price history is not imported.",
+    reason: "Full history migration needs an accepted policy beyond current price/alch import."
+  },
+  {
+    key: "sim_price_history_sanitized_v1",
+    label: "Sanitized price history v1",
+    disposition: "review-only",
+    handling: "Detected only; full legacy price history is not imported.",
+    reason: "Full history migration needs an accepted policy beyond current price/alch import."
+  },
+  {
+    key: "sim_price_history_sanitized_v2",
+    label: "Sanitized price history v2",
+    disposition: "review-only",
+    handling: "Detected only; full legacy price history is not imported.",
+    reason: "Full history migration needs an accepted policy beyond current price/alch import."
+  },
+  {
+    key: "sim_price_history_sanitized_v3",
+    label: "Sanitized price history v3",
+    disposition: "review-only",
+    handling: "Detected only; full legacy price history is not imported.",
+    reason: "Full history migration needs an accepted policy beyond current price/alch import."
+  },
+  {
+    key: "sim_price_history_sanitized_v4",
+    label: "Sanitized price history v4",
+    disposition: "review-only",
+    handling: "Detected only; full legacy price history is not imported.",
+    reason: "Full history migration needs an accepted policy beyond current price/alch import."
+  },
+  {
+    key: "sim_hiscore_player",
+    label: "Hiscores player",
+    disposition: "migrate",
+    handling: "Can be imported into the rewrite last-player field after validation.",
+    reason: "The rewrite has bounded player-name validation and versioned last-player storage."
+  }
+] as const satisfies readonly LegacyStorageKeyPolicy[];
 
 type MutableFormState = CombatSetupFormState;
 type LegacyRecord = Record<string, unknown>;
@@ -93,6 +246,17 @@ export function clearKnownLegacyStorageKeys(storage: KeyValueStorage): LegacySto
     storage.removeItem(key);
   }
   return foundKeys;
+}
+
+export function createLegacyStorageKeyReview(
+  foundKeys: readonly LegacyStorageKey[]
+): LegacyStorageKeyReviewItem[] {
+  const found = new Set(foundKeys);
+  return LEGACY_STORAGE_KEY_POLICIES.map((policy) => ({
+    ...policy,
+    found: found.has(policy.key),
+    clearDeletes: found.has(policy.key)
+  }));
 }
 
 export function inspectLegacySetupMigration(
@@ -113,6 +277,11 @@ export function inspectLegacySetupMigration(
     options.storage,
     report,
     options.maxHiscoresBytes ?? DEFAULT_MAX_LEGACY_HISCORES_BYTES
+  );
+  inspectLegacyPlannerBoundary(
+    options.storage,
+    report,
+    options.maxPlannerBytes ?? DEFAULT_MAX_LEGACY_PLANNER_BYTES
   );
   inspectLegacyPriceSet(options, report);
   inspectLegacyPriceHistory(options.storage, report);
@@ -191,6 +360,34 @@ function inspectLegacyHiscoresPlayer(
   importField(report, "hiscores.player");
 }
 
+function inspectLegacyPlannerBoundary(
+  storage: KeyValueStorage,
+  report: LegacySetupMigrationReport,
+  maxBytes = DEFAULT_MAX_LEGACY_PLANNER_BYTES
+): void {
+  const rawPlanner = storage.getItem("sim_planner_v1");
+  if (rawPlanner == null) return;
+
+  if (byteLength(rawPlanner) > maxBytes) {
+    skip(
+      report,
+      "planner.state",
+      "legacy planner state was detected but not imported because it exceeds safe review size limit"
+    );
+    warn(
+      report,
+      "Legacy planner state was detected but not imported; it exceeds the safe review size limit and will be kept unless you clear known legacy keys."
+    );
+    return;
+  }
+
+  skip(report, "planner.state", "legacy planner state was detected but not imported");
+  warn(
+    report,
+    "Legacy planner state was detected but not imported; it will be kept unless you clear known legacy keys."
+  );
+}
+
 function inspectLegacyPriceSet(
   options: LegacySetupMigrationOptions,
   report: LegacySetupMigrationReport
@@ -264,7 +461,8 @@ function inspectLegacyPriceHistory(
   storage: KeyValueStorage,
   report: LegacySetupMigrationReport
 ): void {
-  if (storage.getItem("sim_price_history_v1") == null) return;
+  const hasLegacyPriceHistory = LEGACY_PRICE_HISTORY_KEYS.some((key) => storage.getItem(key) != null);
+  if (!hasLegacyPriceHistory) return;
   skip(report, "prices.history", "legacy price history migration is not supported in this flow");
   warn(report, "Legacy price history was detected but not imported.");
 }
@@ -272,6 +470,7 @@ function inspectLegacyPriceHistory(
 function createReport(foundKeys: LegacyStorageKey[]): LegacySetupMigrationReport {
   return {
     foundKeys,
+    keyReview: createLegacyStorageKeyReview(foundKeys),
     importedFields: [],
     skippedFields: [],
     warnings: [],

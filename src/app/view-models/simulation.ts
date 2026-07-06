@@ -1,7 +1,24 @@
 import { computeCombatXpBreakdown, simulateCombat, weaponStances } from "@/domain/combat";
-import { buildPlan, defaultPool, type PlannerPlan } from "@/domain/planner";
+import {
+  buildPlan,
+  defaultPool,
+  SKILL_LABEL,
+  SLOT_LABEL,
+  reqOf,
+  type PlannerInput,
+  type PlannerOptions,
+  type PlannerPhase,
+  type PlannerGearSlot,
+  type PlannerPlan,
+  type PlannerPool,
+  type PlannerSkill,
+  type PlannerTransition
+} from "@/domain/planner";
 import type {
+  BonusKey,
   CombatStyle,
+  EquipmentItemDefinition,
+  EquipmentSlot,
   EntityId,
   GameDataSnapshot,
   SimulationContext,
@@ -16,15 +33,28 @@ import {
 } from "@/domain/trip";
 import {
   DEFAULT_DENSE_COMPARE_SORT_STATE,
+  normalizeDenseCompareUiState,
   normalizeDenseCompareSortState,
   type DenseCompareSortKey,
-  type DenseCompareSortState
+  type DenseCompareSortState,
+  type DenseCompareUiState
 } from "../state/dense-compare";
+import { lootSettingsForMonster, type LootSettingsByMonsterState } from "../state/loot-settings";
+import {
+  PLANNER_GEAR_SLOTS,
+  PLANNER_SKILLS,
+  cleanPlannerUiStateForPool,
+  createDefaultPlannerUiState,
+  effectivePlannerGearPool,
+  normalizePlannerUiState,
+  type PlannerUiState
+} from "../state/planner";
 import {
   type CannonByMonsterState,
   formToSimulationRequest,
   formToTripPolicy,
-  type CombatSetupFormState
+  type CombatSetupFormState,
+  type CustomSetupsByMonsterState
 } from "../state/ui-state";
 
 export interface SimulationViewModel {
@@ -102,11 +132,25 @@ export interface CompareRowViewModel {
   bound: string;
 }
 
+export type DenseCompareRowMarkerId = "custom" | "alch" | "overhead" | "hidden" | "target";
+
+export interface DenseCompareRowMarkerViewModel {
+  id: DenseCompareRowMarkerId;
+  label: string;
+  ariaLabel: string;
+}
+
 export interface DenseCompareRowViewModel {
   monsterId: EntityId;
   monsterName: string;
   monsterLevel: number | null;
   isActiveTarget: boolean;
+  isForcedVisible: boolean;
+  isIrrelevant: boolean;
+  hasCustomSetup: boolean;
+  hasHighAlchOverride: boolean;
+  hasOverheadOverride: boolean;
+  markers: DenseCompareRowMarkerViewModel[];
   hitChance: number;
   maxHit: number;
   dps: number;
@@ -138,6 +182,23 @@ const denseCompareSortValue: Record<
 const NATURE_RUNE_FALLBACK = 265;
 const LOOT_ACTION_ORDER: LootAction[] = ["loot", "skip", "bury", "alch", "unid", "value"];
 const MAX_LOOT_OPTIMIZE_ITERATIONS = 30;
+const OPTION_BONUS_KEYS: BonusKey[] = [
+  "stabAtt",
+  "slashAtt",
+  "crushAtt",
+  "rngAtt",
+  "magAtt",
+  "str",
+  "rngStr",
+  "magDmg",
+  "prayer"
+];
+
+export interface SelectOptionViewModel {
+  id: EntityId;
+  label: string;
+  hint?: string;
+}
 
 function uniqueLootActions(actions: LootAction[]): LootAction[] {
   return LOOT_ACTION_ORDER.filter((action) => actions.includes(action));
@@ -169,8 +230,7 @@ function expandedRows(drop: LootBreakdownEntry): LootDropRowViewModel["expandedR
           : typeof record.weight === "string"
             ? record.weight
             : null,
-      price:
-        typeof record.price === "number" && Number.isFinite(record.price) ? record.price : null
+      price: typeof record.price === "number" && Number.isFinite(record.price) ? record.price : null
     };
   });
 }
@@ -179,15 +239,22 @@ function tripInputFor(
   form: CombatSetupFormState,
   request: SimulationRequest,
   combat: ReturnType<typeof simulateCombat>,
-  cannonByMonster: CannonByMonsterState
+  cannonByMonster: CannonByMonsterState,
+  lootSettingsByMonster: LootSettingsByMonsterState = {}
 ): TripLootSupplyInput {
+  const lootSettings = lootSettingsForMonster(lootSettingsByMonster, request.monsterId);
+  const trip = formToTripPolicy(form);
   return {
     request,
     combat,
-    trip: formToTripPolicy(form),
+    trip: {
+      ...trip,
+      alching: lootSettings.highAlch ?? trip.alching
+    },
     ringOfWealth: form.ringOfWealth,
     legendsComplete: true,
-    jewelSpot: "underground",
+    jewelSpot: lootSettings.talismanSpot,
+    overheadSec: lootSettings.overheadSec,
     cannon: cannonByMonster[request.monsterId]
   };
 }
@@ -229,8 +296,7 @@ function createLootRows(
       return {
         action,
         effectiveNetGpPerHour: candidate.effectiveNetGpPerHour,
-        deltaNetGpPerHour:
-          candidate.effectiveNetGpPerHour - defaultTrip.effectiveNetGpPerHour
+        deltaNetGpPerHour: candidate.effectiveNetGpPerHour - defaultTrip.effectiveNetGpPerHour
       };
     });
     const selectedImpact = actionImpacts.find((impact) => impact.action === drop.pref);
@@ -261,8 +327,7 @@ function createLootRows(
   return {
     rows,
     defaultEffectiveNetGpPerHour: defaultTrip.effectiveNetGpPerHour,
-    currentDeltaNetGpPerHour:
-      currentTrip.effectiveNetGpPerHour - defaultTrip.effectiveNetGpPerHour,
+    currentDeltaNetGpPerHour: currentTrip.effectiveNetGpPerHour - defaultTrip.effectiveNetGpPerHour,
     overrideCount: rows.filter((row) => row.isOverride).length
   };
 }
@@ -295,16 +360,107 @@ function compareDenseRows(
   return left.monsterName.localeCompare(right.monsterName);
 }
 
+function normalizedFilterQuery(value: string): string {
+  return value.trim().toLocaleLowerCase();
+}
+
+function stringMatchesFilter(value: string | undefined, query: string): boolean {
+  return query.length === 0 || (value ?? "").toLocaleLowerCase().includes(query);
+}
+
+function collectDropSearchTerms(input: unknown, terms: string[] = []): string[] {
+  if (Array.isArray(input)) {
+    for (const child of input) collectDropSearchTerms(child, terms);
+    return terms;
+  }
+  if (!input || typeof input !== "object") return terms;
+  const record = input as Record<string, unknown>;
+
+  for (const key of ["name", "key", "tag"]) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim()) terms.push(value);
+  }
+
+  const expanded = record._expand;
+  if (Array.isArray(expanded)) {
+    for (const child of expanded) collectDropSearchTerms(child, terms);
+  }
+
+  return terms;
+}
+
+function monsterMatchesDropFilter(
+  gameData: GameDataSnapshot,
+  monsterId: EntityId,
+  query: string
+): boolean {
+  if (query.length === 0) return true;
+  const monster = gameData.monsters[monsterId];
+  if (!monster?.loot) return false;
+  return monster.loot.some((drop) =>
+    collectDropSearchTerms(drop).some((term) => stringMatchesFilter(term, query))
+  );
+}
+
+function rowMatchesDenseFilters(
+  row: DenseCompareRowViewModel,
+  gameData: GameDataSnapshot,
+  state: DenseCompareUiState
+): boolean {
+  const monsterQuery = normalizedFilterQuery(state.monsterFilter);
+  const dropQuery = normalizedFilterQuery(state.dropFilter);
+  const monsterMatches =
+    stringMatchesFilter(row.monsterName, monsterQuery) ||
+    stringMatchesFilter(row.monsterId, monsterQuery);
+  const dropMatches = monsterMatchesDropFilter(gameData, row.monsterId, dropQuery);
+  const relevanceMatches = state.showIrrelevant || !row.isIrrelevant;
+
+  return monsterMatches && dropMatches && relevanceMatches;
+}
+
+function createDenseCompareRowMarkers(row: {
+  hasCustomSetup: boolean;
+  hasHighAlchOverride: boolean;
+  hasOverheadOverride: boolean;
+  isIrrelevant: boolean;
+  isForcedVisible: boolean;
+}): DenseCompareRowMarkerViewModel[] {
+  const markers: DenseCompareRowMarkerViewModel[] = [];
+
+  if (row.hasCustomSetup) {
+    markers.push({ id: "custom", label: "custom", ariaLabel: "Custom setup" });
+  }
+  if (row.hasHighAlchOverride) {
+    markers.push({ id: "alch", label: "alch", ariaLabel: "High alch override" });
+  }
+  if (row.hasOverheadOverride) {
+    markers.push({ id: "overhead", label: "overhead", ariaLabel: "Kill overhead override" });
+  }
+  if (row.isIrrelevant) {
+    markers.push({ id: "hidden", label: "hidden", ariaLabel: "Marked irrelevant" });
+  }
+  if (row.isForcedVisible) {
+    markers.push({
+      id: "target",
+      label: "target",
+      ariaLabel: "Current target kept visible"
+    });
+  }
+
+  return markers;
+}
+
 export function createSimulationViewModel(
   form: CombatSetupFormState,
   context: SimulationContext,
   cannonByMonster: CannonByMonsterState = {},
   lootPrefs: Record<string, LootAction | string | undefined> = {},
+  lootSettingsByMonster: LootSettingsByMonsterState = {},
   options: { includeLootRows?: boolean } = {}
 ): SimulationViewModel {
   const request = formToSimulationRequest(form, context.gameData);
   const combat = simulateCombat(request, context);
-  const tripInput = tripInputFor(form, request, combat, cannonByMonster);
+  const tripInput = tripInputFor(form, request, combat, cannonByMonster, lootSettingsByMonster);
   const trip = simulateWithLootPrefs(tripInput, context, lootPrefs);
   const xp = computeCombatXpBreakdown(
     request,
@@ -370,17 +526,27 @@ export function sortDenseCompareRows(
 export function createDenseCompareRows(
   form: CombatSetupFormState,
   context: SimulationContext,
-  sort: unknown = DEFAULT_DENSE_COMPARE_SORT_STATE,
+  denseCompare: unknown = DEFAULT_DENSE_COMPARE_SORT_STATE,
   cannonByMonster: CannonByMonsterState = {},
-  lootPrefsByMonster: Record<string, Record<string, LootAction | string | undefined>> = {}
+  lootPrefsByMonster: Record<string, Record<string, LootAction | string | undefined>> = {},
+  customSetupsByMonster: CustomSetupsByMonsterState = {},
+  lootSettingsByMonster: LootSettingsByMonsterState = {}
 ): DenseCompareRowViewModel[] {
+  const denseState = normalizeDenseCompareUiState(denseCompare);
+  const sort = denseState.sort;
+  const irrelevantMonsterIds = new Set(denseState.irrelevantMonsterIds);
   const rows = Object.values(context.gameData.monsters).map((monster) => {
-    const rowForm = { ...form, monsterId: monster.id };
+    const customSetup = customSetupsByMonster[monster.id];
+    const lootSettings = lootSettingsByMonster[monster.id];
+    const hasHighAlchOverride = lootSettings?.highAlch != null;
+    const hasOverheadOverride = lootSettings?.overheadSec != null;
+    const rowForm = customSetup ?? { ...form, monsterId: monster.id };
     const vm = createSimulationViewModel(
       rowForm,
       context,
       cannonByMonster,
       lootPrefsByMonster[monster.id] ?? {},
+      lootSettingsByMonster,
       { includeLootRows: false }
     );
     return {
@@ -388,6 +554,18 @@ export function createDenseCompareRows(
       monsterName: monster.name,
       monsterLevel: monster.level ?? null,
       isActiveTarget: monster.id === form.monsterId,
+      isForcedVisible: false,
+      isIrrelevant: irrelevantMonsterIds.has(monster.id),
+      hasCustomSetup: customSetup != null,
+      hasHighAlchOverride,
+      hasOverheadOverride,
+      markers: createDenseCompareRowMarkers({
+        hasCustomSetup: customSetup != null,
+        hasHighAlchOverride,
+        hasOverheadOverride,
+        isIrrelevant: irrelevantMonsterIds.has(monster.id),
+        isForcedVisible: false
+      }),
       hitChance: vm.combat.hitChance,
       maxHit: vm.combat.maxHit,
       dps: vm.combat.effectiveDps,
@@ -401,7 +579,21 @@ export function createDenseCompareRows(
     };
   });
 
-  return sortDenseCompareRows(rows, sort);
+  const filteredRows = rows
+    .map((row) => {
+      const isForcedVisible =
+        row.isActiveTarget && !rowMatchesDenseFilters(row, context.gameData, denseState);
+      return {
+        ...row,
+        isForcedVisible,
+        markers: createDenseCompareRowMarkers({ ...row, isForcedVisible })
+      };
+    })
+    .filter(
+      (row) => row.isForcedVisible || rowMatchesDenseFilters(row, context.gameData, denseState)
+    );
+
+  return sortDenseCompareRows(filteredRows, sort);
 }
 
 export function createCompareRows(
@@ -430,45 +622,379 @@ export function createCompareRows(
     }));
 }
 
-export function createPlannerViewModel(
-  form: CombatSetupFormState,
+export interface PlannerDomainAdapterViewModel {
+  input: PlannerInput;
+  options: PlannerOptions;
+  state: PlannerUiState;
+  defaultPool: PlannerPool;
+  pool: PlannerPool;
+}
+
+export interface PlannerPanelSummaryViewModel {
+  totalXp: number;
+  stepCount: number;
+  phaseCount: number;
+  unlockCount: number;
+  startDps: number;
+  endDps: number;
+  startMetric: number;
+  endMetric: number;
+  truncated: boolean;
+}
+
+export interface PlannerTrainingOrderRowViewModel {
+  id: string;
+  skill: PlannerSkill;
+  skillLabel: string;
+  from: number;
+  to: number;
+  xp: number;
+  cumXp: number;
+  startDps: number;
+  endDps: number;
+  startMetric: number;
+  endMetric: number;
+  unlockCount: number;
+}
+
+export interface PlannerUnlockRowViewModel {
+  id: string;
+  itemName: string;
+  slotLabel: string;
+  type: PlannerTransition["type"];
+  skillLabel: string;
+  level: number;
+  reqSkillLabel: string;
+  reqLevel: number;
+  cumXp: number;
+  dpsBefore: number;
+  dpsAfter: number;
+}
+
+export interface PlannerGearPoolOptionViewModel {
+  id: EntityId;
+  label: string;
+  hint: string;
+  selected: boolean;
+}
+
+export interface PlannerGearPoolSlotViewModel {
+  slot: PlannerGearSlot;
+  label: string;
+  selectedCount: number;
+  totalCount: number;
+  options: PlannerGearPoolOptionViewModel[];
+}
+
+export interface PlannerTimelineEventViewModel {
+  id: string;
+  itemName: string;
+  slotLabel: string;
+  type: PlannerTransition["type"];
+  skillLabel: string;
+  level: number;
+  cumXp: number;
+  dpsDelta: number;
+}
+
+export interface PlannerChartPointViewModel {
+  id: string;
+  label: string;
+  cumXp: number;
+  dps: number;
+  x: number;
+  y: number;
+}
+
+export interface PlannerChartViewModel {
+  points: PlannerChartPointViewModel[];
+  minDps: number;
+  maxDps: number;
+  maxCumXp: number;
+  isEmpty: boolean;
+}
+
+export interface PlannerPanelViewModel {
+  summary: PlannerPanelSummaryViewModel;
+  trainingOrder: PlannerTrainingOrderRowViewModel[];
+  unlocks: PlannerUnlockRowViewModel[];
+  timeline: PlannerTimelineEventViewModel[];
+  chart: PlannerChartViewModel;
+  warnings: string[];
+  isEmpty: boolean;
+}
+
+export interface PlannerGearPoolEditorViewModel {
+  slots: PlannerGearPoolSlotViewModel[];
+  totalSelectedCount: number;
+  totalOptionCount: number;
+}
+
+function isHypotheticalPlannerItem(gameData: GameDataSnapshot, itemId: EntityId): boolean {
+  return gameData.items[itemId]?.provenance?.source === "hypothetical";
+}
+
+function itemExistsInPlannerSlot(
+  gameData: GameDataSnapshot,
+  slot: PlannerGearSlot,
+  itemId: EntityId
+): boolean {
+  if (itemId === "none") return true;
+  if (slot === "weapon") return !!gameData.weapons[itemId];
+  return !!gameData.equipment[slot as EquipmentSlot]?.[itemId];
+}
+
+export function plannerAllowedPool(
+  combatStyle: CombatStyle,
   context: SimulationContext
-): PlannerPlan {
-  const request = formToSimulationRequest(form, context.gameData);
-  const targets = {
-    attack: form.plannerTargets.attack ?? form.levels.attack,
-    strength: form.plannerTargets.strength ?? form.levels.strength,
-    defence: form.plannerTargets.defence ?? form.levels.defence,
-    ranged: form.plannerTargets.ranged ?? form.levels.ranged,
-    magic: form.plannerTargets.magic ?? form.levels.magic
+): PlannerPool {
+  const source = defaultPool(combatStyle, context);
+  const pool: PlannerPool = {};
+  for (const slot of PLANNER_GEAR_SLOTS) {
+    const itemIds = source[slot] ?? [];
+    pool[slot] = itemIds.filter(
+      (itemId) =>
+        itemExistsInPlannerSlot(context.gameData, slot, itemId) &&
+        !isHypotheticalPlannerItem(context.gameData, itemId)
+    );
+  }
+  return pool;
+}
+
+function plannerPoolItemLabel(
+  context: SimulationContext,
+  slot: PlannerGearSlot,
+  itemId: EntityId
+): string {
+  if (itemId === "none") return "None";
+  if (slot === "weapon") return context.gameData.weapons[itemId]?.name ?? itemId;
+  return context.gameData.equipment[slot as EquipmentSlot]?.[itemId]?.name ?? itemId;
+}
+
+function plannerPoolItemHint(
+  context: SimulationContext,
+  slot: PlannerGearSlot,
+  itemId: EntityId
+): string {
+  const req = reqOf(itemId);
+  const reqs = Object.entries(req)
+    .map(([skill, level]) => `${SKILL_LABEL[skill as PlannerSkill]} ${level}`)
+    .join(", ");
+  if (slot === "weapon") {
+    const weapon = context.gameData.weapons[itemId];
+    return [weapon ? `speed ${weapon.speed}` : null, reqs || null].filter(Boolean).join(", ");
+  }
+  return reqs || "no requirement";
+}
+
+export function createPlannerGearPoolEditorViewModel(
+  form: CombatSetupFormState,
+  context: SimulationContext,
+  plannerUiState: PlannerUiState
+): PlannerGearPoolEditorViewModel {
+  const allowedPool = plannerAllowedPool(form.combatStyle, context);
+  const state = cleanPlannerUiStateForPool(plannerUiState, allowedPool);
+  const effectivePool = effectivePlannerGearPool(state, allowedPool);
+  const slots = PLANNER_GEAR_SLOTS.map((slot): PlannerGearPoolSlotViewModel => {
+    const itemIds = allowedPool[slot] ?? [];
+    const selected = new Set(effectivePool[slot] ?? []);
+    const options = itemIds.map((itemId) => ({
+      id: itemId,
+      label: plannerPoolItemLabel(context, slot, itemId),
+      hint: plannerPoolItemHint(context, slot, itemId),
+      selected: selected.has(itemId)
+    }));
+    return {
+      slot,
+      label: SLOT_LABEL[slot],
+      selectedCount: options.filter((option) => option.selected).length,
+      totalCount: options.length,
+      options
+    };
+  }).filter((slot) => slot.totalCount > 0);
+
+  return {
+    slots,
+    totalSelectedCount: slots.reduce((sum, slot) => sum + slot.selectedCount, 0),
+    totalOptionCount: slots.reduce((sum, slot) => sum + slot.totalCount, 0)
   };
-  return buildPlan(
-    {
+}
+
+function plannerTargetsForState(
+  form: CombatSetupFormState,
+  plannerState: PlannerUiState
+): Record<PlannerSkill, number> {
+  const targets = {} as Record<PlannerSkill, number>;
+  for (const skill of PLANNER_SKILLS) {
+    targets[skill] = plannerState.skillLocks[skill]
+      ? form.levels[skill]
+      : Math.max(form.levels[skill], plannerState.targetLevels[skill]);
+  }
+  return targets;
+}
+
+export function createPlannerDomainAdapter(
+  form: CombatSetupFormState,
+  context: SimulationContext,
+  lootSettingsByMonster: LootSettingsByMonsterState = {},
+  plannerUiState?: PlannerUiState
+): PlannerDomainAdapterViewModel {
+  const request = formToSimulationRequest(form, context.gameData);
+  const lootSettings = lootSettingsForMonster(lootSettingsByMonster, request.monsterId);
+  const trip = formToTripPolicy(form);
+  const defaultPlannerPool = plannerAllowedPool(request.combatStyle, context);
+  const state = cleanPlannerUiStateForPool(
+    normalizePlannerUiState(plannerUiState ?? createDefaultPlannerUiState(form)),
+    defaultPlannerPool
+  );
+  const pool = effectivePlannerGearPool(state, defaultPlannerPool);
+
+  return {
+    input: {
       request,
-      trip: formToTripPolicy(form),
+      trip: { ...trip, alching: lootSettings.highAlch ?? trip.alching },
       ringOfWealth: form.ringOfWealth,
       legendsComplete: true,
-      jewelSpot: "underground"
+      jewelSpot: lootSettings.talismanSpot,
+      overheadSec: lootSettings.overheadSec
     },
-    context,
-    {
-      metric: "xph",
-      targets,
-      pool: defaultPool(request.combatStyle, context),
+    options: {
+      metric: state.metric,
+      targets: plannerTargetsForState(form, state),
+      startXp: state.currentXp,
+      pool,
+      lockGear: state.onlyCurrentGear,
       sustained: form.sustained,
       maxLevels: 120
-    }
-  );
+    },
+    state,
+    defaultPool: defaultPlannerPool,
+    pool
+  };
+}
+
+export function createPlannerViewModel(
+  form: CombatSetupFormState,
+  context: SimulationContext,
+  lootSettingsByMonster: LootSettingsByMonsterState = {},
+  plannerUiState?: PlannerUiState
+): PlannerPlan {
+  const adapter = createPlannerDomainAdapter(form, context, lootSettingsByMonster, plannerUiState);
+  return buildPlan(adapter.input, context, adapter.options);
+}
+
+function trainingOrderRow(phase: PlannerPhase, index: number): PlannerTrainingOrderRowViewModel {
+  return {
+    id: `${index}:${phase.skill}:${phase.from}-${phase.to}`,
+    skill: phase.skill,
+    skillLabel: SKILL_LABEL[phase.skill],
+    from: phase.from,
+    to: phase.to,
+    xp: phase.xp,
+    cumXp: phase.cumXp,
+    startDps: phase.startDps,
+    endDps: phase.endDps,
+    startMetric: phase.startMetric,
+    endMetric: phase.endMetric,
+    unlockCount: phase.unlocks.length
+  };
+}
+
+function unlockRow(unlock: PlannerTransition, index: number): PlannerUnlockRowViewModel {
+  return {
+    id: `${index}:${unlock.slot}:${unlock.itemId}:${unlock.level}`,
+    itemName: unlock.name,
+    slotLabel: SLOT_LABEL[unlock.slot],
+    type: unlock.type,
+    skillLabel: SKILL_LABEL[unlock.skill],
+    level: unlock.level,
+    reqSkillLabel: SKILL_LABEL[unlock.reqSkill],
+    reqLevel: unlock.reqLevel,
+    cumXp: unlock.cumXp,
+    dpsBefore: unlock.dpsBefore,
+    dpsAfter: unlock.dpsAfter
+  };
+}
+
+function timelineEvent(unlock: PlannerTransition, index: number): PlannerTimelineEventViewModel {
+  return {
+    id: `${index}:${unlock.slot}:${unlock.itemId}:${unlock.cumXp}`,
+    itemName: unlock.name,
+    slotLabel: SLOT_LABEL[unlock.slot],
+    type: unlock.type,
+    skillLabel: SKILL_LABEL[unlock.skill],
+    level: unlock.level,
+    cumXp: unlock.cumXp,
+    dpsDelta: unlock.dpsAfter - unlock.dpsBefore
+  };
+}
+
+function createPlannerChartViewModel(plan: PlannerPlan): PlannerChartViewModel {
+  const rawPoints = [
+    {
+      id: "start",
+      label: "Start",
+      cumXp: 0,
+      dps: plan.start.dps
+    },
+    ...plan.steps.map((step, index) => ({
+      id: `step-${index + 1}`,
+      label: `${SKILL_LABEL[step.skill]} ${step.to}`,
+      cumXp: step.cumXp,
+      dps: step.dps
+    }))
+  ];
+  const maxCumXp = Math.max(0, ...rawPoints.map((point) => point.cumXp));
+  const minDps = Math.min(...rawPoints.map((point) => point.dps));
+  const maxDps = Math.max(...rawPoints.map((point) => point.dps));
+  const dpsRange = Math.max(0.000001, maxDps - minDps);
+  const xpRange = Math.max(1, maxCumXp);
+
+  return {
+    points: rawPoints.map((point) => ({
+      ...point,
+      x: (point.cumXp / xpRange) * 100,
+      y: 100 - ((point.dps - minDps) / dpsRange) * 100
+    })),
+    minDps,
+    maxDps,
+    maxCumXp,
+    isEmpty: rawPoints.length < 2
+  };
+}
+
+export function createPlannerPanelViewModel(plan: PlannerPlan): PlannerPanelViewModel {
+  const timeline = plan.unlocks.map(timelineEvent);
+  return {
+    summary: {
+      totalXp: plan.totalXp,
+      stepCount: plan.steps.length,
+      phaseCount: plan.phases.length,
+      unlockCount: plan.unlocks.length,
+      startDps: plan.start.dps,
+      endDps: plan.end?.dps ?? plan.start.dps,
+      startMetric: plan.start.metricValue,
+      endMetric: plan.end?.metricValue ?? plan.start.metricValue,
+      truncated: plan.truncated
+    },
+    trainingOrder: plan.phases.map(trainingOrderRow),
+    unlocks: plan.unlocks.map(unlockRow),
+    timeline,
+    chart: createPlannerChartViewModel(plan),
+    warnings: plan.warnings.map((warning) => warning.message),
+    isEmpty: plan.steps.length === 0
+  };
 }
 
 export function optimizeLootPrefsForMonster(
   form: CombatSetupFormState,
   context: SimulationContext,
-  cannonByMonster: CannonByMonsterState = {}
+  cannonByMonster: CannonByMonsterState = {},
+  lootSettingsByMonster: LootSettingsByMonsterState = {}
 ): LootOptimizeResult {
   const request = formToSimulationRequest(form, context.gameData);
   const combat = simulateCombat(request, context);
-  const input = tripInputFor(form, request, combat, cannonByMonster);
+  const input = tripInputFor(form, request, combat, cannonByMonster, lootSettingsByMonster);
   const defaultTrip = simulateWithLootPrefs(input, context, undefined);
   const natureRuneCost = context.priceSet.itemPrices.naturerune ?? NATURE_RUNE_FALLBACK;
   const defaultRows = defaultTrip.lootBreakdown;
@@ -517,10 +1043,41 @@ export function optimizeLootPrefsForMonster(
   };
 }
 
-export function weaponOptions(gameData: GameDataSnapshot, combatStyle: CombatStyle) {
+function signedBonus(value: number): string {
+  return `${value > 0 ? "+" : ""}${value}`;
+}
+
+function equipmentHint(item: EquipmentItemDefinition): string | undefined {
+  const bonuses = OPTION_BONUS_KEYS.flatMap((key) => {
+    const value = item[key] ?? 0;
+    return value === 0 ? [] : `${key} ${signedBonus(value)}`;
+  });
+  if (item.note) bonuses.push(item.note);
+  return bonuses.slice(0, 4).join(", ") || undefined;
+}
+
+export function weaponOptions(
+  gameData: GameDataSnapshot,
+  combatStyle: CombatStyle
+): SelectOptionViewModel[] {
   return Object.entries(gameData.weapons)
     .filter(([, weapon]) => weapon.type === combatStyle)
-    .map(([id, weapon]) => ({ id, label: weapon.name }))
+    .map(([id, weapon]) => ({
+      id,
+      label: weapon.name,
+      hint: [
+        `speed ${weapon.speed}`,
+        weapon.twoHand ? "2h" : null,
+        weapon.sub ?? weapon.wclass ?? null,
+        combatStyle === "melee"
+          ? `acc ${weapon.accBonus}, str ${weapon.dmgBonus}`
+          : combatStyle === "ranged"
+            ? `rng ${weapon.accBonus}`
+            : `magic ${weapon.accBonus}`
+      ]
+        .filter(Boolean)
+        .join(", ")
+    }))
     .sort((left, right) => left.label.localeCompare(right.label));
 }
 
@@ -528,6 +1085,56 @@ export function monsterOptions(gameData: GameDataSnapshot) {
   return Object.values(gameData.monsters)
     .map((monster) => ({ id: monster.id, label: monster.name }))
     .sort((left, right) => left.label.localeCompare(right.label));
+}
+
+export function ammoOptions(
+  gameData: GameDataSnapshot,
+  kind?: GameDataSnapshot["ammo"][string]["kind"]
+): SelectOptionViewModel[] {
+  return [
+    { id: "none", label: "None" },
+    ...Object.entries(gameData.ammo)
+      .filter(([, ammo]) => !kind || ammo.kind === kind)
+      .map(([id, ammo]) => ({
+        id,
+        label: ammo.name,
+        hint: [ammo.kind, `range ${signedBonus(ammo.rangeBonus)}`].filter(Boolean).join(", ")
+      }))
+      .sort((left, right) => left.label.localeCompare(right.label))
+  ];
+}
+
+export function spellOptions(gameData: GameDataSnapshot): SelectOptionViewModel[] {
+  return Object.entries(gameData.spells)
+    .map(([id, spell]) => ({
+      id,
+      label: spell.name,
+      hint: [
+        spell.lvl == null ? null : `lvl ${spell.lvl}`,
+        `base ${spell.base}`,
+        spell.god ? "god" : null
+      ]
+        .filter(Boolean)
+        .join(", ")
+    }))
+    .sort((left, right) => left.label.localeCompare(right.label));
+}
+
+export function equipmentSlotOptions(
+  gameData: GameDataSnapshot,
+  slot: EquipmentSlot
+): SelectOptionViewModel[] {
+  return Object.entries(gameData.equipment[slot] ?? {})
+    .map(([id, item]) => ({
+      id,
+      label: item.name,
+      hint: equipmentHint(item)
+    }))
+    .sort((left, right) => {
+      if (left.id === "none") return -1;
+      if (right.id === "none") return 1;
+      return left.label.localeCompare(right.label);
+    });
 }
 
 export function styleOptions(

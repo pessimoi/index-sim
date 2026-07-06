@@ -314,6 +314,12 @@ export interface SpecialAttackSelection {
   ammoId?: EntityId;
 }
 
+export interface ManualCombatOverrides {
+  accuracyBonus?: number | null;
+  damageBonus?: number | null;
+  attackSpeedSec?: number | null;
+}
+
 export interface SimulationRequest {
   combatStyle: CombatStyle;
   monsterId: EntityId;
@@ -327,6 +333,7 @@ export interface SimulationRequest {
   spellId?: EntityId;
   charge?: boolean;
   specialAttack?: SpecialAttackSelection;
+  manualOverrides?: ManualCombatOverrides;
 }
 
 export interface SimulationContext {

@@ -37,7 +37,7 @@ const definitionsById = new Map(
   LEGACY_GOLDEN_CASES.map((definition) => [definition.id, definition])
 );
 const numericRoundingGuard = 0.000000001;
-const knownXpParityExclusions = new Set(["melee_ring_recoil_fire_giant_food_trip"]);
+const acceptedXpIntentionalDeltas = new Set(["melee_ring_recoil_fire_giant_food_trip"]);
 
 function stableNumber(value: number): number {
   return Number(value.toFixed(6));
@@ -140,11 +140,13 @@ function buildTripInput(
 
 describe("XP parity with legacy golden fixtures", () => {
   const parityCases = fixtures.cases.filter(
-    (testCase) => !knownXpParityExclusions.has(testCase.id)
+    (testCase) => !acceptedXpIntentionalDeltas.has(testCase.id)
   );
 
-  it("keeps known XP parity exclusions explicit", () => {
-    expect([...knownXpParityExclusions].sort()).toEqual(["melee_ring_recoil_fire_giant_food_trip"]);
+  it("keeps accepted XP intentional deltas explicit", () => {
+    expect([...acceptedXpIntentionalDeltas].sort()).toEqual([
+      "melee_ring_recoil_fire_giant_food_trip"
+    ]);
   });
 
   for (const testCase of parityCases) {
@@ -238,8 +240,8 @@ describe("cannon XP parity", () => {
   });
 });
 
-describe("XP parity diagnostics", () => {
-  it("locates the ring-of-recoil XP/hr exclusion at recoil direct-damage attribution", () => {
+describe("XP intentional delta diagnostics", () => {
+  it("documents the accepted ring-of-recoil XP/hr direct-damage attribution delta", () => {
     const caseId = "melee_ring_recoil_fire_giant_food_trip";
     const runtime = createLegacyRuntime();
     const context = domainContextFromLegacy(runtime);

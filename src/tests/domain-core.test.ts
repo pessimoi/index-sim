@@ -160,6 +160,51 @@ describe("pure combat formulas", () => {
       type: "slash"
     });
   });
+
+  it("applies bounded manual combat overrides without changing the derived default path", () => {
+    const runtime = createLegacyRuntime();
+    const context = domainContextFromLegacy(runtime);
+    const definition = definitionsById.get("melee_rune_scimitar_hill_giant_super_prayers");
+    expect(definition).toBeDefined();
+    if (!definition) {
+      throw new Error("Missing melee_rune_scimitar_hill_giant_super_prayers case definition");
+    }
+
+    const baseRequest = domainRequestFromLegacyInput(buildLegacyInput(runtime, definition));
+    const derived = simulateCombat(baseRequest, context);
+    const overridden = simulateCombat(
+      {
+        ...baseRequest,
+        manualOverrides: {
+          accuracyBonus: 350,
+          damageBonus: 200,
+          attackSpeedSec: 1.2
+        }
+      },
+      context
+    );
+    const invalid = simulateCombat(
+      {
+        ...baseRequest,
+        manualOverrides: {
+          accuracyBonus: Number.POSITIVE_INFINITY,
+          damageBonus: -999,
+          attackSpeedSec: 0
+        }
+      },
+      context
+    );
+
+    expect(overridden.debug.accuracyBonus).toBe(350);
+    expect(overridden.debug.damageBonus).toBe(200);
+    expect(overridden.attackSpeedSec).toBe(1.2);
+    expect(overridden.hitChance).toBeGreaterThan(derived.hitChance);
+    expect(overridden.maxHit).toBeGreaterThan(derived.maxHit);
+    expect(overridden.dps).toBeGreaterThan(derived.dps);
+    expect(invalid.debug.accuracyBonus).toBe(derived.debug.accuracyBonus);
+    expect(invalid.debug.damageBonus).toBe(derived.debug.damageBonus);
+    expect(invalid.attackSpeedSec).toBe(derived.attackSpeedSec);
+  });
 });
 
 describe("pure equipment core", () => {

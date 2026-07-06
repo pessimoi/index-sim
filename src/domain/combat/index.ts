@@ -13,6 +13,10 @@ import {
 } from "../shared";
 
 export const TICK_SECONDS = 0.6;
+const MIN_ATTACK_SPEED_SEC = TICK_SECONDS;
+const MAX_ATTACK_SPEED_SEC = 12;
+const MIN_MANUAL_BONUS = -250;
+const MAX_MANUAL_BONUS = 350;
 
 type StatKey = "att" | "str" | "def" | "rng" | "mag";
 
@@ -545,6 +549,12 @@ function meanOf(samples: Array<Record<string, number>>, key: string): number {
   return samples.reduce((sum, sample) => sum + sample[key], 0) / samples.length;
 }
 
+function finiteOverride(value: number | null | undefined, min: number, max: number): number | null {
+  if (value == null || !Number.isFinite(value)) return null;
+  if (value < min || value > max) return null;
+  return value;
+}
+
 function monsterDefenceLevel(monster: MonsterDefinition, combatStyle: CombatStyle): number {
   return combatStyle === "magic" ? (monster.magicLevel ?? 1) : (monster.defLevel ?? 1);
 }
@@ -699,6 +709,28 @@ export function simulateCombat(
   if (request.combatStyle === "melee" && stance && loadoutBonuses.accByType) {
     accuracyBonusEffective = loadoutBonuses.accByType[stance.type] ?? accuracyBonusEffective;
   }
+  let damageBonusEffective = loadoutBonuses.dmgBonus;
+  if (request.combatStyle === "ranged") {
+    accuracyBonusEffective = loadoutBonuses.accBonus + loadoutBonuses.ammoRangeBonus;
+    damageBonusEffective = loadoutBonuses.dmgBonus + loadoutBonuses.ammoRangeBonus;
+  }
+  const manualAccuracyBonus = finiteOverride(
+    request.manualOverrides?.accuracyBonus,
+    MIN_MANUAL_BONUS,
+    MAX_MANUAL_BONUS
+  );
+  const manualDamageBonus = finiteOverride(
+    request.manualOverrides?.damageBonus,
+    MIN_MANUAL_BONUS,
+    MAX_MANUAL_BONUS
+  );
+  const manualAttackSpeedSec = finiteOverride(
+    request.manualOverrides?.attackSpeedSec,
+    MIN_ATTACK_SPEED_SEC,
+    MAX_ATTACK_SPEED_SEC
+  );
+  if (manualAccuracyBonus != null) accuracyBonusEffective = manualAccuracyBonus;
+  if (manualDamageBonus != null) damageBonusEffective = manualDamageBonus;
 
   const offSamples: Array<{ effAcc: number; effDmg: number; mh: number }> = [];
   if (request.combatStyle === "melee") {
@@ -717,11 +749,10 @@ export function simulateCombat(
     for (const [attackLevel, strengthLevel] of levelSamples) {
       const effAcc = Math.floor(attackLevel * prayer.att) + style.accBonus + 8;
       const effDmg = Math.floor(strengthLevel * prayer.str) + style.dmgBonus + 8;
-      offSamples.push({ effAcc, effDmg, mh: maxHitMelee(effDmg, loadoutBonuses.dmgBonus) });
+      offSamples.push({ effAcc, effDmg, mh: maxHitMelee(effDmg, damageBonusEffective) });
     }
   } else if (request.combatStyle === "ranged") {
     const peakRangedLevel = Math.floor(potionFn("rng", request.levels.ranged));
-    accuracyBonusEffective = loadoutBonuses.accBonus + loadoutBonuses.ammoRangeBonus;
     const levelSamples = decayLevelSamples(
       [{ base: request.levels.ranged, peakL: peakRangedLevel }],
       request.repotThreshold,
@@ -732,7 +763,7 @@ export function simulateCombat(
       offSamples.push({
         effAcc: rangedLevel + style.accBonus + 8,
         effDmg,
-        mh: maxHitRanged(effDmg, loadoutBonuses.dmgBonus + loadoutBonuses.ammoRangeBonus)
+        mh: maxHitRanged(effDmg, damageBonusEffective)
       });
     }
   } else {
@@ -742,7 +773,7 @@ export function simulateCombat(
     const hasChaosGauntlets = request.boosts.keys.includes("chaos_gauntlets");
     const chaosBonus = hasChaosGauntlets && /bolt/i.test(spellId) ? 3 : 0;
     const spellBase = spell?.god && request.charge !== false ? 30 : (spell?.base ?? 0);
-    const maxHit = maxHitMagic(spellBase, loadoutBonuses.dmgBonus) + chaosBonus;
+    const maxHit = maxHitMagic(spellBase, damageBonusEffective) + chaosBonus;
     const levelSamples = decayLevelSamples(
       [{ base: request.levels.magic, peakL: peakMagicLevel }],
       request.repotThreshold,
@@ -784,8 +815,9 @@ export function simulateCombat(
 
   const baseTicks =
     loadoutBonuses.attackSpeed ?? context.gameData.weapons[request.loadout.weaponId]?.speed ?? 4;
-  const attackTicks = Math.max(1, baseTicks + (style.tickMod || 0));
-  const attackSpeedSec = attackTicks * TICK_SECONDS;
+  const derivedAttackTicks = Math.max(1, baseTicks + (style.tickMod || 0));
+  const attackSpeedSec = manualAttackSpeedSec ?? derivedAttackTicks * TICK_SECONDS;
+  const attackTicks = attackSpeedSec / TICK_SECONDS;
   const dps = avgHit / attackSpeedSec;
   const specialAttack = specialAttackResult(
     request,
@@ -838,7 +870,7 @@ export function simulateCombat(
       effectiveAccuracy,
       effectiveDamage,
       accuracyBonus: accuracyBonusEffective,
-      damageBonus: loadoutBonuses.dmgBonus,
+      damageBonus: damageBonusEffective,
       defenceField,
       styleId: stance?.style ?? request.styleId,
       attackType: stance?.type
