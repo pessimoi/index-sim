@@ -41,7 +41,7 @@ MVP behavior:
 - stores the last searched player name locally only when browser storage is available
 - provides understandable empty, not-found, rate-limited and service-unavailable states
 
-Current implementation note: the rewrite UI now exposes player input, service status, lookup, preview and Apply for these seven skills. It calls the same-origin hiscores API through `src/adapters/hiscores`, stores the last searched player with the rewrite `PersistedEnvelope<T>` helper and never calls a live upstream directly from the browser. The default repo provider remains disabled until an authoritative upstream is accepted.
+Current implementation note: the rewrite UI now exposes player input, service status, lookup, preview and Apply for these seven skills. It calls the same-origin hiscores API through `src/adapters/hiscores`, stores the last searched player with the rewrite `PersistedEnvelope<T>` helper and never calls a live upstream directly from the browser. The default repo provider remains disabled until an authoritative upstream is accepted. When the status source is `disabled`, the UI keeps the player input visible, disables Lookup and explains that live lookup is not configured for this run while the Player level fields remain the working manual fallback. Non-disabled unavailable/error states use the same manual-level fallback guidance without exposing runtime details.
 
 ### Live market sync
 
@@ -57,11 +57,11 @@ MVP behavior:
 - syncs prices for the current monster
 - syncs the full supported loot/supply item allowlist
 - returns a validated `PriceSet` that the app can select explicitly
-- shows source, fetched time, updated count, skipped count and failed count
+- shows source, fetched time, updated count, skipped count, failed count, item-level status details and compact warnings
 - preserves missing-price warnings instead of silently mutating fallback data
 - updates browser-local price history only after a validated price set is accepted by the UI
 
-Current implementation note: the rewrite UI now exposes current-monster and all-supported sync controls in the Loot and Economy panes. It calls the same-origin market API through `src/adapters/market`, validates the returned `MarketSyncResponse` and swaps the selected explicit `PriceSet` only after validation succeeds. A validated imported or synced `PriceSet` records a capped browser-local snapshot in `index-sim:price-history` after the UI accepts it as active; failed imports, failed syncs and invalid payloads do not update that history. The Economy tab can also capture the currently active validated `PriceSet` with Snapshot now, analyze local movers against Previous, First or an explicit snapshot baseline and clear only the local history key after confirmation. The default repo provider remains disabled until an authoritative market upstream is accepted.
+Current implementation note: the rewrite UI now exposes current-monster and all-supported sync controls in the Loot and Economy panes. It calls the same-origin market API through `src/adapters/market`, validates the returned `MarketSyncResponse` and swaps the selected explicit `PriceSet` only after validation succeeds. The offline `PriceSet` file import reports invalid JSON, duplicate keys, invalid schema data and oversized files as non-fatal, sanitized UI notices with validation code, the first bounded issue/schema paths when available and an explicit note that the current `PriceSet` remains active and browser-local history is unchanged. The Market sync area keeps the import action and active `PriceSet` summary visible beside the sync controls, including disabled and unavailable service states; disabled sync buttons stay disabled, and copy directs users to the active bundled or imported `PriceSet` fallback instead of runtime setup instructions. Successful sync reports show source/fetched/count summary, compact report warnings, status-filtered item diagnostics for updated/skipped/failed rows, item label or id, status, price, alch value, source slug and sanitized reason text. The Settings Price data panel remains available with the same import/status path. A validated imported or synced `PriceSet` records a capped browser-local snapshot in `index-sim:price-history` after the UI accepts it as active; failed imports, failed syncs and invalid payloads do not update that history. The Economy tab can also capture the currently active validated `PriceSet` with Snapshot now, analyze local movers against Previous, First or an explicit snapshot baseline and clear only the local history key after confirmation. The default repo provider remains disabled until an authoritative market upstream is accepted.
 
 ## Non-goals for the first implementation
 
@@ -311,6 +311,7 @@ Recommended flow:
 The UI must not claim hiscores are unavailable simply because the app is not running on `localhost`. It should use `GET /api/hiscores/status` service availability or handle the hiscores endpoint response directly.
 
 Current implementation note: the rewrite follows this flow through the Levels panel. `GET /api/hiscores/status` drives the visible availability state; `GET /api/hiscores?player=...` returns a validated preview; Apply mutates only returned skills in the current setup model. Missing returned skills leave existing manual levels unchanged.
+When the status endpoint reports a disabled provider or unavailable service, the player-name input remains visible for continuity with the live workflow but Lookup stays disabled. The user-facing copy points to the Player level fields for manual editing, and the unavailable state must not clear or overwrite those manual levels.
 
 ### Market sync
 
@@ -325,7 +326,7 @@ Recommended flow:
 
 The Settings/Economy UI should keep file import available even when the live service is down.
 
-Current implementation note: the rewrite keeps JSON price import in the topbar as the offline fallback. Market sync shows service availability, source, fetched timestamp and updated/skipped/failed counts. Partial failures keep successful validated prices and do not discard the returned `PriceSet`.
+Current implementation note: the rewrite keeps JSON price import in the topbar, Settings Price data panel and Market sync area as the offline fallback. Market sync shows service availability, active `PriceSet` label/source/created age/counts, source, fetched timestamp, updated/skipped/failed counts, compact warnings and item-level diagnostics with an All/Updated/Skipped/Failed filter. Disabled and unavailable states keep sync buttons disabled while leaving the validated import path active. Partial failures keep successful validated prices and do not discard the returned `PriceSet`.
 
 ## Persistence
 
@@ -458,11 +459,11 @@ Market sync is acceptable when:
 - the returned data is a valid explicit `PriceSet`
 - simulation results depend on the selected `PriceSet`, not hidden global mutation
 - partial failures are visible and do not discard successful prices
-- source, timestamp and updated/skipped/failed counts are shown
+- source, timestamp, updated/skipped/failed counts, item-level skipped/failed reasons and warnings are shown
 - file import remains available as an offline fallback
 - tests cover mapping, validation, partial failures and UI apply/failure behavior
 
-Current status: the same-origin API, browser adapter, UI sync flow and browser-local accepted-price history meet the validation, explicit `PriceSet`, partial-failure, offline-import and local-history parts with mocked/provider tests. Full acceptance still requires the approved market upstream source and production runtime/hosting decision.
+Current status: the same-origin API, browser adapter, UI sync flow, item-level report diagnostics, disabled-service import fallback and browser-local accepted-price history meet the validation, explicit `PriceSet`, partial-failure, offline-import and local-history parts with mocked/provider tests. Full acceptance still requires the approved market upstream source and production runtime/hosting decision.
 
 ## Open questions
 

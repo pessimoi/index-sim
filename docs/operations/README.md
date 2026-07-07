@@ -34,6 +34,7 @@ Current hiscores run behavior:
 
 - Vite dev and preview expose same-origin `GET /api/hiscores/status` and `GET /api/hiscores?player=...` through repo-owned middleware.
 - The default hiscores provider is disabled, so local runs show the disabled service state unless a test or future runtime injects an approved provider.
+- In the disabled service state, the rewrite keeps the player-name input visible, disables Lookup and directs users to the Player level fields for manual level editing.
 - No live hiscores upstream, secret, account model, database or scheduled job is configured in this repo.
 
 Current market run behavior:
@@ -107,7 +108,7 @@ npm run test -- src/tests/data-economy.test.ts
 node -e "for (const f of ['prices.json','alch.json','price-history.json']) JSON.parse(require('fs').readFileSync(f,'utf8'))"
 ```
 
-The rewrite data layer can adapt current legacy runtime data into a validated `GameDataSnapshot`, including the browser sandbox bootstrap used by the Vite UI. It can validate `PriceSet` imports. This is not yet an authoritative generation workflow.
+The rewrite data layer can adapt current legacy runtime data into a validated `GameDataSnapshot`, including the browser sandbox bootstrap used by the Vite UI. It can validate `PriceSet` imports. In local runs where the market provider is disabled, the Market sync UI keeps sync actions disabled but still shows the active bundled/imported `PriceSet` summary and the same validated `PriceSet` import path. This is not yet an authoritative generation workflow.
 
 Open question: the authoritative refresh workflow for these files is not present in the repo. The target market source is `markets.lostcity.rs`, and retained 12-hour shared price history snapshots are accepted as a target. Live user-triggered market sync and browser-local accepted-price history are accepted in [../technical/live-integrations-spec.md](../technical/live-integrations-spec.md), but the concrete shared latest/history writer, deploy path, scheduled execution mechanism, database choice or backend-managed shared price history still need separate recorded decisions.
 

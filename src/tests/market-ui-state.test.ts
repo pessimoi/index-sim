@@ -1,5 +1,6 @@
 import {
   applyMarketSyncResponse,
+  formatMarketSyncReportDetails,
   keepMarketSyncFailureContext,
   summarizeMarketSyncReport
 } from "../app/state/market-sync";
@@ -110,6 +111,110 @@ describe("market sync UI state helpers", () => {
         failed: 1
       })
     ).toBe("2 updated · 1 skipped · 1 failed");
+  });
+
+  it("formats partial failure report item diagnostics with failed rows first", () => {
+    const details = formatMarketSyncReportDetails(
+      {
+        ...syncResponse.report,
+        requested: 3,
+        updated: 1,
+        skipped: 1,
+        failed: 1,
+        items: [
+          {
+            itemId: "big_bones",
+            sourceSlug: "big_bones",
+            status: "updated",
+            price: 430,
+            alchValue: 0,
+            sampleSize: 3
+          },
+          {
+            itemId: "lobster",
+            sourceSlug: "lobster",
+            status: "failed",
+            reason:
+              "Mock upstream timeout while reading /Users/example/private-market-dump.json with a very long diagnostic that should be shortened before it reaches the UI surface."
+          },
+          {
+            itemId: "rune_scimitar",
+            sourceSlug: "rune_scimitar",
+            status: "skipped",
+            reason: "No recent samples"
+          }
+        ],
+        warnings: [
+          {
+            code: "partial-market-sync",
+            severity: "warning",
+            message: "One mocked item failed; successful prices remain usable",
+            itemId: "lobster"
+          }
+        ]
+      },
+      {
+        itemLabel: (itemId) =>
+          itemId === "big_bones"
+            ? "Big bones"
+            : itemId === "lobster"
+              ? "Lobster"
+              : undefined
+      }
+    );
+
+    expect(details.counts).toEqual({ all: 3, updated: 1, skipped: 1, failed: 1 });
+    expect(details.items.map((item) => item.status)).toEqual(["failed", "skipped", "updated"]);
+    expect(details.items[0]).toMatchObject({
+      itemId: "lobster",
+      itemLabel: "Lobster",
+      sourceSlug: "lobster",
+      priceLabel: "-",
+      alchValueLabel: "-",
+      reason: expect.stringContaining("[path]")
+    });
+    expect(details.items[0].reason).not.toContain("/Users/example");
+    expect(details.items[2]).toMatchObject({
+      itemId: "big_bones",
+      itemLabel: "Big bones",
+      priceLabel: "430",
+      alchValueLabel: "0",
+      sampleSizeLabel: "3"
+    });
+    expect(details.warnings).toEqual([
+      {
+        id: "partial-market-sync:lobster",
+        severity: "warning",
+        message: "One mocked item failed; successful prices remain usable",
+        itemId: "lobster"
+      }
+    ]);
+  });
+
+  it("filters market report details by item status", () => {
+    const details = formatMarketSyncReportDetails(
+      {
+        ...syncResponse.report,
+        requested: 2,
+        updated: 1,
+        skipped: 0,
+        failed: 1,
+        items: [
+          { itemId: "big_bones", sourceSlug: "big_bones", status: "updated", price: 430 },
+          {
+            itemId: "lobster",
+            sourceSlug: "lobster",
+            status: "failed",
+            reason: "Mock upstream timeout"
+          }
+        ]
+      },
+      { filter: "failed" }
+    );
+
+    expect(details.items).toHaveLength(1);
+    expect(details.items[0]).toMatchObject({ itemId: "lobster", status: "failed" });
+    expect(details.counts).toEqual({ all: 2, updated: 1, skipped: 0, failed: 1 });
   });
 
   it("accepted imported PriceSet adds a browser-local history snapshot", () => {
