@@ -1,7 +1,7 @@
 # UI Parity Specification
 
 - Status: implementation target specification
-- Date: 2026-07-06
+- Date: 2026-07-07
 - Owner: technical docs
 - Product inventory: [../product/feature-inventory.md](../product/feature-inventory.md)
 - Legacy UI source: `views.jsx` and `planner.jsx`
@@ -236,6 +236,40 @@ compact setup controls, metric strip and initial rows remain visible, and the
 current target remains forced-visible after irrelevant-state plus long
 monster/drop filter paths.
 
+### Dense/Compare Release Classification
+
+Status date: 2026-07-07. This classification applies to the current Vite
+rewrite Dense/Compare release slice, not to deleting archived legacy files or
+claiming full visual parity.
+
+Current Dense/Compare release blocker list: none. The release-required items
+below are implemented and have unit/view-model or Playwright evidence. The
+feature inventory rows stay `Osittainen` because later and decision-needed
+items remain open for broader parity or full replacement.
+
+Decision: D-032 accepts the current release-path browser numeric coverage for
+this slice. The existing browser evidence covers representative default melee,
+melee alch-relevant, ranged safespot, ranged cannon, magic safespot and custom
+loot-settings marker rows plus related metric-strip workflows. All-fixture
+browser-display expansion and full visual regression are not release blockers
+unless a future user decision makes them required.
+
+| Item | Classification | Release note |
+| --- | --- | --- |
+| Dense shell, compact setup strip, metric strip, full all-monster table, default XP/hr sort, sortable headers, row target selection and active target marker | `release-required` | Implemented in the root workbench and smoke-covered. |
+| Monster/drop filters, show hidden/irrelevant toggle, reset filters, persisted irrelevant monster state and forced-current-target visibility | `release-required` | Implemented through rewrite-owned dense compare state and covered by view-model/browser tests. |
+| Row markers for custom setup, high-alch override, kill-overhead override, hidden/irrelevant and forced-current-target rows | `release-required` | Implemented and covered as release usability evidence. |
+| Custom setup dense row calculations and per-monster loot-setting markers | `release-required` | Implemented for rewrite-owned custom setups and current per-monster loot settings. |
+| Visible-row XP/hr and net GP/hr scale indicators | `release-required` | Implemented and browser-smoked through filtered visible-row paths. |
+| Mobile/tablet containment for the dense table | `release-required` | Implemented with contained horizontal table scroll and browser-smoked at mobile and tablet widths. |
+| Browser-rendered numeric snapshots for representative release paths | `release-required` | Accepted by D-032 as sufficient for this release slice. |
+| All-fixture browser-display expansion | `later` | Add only if a future release asks for every legacy fixture rendered in the browser. Domain/trip/XP fixture parity remains the current numeric baseline. |
+| Full visual regression suite | `later` | Not required by the current release classification; add only if visual tolerance becomes a release requirement. |
+| Exact legacy CSS/layout pixel matching and script-order `window.*` internals | `legacy-only` | The rewrite preserves user workflow shape, not archived implementation internals. |
+| Deeper legacy compare-state migration beyond compatible `sim_compare_sort_v1` and `sim_irrelevant_v1` import | `decision-needed` | Do not implicitly read or migrate additional legacy compare maps without a separate migration/no-migration decision. |
+| Final default relationship between Dense Compare and the broader tabbed workbench | `decision-needed` | Current release can ship with Compare as the active dense pane; final product default remains a UX decision. |
+| Worker-backed compare calculation runner | `decision-needed` | Keep the current main-thread implementation unless performance evidence misses the accepted budget. |
+
 ## Layout Contract
 
 ### Desktop shell
@@ -310,7 +344,7 @@ Keep the rewrite's domain boundaries, but model the legacy UI state explicitly:
 - `SimulationRequest` remains clean and domain-facing.
 - UI form state must include per-combat-type loadouts.
 - Versioned persisted state must account for per-monster custom setups, default setup, current target, loot prefs, hidden gear tiers, compare relevance, compare sort, planner UI config, duel snapshots, cannon settings, per-monster alch, overhead and jewel-spot maps.
-- Legacy keys now have an import/keep/clear UX for known keys and compatible `sim_input_v3` setup fields. `sim_planner_v1`, `sim_loot_prefs_v1`, `sim_hidden_tiers_v1`, compare/cannon maps and legacy price-history keys still need either deeper migration, intentional reset handling or an accepted no-migration decision.
+- Legacy keys now have an import/keep/clear UX for known keys, compatible `sim_input_v3` setup fields, compatible hidden tiers, dense compare state and unambiguous loot preferences. `sim_planner_v1`, legacy custom setup state, cannon maps and legacy price-history keys still need either deeper migration, intentional reset handling or an accepted no-migration decision.
 - Per-monster settings must not be hidden inside generic trip state. They must appear where users expect them: setup scope in SetupBar, alch/overhead in Loot, cannon in Cannon/Trip, target selection in MonsterCard.
 
 Current implementation note: rewrite setup persistence is version 3. The active
@@ -403,17 +437,17 @@ metric strip, XP routing chips, a Trip & banking summary and a
 normal-player-attack hit distribution histogram. XP routing is derived in the
 view-model from the current combat XP breakdown and trip output: player combat
 XP/hr is always shown, cannon ranged XP/hr appears only when cannon contributes,
-skill-specific combat XP rows are listed and Prayer/Magic-alch rows are marked
-as partial/not-modeled instead of claiming full `totalXpPerHour` parity. The
+skill-specific combat XP rows are listed, Prayer XP is modeled from current bury
+loot rows and Magic alch XP is modeled from tracked in-trip alch casts. The
+`totalXpPerHour` value is composed from those modeled XP source rows. The
 Trip & banking summary mirrors the current trip result for kills/trip, trip
 length, bank time, effective kills/hr, supply/kill, net GP/hr, current bound,
 safespot and protection state. Hit distribution bucket data is derived from the
 current combat result through the domain/view-model boundary, with bounded hit
 chance/max-hit inputs, a combined miss/zero bucket, damage buckets, accessible
 bucket labels and a max-hit marker. This does not change the `SimulationResult`
-contract or combat golden baselines. Combat roll metric expansion, full
-Prayer/alch total-XP ownership and special/cannon hit distributions remain open
-parity work.
+contract or combat golden baselines. Combat roll metric expansion and
+special/cannon hit distributions remain open parity work.
 
 ### Melee, Ranged and Magic
 
@@ -436,7 +470,7 @@ Required style-specific content:
 
 Current implementation note: the rewrite workbench now exposes Melee, Ranged and Magic equipment panes backed by `GameDataSnapshot` option data. They provide searchable weapon selectors, style selectors, per-slot gear quick action buttons, primary prayer/boost selectors, multi-prayer and multi-boost checkbox controls with same-category replacement and canonical `None` handling, sustained/repot controls, manual accuracy/damage/speed override controls, equipment slot selectors, an equipment bonus summary, Ranged ammo selection and Magic spell selection. The gear quick action MVP scores only currently visible slot candidates for the active combat style: melee uses active attack-type bonus plus weighted strength, ranged uses ranged attack plus weighted ranged strength, and magic uses magic attack plus magic damage when present. It is not a full loadout optimizer and does not use prices, requirements, quests, future gear or hidden candidates. Selecting a two-handed weapon clears and locks the shield slot while the weapon remains active. These controls write the versioned per-combat-type loadout state and flow through `formToSimulationRequest()` as multi-value prayer/boost arrays. Manual overrides map to `SimulationRequest.manualOverrides`; invalid or out-of-range values are rejected by persisted-state validation and defensively ignored by the combat domain.
 
-Current special-attack implementation note: the dense rewrite UI has an interim Special attack section that exposes the existing domain-supported melee and ranged DPS special weapons, ranged spec-arrow selection for bow specials and result metrics for spec max hit, hit chance, specs/hr, DPS with spec and DPS gain. The control writes versioned rewrite setup state and `formToSimulationRequest()` only emits `specialAttack` for valid supported selections. Magic special attack UI is disabled because no magic DPS special path is currently modeled, and DBA restore/detail behavior remains a separate Trip/workbench parity step.
+Current special-attack implementation note: the dense rewrite UI has an interim Special attack section that exposes the existing domain-supported melee and ranged DPS special weapons, ranged spec-arrow selection for bow specials and result metrics for spec max hit, hit chance, specs/hr, DPS with spec and DPS gain. The control writes versioned rewrite setup state and `formToSimulationRequest()` only emits `specialAttack` for valid supported selections. Magic special attack UI shows a compact unsupported state because no magic DPS special path is currently modeled, and it emits no `specialAttack` request. DBA special boost is modeled as a boost/spec-energy state instead of a DPS-special weapon: when the DBA boost is active the DPS-special selector is paused, no conflicting `specialAttack` request is emitted, and the Trip pane is the visible owner of the DBA restore carry toggle and summary row. Persisted setup normalization drops unknown, combat-style-incompatible and DBA-conflicting special state from active, per-style and custom setup state. Dragon halberd special keeps the current legacy NPC-size fallback assumption, but it now emits a structured info warning surfaced near the special metrics so the missing size-data behavior is visible. Final dragon-halberd/NPC-size behavior and new special formulas remain outside this slice.
 
 ### Compare
 
@@ -610,7 +644,7 @@ Required content:
 - Food-per-kill override.
 - Trip outcome, effective rates, supply rates, ammo and prayer drain details.
 
-Current implementation note: the rewrite state/schema now models `bankSeconds` as a nullable auto/manual value plus `potionSets`, `potionDoses`, `singleDose`, `dbaRestore`, `runeSlots`, `safespot`, `protect`, `recoilRings`, `foodCount`, `foodPerKillOverride`, `prayerPotionSets`, `prayerPotionDoses`, `altarSeconds`, `scarceSpot`, `targetsAtSpot` and `respawnSeconds`, and maps active Trip assumptions into `TripPolicy` without adding Trip fields to `SimulationRequest`. Version 3 rewrite setup envelopes remain backward compatible because newly modeled fields default through the Zod schema, and legacy auto bank time imports as `bankSeconds: null`. The root UI exposes food selector, bank time Auto/Manual seconds, single-dose toggle, general potion vials/doses, a general potion recommendation panel with recommended carry, repot interval, active-trip estimate, match status and Apply recommendation action, teleport item, ranged ammo recovery, DBA restore when melee DBA special boost is active, magic rune slots, safespot Auto/On/Off, protect prayer, antifire, antipoison, prayer restore auto/manual vials/manual doses, altar timing, scarce/AFK target count and respawn seconds, food-count auto/manual, food-per-kill override and recoil ring count when ring of recoil is equipped. Non-applicable reserve controls stay visible in disabled/read-only form for the current combat style or setup. The domain applies enabled scarce/respawn limits to effective trip rates before prayer-per-kill is calculated. The general potion recommendation is derived in `src/domain/trip` from selected general combat boosts, `sustained`, `repotThreshold`, finite `cycleSec * killsPerTrip` active fighting time and the current vial/single-dose mode; it is not persisted and Apply only writes `potionSets` or `potionDoses`. The Cannon pane can link its target count and respawn seconds into the same Trip sparse state, so cannon-at-spot sparse assumptions are visible in the Cannon workflow instead of hidden in generic Trip state. The Trip summary is grouped by survival, prayer, food, inventory reserve, potion slots, scarce cap, recoil and outcome/effective rates, and shows selected food, bank time, teleport reserve, ammo recovery, DBA restore, rune slots, active survival, prayer restore, prayer carried, max kills from prayer, prayer points per dose, food and recoil assumptions, respawn-bound status, inventory reserve slots/parts, potion carry/slots/parts/costs, loot capacity, free-at-start details, supply/kill, ammo/kill and effective net GP/hr. Open question: should exact archived legacy UI `potRec` numerical parity be accepted as a requirement, and should sustained-off setups offer a one-dose snapshot recommendation instead of the current inactive safe fallback?
+Current implementation note: the rewrite state/schema now models `bankSeconds` as a nullable auto/manual value plus `potionSets`, `potionDoses`, `singleDose`, `dbaRestore`, `runeSlots`, `safespot`, `protect`, `recoilRings`, `foodCount`, `foodPerKillOverride`, `prayerPotionSets`, `prayerPotionDoses`, `altarSeconds`, `scarceSpot`, `targetsAtSpot` and `respawnSeconds`, and maps active Trip assumptions into `TripPolicy` without adding Trip fields to `SimulationRequest`. Version 3 rewrite setup envelopes remain backward compatible because newly modeled fields default through the Zod schema, and legacy auto bank time imports as `bankSeconds: null`. The root UI exposes food selector, bank time Auto/Manual seconds, single-dose toggle, general potion vials/doses, a general potion recommendation panel with recommended carry, repot interval, active-trip estimate, inactive/no-boost/manual-carry/below/above/matched status and Apply recommendation action, teleport item, ranged ammo recovery, DBA restore only when the melee DBA special boost is active, magic rune slots, safespot Auto/On/Off, protect prayer, antifire, antipoison, prayer restore auto/manual vials/manual doses, altar timing, scarce/AFK target count and respawn seconds, food-count auto/manual, food-per-kill override and recoil ring count when ring of recoil is equipped. Non-applicable reserve controls stay visible in disabled/read-only form for the current combat style or setup except DBA restore, which is hidden until the DBA boost makes it relevant. The domain applies enabled scarce/respawn limits to effective trip rates before prayer-per-kill is calculated. The general potion recommendation is derived in `src/domain/trip` from selected general combat boosts, `sustained`, `repotThreshold`, finite `cycleSec * killsPerTrip` active fighting time and the current vial/single-dose mode; sustained-off setups show an inactive repeat-dose state, no general combat boost shows a no-boost state, non-finite trip estimates guide the user to manual `vials/type` or `doses/type` carry, and active finite estimates enable Apply only when the recommended carry differs from the current general potion carry. It is not persisted and Apply only writes `potionSets` or `potionDoses`. The Cannon pane can link its target count and respawn seconds into the same Trip sparse state, so cannon-at-spot sparse assumptions are visible in the Cannon workflow instead of hidden in generic Trip state. The Trip summary is grouped by survival, prayer, food, inventory reserve, potions, scarce cap, recoil and outcome/effective rates, and uses user-facing labels for `Bank time` (`Auto 90s`/`Manual 60s` style), `Food count` (`Auto 12`/`Manual 8` style), `Prayer restore` (`Auto 3 vials`, `Manual 8 doses` or `Manual 3 vials`), `Protection prayer`, `Potion carry`, `Potion slots`, `Loot capacity` and `Effective K/hr`. It keeps the same selected food, teleport reserve, ammo recovery, rune slots, active survival, prayer carried, max kills from prayer, prayer points per dose, recoil assumptions, respawn-bound status, inventory reserve slots/parts, potion parts/costs, free-at-start details, supply/kill and ammo/kill details, plus DBA restore only when the DBA boost is active. Open question: should exact archived legacy UI `potRec` numerical parity be accepted as a requirement?
 
 ### Cannon
 
@@ -686,7 +720,7 @@ Required content:
 - Market sync controls following [live-integrations-spec.md](live-integrations-spec.md).
 - Service-aware `available`, `unavailable` or disabled-runtime state for live sync when the accepted integration endpoint or provider is unavailable. Production copy must not point users to `run_sim.py`.
 
-Current implementation note: Settings now has a Price data panel that shows the active `PriceSet` label, source, created timestamp, age, item price count, alch value count and current import/status notice. Its import control uses the same validated `parsePriceSetFileText` path as the existing topbar shortcut, accepts only the current `PriceSet` schema and updates the active price set, browser-local accepted price history, topbar price label/status and visible notice. The topbar import remains a shortcut. Economy remains the owner of browser-local price-history analysis. Settings also has a Gear menu panel backed by the rewrite-owned versioned `index-sim:hidden-gear-tiers` state. It can hide the accepted metal, d-hide, leather, low-bow and 1 defence magic tier groups from weapon, ammo, special-attack and equipment pickers while preserving `None` and the current selected item. Legacy `sim_hidden_tiers_v1` remains review-only and is not auto-migrated into the rewrite-owned state.
+Current implementation note: Settings now has a Price data panel that shows the active `PriceSet` label, source, created timestamp, age, item price count, alch value count and current import/status notice. Its import control uses the same validated `parsePriceSetFileText` path as the existing topbar shortcut, accepts only the current `PriceSet` schema and updates the active price set, browser-local accepted price history, topbar price label/status and visible notice. The topbar import remains a shortcut. Economy remains the owner of browser-local price-history analysis. Settings also has a Gear menu panel backed by the rewrite-owned versioned `index-sim:hidden-gear-tiers` state. It can hide the accepted metal, d-hide, leather, low-bow and 1 defence magic tier groups from weapon, ammo, special-attack and equipment pickers while preserving `None` and the current selected item. Compatible legacy `sim_hidden_tiers_v1` flags can be imported into the rewrite-owned state through the explicit migration UX.
 
 ## Implementation Phases
 
@@ -746,7 +780,7 @@ custom setup migration remain open.
 - Extend browser-rendered numeric snapshots from the current dense table row and
   metric-strip workflow coverage to any remaining representative legacy fixtures
   once those workflows become release blockers.
-- Extend migration/reset UX for review-only legacy `localStorage` keys if deeper migration is accepted. The current rewrite already classifies known keys in the review UI, shows what import/keep/clear will do and hardens `sim_planner_v1` as detect/review-only rather than importing it into rewrite Planner state.
+- Extend migration/reset UX for remaining review-only legacy `localStorage` keys if deeper migration is accepted. The current rewrite already classifies known keys in the review UI, imports compatible setup, prices, hidden tiers, dense compare and unambiguous loot prefs, shows what import/keep/clear will do and hardens `sim_planner_v1` as detect/review-only rather than importing it into rewrite Planner state.
 - Update [rewrite-parity-report.md](rewrite-parity-report.md) when browser UI parity evidence exists.
 
 ## Acceptance Criteria

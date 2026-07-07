@@ -145,12 +145,13 @@ npm run test -- src/tests/xp-parity.test.ts
 They cover:
 
 - direct `xpPerHour` and `effectiveXpPerHour` parity for 17 legacy fixtures
-- rewrite-owned `skillXpBreakdown` rows for the covered fixtures
+- rewrite-owned `skillXpBreakdown` rows for the covered fixtures, including Prayer XP from bury loot rows and Magic alch XP from tracked in-trip alch casts
 - explicit accepted intentional delta for the ring-of-recoil XP/hr attribution case
 - cannon ranged XP as a separate effective XP row for the cannon fixture
+- full `totalXpPerHour` parity for every non-recoil fixture once combat, cannon, Prayer and alch XP source rows are composed
 - diagnostic coverage showing that the accepted ring-of-recoil XP/hr delta is caused by XP direct-damage attribution, not by trip/KPH/recoil damage parity
 
-The ring-of-recoil delta is accepted in [D-031](../project/decisions.md): legacy remains comparison evidence, but rewrite combat XP is not reduced by trip-layer recoil damage. `totalXpPerHour` is compared only when every legacy skill row is owned by the rewrite XP model. Prayer and alch XP rows remain partial until those row owners are modeled explicitly; the cannon fixture now has a focused total-XP assertion that includes the separate cannon ranged XP row.
+The ring-of-recoil delta is accepted in [D-031](../project/decisions.md): legacy remains comparison evidence, but rewrite combat XP is not reduced by trip-layer recoil damage. `totalXpPerHour` is compared for every non-recoil fixture by summing the rewrite-owned XP source rows. Prayer XP is derived from current trip/loot bury data, Magic alch XP is derived from tracked in-trip alch casts at 65 XP per cast, and cannon ranged XP remains a separate effective XP row.
 
 ## Data and economy schema tests
 
@@ -238,11 +239,11 @@ The legacy storage migration unit tests live in:
 npm run test -- src/tests/legacy-migration.test.ts src/tests/ui-adapters.test.ts
 ```
 
-They cover known legacy key detection, the policy table that classifies every known legacy key as `migrate`, `review-only`, `intentional-reset` or `legacy-only`, defensive `sim_input_v3` JSON parsing, invalid non-object legacy setup state, safe mapping into the current rewrite form schema, unknown entity-id skips, numeric range/default handling, oversized payload rejection, compatible `sim_hiscore_player` import, malformed hiscores skips with sanitized warnings, compatible legacy price/alch map conversion into an explicit `PriceSet`, malformed/oversized/unknown price skips, failed price import preserving the current `PriceSet`, legacy price-history detection without unsafe mutation across known history keys, invalid rewrite setup envelopes/data, rewrite setup version mismatch, the guarantee that inspection does not write or delete legacy or rewrite storage keys, explicit known-key clearing behavior and the review-only boundaries for `sim_planner_v1` and `sim_hidden_tiers_v1`: detected, not parsed/imported into rewrite-owned state, safe for invalid/oversized payloads and kept unless the user confirms Clear.
+They cover known legacy key detection, the policy table that classifies every known legacy key as `migrate`, `review-only`, `intentional-reset` or `legacy-only`, defensive `sim_input_v3` JSON parsing, invalid non-object legacy setup state, safe mapping into the current rewrite form schema, unknown entity-id skips, numeric range/default handling, oversized payload rejection, compatible `sim_hiscore_player` import, malformed hiscores skips with sanitized warnings, compatible legacy price/alch map conversion into an explicit `PriceSet`, malformed/oversized/unknown price skips, failed price import preserving the current `PriceSet`, compatible `sim_loot_prefs_v1` import for unambiguous current loot row ids with unknown row, invalid action, ambiguous name and oversized payload skips, compatible `sim_hidden_tiers_v1` import with unknown tier skips, compatible `sim_compare_sort_v1` import with invalid sort skips, compatible `sim_irrelevant_v1` import with unknown monster-id skips, oversized legacy UI-state rejection, legacy price-history detection without unsafe mutation across known history keys, invalid rewrite setup envelopes/data, rewrite setup version mismatch, the guarantee that inspection does not write or delete legacy or rewrite storage keys, explicit known-key clearing behavior and the review-only boundary for `sim_planner_v1`: detected, not parsed/imported into rewrite-owned Planner state, safe for invalid/oversized payloads and kept unless the user confirms Clear.
 
-The Playwright scaffold covers the user-facing notice/review flow: legacy keys show a migration notice, the review UX lists the import plan, review/reset plan, per-key policy and exact clear list, Import writes compatible setup, hiscores last-player and accepted-price-history state while keeping legacy keys, `sim_planner_v1` stays review-only and does not overwrite existing `index-sim:planner-ui`, Keep dismisses without deletion, Clear removes only known legacy keys after confirmation and an existing rewrite setup is not overwritten until the user chooses Import.
+The Playwright scaffold covers the user-facing notice/review flow: legacy keys show a migration notice, the review UX lists the import plan, review/reset plan, per-key policy and exact clear list, Import writes compatible setup, loot prefs, hidden gear tiers, dense compare sort/relevance, hiscores last-player and accepted-price-history state while keeping legacy keys, `sim_planner_v1` stays review-only and does not overwrite existing `index-sim:planner-ui`, Keep dismisses without deletion, Clear removes only known legacy keys after confirmation and an existing rewrite setup is not overwritten until the user chooses Import.
 
-Release evidence for legacy migration/reset should include the focused unit command above, `npm run test:e2e` for the user-facing notice/review flow, the release-copy audit `rg -n "run_sim.py|/api/prices|/api/scrape|/api/hiscores" index.html legacy/index.html src views.jsx planner.jsx market.js docs`, the static security searches from this document and a feature-inventory check confirming the feature remains `Osittainen` until planner/custom setup/loot prefs/compare/cannon/hidden tiers and full price-history migration have an accepted policy.
+Release evidence for legacy migration/reset should include the focused unit command above, `npm run test:e2e` for the user-facing notice/review flow, the release-copy audit `rg -n "run_sim.py|/api/prices|/api/scrape|/api/hiscores" index.html legacy/index.html src views.jsx planner.jsx market.js docs`, the static security searches from this document and a feature-inventory check confirming the feature remains `Osittainen` until planner/custom setup/cannon and full price-history migration have an accepted policy.
 
 ## Market API, adapter and UI state tests
 
@@ -281,7 +282,7 @@ hidden gear preferences: hiding a tier removes matching unselected options from
 gear pickers, keeps `None` and the current selection visible, and persists the
 versioned `index-sim:hidden-gear-tiers` state. Focused UI adapter tests cover the
 tier classifier, option filtering, storage schema and legacy
-`sim_hidden_tiers_v1` review-only boundary.
+`sim_hidden_tiers_v1` import boundary.
 
 ## Trip, loot and supply tests
 
@@ -303,7 +304,7 @@ They cover:
 - structured missing-price, approximate-data, gem price alias and fallback warnings
 - combat-integrated parity for all 18 fixtures covering prayer, food, recoil, dragonfire, alch, ranged ammo, magic runes, low-value loot, cannon occupancy and cannonball supply
 - scarce/AFK spot target and respawn caps, visible inventory reserve details and prayer restore capacity fields
-- domain-owned general potion carry recommendation, including no-general-boost inactive fallback, non-finite trip fallback, vial and single-dose match state and long-trip carry scaling
+- domain-owned general potion carry recommendation, including sustained-off inactive state, no-general-boost inactive fallback, non-finite manual-carry fallback, vial and single-dose under/over/matched state, `canApply` gating and long-trip carry scaling
 
 ## Planner domain tests
 
@@ -366,14 +367,15 @@ They cover:
 
 - UI form state to `SimulationRequest` separation
 - searchable weapon, ammo, spell and equipment-slot option view models
-- supported special attack state to `SimulationRequest.specialAttack` mapping, including ranged spec-arrow fallback
+- supported special attack state to `SimulationRequest.specialAttack` mapping, including ranged spec-arrow fallback, DBA boost suppression and magic unsupported fallback
+- dragon halberd special warning surfacing for the current legacy NPC-size fallback assumption without changing fixture math
 - manual accuracy/damage/speed override state to `SimulationRequest.manualOverrides` mapping and visible combat metric changes
 - MonsterCard view-model contract for nullable monster stats, active defence rows and compact setup summaries
 - extended trip-control state to `TripPolicy` mapping without leaking trip fields into `SimulationRequest`
-- scarce/AFK Trip controls, inventory reserve details, prayer restore capacity and derived general potion recommendation in the UI view model
+- scarce/AFK Trip controls, inventory reserve details, prayer restore capacity, Trip summary Auto/Manual wording and derived general potion recommendation status/`canApply` state in the UI view model
 - domain-backed result, compare and planner view models
 - Stats hit distribution view-model labels, bucket accessibility text and probability-total invariants
-- Stats XP routing view-model rows, cannon-only XP row visibility, Prayer/Magic-alch partial/not-modeled statuses and Trip/banking summary mapping
+- Stats XP routing view-model rows, cannon-only XP row visibility, modeled Prayer/Magic-alch total-XP rows and Trip/banking summary mapping
 - Duel comparison view-model rows for live setup and saved snapshots against the current monster, including deltas and best-marker fields
 - structured money warning view models for price alias and fallback surfacing
 - dense compare monster/drop filters, irrelevant monster state, active-target forced visibility and derived row state markers
@@ -394,14 +396,14 @@ They cover:
 - rewrite-owned monster-specific custom setup create/restore/remove helpers, persisted schema validation and dense row marker/calculation mapping
 - per-monster loot settings for high-alch enablement, kill overhead and talisman spot, with separate persistence from `index-sim:loot-prefs`
 - defaulting and sanitization for newly modeled trip-control fields in persisted rewrite setups
-- defaulting and sanitization for special attack controls in persisted rewrite setups
+- defaulting and sanitization for special attack controls in persisted rewrite setups, including unknown, combat-style-incompatible and DBA-conflicting active/per-style/custom setup state
 - versioned per-monster cannon settings persistence in the rewrite setup envelope
 - derived general potion recommendations staying out of persisted rewrite setup state
 - versioned last-player hiscores and browser-local price history persistence through `PersistedEnvelope<T>`
 - browser-local Economy movers analysis, Snapshot now and confirmed Clear history that removes only `index-sim:price-history`
 - refusal to implicitly migrate mismatched persisted versions
 - validated `PriceSet` import errors
-- Playwright smoke for the workbench shell, PlayerSidebar, legacy-order TabBar, right-side MonsterCard rail, mobile MonsterCard ordering, MonsterCard target switch/drop-filter sharing/active defence highlights, dense spreadsheet Compare pane, Dense Compare mobile/tablet page-width containment and internal horizontal table scroll, dense XP/net-GP scale indicators, metric strip, Stats XP routing, Trip & banking summary and hit distribution histogram, combat-style switching, per-combat-type loadout restore, multi-prayer/multi-boost workbench controls with compact-strip primary edits and `+N` markers, active-style gear quick actions with two-handed shield lock, manual combat override persistence/reset, SetupBar custom setup create/restore/remove, Melee/Ranged/Magic equipment pane edits with searchable selectors and persisted selections, tab-routed special attack controls/metrics, trip survival/food/recoil controls, dense row markers, browser-rendered dense numeric release-path snapshots for default melee, melee alch-relevant, ranged safespot, ranged cannon, magic safespot and custom loot-settings marker rows, browser-rendered metric-strip acceptance snapshots for those target selections plus default melee, ranged safespot, cannon-enabled ranged, loot action override, manual food/prayer trip, imported PriceSet, mocked market sync and compatible legacy import paths, final Cannon tab controls with sparse-link/reset behavior and expanded output snapshots for effective targets, cannon DPS, balls/hr, balls/kill, cannon ranged XP/hr, effective XP/hr, effective net GP/hr, ball costs, cannonballs/trip and K/hr uplift, Duel tab snapshot/rename/load/delete/persistence flow, Planner tab open/metric/current-XP/target/skill-lock/gear-pool/Recompute/training-order/timeline/chart persistence flow, per-monster loot settings persistence, full monster table row count, table sorting, dense compare filters/relevance persistence, row target selection, per-monster cannon controls, Economy price-history controls, mocked hiscores lookup/apply flow and mocked market sync/report/history flow
+- Playwright smoke for the workbench shell, PlayerSidebar, legacy-order TabBar, right-side MonsterCard rail, mobile MonsterCard ordering, MonsterCard target switch/drop-filter sharing/active defence highlights, dense spreadsheet Compare pane, Dense Compare mobile/tablet page-width containment and internal horizontal table scroll, dense XP/net-GP scale indicators, metric strip, Stats XP routing, Trip & banking summary and hit distribution histogram, combat-style switching, per-combat-type loadout restore, multi-prayer/multi-boost workbench controls with compact-strip primary edits and `+N` markers, active-style gear quick actions with two-handed shield lock, manual combat override persistence/reset, SetupBar custom setup create/restore/remove, Melee/Ranged/Magic equipment pane edits with searchable selectors and persisted selections, tab-routed special attack controls/metrics, dragon halberd NPC-size fallback warning, DBA boost special suppression, magic special unsupported state, trip survival/food/recoil controls, Trip summary Auto/Manual labels for bank time, food count and prayer restore, trip potion recommendation apply/disabled/inactive states, dense row markers, browser-rendered dense numeric release-path snapshots for default melee, melee alch-relevant, ranged safespot, ranged cannon, magic safespot and custom loot-settings marker rows, browser-rendered metric-strip acceptance snapshots for those target selections plus default melee, ranged safespot, cannon-enabled ranged, loot action override, manual food/prayer trip, imported PriceSet, mocked market sync and compatible legacy import paths, final Cannon tab controls with sparse-link/reset behavior and expanded output snapshots for effective targets, cannon DPS, balls/hr, balls/kill, cannon ranged XP/hr, effective XP/hr, effective net GP/hr, ball costs, cannonballs/trip and K/hr uplift, Duel tab snapshot/rename/load/delete/persistence flow, Planner tab open/metric/current-XP/target/skill-lock/gear-pool/Recompute/training-order/timeline/chart persistence flow, per-monster loot settings persistence, full monster table row count, table sorting, dense compare filters/relevance persistence, row target selection, per-monster cannon controls, Economy price-history controls, mocked hiscores lookup/apply flow and mocked market sync/report/history flow
 
 Run the focused browser smoke for the visible Stats workflow with:
 
@@ -420,6 +422,12 @@ Run the focused browser smoke for Dense Compare release-path numeric snapshots w
 ```sh
 npm run test:e2e -- --grep "release-path dense"
 ```
+
+Dense/Compare release classification: D-032 accepts the current release-path
+browser numeric snapshots as sufficient for the current Dense/Compare release
+slice. All-fixture browser-display expansion and full visual regression remain
+later or decision-needed evidence, not required checks for this slice unless a
+future release decision changes that boundary.
 
 Run the focused browser smoke for Dense Compare mobile/tablet overflow containment with:
 
