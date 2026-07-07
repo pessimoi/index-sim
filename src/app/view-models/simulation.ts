@@ -34,6 +34,7 @@ import type {
   SimulationWarning
 } from "@/domain/shared";
 import {
+  HIGH_ALCH_MAGIC_XP_PER_CAST,
   simulateTripLootSupply,
   type LootAction,
   type LootBreakdownEntry,
@@ -87,6 +88,7 @@ export interface SimulationViewModel {
   totalXpPerHour: number;
   warnings: string[];
   calculationWarnings: CalculationWarningViewModel[];
+  specialWarnings: CalculationWarningViewModel[];
   moneyWarnings: CalculationWarningViewModel[];
   topLoot: Array<{
     name: string;
@@ -1068,6 +1070,7 @@ const MONEY_WARNING_CODES = new Set([
   "price-fallback-used",
   "approximate-data-source"
 ]);
+const SPECIAL_WARNING_CODES = new Set(["dragon-halberd-npc-size-fallback"]);
 
 function warningViewModel(warning: SimulationWarning): CalculationWarningViewModel {
   return {
@@ -1340,6 +1343,30 @@ const PROTECTION_LABELS: Record<NonNullable<CombatSetupFormState["trip"]["protec
   magic: "Protect from Magic"
 };
 
+function prayerEffectiveXpPerHour(trip: TripLootSupplyResult): number {
+  return trip.prayerXpPerKill * trip.effectiveKph;
+}
+
+function alchMagicXpPerHour(trip: TripLootSupplyResult): number {
+  return trip.alchCastsPerKill * HIGH_ALCH_MAGIC_XP_PER_CAST * trip.effectiveKph;
+}
+
+function modeledTotalXpPerHour(input: {
+  xp: CombatXpBreakdown;
+  trip: TripLootSupplyResult;
+  cannonEffectiveXpPerHour: number;
+}): number {
+  const combatSkillXpPerHour =
+    Object.values(input.xp.skillXpPerKill).reduce((sum, value) => sum + (value ?? 0), 0) *
+    input.trip.effectiveKph;
+  return (
+    combatSkillXpPerHour +
+    input.cannonEffectiveXpPerHour +
+    prayerEffectiveXpPerHour(input.trip) +
+    alchMagicXpPerHour(input.trip)
+  );
+}
+
 function xpRoutingRow(input: {
   id: string;
   label: string;
@@ -1367,6 +1394,8 @@ function createXpRoutingViewModel(input: {
   effectiveXpPerHour: number;
   totalXpPerHour: number;
 }): XpRoutingViewModel {
+  const prayerXpPerHour = prayerEffectiveXpPerHour(input.trip);
+  const alchXpPerHour = alchMagicXpPerHour(input.trip);
   const rows: XpRoutingRowViewModel[] = [
     xpRoutingRow({
       id: "player-combat",
@@ -1407,19 +1436,22 @@ function createXpRoutingViewModel(input: {
     xpRoutingRow({
       id: "prayer",
       label: "Prayer XP/hr",
-      xpPerHour: input.trip.prayerXpPerHour,
-      status: "partial",
-      note: "Trip loot prayer XP is surfaced, but full total-XP parity remains partial."
+      xpPerHour: prayerXpPerHour,
+      status: "modeled",
+      note:
+        prayerXpPerHour > 0
+          ? "Bury XP from current loot actions after trip efficiency."
+          : "No buryable bone XP in the current loot actions."
     }),
     xpRoutingRow({
       id: "alch",
       label: "Magic (alch) XP/hr",
-      xpPerHour: null,
-      status: "not-modeled",
+      xpPerHour: alchXpPerHour,
+      status: "modeled",
       note:
         input.trip.alchCastsPerKill > 0
-          ? `${formatNumber(input.trip.alchCastsPerKill, 2)} alch casts/kill tracked; XP row is not yet domain-owned.`
-          : "High-alch Magic XP is not yet domain-owned in rewrite XP routing."
+          ? `${formatNumber(input.trip.alchCastsPerKill, 2)} alch casts/kill at ${HIGH_ALCH_MAGIC_XP_PER_CAST} Magic XP/cast after trip efficiency.`
+          : "No in-trip high-alch casts in the current loot model."
     })
   );
 
@@ -1533,7 +1565,7 @@ function createTripBankingSummaryViewModel(
       }),
       statsTripRow({
         id: "protection-state",
-        label: "Protection",
+        label: "Protection prayer",
         value: protectionStateLabel(form, trip),
         note: trip.trip.incoming.protected ? "Incoming damage blocked by protection prayer." : ""
       })
@@ -1660,10 +1692,7 @@ export function createSimulationViewModel(
   const playerEffectiveXpPerHour = xp.combatXpPerKill * trip.effectiveKph;
   const cannonEffectiveXpPerHour = (trip.cannon?.rangedXpPerHour ?? 0) * trip.trip.efficiency;
   const effectiveXpPerHour = playerEffectiveXpPerHour + cannonEffectiveXpPerHour;
-  const totalXpPerHour =
-    Object.values(xp.skillXpPerKill).reduce((sum, value) => sum + (value ?? 0), 0) *
-      trip.effectiveKph +
-    cannonEffectiveXpPerHour;
+  const totalXpPerHour = modeledTotalXpPerHour({ xp, trip, cannonEffectiveXpPerHour });
 
   const lootRows =
     options.includeLootRows === false
@@ -1675,6 +1704,9 @@ export function createSimulationViewModel(
         }
       : createLootRows(tripInput, context, trip, lootPrefs, options.lootPriceHistoryByItem);
   const calculationWarnings = calculationWarningViewModels([...combat.warnings, ...trip.warnings]);
+  const specialWarnings = calculationWarnings.filter((warning) =>
+    SPECIAL_WARNING_CODES.has(warning.code)
+  );
   const moneyWarnings = calculationWarnings.filter((warning) =>
     MONEY_WARNING_CODES.has(warning.code)
   );
@@ -1700,6 +1732,7 @@ export function createSimulationViewModel(
     totalXpPerHour,
     warnings: calculationWarnings.map((warning) => warning.message),
     calculationWarnings,
+    specialWarnings,
     moneyWarnings,
     topLoot: trip.lootBreakdown
       .filter((drop) => drop.evGp > 0 || drop.prayerXp > 0)

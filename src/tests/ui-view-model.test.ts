@@ -33,6 +33,7 @@ import {
   type DenseCompareRowViewModel,
   weaponOptions
 } from "../app/view-models/simulation";
+import { HIGH_ALCH_MAGIC_XP_PER_CAST } from "../domain/trip";
 
 interface GoldenFixture {
   tolerances: {
@@ -801,22 +802,41 @@ describe("rewrite UI view models", () => {
       },
       context
     );
+    const sustainedOff = createSimulationViewModel(
+      {
+        ...DEFAULT_FORM_STATE,
+        sustained: false,
+        trip: { ...DEFAULT_FORM_STATE.trip, potionSets: 0, singleDose: false }
+      },
+      context
+    );
 
     expect(vialMode.request).not.toHaveProperty("potionRecommendation");
     expect(vialMode.trip.potionRecommendation).toMatchObject({
       active: true,
+      status: "under",
+      canApply: true,
       recommendedVials: 1,
       matched: false
     });
     expect(singleDoseMode.trip.potionRecommendation).toMatchObject({
       active: true,
+      status: "under",
+      canApply: true,
       recommendedDoses: 1,
       matched: false
     });
     expect(noBoost.trip.potionRecommendation).toMatchObject({
       active: false,
+      status: "no-boost",
+      canApply: false,
       recommendedVials: 0,
       recommendedDoses: 0
+    });
+    expect(sustainedOff.trip.potionRecommendation).toMatchObject({
+      active: false,
+      status: "inactive",
+      canApply: false
     });
   });
 
@@ -831,11 +851,24 @@ describe("rewrite UI view models", () => {
       ...form,
       specialAttack: { weaponId: "magic_shortbow", ammoId: "rune_arrow" }
     };
+    const dbaBoostForm: CombatSetupFormState = {
+      ...form,
+      boosts: ["dba_spec", "super_att"],
+      specialAttack: { weaponId: "dragon_dagger_p", ammoId: "none" }
+    };
+    const magicForm = normalizeFormState({
+      ...switchCombatStyleLoadout(form, "magic"),
+      specialAttack: { weaponId: "dragon_dagger_p", ammoId: "none" }
+    });
 
     expect(formToSimulationRequest(form, context.gameData).specialAttack).toEqual({
       weaponId: "dragon_dagger_p"
     });
     expect(formToSimulationRequest(invalidForm, context.gameData).specialAttack).toBeUndefined();
+    expect(formToSimulationRequest(dbaBoostForm, context.gameData).specialAttack).toBeUndefined();
+    expect(formToSimulationRequest(magicForm, context.gameData).specialAttack).toBeUndefined();
+    expect(createSimulationViewModel(dbaBoostForm, context).combat.specialAttack).toBeNull();
+    expect(magicForm.specialAttack).toEqual({ weaponId: "none", ammoId: "none" });
   });
 
   it("maps ranged special attack ammo through current valid arrow fallback", async () => {
@@ -884,6 +917,44 @@ describe("rewrite UI view models", () => {
     expect(result.combat.specialAttack?.maxHit).toBeGreaterThan(0);
     expect(result.combat.specialAttack?.specsPerHour).toBeGreaterThan(0);
     expect(result.combat.effectiveDps).toBe(result.combat.specialAttack?.dpsWithSpec);
+    expect(result.specialWarnings).toEqual([]);
+  });
+
+  it("surfaces dragon halberd NPC-size fallback warning only for that special path", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const warningText =
+      "NPC size data is not modeled; dragon halberd second-hit behavior follows the current legacy fixture assumption.";
+    const daggerResult = createSimulationViewModel(
+      {
+        ...DEFAULT_FORM_STATE,
+        weaponId: "dragon_dagger_p",
+        specialAttack: { weaponId: "dragon_dagger_p", ammoId: "none" }
+      },
+      context
+    );
+    const halberdResult = createSimulationViewModel(
+      {
+        ...DEFAULT_FORM_STATE,
+        monsterId: "rock_crab",
+        weaponId: "dragon_halberd",
+        styleId: "aggressive",
+        gear: { ...DEFAULT_FORM_STATE.gear, shield: "none" },
+        boosts: ["super_att", "super_str"],
+        specialAttack: { weaponId: "dragon_halberd", ammoId: "none" }
+      },
+      context
+    );
+
+    expect(daggerResult.specialWarnings).toEqual([]);
+    expect(halberdResult.combat.specialAttack?.key).toBe("dragon_halberd");
+    expect(halberdResult.specialWarnings).toEqual([
+      {
+        code: "dragon-halberd-npc-size-fallback",
+        severity: "info",
+        message: warningText
+      }
+    ]);
+    expect(halberdResult.warnings).toContain(warningText);
   });
 
   it("maps prayer restore detail controls only for the active restore mode", () => {
@@ -1021,15 +1092,19 @@ describe("rewrite UI view models", () => {
     expect(maxBucket?.ariaLabel).toContain("max hit bucket");
   }, 15_000);
 
-  it("builds Stats XP routing rows with player, skill and honest partial rows", async () => {
+  it("builds Stats XP routing rows with player, skill and modeled loot XP rows", async () => {
     const { context } = await loadBundledLegacyContext();
     const result = createSimulationViewModel(DEFAULT_FORM_STATE, context);
     const rows = new Map(result.xpRouting.rows.map((row) => [row.id, row]));
     const skillRows = result.xpRouting.rows.filter((row) => row.id.startsWith("skill-"));
+    const modeledSourceTotal = result.xpRouting.rows
+      .filter((row) => row.id !== "player-combat")
+      .reduce((sum, row) => sum + (row.xpPerHour ?? 0), 0);
 
     expect(result.xpRouting.effectiveXpPerHour).toBe(result.effectiveXpPerHour);
     expect(result.xpRouting.totalXpPerHour).toBe(result.totalXpPerHour);
     expect(result.xpRouting.effectiveXpPerHourLabel).toBe(formatNumber(result.effectiveXpPerHour));
+    expect(modeledSourceTotal).toBeCloseTo(result.totalXpPerHour, 6);
     expect(rows.get("player-combat")).toMatchObject({
       label: "Player combat XP/hr",
       xpPerHour: result.playerEffectiveXpPerHour,
@@ -1043,18 +1118,64 @@ describe("rewrite UI view models", () => {
     });
     expect(rows.get("prayer")).toMatchObject({
       label: "Prayer XP/hr",
-      xpPerHour: result.trip.prayerXpPerHour,
-      status: "partial",
-      statusLabel: "partial"
+      xpPerHour: result.trip.prayerXpPerKill * result.trip.effectiveKph,
+      status: "modeled",
+      statusLabel: "modeled"
     });
-    expect(rows.get("prayer")?.note).toContain("full total-XP parity remains partial");
+    expect(rows.get("prayer")?.note).toContain("Bury XP");
     expect(rows.get("alch")).toMatchObject({
       label: "Magic (alch) XP/hr",
-      xpPerHour: null,
-      value: "-",
-      status: "not-modeled",
-      statusLabel: "not modeled"
+      xpPerHour: 0,
+      value: "0",
+      status: "modeled",
+      statusLabel: "modeled"
     });
+  }, 15_000);
+
+  it("models Magic alch XP from tracked in-trip alch casts", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const form = normalizeFormState({
+      ...DEFAULT_FORM_STATE,
+      monsterId: "chaos_dwarf",
+      levels: {
+        attack: 70,
+        strength: 72,
+        defence: 60,
+        hitpoints: DEFAULT_FORM_STATE.levels.hitpoints,
+        ranged: 50,
+        magic: 55,
+        prayer: 43
+      },
+      prayers: ["ultimate", "incredible"],
+      boosts: ["super_att", "super_str"],
+      sustained: true,
+      repotThreshold: 74,
+      trip: {
+        ...DEFAULT_FORM_STATE.trip,
+        foodKey: "lobster",
+        teleport: true,
+        bankSeconds: 120,
+        alching: true,
+        prayerMode: "none"
+      }
+    });
+    const result = createSimulationViewModel(form, context);
+    const rows = new Map(result.xpRouting.rows.map((row) => [row.id, row]));
+    const expectedAlchXp =
+      result.trip.alchCastsPerKill * HIGH_ALCH_MAGIC_XP_PER_CAST * result.trip.effectiveKph;
+    const modeledSourceTotal = result.xpRouting.rows
+      .filter((row) => row.id !== "player-combat")
+      .reduce((sum, row) => sum + (row.xpPerHour ?? 0), 0);
+
+    expect(result.trip.alchCastsPerKill).toBeGreaterThan(0);
+    expect(rows.get("alch")).toMatchObject({
+      label: "Magic (alch) XP/hr",
+      xpPerHour: expectedAlchXp,
+      status: "modeled",
+      statusLabel: "modeled"
+    });
+    expect(rows.get("alch")?.note).toContain(`${HIGH_ALCH_MAGIC_XP_PER_CAST} Magic XP/cast`);
+    expect(modeledSourceTotal).toBeCloseTo(result.totalXpPerHour, 6);
   }, 15_000);
 
   it("adds the Stats cannon XP routing row only when cannon contributes", async () => {
@@ -1112,6 +1233,7 @@ describe("rewrite UI view models", () => {
     expect(rows.get("net-gp-hour")?.numericValue).toBe(result.trip.effectiveNetGpPerHour);
     expect(rows.get("trip-bound")?.value).toBe(expectedBound);
     expect(rows.get("safespot-state")?.value).toBe("Off");
+    expect(rows.get("protection-state")?.label).toBe("Protection prayer");
     expect(rows.get("protection-state")?.value).toContain("active");
   }, 15_000);
 

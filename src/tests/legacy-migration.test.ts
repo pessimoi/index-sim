@@ -1,8 +1,5 @@
 import { loadBundledLegacyContext } from "../adapters/browser";
-import {
-  createMemoryStorage,
-  type KeyValueStorage
-} from "../adapters/storage";
+import { createMemoryStorage, type KeyValueStorage } from "../adapters/storage";
 import {
   LEGACY_INPUT_STORAGE_KEY,
   LEGACY_STORAGE_KEYS,
@@ -12,6 +9,8 @@ import {
   detectLegacyStorageKeys,
   inspectLegacySetupMigration
 } from "../adapters/storage/legacy-migration";
+import { HIDDEN_GEAR_TIERS_STORAGE_KEY } from "../app/state/hidden-gear-tiers";
+import { LOOT_PREFS_STORAGE_KEY } from "../app/state/loot-prefs";
 import { PLANNER_UI_STORAGE_KEY } from "../app/state/planner";
 import { DEFAULT_FORM_STATE, REWRITE_SETUP_STORAGE_KEY } from "../app/state/ui-state";
 import type { GameDataSnapshot, PriceSet } from "../domain/shared";
@@ -45,6 +44,7 @@ describe("legacy storage migration foundation", () => {
       LEGACY_INPUT_STORAGE_KEY,
       "sim_scraped_keys_v1",
       "sim_hidden_tiers_v1",
+      "sim_irrelevant_v1",
       "sim_loot_comp_open"
     ]);
 
@@ -52,9 +52,7 @@ describe("legacy storage migration foundation", () => {
     expect(new Set(policyKeys).size).toBe(LEGACY_STORAGE_KEYS.length);
     expect(
       LEGACY_STORAGE_KEY_POLICIES.every((policy) =>
-        ["migrate", "review-only", "intentional-reset", "legacy-only"].includes(
-          policy.disposition
-        )
+        ["migrate", "review-only", "intentional-reset", "legacy-only"].includes(policy.disposition)
       )
     ).toBe(true);
     expect(review).toEqual(
@@ -72,6 +70,12 @@ describe("legacy storage migration foundation", () => {
           clearDeletes: true
         }),
         expect.objectContaining({
+          key: "sim_loot_prefs_v1",
+          disposition: "migrate",
+          found: false,
+          clearDeletes: false
+        }),
+        expect.objectContaining({
           key: "sim_loot_comp_open",
           disposition: "legacy-only",
           found: true,
@@ -85,7 +89,19 @@ describe("legacy storage migration foundation", () => {
         }),
         expect.objectContaining({
           key: "sim_hidden_tiers_v1",
-          disposition: "review-only",
+          disposition: "migrate",
+          found: true,
+          clearDeletes: true
+        }),
+        expect.objectContaining({
+          key: "sim_compare_sort_v1",
+          disposition: "migrate",
+          found: false,
+          clearDeletes: false
+        }),
+        expect.objectContaining({
+          key: "sim_irrelevant_v1",
+          disposition: "migrate",
           found: true,
           clearDeletes: true
         })
@@ -373,10 +389,227 @@ describe("legacy storage migration foundation", () => {
     expect(report.importedFields).toContain("trip.bankSeconds");
   });
 
+  it("imports valid legacy loot preferences into unambiguous rewrite row ids", () => {
+    const storage = createMemoryStorage({
+      sim_loot_prefs_v1: JSON.stringify({
+        "Big bones": "bury"
+      })
+    });
+
+    const report = inspectLegacySetupMigration({ storage, gameData });
+
+    expect(report.lootPrefs).not.toBeNull();
+    expect(report.lootPrefs?.giant).toMatchObject({
+      key_big_bones_0: "bury"
+    });
+    expect(report.importedFields).toContain("lootPrefs");
+  });
+
+  it("reports partial legacy loot preference imports for unknown rows and invalid actions", () => {
+    const storage = createMemoryStorage({
+      sim_loot_prefs_v1: JSON.stringify({
+        "Big bones": "bury",
+        "Not a real drop": "skip",
+        Bones: "dance"
+      })
+    });
+
+    const report = inspectLegacySetupMigration({ storage, gameData });
+
+    expect(report.lootPrefs?.giant).toMatchObject({
+      key_big_bones_0: "bury"
+    });
+    expect(report.skippedFields).toEqual(
+      expect.arrayContaining([
+        {
+          field: "lootPrefs.Not a real drop",
+          reason: "unknown loot preference row name"
+        },
+        {
+          field: "lootPrefs.Bones",
+          reason: "unknown loot action"
+        }
+      ])
+    );
+  });
+
+  it("skips ambiguous legacy loot preference names for a monster instead of guessing a row id", () => {
+    const storage = createMemoryStorage({
+      sim_loot_prefs_v1: JSON.stringify({
+        Coins: "skip"
+      })
+    });
+
+    const report = inspectLegacySetupMigration({ storage, gameData });
+
+    expect(report.skippedFields).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          field: "lootPrefs.giant.Coins",
+          reason: "ambiguous legacy drop name for monster"
+        })
+      ])
+    );
+  });
+
+  it("skips oversized legacy loot preference payloads before parsing", () => {
+    const storage = createMemoryStorage({
+      sim_loot_prefs_v1: JSON.stringify({
+        "Big bones": "bury",
+        pad: "x".repeat(50)
+      })
+    });
+
+    const report = inspectLegacySetupMigration({
+      storage,
+      gameData,
+      maxLootPrefsBytes: 20
+    });
+
+    expect(report.lootPrefs).toBeNull();
+    expect(report.skippedFields).toContainEqual({
+      field: "sim_loot_prefs_v1",
+      reason: "legacy value exceeds safe size limit"
+    });
+  });
+
+  it("imports valid legacy hidden gear tiers into the migration report", () => {
+    const storage = createMemoryStorage({
+      sim_hidden_tiers_v1: JSON.stringify({
+        bronze: true,
+        iron: false,
+        red_dhide: true
+      })
+    });
+
+    const report = inspectLegacySetupMigration({ storage, gameData });
+
+    expect(report.hiddenGearTiers).toEqual({
+      bronze: true,
+      red_dhide: true
+    });
+    expect(report.importedFields).toContain("hiddenGearTiers");
+  });
+
+  it("skips unknown hidden tier ids while importing known tier flags", () => {
+    const storage = createMemoryStorage({
+      sim_hidden_tiers_v1: JSON.stringify({
+        bronze: true,
+        not_a_tier: true
+      })
+    });
+
+    const report = inspectLegacySetupMigration({ storage, gameData });
+
+    expect(report.hiddenGearTiers).toEqual({ bronze: true });
+    expect(report.skippedFields).toContainEqual({
+      field: "hiddenGearTiers.not_a_tier",
+      reason: "unknown hidden tier id"
+    });
+  });
+
+  it("imports valid legacy compare sort into dense compare sort state", () => {
+    const storage = createMemoryStorage({
+      sim_compare_sort_v1: JSON.stringify({
+        key: "effectiveXpPerHour",
+        dir: -1
+      })
+    });
+
+    const report = inspectLegacySetupMigration({ storage, gameData });
+
+    expect(report.denseCompareSort).toEqual({
+      key: "xpPerHour",
+      direction: "desc"
+    });
+    expect(report.importedFields).toContain("compare.sort");
+  });
+
+  it("skips invalid legacy compare sort safely", () => {
+    const invalidKeyStorage = createMemoryStorage({
+      sim_compare_sort_v1: JSON.stringify({
+        key: "not_a_sort_key",
+        dir: -1
+      })
+    });
+    const invalidDirectionStorage = createMemoryStorage({
+      sim_compare_sort_v1: JSON.stringify({
+        key: "dps",
+        dir: 0
+      })
+    });
+
+    const invalidKeyReport = inspectLegacySetupMigration({ storage: invalidKeyStorage, gameData });
+    const invalidDirectionReport = inspectLegacySetupMigration({
+      storage: invalidDirectionStorage,
+      gameData
+    });
+
+    expect(invalidKeyReport.denseCompareSort).toBeNull();
+    expect(invalidKeyReport.skippedFields).toContainEqual({
+      field: "compare.sort",
+      reason: "unknown compare sort key"
+    });
+    expect(invalidDirectionReport.denseCompareSort).toBeNull();
+    expect(invalidDirectionReport.skippedFields).toContainEqual({
+      field: "compare.sort",
+      reason: "unknown compare sort direction"
+    });
+  });
+
+  it("imports valid legacy irrelevant monster ids into dense compare state", () => {
+    const storage = createMemoryStorage({
+      sim_irrelevant_v1: JSON.stringify(["rock_crab", "greater_demon", "rock_crab"])
+    });
+
+    const report = inspectLegacySetupMigration({ storage, gameData });
+
+    expect(report.irrelevantMonsterIds).toEqual(["rock_crab", "greater_demon"]);
+    expect(report.importedFields).toContain("compare.irrelevantMonsterIds");
+  });
+
+  it("skips unknown legacy irrelevant monster ids while importing known ids", () => {
+    const storage = createMemoryStorage({
+      sim_irrelevant_v1: JSON.stringify(["not_a_monster", "rock_crab"])
+    });
+
+    const report = inspectLegacySetupMigration({ storage, gameData });
+
+    expect(report.irrelevantMonsterIds).toEqual(["rock_crab"]);
+    expect(report.skippedFields).toContainEqual({
+      field: "compare.irrelevantMonsterIds.not_a_monster",
+      reason: "unknown monster id"
+    });
+  });
+
+  it("skips oversized legacy UI state payloads before parsing", () => {
+    const storage = createMemoryStorage({
+      sim_hidden_tiers_v1: JSON.stringify({ bronze: true, pad: "x".repeat(50) })
+    });
+
+    const report = inspectLegacySetupMigration({
+      storage,
+      gameData,
+      maxUiStateBytes: 20
+    });
+
+    expect(report.hiddenGearTiers).toBeNull();
+    expect(report.skippedFields).toContainEqual({
+      field: "sim_hidden_tiers_v1",
+      reason: "legacy value exceeds safe size limit"
+    });
+  });
+
   it("does not write to legacy or rewrite storage keys while inspecting migration state", () => {
     const values = new Map<string, string>([
       [LEGACY_INPUT_STORAGE_KEY, JSON.stringify({ combatType: "melee" })],
+      ["sim_loot_prefs_v1", JSON.stringify({ "Big bones": "bury" })],
+      ["sim_hidden_tiers_v1", JSON.stringify({ bronze: true })],
+      ["sim_compare_sort_v1", JSON.stringify({ key: "dps", dir: -1 })],
+      ["sim_irrelevant_v1", JSON.stringify(["rock_crab"])],
       ["sim_planner_v1", "{}"],
+      [LOOT_PREFS_STORAGE_KEY, "existing rewrite loot prefs"],
+      [HIDDEN_GEAR_TIERS_STORAGE_KEY, "existing rewrite hidden tiers"],
       [PLANNER_UI_STORAGE_KEY, "existing rewrite planner state"],
       [REWRITE_SETUP_STORAGE_KEY, "existing rewrite state"]
     ]);
@@ -393,9 +626,18 @@ describe("legacy storage migration foundation", () => {
 
     const report = inspectLegacySetupMigration({ storage, gameData });
 
-    expect(report.foundKeys).toEqual([LEGACY_INPUT_STORAGE_KEY, "sim_planner_v1"]);
+    expect(report.foundKeys).toEqual([
+      LEGACY_INPUT_STORAGE_KEY,
+      "sim_planner_v1",
+      "sim_loot_prefs_v1",
+      "sim_hidden_tiers_v1",
+      "sim_compare_sort_v1",
+      "sim_irrelevant_v1"
+    ]);
     expect(writes).toEqual([]);
     expect(values.get(LEGACY_INPUT_STORAGE_KEY)).toBe(JSON.stringify({ combatType: "melee" }));
+    expect(values.get(LOOT_PREFS_STORAGE_KEY)).toBe("existing rewrite loot prefs");
+    expect(values.get(HIDDEN_GEAR_TIERS_STORAGE_KEY)).toBe("existing rewrite hidden tiers");
     expect(values.get(PLANNER_UI_STORAGE_KEY)).toBe("existing rewrite planner state");
     expect(values.get(REWRITE_SETUP_STORAGE_KEY)).toBe("existing rewrite state");
   });
@@ -617,6 +859,7 @@ describe("legacy storage migration foundation", () => {
       sim_planner_v1: "{}",
       sim_hidden_tiers_v1: "{}",
       sim_compare_sort_v1: "{}",
+      sim_irrelevant_v1: "[]",
       sim_prices_v1: "{}",
       sim_price_history_sanitized_v4: "[]",
       sim_hiscore_player: "Fixture Player",
@@ -629,6 +872,7 @@ describe("legacy storage migration foundation", () => {
       "sim_planner_v1",
       "sim_hidden_tiers_v1",
       "sim_compare_sort_v1",
+      "sim_irrelevant_v1",
       "sim_prices_v1",
       "sim_price_history_sanitized_v4",
       "sim_hiscore_player"
@@ -638,6 +882,7 @@ describe("legacy storage migration foundation", () => {
     expect(storage.getItem("sim_planner_v1")).toBeNull();
     expect(storage.getItem("sim_hidden_tiers_v1")).toBeNull();
     expect(storage.getItem("sim_compare_sort_v1")).toBeNull();
+    expect(storage.getItem("sim_irrelevant_v1")).toBeNull();
     expect(storage.getItem("sim_prices_v1")).toBeNull();
     expect(storage.getItem("sim_price_history_sanitized_v4")).toBeNull();
     expect(storage.getItem("sim_hiscore_player")).toBeNull();

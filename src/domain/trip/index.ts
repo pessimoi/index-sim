@@ -17,9 +17,18 @@ import {
 export type LootAction = "skip" | "bury" | "alch" | "loot" | "unid" | "value";
 export type TripBound = "loot" | "food" | "overfull" | "prayer" | "recoil" | "respawn" | "none";
 export type JewelSpot = "underground" | "overground";
+export type PotionCarryRecommendationStatus =
+  | "inactive"
+  | "no-boost"
+  | "manual"
+  | "under"
+  | "over"
+  | "matched";
 
 export interface PotionCarryRecommendation {
   active: boolean;
+  status: PotionCarryRecommendationStatus;
+  canApply: boolean;
   recommendedVials: number;
   recommendedDoses: number;
   tripMinutes: number | null;
@@ -306,6 +315,7 @@ export interface TripLootSupplyResult {
 const INVENTORY_SIZE = 28;
 const VALUE_THRESHOLD = 2000;
 const NATURE_RUNE_FALLBACK = 265;
+export const HIGH_ALCH_MAGIC_XP_PER_CAST = 65;
 const CANNONBALL_PRICE_KEY = "mcannonball";
 const CANNONBALL_FALLBACK_PRICE = 180;
 const PROTECT_DRAIN = 12;
@@ -409,11 +419,14 @@ const CAT_POTION: Record<PotionStatKey, EntityId> = {
 };
 
 function inactivePotionRecommendation(
+  status: PotionCarryRecommendationStatus,
   reason: string,
   warnings: string[] = []
 ): PotionCarryRecommendation {
   return {
     active: false,
+    status,
+    canApply: false,
     recommendedVials: 0,
     recommendedDoses: 0,
     tripMinutes: null,
@@ -429,7 +442,8 @@ export function recommendPotionCarry(
 ): PotionCarryRecommendation {
   if (!input.request.sustained) {
     return inactivePotionRecommendation(
-      "Sustained boost averaging is off, so the trip cannot infer a repot cadence."
+      "inactive",
+      "Sustained is off; repeat-dose carry recommendation is not needed."
     );
   }
 
@@ -439,7 +453,10 @@ export function recommendPotionCarry(
     .filter((entry) => !(isDbaSelected(input.request) && entry.stat === "str"));
 
   if (!selected.length) {
-    return inactivePotionRecommendation("No general combat potion boost is selected.");
+    return inactivePotionRecommendation(
+      "no-boost",
+      "Select a general combat boost to enable vials/type or doses/type guidance."
+    );
   }
 
   if (
@@ -449,7 +466,8 @@ export function recommendPotionCarry(
     input.killsPerTrip <= 0
   ) {
     return inactivePotionRecommendation(
-      "Trip length is not finite enough for a carry recommendation.",
+      "manual",
+      "No finite trip estimate is available; set vials/type or doses/type manually.",
       ["Set a finite food, loot, prayer, recoil or banking limit to enable this estimate."]
     );
   }
@@ -457,7 +475,8 @@ export function recommendPotionCarry(
   const tripMinutes = (input.cycleSec * input.killsPerTrip) / 60;
   if (!Number.isFinite(tripMinutes) || tripMinutes <= 0) {
     return inactivePotionRecommendation(
-      "Trip estimate is not finite enough for a carry recommendation.",
+      "manual",
+      "No finite active fighting estimate is available; set vials/type or doses/type manually.",
       ["The recommendation stays inactive until active fighting time can be estimated."]
     );
   }
@@ -477,7 +496,10 @@ export function recommendPotionCarry(
   }
 
   if (!Number.isFinite(repotIntervalMinutes) || repotIntervalMinutes <= 0) {
-    return inactivePotionRecommendation("Selected boosts do not change a general combat stat.");
+    return inactivePotionRecommendation(
+      "inactive",
+      "Selected boosts do not change a general combat stat."
+    );
   }
 
   const rawDoses = Math.max(1, Math.ceil(tripMinutes / repotIntervalMinutes));
@@ -488,6 +510,11 @@ export function recommendPotionCarry(
     ? Math.max(0, input.trip.potionDoses ?? 4)
     : Math.max(0, input.trip.potionSets ?? 1);
   const matched = currentCarry === (singleDose ? cappedDoses : cappedVials);
+  const status: PotionCarryRecommendationStatus = matched
+    ? "matched"
+    : currentCarry < (singleDose ? cappedDoses : cappedVials)
+      ? "under"
+      : "over";
   const warnings =
     rawDoses > MAX_RECOMMENDED_POTION_DOSES
       ? [
@@ -497,6 +524,8 @@ export function recommendPotionCarry(
 
   return {
     active: true,
+    status,
+    canApply: !matched,
     recommendedVials: cappedVials,
     recommendedDoses: cappedDoses,
     tripMinutes,

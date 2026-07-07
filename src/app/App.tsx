@@ -775,16 +775,18 @@ function tripMetricGroup(title: string, items: DisplayMetric[]) {
 
 function CalculationWarningSummary({
   warnings,
-  label
+  label,
+  title = "Price warnings"
 }: {
   warnings: readonly CalculationWarningViewModel[];
   label: string;
+  title?: string;
 }) {
   if (!warnings.length) return null;
   const visible = warnings.slice(0, 4);
   return (
     <div className="calculation-warnings" role="status" aria-label={label}>
-      <strong>Price warnings</strong>
+      <strong>{title}</strong>
       {visible.map((warning) => (
         <span className={warning.severity} key={`${warning.code}:${warning.message}`}>
           {warning.message}
@@ -915,6 +917,7 @@ function MonsterCardPanel({
 function legacyMigrationSummaryItems(report: LegacySetupMigrationReport): string[] {
   const foundKeys = new Set(report.foundKeys);
   const pricesFound = report.foundKeys.some((key) => LEGACY_PRICE_STORAGE_KEYS.has(key));
+  const compareFound = foundKeys.has("sim_compare_sort_v1") || foundKeys.has("sim_irrelevant_v1");
   const historyFound = report.keyReview.some(
     (item) => item.found && item.key.startsWith("sim_price_history")
   );
@@ -932,6 +935,21 @@ function legacyMigrationSummaryItems(report: LegacySetupMigrationReport): string
       : foundKeys.has("sim_hiscore_player")
         ? "Hiscores player skipped"
         : "No hiscores player",
+    report.lootPrefs != null
+      ? "Loot preferences ready"
+      : foundKeys.has("sim_loot_prefs_v1")
+        ? "Loot preferences skipped"
+        : "No loot preferences",
+    report.hiddenGearTiers != null
+      ? "Hidden gear tiers ready"
+      : foundKeys.has("sim_hidden_tiers_v1")
+        ? "Hidden gear tiers skipped"
+        : "No hidden gear tiers",
+    report.denseCompareSort != null || report.irrelevantMonsterIds != null
+      ? "Compare state ready"
+      : compareFound
+        ? "Compare state skipped"
+        : "No compare state",
     report.priceSet ? "Prices ready" : pricesFound ? "Prices skipped" : "No prices",
     historyFound ? "Price history found" : "No price history",
     foundKeys.has("sim_planner_v1") ? "Planner data found" : "No planner data",
@@ -949,6 +967,16 @@ function legacyDispositionLabel(disposition: LegacyStorageKeyMigrationDispositio
 function legacyMigrationImportPlan(report: LegacySetupMigrationReport): string[] {
   const items: string[] = [];
   if (report.setup) items.push("Compatible setup fields into rewrite setup");
+  if (report.lootPrefs != null) {
+    items.push("Loot preferences into rewrite per-monster drop actions");
+  }
+  if (report.hiddenGearTiers != null) {
+    items.push("Hidden gear tiers into rewrite gear-menu preferences");
+  }
+  if (report.denseCompareSort != null) items.push("Compare sort into dense compare state");
+  if (report.irrelevantMonsterIds != null) {
+    items.push("Compare hidden monsters into dense compare state");
+  }
   if (report.hiscoresPlayer) items.push("Validated hiscores player into last-player storage");
   if (report.priceSet) items.push("Validated current price/alch maps as a PriceSet snapshot");
   return items;
@@ -960,6 +988,17 @@ function legacyMigrationReviewPlan(report: LegacySetupMigrationReport): string[]
     .map((item) => `${item.key}: ${legacyDispositionLabel(item.disposition)} - ${item.reason}`);
   const skippedItems = report.skippedFields.map((field) => `${field.field}: ${field.reason}`);
   return [...reviewItems, ...skippedItems];
+}
+
+function mergeLootPrefsState(current: LootPrefsState, imported: LootPrefsState): LootPrefsState {
+  const next: LootPrefsState = { ...current };
+  for (const [monsterId, prefs] of Object.entries(imported)) {
+    next[monsterId] = {
+      ...(next[monsterId] ?? {}),
+      ...prefs
+    };
+  }
+  return LootPrefsStateSchema.parse(next);
 }
 
 function legacyClearKeyList(report: LegacySetupMigrationReport): string {
@@ -2022,13 +2061,47 @@ export function App() {
   const importLegacySetup = () => {
     if (
       !legacyMigrationReport?.setup &&
+      legacyMigrationReport?.lootPrefs == null &&
+      !legacyMigrationReport?.hiddenGearTiers &&
+      !legacyMigrationReport?.denseCompareSort &&
+      !legacyMigrationReport?.irrelevantMonsterIds &&
       !legacyMigrationReport?.hiscoresPlayer &&
       !legacyMigrationReport?.priceSet
     ) {
       return;
     }
-    if (legacyMigrationReport.setup) {
-      const setup = savedSetupFromForm(legacyMigrationReport.setup, denseCompare, cannonByMonster);
+    const hasDenseCompareImport =
+      legacyMigrationReport.denseCompareSort != null ||
+      legacyMigrationReport.irrelevantMonsterIds != null;
+    let nextDenseCompare = denseCompare;
+    if (hasDenseCompareImport) {
+      nextDenseCompare = {
+        ...denseCompare,
+        ...(legacyMigrationReport.denseCompareSort
+          ? { sort: legacyMigrationReport.denseCompareSort }
+          : {}),
+        ...(legacyMigrationReport.irrelevantMonsterIds != null
+          ? { irrelevantMonsterIds: legacyMigrationReport.irrelevantMonsterIds }
+          : {})
+      };
+      if (context) {
+        nextDenseCompare = cleanDenseCompareStateForMonsterIds(
+          nextDenseCompare,
+          Object.keys(context.gameData.monsters)
+        );
+      }
+    }
+    if (legacyMigrationReport.setup || hasDenseCompareImport) {
+      const setup = legacyMigrationReport.setup
+        ? savedSetupFromForm(legacyMigrationReport.setup, nextDenseCompare, cannonByMonster)
+        : savedSetupFromForm(
+            form,
+            nextDenseCompare,
+            cannonByMonster,
+            customSetupsByMonster,
+            defaultForm,
+            setupMode
+          );
       savePersisted(setupStorageOptions, setup);
       setForm(normalizeFormState(setup.form));
       setDefaultForm(normalizeFormState(setup.defaultForm));
@@ -2036,6 +2109,15 @@ export function App() {
       setCustomSetupsByMonster(setup.customSetupsByMonster);
       setDenseCompare(setup.denseCompare);
       setCannonByMonster(setup.cannonByMonster);
+    }
+    if (legacyMigrationReport.lootPrefs != null) {
+      const nextLootPrefs = mergeLootPrefsState(lootPrefsForGameData, legacyMigrationReport.lootPrefs);
+      savePersisted(lootPrefsStorageOptions, nextLootPrefs);
+      setLootPrefsByMonster(nextLootPrefs);
+    }
+    if (legacyMigrationReport.hiddenGearTiers != null) {
+      savePersisted(hiddenGearTiersStorageOptions, legacyMigrationReport.hiddenGearTiers);
+      setHiddenGearTiers(legacyMigrationReport.hiddenGearTiers);
     }
     if (legacyMigrationReport.hiscoresPlayer) {
       saveLastHiscoresPlayer(storage, legacyMigrationReport.hiscoresPlayer);
@@ -2311,9 +2393,9 @@ export function App() {
   const specialAttackDisabled = form.combatStyle === "magic" || dbaSpecActive;
   const specialStatus =
     form.combatStyle === "magic"
-      ? "magic off"
+      ? "unsupported"
       : dbaSpecActive
-        ? "DBA"
+        ? "DBA boost"
         : (viewModel.combat.specialAttack?.weaponName ?? "off");
   const currentMonster = context.gameData.monsters[form.monsterId];
   const highAlchEnabled = currentLootSettings.highAlch ?? form.trip.alching;
@@ -2416,14 +2498,16 @@ export function App() {
       : `Manual ${formatNumber(form.trip.bankSeconds)}s`;
   const recoverAmmoApplies = form.combatStyle === "ranged";
   const recoverAmmoSummary = recoverAmmoApplies ? yesNo(form.trip.recoverAmmo) : "Ranged only";
-  const dbaRestoreSummary = dbaSpecActive
-    ? yesNo(form.trip.dbaRestore)
-    : "Requires DBA special";
+  const dbaRestoreSummary = dbaSpecActive ? yesNo(form.trip.dbaRestore) : "-";
   const runeSlotsApplies = form.combatStyle === "magic";
   const runeSlotsSummary = runeSlotsApplies ? formatNumber(form.trip.runeSlots) : "Magic only";
   const foodCountMode = form.trip.foodCount == null ? "auto" : "manual";
   const foodCountValue =
     form.trip.foodCount ?? Math.max(0, Math.round(viewModel.trip.trip.slots.autoFoodCount));
+  const foodCountSummary =
+    form.trip.foodCount == null
+      ? `Auto ${formatNumber(viewModel.trip.trip.slots.autoFoodCount)}`
+      : `Manual ${formatNumber(form.trip.foodCount)}`;
   const foodPerKillOverrideMode = form.trip.foodPerKillOverride == null ? "off" : "on";
   const foodPerKillOverrideValue =
     form.trip.foodPerKillOverride ?? Number(viewModel.trip.trip.foodPerKill.toFixed(2));
@@ -2465,9 +2549,13 @@ export function App() {
         : "Off";
   const prayerRestoreSummary =
     form.trip.prayerMode === "potions"
-      ? optionLabel(PRAYER_RESTORE_MODE_OPTIONS, prayerRestoreMode)
+      ? form.trip.prayerPotionDoses != null
+        ? `Manual ${formatNumber(form.trip.prayerPotionDoses)} doses`
+        : form.trip.prayerPotionSets != null
+          ? `Manual ${formatNumber(form.trip.prayerPotionSets)} vials`
+          : `Auto ${formatNumber(viewModel.trip.trip.prayerSlots)} vials`
       : form.trip.prayerMode === "altar"
-        ? optionLabel(ALTAR_TIME_MODE_OPTIONS, altarTimeMode)
+        ? `${optionLabel(ALTAR_TIME_MODE_OPTIONS, altarTimeMode)} altar`
         : "No restore";
   const prayerCarriedSummary =
     form.trip.prayerMode !== "potions" || !viewModel.trip.trip.prayerActive
@@ -2518,20 +2606,28 @@ export function App() {
     ? `${formatNumber(form.trip.potionDoses)} doses/type`
     : `${formatNumber(form.trip.potionSets)} vials/type`;
   const potionRecommendation = viewModel.trip.potionRecommendation;
-  const potionRecommendationStatus = !potionRecommendation.active
-    ? "Inactive"
-    : potionRecommendation.matched
+  const potionRecommendationStatus =
+    potionRecommendation.status === "matched"
       ? "Matches recommendation"
-      : "Apply recommendation";
+      : potionRecommendation.status === "under"
+        ? "Below recommendation"
+        : potionRecommendation.status === "over"
+          ? "Above recommendation"
+          : potionRecommendation.status === "no-boost"
+            ? "No combat boost selected"
+            : potionRecommendation.status === "manual"
+              ? "Manual carry"
+              : "Inactive";
+  const potionRecommendationClass = potionRecommendation.canApply
+    ? "needs-apply"
+    : potionRecommendation.matched
+      ? "matched"
+      : "inactive";
   const potionRecommendationCarry = !potionRecommendation.active
     ? "-"
     : form.trip.singleDose
-      ? `${formatNumber(potionRecommendation.recommendedDoses)} dose${
-          potionRecommendation.recommendedDoses === 1 ? "" : "s"
-        }/type`
-      : `${formatNumber(potionRecommendation.recommendedVials)} vial${
-          potionRecommendation.recommendedVials === 1 ? "" : "s"
-        }/type`;
+      ? `${formatNumber(potionRecommendation.recommendedDoses)} doses/type`
+      : `${formatNumber(potionRecommendation.recommendedVials)} vials/type`;
   const potionRecommendationTrip =
     potionRecommendation.tripMinutes == null
       ? "-"
@@ -2541,7 +2637,7 @@ export function App() {
       ? "-"
       : `${formatNumber(potionRecommendation.repotIntervalMinutes, 1)}m`;
   const applyPotionRecommendation = () => {
-    if (!potionRecommendation.active || potionRecommendation.matched) return;
+    if (!potionRecommendation.canApply) return;
     setFormSafe((current) =>
       updateForm(current, {
         trip: {
@@ -2664,6 +2760,10 @@ export function App() {
   const legacyClearKeys = legacyMigrationReport ? legacyClearKeyList(legacyMigrationReport) : "";
   const legacyImportReady =
     legacyMigrationReport?.setup != null ||
+    legacyMigrationReport?.lootPrefs != null ||
+    legacyMigrationReport?.hiddenGearTiers != null ||
+    legacyMigrationReport?.denseCompareSort != null ||
+    legacyMigrationReport?.irrelevantMonsterIds != null ||
     legacyMigrationReport?.hiscoresPlayer != null ||
     legacyMigrationReport?.priceSet != null;
   const legacyMigrationStatus = legacyMigrationReport
@@ -3604,9 +3704,15 @@ export function App() {
                     />
                   )}
                   {form.combatStyle === "magic" && (
-                    <p className="inline-status neutral">Magic DPS specs unavailable</p>
+                    <p className="inline-status neutral">
+                      Magic special attacks are not modeled yet.
+                    </p>
                   )}
-                  {dbaSpecActive && <p className="inline-status neutral">DBA uses spec energy</p>}
+                  {dbaSpecActive && (
+                    <p className="inline-status neutral">
+                      DBA boost uses spec energy as a boost; DPS-special selection is paused.
+                    </p>
+                  )}
                   {viewModel.combat.specialAttack && (
                     <div className="special-output" aria-label="Special attack metrics">
                       {metricList([
@@ -3636,6 +3742,15 @@ export function App() {
                           tone: viewModel.combat.specialAttack.dpsGainPct >= 0 ? "teal" : "gold"
                         }
                       ])}
+                      {viewModel.specialWarnings.length > 0 && (
+                        <div className="calculation-warning-slot">
+                          <CalculationWarningSummary
+                            warnings={viewModel.specialWarnings}
+                            label="Special attack warnings"
+                            title="Special note"
+                          />
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -4098,13 +4213,7 @@ export function App() {
                     }
                   />
                   <div
-                    className={`potion-recommendation ${
-                      !potionRecommendation.active
-                        ? "inactive"
-                        : potionRecommendation.matched
-                          ? "matched"
-                          : "needs-apply"
-                    }`}
+                    className={`potion-recommendation ${potionRecommendationClass}`}
                     aria-label="Potion recommendation"
                     aria-live="polite"
                   >
@@ -4135,7 +4244,7 @@ export function App() {
                     <button
                       type="button"
                       className="potion-recommendation-apply"
-                      disabled={!potionRecommendation.active || potionRecommendation.matched}
+                      disabled={!potionRecommendation.canApply}
                       onClick={applyPotionRecommendation}
                     >
                       Apply recommendation
@@ -4170,21 +4279,22 @@ export function App() {
                     />
                     <span>Recover ammo</span>
                   </label>
-                  <label className="toggle">
-                    <input
-                      type="checkbox"
-                      checked={dbaSpecActive && form.trip.dbaRestore}
-                      disabled={!dbaSpecActive}
-                      onChange={(event) =>
-                        setFormSafe((current) =>
-                          updateForm(current, {
-                            trip: { ...current.trip, dbaRestore: event.target.checked }
-                          })
-                        )
-                      }
-                    />
-                    <span>DBA restore</span>
-                  </label>
+                  {dbaSpecActive && (
+                    <label className="toggle">
+                      <input
+                        type="checkbox"
+                        checked={form.trip.dbaRestore}
+                        onChange={(event) =>
+                          setFormSafe((current) =>
+                            updateForm(current, {
+                              trip: { ...current.trip, dbaRestore: event.target.checked }
+                            })
+                          )
+                        }
+                      />
+                      <span>DBA restore</span>
+                    </label>
+                  )}
                   <NumberField
                     label="Rune slots"
                     value={form.trip.runeSlots}
@@ -4471,7 +4581,7 @@ export function App() {
                       tripMetricGroup("Survival", [
                         { label: "Safespot", value: safespotSummary },
                         {
-                          label: "Protect",
+                          label: "Protection prayer",
                           value: optionLabel(PROTECT_OPTIONS, form.trip.protect)
                         },
                         { label: "Prayer block", value: yesNo(incoming.protected) },
@@ -4486,7 +4596,7 @@ export function App() {
                           label: "Prayer mode",
                           value: optionLabel(PRAYER_MODE_OPTIONS, form.trip.prayerMode)
                         },
-                        { label: "Restore", value: prayerRestoreSummary },
+                        { label: "Prayer restore", value: prayerRestoreSummary },
                         { label: "Prayer carried", value: prayerCarriedSummary },
                         {
                           label: "Prayer/kill",
@@ -4523,10 +4633,10 @@ export function App() {
                         { label: "Food", value: foodSummary },
                         {
                           label: "Food count",
-                          value: formatNumber(viewModel.trip.trip.slots.foodCount)
+                          value: foodCountSummary
                         },
                         {
-                          label: "Auto food",
+                          label: "Auto estimate",
                           value: formatNumber(viewModel.trip.trip.slots.autoFoodCount)
                         },
                         {
@@ -4541,7 +4651,9 @@ export function App() {
                       tripMetricGroup("Inventory reserve", [
                         { label: "Teleport", value: form.trip.teleport ? "1 slot" : "Off" },
                         { label: "Ammo recovery", value: recoverAmmoSummary },
-                        { label: "DBA restore", value: dbaRestoreSummary },
+                        ...(dbaSpecActive
+                          ? [{ label: "DBA restore", value: dbaRestoreSummary }]
+                          : []),
                         { label: "Rune slots", value: runeSlotsSummary },
                         {
                           label: "Reserve slots",
@@ -4560,7 +4672,7 @@ export function App() {
                           value: formatNumber(viewModel.trip.trip.slots.freeAtStart)
                         }
                       ]),
-                      tripMetricGroup("Potion slots", [
+                      tripMetricGroup("Potions", [
                         { label: "Potion carry", value: potionCarrySummary },
                         {
                           label: "Potion slots",

@@ -9,6 +9,7 @@ import {
 } from "./helpers/legacy-sim";
 import { computeCombatXpBreakdown, simulateCombat } from "../domain/combat";
 import {
+  HIGH_ALCH_MAGIC_XP_PER_CAST,
   simulateTripLootSupply,
   type CannonSettings,
   type TripLootSupplyInput,
@@ -138,6 +139,69 @@ function buildTripInput(
   };
 }
 
+function modeledXpRows(
+  xp: ReturnType<typeof computeCombatXpBreakdown>,
+  trip: ReturnType<typeof simulateTripLootSupply>
+): Map<string, number> {
+  const rows = new Map<string, number>();
+  for (const [key, xpPerKill] of Object.entries(xp.skillXpPerKill)) {
+    const xpPerHour = (xpPerKill ?? 0) * trip.effectiveKph;
+    if (xpPerHour > 0) rows.set(key, xpPerHour);
+  }
+  if (trip.cannon) {
+    const cannonXpPerHour = trip.cannon.rangedXpPerHour * trip.trip.efficiency;
+    if (cannonXpPerHour > 0) rows.set("rngcannon", cannonXpPerHour);
+  }
+  const prayerXpPerHour = trip.prayerXpPerKill * trip.effectiveKph;
+  if (prayerXpPerHour > 0) rows.set("prayer", prayerXpPerHour);
+
+  const alchXpPerHour =
+    trip.alchCastsPerKill * HIGH_ALCH_MAGIC_XP_PER_CAST * trip.effectiveKph;
+  if (alchXpPerHour > 0) rows.set("alch", alchXpPerHour);
+
+  return rows;
+}
+
+function expectedXpRows(fixture: Record<string, unknown>): Map<string, number> {
+  return new Map(
+    (
+      fixture.skillXpBreakdown as Array<{
+        key: string;
+        xpPerHour: number;
+      }>
+    ).map((row) => [row.key, row.xpPerHour])
+  );
+}
+
+function expectModeledXpRowParity(caseId: string, rowKey: string): void {
+  const runtime = createLegacyRuntime();
+  const context = domainContextFromLegacy(runtime);
+  const definition = definitionsById.get(caseId);
+  const fixture = fixturesById.get(caseId);
+  expect(definition, `Missing case definition for ${caseId}`).toBeDefined();
+  expect(fixture, `Missing golden fixture for ${caseId}`).toBeDefined();
+  if (!definition || !fixture) throw new Error(`Missing test data for ${caseId}`);
+
+  const tripInput = buildTripInput(runtime, definition, context);
+  const trip = simulateTripLootSupply(tripInput, context);
+  const xp = computeCombatXpBreakdown(
+    tripInput.request,
+    context,
+    tripInput.combat,
+    trip.cannon ? { directDamageFraction: trip.combatXpDamageFraction } : undefined
+  );
+  const actualRows = modeledXpRows(xp, trip);
+  const expectedRows = expectedXpRows(fixture.expected);
+
+  expect(expectedRows.has(rowKey), `${caseId} should have a legacy ${rowKey} row`).toBe(true);
+  expect(actualRows.has(rowKey), `${caseId} should have a rewrite ${rowKey} row`).toBe(true);
+  expectClose(actualRows.get(rowKey) ?? NaN, expectedRows.get(rowKey));
+  expectClose(
+    Array.from(actualRows.values()).reduce((sum, value) => sum + value, 0),
+    fixture.expected.totalXpPerHour
+  );
+}
+
 describe("XP parity with legacy golden fixtures", () => {
   const parityCases = fixtures.cases.filter(
     (testCase) => !acceptedXpIntentionalDeltas.has(testCase.id)
@@ -169,33 +233,16 @@ describe("XP parity with legacy golden fixtures", () => {
       expectClose(xp.combatXpPerKill * trip.killsPerHour, testCase.expected.xpPerHour);
       expectClose(xp.combatXpPerKill * trip.effectiveKph, testCase.expected.effectiveXpPerHour);
 
-      const expectedRows = testCase.expected.skillXpBreakdown as Array<{
-        key: string;
-        xpPerHour: number;
-      }>;
-      const actualRows = new Map(
-        Object.entries(xp.skillXpPerKill).map(([key, xpPerKill]) => [
-          key,
-          stableNumber((xpPerKill ?? 0) * trip.effectiveKph)
-        ])
-      );
-      if (trip.cannon) {
-        actualRows.set(
-          "rngcannon",
-          stableNumber(trip.cannon.rangedXpPerHour * trip.trip.efficiency)
-        );
-      }
-      const comparableRows = expectedRows.filter((row) => actualRows.has(row.key));
+      const expectedRows = expectedXpRows(testCase.expected);
+      const actualRows = modeledXpRows(xp, trip);
 
-      expect(comparableRows.length).toBeGreaterThan(0);
-      for (const row of comparableRows) {
-        expectClose(actualRows.get(row.key) ?? NaN, row.xpPerHour);
+      expect([...actualRows.keys()].sort()).toEqual([...expectedRows.keys()].sort());
+      for (const [key, xpPerHour] of expectedRows) {
+        expectClose(actualRows.get(key) ?? NaN, xpPerHour);
       }
 
-      if (comparableRows.length === expectedRows.length) {
-        const actualTotal = Array.from(actualRows.values()).reduce((sum, value) => sum + value, 0);
-        expectClose(actualTotal, testCase.expected.totalXpPerHour);
-      }
+      const actualTotal = Array.from(actualRows.values()).reduce((sum, value) => sum + value, 0);
+      expectClose(actualTotal, testCase.expected.totalXpPerHour);
     });
   }
 });
@@ -237,6 +284,16 @@ describe("cannon XP parity", () => {
       playerRowsTotal + cannonXpPerHour + prayerXpPerHour,
       fixture.expected.totalXpPerHour
     );
+  });
+});
+
+describe("loot XP ownership parity", () => {
+  it("models Prayer XP from bury loot rows as a total-XP source", () => {
+    expectModeledXpRowParity("melee_rune_scimitar_hill_giant_super_prayers", "prayer");
+  });
+
+  it("models Magic alch XP from in-trip alch casts as a total-XP source", () => {
+    expectModeledXpRowParity("melee_chaos_dwarf_alch_rune_drop", "alch");
   });
 });
 

@@ -9,6 +9,7 @@ import {
   type SimulationContext,
   type SimulationRequest,
   type SimulationResult,
+  type SimulationWarning,
   type SpecialAttackResult
 } from "../shared";
 
@@ -17,6 +18,12 @@ const MIN_ATTACK_SPEED_SEC = TICK_SECONDS;
 const MAX_ATTACK_SPEED_SEC = 12;
 const MIN_MANUAL_BONUS = -250;
 const MAX_MANUAL_BONUS = 350;
+const DRAGON_HALBERD_NPC_SIZE_WARNING: SimulationWarning = {
+  code: "dragon-halberd-npc-size-fallback",
+  severity: "info",
+  message:
+    "NPC size data is not modeled; dragon halberd second-hit behavior follows the current legacy fixture assumption."
+};
 
 export type PotionStatKey = "att" | "str" | "def" | "rng" | "mag";
 type StatKey = PotionStatKey;
@@ -925,6 +932,8 @@ export function simulateCombat(
     dps,
     dbaSelected
   );
+  const warnings =
+    specialAttack?.key === "dragon_halberd" ? [DRAGON_HALBERD_NPC_SIZE_WARNING] : [];
   const effectiveDps = specialAttack?.dpsWithSpec ?? dps;
   const weapon = context.gameData.weapons[request.loadout.weaponId];
   const poisonSeverity = weapon?.poisonSeverity ?? 0;
@@ -962,7 +971,7 @@ export function simulateCombat(
           }
         : null,
     dbaInfo,
-    warnings: [],
+    warnings,
     debug: {
       effectiveAccuracy,
       effectiveDamage,

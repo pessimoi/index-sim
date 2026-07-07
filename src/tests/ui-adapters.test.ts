@@ -994,6 +994,67 @@ describe("versioned rewrite persistence", () => {
     });
   });
 
+  it("drops persisted special attacks that are unsupported for magic or DBA boost state", () => {
+    const parsed = SavedSetupEnvelopeSchema.parse({
+      version: REWRITE_SETUP_VERSION,
+      savedAt: "2026-07-05T12:00:00.000Z",
+      data: {
+        form: {
+          ...DEFAULT_FORM_STATE,
+          combatStyle: "magic",
+          weaponId: "staff_of_fire",
+          styleId: "accurate",
+          boosts: ["magic"],
+          specialAttack: {
+            weaponId: "dragon_dagger_p",
+            ammoId: "none"
+          },
+          perStyleLoadouts: {
+            ...DEFAULT_FORM_STATE.perStyleLoadouts,
+            melee: {
+              ...DEFAULT_FORM_STATE.perStyleLoadouts.melee,
+              boosts: ["dba_spec", "super_att"],
+              specialAttack: { weaponId: "dragon_dagger_p", ammoId: "none" }
+            },
+            magic: {
+              ...DEFAULT_FORM_STATE.perStyleLoadouts.magic,
+              specialAttack: { weaponId: "dragon_dagger_p", ammoId: "none" }
+            }
+          }
+        },
+        defaultForm: {
+          ...DEFAULT_FORM_STATE,
+          boosts: ["dba_spec", "super_att"],
+          specialAttack: { weaponId: "dragon_dagger_p", ammoId: "none" }
+        },
+        customSetupsByMonster: {
+          giant: {
+            ...DEFAULT_FORM_STATE,
+            monsterId: "giant",
+            boosts: ["dba_spec", "super_att"],
+            specialAttack: { weaponId: "dragon_dagger_p", ammoId: "none" }
+          }
+        },
+        cannonByMonster: {}
+      }
+    });
+
+    expect(parsed.data.form.specialAttack).toEqual({ weaponId: "none", ammoId: "none" });
+    expect(parsed.data.form.perStyleLoadouts.melee.specialAttack).toEqual({
+      weaponId: "none",
+      ammoId: "none"
+    });
+    expect(parsed.data.form.perStyleLoadouts.magic.specialAttack).toEqual({
+      weaponId: "none",
+      ammoId: "none"
+    });
+    expect(parsed.data.defaultForm.specialAttack).toEqual({ weaponId: "none", ammoId: "none" });
+    expect(parsed.data.customSetupsByMonster.giant?.specialAttack).toEqual({
+      weaponId: "none",
+      ammoId: "none"
+    });
+  });
+
   it("rejects invalid persisted per-style loadout data without loading data", () => {
     const storage = createMemoryStorage({
       [REWRITE_SETUP_STORAGE_KEY]: JSON.stringify({

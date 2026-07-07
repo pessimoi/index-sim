@@ -286,6 +286,8 @@ export const SpecialAttackFormSchema = z
   .catch(DEFAULT_SPECIAL_ATTACK_STATE)
   .default(DEFAULT_SPECIAL_ATTACK_STATE);
 
+type SpecialAttackFormState = z.infer<typeof SpecialAttackFormSchema>;
+
 const DEFAULT_GEAR = {
   helm: "rune_full_helm",
   amulet: "amu_power",
@@ -341,6 +343,44 @@ function cloneLoadout(loadout: CombatStyleLoadout): CombatStyleLoadout {
   });
 }
 
+function dbaSpecActive(combatStyle: CombatStyle, boosts: readonly string[]): boolean {
+  return combatStyle === "melee" && boosts.includes("dba_spec");
+}
+
+function normalizeSpecialAttackForStyle(
+  combatStyle: CombatStyle,
+  boosts: readonly string[],
+  specialAttack: SpecialAttackSelection
+): SpecialAttackFormState {
+  if (
+    dbaSpecActive(combatStyle, boosts) ||
+    !isSupportedSpecialAttackWeapon(specialAttack.weaponId, combatStyle)
+  ) {
+    return DEFAULT_SPECIAL_ATTACK_STATE;
+  }
+  return SpecialAttackFormSchema.parse(specialAttack);
+}
+
+function normalizeLoadoutForStyle(
+  combatStyle: CombatStyle,
+  loadout: CombatStyleLoadout
+): CombatStyleLoadout {
+  const parsed = cloneLoadout(loadout);
+  return {
+    ...parsed,
+    specialAttack: normalizeSpecialAttackForStyle(combatStyle, parsed.boosts, parsed.specialAttack)
+  };
+}
+
+function normalizePerStyleLoadouts(loadouts: PerStyleLoadoutsState): PerStyleLoadoutsState {
+  const parsed = PerStyleLoadoutsSchema.parse(loadouts);
+  return PerStyleLoadoutsSchema.parse({
+    melee: normalizeLoadoutForStyle("melee", parsed.melee),
+    ranged: normalizeLoadoutForStyle("ranged", parsed.ranged),
+    magic: normalizeLoadoutForStyle("magic", parsed.magic)
+  });
+}
+
 export function createDefaultLoadoutForStyle(
   combatStyle: CombatStyle,
   source?: CombatStyleLoadout
@@ -386,7 +426,7 @@ export function createDefaultLoadoutForStyle(
             styleId: "accurate"
           };
 
-  return CombatStyleLoadoutSchema.parse({
+  return normalizeLoadoutForStyle(combatStyle, {
     ...base,
     ...patch,
     gear: {
@@ -618,7 +658,7 @@ export function formForMonsterSetup(
 }
 
 export function loadoutFromForm(form: CombatSetupFormState): CombatStyleLoadout {
-  return CombatStyleLoadoutSchema.parse({
+  return normalizeLoadoutForStyle(form.combatStyle, {
     weaponId: form.weaponId,
     ammoId: form.ammoId,
     spellId: form.spellId,
@@ -689,12 +729,11 @@ export function applyWeaponSelection(
       ...current.gear,
       shield: weapon.twoHand ? "none" : (current.gear.shield ?? "none")
     },
-    specialAttack: isSupportedSpecialAttackWeapon(
-      current.specialAttack.weaponId,
-      current.combatStyle
+    specialAttack: normalizeSpecialAttackForStyle(
+      current.combatStyle,
+      current.boosts,
+      current.specialAttack
     )
-      ? current.specialAttack
-      : DEFAULT_SPECIAL_ATTACK_STATE
   });
 }
 
@@ -702,7 +741,7 @@ function syncActiveLoadout(form: CombatSetupFormState): CombatSetupFormState {
   const next = CombatSetupFormSchema.parse(form);
   return {
     ...next,
-    perStyleLoadouts: PerStyleLoadoutsSchema.parse({
+    perStyleLoadouts: normalizePerStyleLoadouts({
       ...next.perStyleLoadouts,
       [next.combatStyle]: loadoutFromForm(next)
     })
@@ -711,12 +750,12 @@ function syncActiveLoadout(form: CombatSetupFormState): CombatSetupFormState {
 
 export function normalizeFormState(form: CombatSetupFormState): CombatSetupFormState {
   let next = CombatSetupFormSchema.parse(form);
-  const specialAttack = isSupportedSpecialAttackWeapon(
-    next.specialAttack.weaponId,
-    next.combatStyle
-  )
-    ? next.specialAttack
-    : DEFAULT_SPECIAL_ATTACK_STATE;
+  next = { ...next, perStyleLoadouts: normalizePerStyleLoadouts(next.perStyleLoadouts) };
+  const specialAttack = normalizeSpecialAttackForStyle(
+    next.combatStyle,
+    next.boosts,
+    next.specialAttack
+  );
   if (next.combatStyle === "ranged" && next.ammoId === "none") {
     next = {
       ...next,
@@ -799,7 +838,11 @@ function specialAttackForRequest(
   gameData: GameDataSnapshot | undefined
 ): SpecialAttackSelection | undefined {
   const weaponId = form.specialAttack.weaponId;
-  if (weaponId === "none" || !isSupportedSpecialAttackWeapon(weaponId, form.combatStyle)) {
+  if (
+    weaponId === "none" ||
+    dbaSpecActive(form.combatStyle, form.boosts) ||
+    !isSupportedSpecialAttackWeapon(weaponId, form.combatStyle)
+  ) {
     return undefined;
   }
   if (gameData && !gameData.weapons[weaponId]) return undefined;

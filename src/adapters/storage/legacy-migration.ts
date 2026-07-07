@@ -2,11 +2,13 @@ import { weaponStances } from "@/domain/combat";
 import {
   EQUIPMENT_SLOTS,
   type CombatStyle,
+  type DropDefinition,
   type EntityId,
   type GameDataSnapshot,
+  type MonsterDefinition,
   type PriceSet
 } from "@/domain/shared";
-import { FOOD } from "@/domain/trip";
+import { FOOD, lootPreferenceKey, lootPreferenceKeysForMonster } from "@/domain/trip";
 import { HiscoresPlayerNameSchema, createPriceSetFromLegacyRecords } from "@/data/schemas";
 import {
   CombatSetupFormSchema,
@@ -15,6 +17,22 @@ import {
   setCombatStyleDefaults,
   type CombatSetupFormState
 } from "@/app/state/ui-state";
+import {
+  DenseCompareSortStateSchema,
+  type DenseCompareSortKey,
+  type DenseCompareSortState
+} from "@/app/state/dense-compare";
+import {
+  GEAR_TIER_DEFS,
+  HiddenGearTiersStateSchema,
+  type GearTierId,
+  type HiddenGearTiersState
+} from "@/app/state/hidden-gear-tiers";
+import {
+  LootActionSchema,
+  LootPrefsStateSchema,
+  type LootPrefsState
+} from "@/app/state/loot-prefs";
 import type { KeyValueStorage } from "./index";
 
 export const LEGACY_INPUT_STORAGE_KEY = "sim_input_v3";
@@ -42,10 +60,7 @@ export const LEGACY_STORAGE_KEYS = [
 export type LegacyStorageKey = (typeof LEGACY_STORAGE_KEYS)[number];
 
 export type LegacyStorageKeyMigrationDisposition =
-  | "migrate"
-  | "review-only"
-  | "intentional-reset"
-  | "legacy-only";
+  "migrate" | "review-only" | "intentional-reset" | "legacy-only";
 
 export interface LegacyStorageKeyPolicy {
   key: LegacyStorageKey;
@@ -74,6 +89,10 @@ export interface LegacySetupMigrationReport {
   setup: CombatSetupFormState | null;
   hiscoresPlayer: string | null;
   priceSet: PriceSet | null;
+  lootPrefs: LootPrefsState | null;
+  hiddenGearTiers: HiddenGearTiersState | null;
+  denseCompareSort: DenseCompareSortState | null;
+  irrelevantMonsterIds: string[] | null;
 }
 
 export interface LegacySetupMigrationOptions {
@@ -83,12 +102,18 @@ export interface LegacySetupMigrationOptions {
   maxPriceBytes?: number;
   maxHiscoresBytes?: number;
   maxPlannerBytes?: number;
+  maxLootPrefsBytes?: number;
+  maxUiStateBytes?: number;
 }
 
 const DEFAULT_MAX_LEGACY_INPUT_BYTES = 250_000;
 const DEFAULT_MAX_LEGACY_PRICE_BYTES = 1_000_000;
 const DEFAULT_MAX_LEGACY_HISCORES_BYTES = 200;
 const DEFAULT_MAX_LEGACY_PLANNER_BYTES = 250_000;
+const DEFAULT_MAX_LEGACY_LOOT_PREFS_BYTES = 100_000;
+const DEFAULT_MAX_LEGACY_UI_STATE_BYTES = 50_000;
+const MAX_LEGACY_LOOT_PREF_KEYS = 500;
+const MAX_LEGACY_IRRELEVANT_MONSTER_IDS = 500;
 const COMBAT_STYLES = ["melee", "ranged", "magic"] as const satisfies readonly CombatStyle[];
 const PROTECT_PRAYERS = ["none", "melee", "missiles", "magic"] as const;
 const PRAYER_MODES = ["potions", "altar", "none"] as const;
@@ -101,6 +126,10 @@ const LEGACY_PRICE_HISTORY_KEYS = [
 ] as const satisfies readonly LegacyStorageKey[];
 const IMPORT_SUPPORTED_LEGACY_KEYS = new Set<LegacyStorageKey>([
   LEGACY_INPUT_STORAGE_KEY,
+  "sim_loot_prefs_v1",
+  "sim_hidden_tiers_v1",
+  "sim_compare_sort_v1",
+  "sim_irrelevant_v1",
   "sim_hiscore_player",
   "sim_prices_v1",
   "sim_alch_v1",
@@ -128,30 +157,32 @@ export const LEGACY_STORAGE_KEY_POLICIES = [
   {
     key: "sim_loot_prefs_v1",
     label: "Loot preferences",
-    disposition: "review-only",
-    handling: "Detected only; legacy loot preference row ids are not imported.",
-    reason: "Rewrite loot prefs exist, but legacy row-id compatibility is not accepted."
+    disposition: "migrate",
+    handling:
+      "Compatible legacy drop-name preferences can be imported into unambiguous rewrite loot row ids.",
+    reason:
+      "Legacy stored a flat drop-name map; the rewrite imports only names that resolve to current validated monster row ids."
   },
   {
     key: "sim_hidden_tiers_v1",
     label: "Hidden gear tiers",
-    disposition: "review-only",
-    handling: "Detected only; hidden-tier state is not imported.",
-    reason: "Hidden-tier controls and migration policy are outside the current rewrite slice."
+    disposition: "migrate",
+    handling: "Compatible tier flags can be imported into rewrite gear-menu preferences.",
+    reason: "The rewrite has the same tier ids and versioned hidden-tier preference storage."
   },
   {
     key: "sim_compare_sort_v1",
     label: "Compare sort",
-    disposition: "review-only",
-    handling: "Detected only; legacy compare sort is not imported.",
-    reason: "Rewrite dense compare owns separate versioned sort state."
+    disposition: "migrate",
+    handling: "Compatible sort keys can be imported into rewrite dense compare state.",
+    reason: "The rewrite owns a bounded dense-compare sort schema with accepted key mapping."
   },
   {
     key: "sim_irrelevant_v1",
     label: "Compare relevance",
-    disposition: "review-only",
-    handling: "Detected only; legacy irrelevant/relevance state is not imported.",
-    reason: "Rewrite relevance state exists, but legacy relevance migration policy is not accepted."
+    disposition: "migrate",
+    handling: "Known irrelevant monster ids can be imported into rewrite dense compare state.",
+    reason: "The rewrite validates the id list against bundled monster data before accepting it."
   },
   {
     key: "sim_loot_comp_open",
@@ -235,6 +266,29 @@ export const LEGACY_STORAGE_KEY_POLICIES = [
 type MutableFormState = CombatSetupFormState;
 type LegacyRecord = Record<string, unknown>;
 type TripField = keyof CombatSetupFormState["trip"];
+type LegacyJsonField = LegacyStorageKey | string;
+interface LootPreferenceCandidate {
+  monsterId: EntityId;
+  rowId: string;
+  ambiguous: boolean;
+}
+
+const HIDDEN_GEAR_TIER_IDS = new Set<GearTierId>(GEAR_TIER_DEFS.map((tier) => tier.id));
+const LEGACY_COMPARE_SORT_KEY_MAP: Partial<Record<string, DenseCompareSortKey>> = {
+  name: "monsterName",
+  monsterName: "monsterName",
+  hitChance: "hitChance",
+  maxHit: "maxHit",
+  dps: "dps",
+  ttkSec: "ttkSec",
+  killsPerHour: "killsPerHour",
+  effectiveXpPerHour: "xpPerHour",
+  xpPerHour: "xpPerHour",
+  gpPerKill: "gpPerKill",
+  gpPerHour: "gpPerHour",
+  effectiveNetGpPerHour: "netGpPerHour",
+  netGpPerHour: "netGpPerHour"
+};
 
 export function detectLegacyStorageKeys(storage: KeyValueStorage): LegacyStorageKey[] {
   return LEGACY_STORAGE_KEYS.filter((key) => storage.getItem(key) !== null);
@@ -277,6 +331,26 @@ export function inspectLegacySetupMigration(
     options.storage,
     report,
     options.maxHiscoresBytes ?? DEFAULT_MAX_LEGACY_HISCORES_BYTES
+  );
+  inspectLegacyLootPrefs(
+    options,
+    report,
+    options.maxLootPrefsBytes ?? DEFAULT_MAX_LEGACY_LOOT_PREFS_BYTES
+  );
+  inspectLegacyHiddenGearTiers(
+    options.storage,
+    report,
+    options.maxUiStateBytes ?? DEFAULT_MAX_LEGACY_UI_STATE_BYTES
+  );
+  inspectLegacyCompareSort(
+    options.storage,
+    report,
+    options.maxUiStateBytes ?? DEFAULT_MAX_LEGACY_UI_STATE_BYTES
+  );
+  inspectLegacyIrrelevantMonsters(
+    options,
+    report,
+    options.maxUiStateBytes ?? DEFAULT_MAX_LEGACY_UI_STATE_BYTES
   );
   inspectLegacyPlannerBoundary(
     options.storage,
@@ -358,6 +432,261 @@ function inspectLegacyHiscoresPlayer(
 
   report.hiscoresPlayer = parsed.data;
   importField(report, "hiscores.player");
+}
+
+function inspectLegacyLootPrefs(
+  options: LegacySetupMigrationOptions,
+  report: LegacySetupMigrationReport,
+  maxBytes = DEFAULT_MAX_LEGACY_LOOT_PREFS_BYTES
+): void {
+  const rawValue = options.storage.getItem("sim_loot_prefs_v1");
+  if (rawValue == null) return;
+
+  const parsed = parseLegacyJsonStorageValue(
+    rawValue,
+    "sim_loot_prefs_v1",
+    maxBytes,
+    report,
+    "Legacy loot preferences"
+  );
+  if (!parsed.ok) return;
+  if (!isRecord(parsed.value)) {
+    skip(report, "lootPrefs", "expected an object");
+    warn(report, "Legacy loot preferences were ignored because the value is not an object.");
+    return;
+  }
+
+  const entries = Object.entries(parsed.value);
+  if (entries.length > MAX_LEGACY_LOOT_PREF_KEYS) {
+    skip(report, "lootPrefs", "legacy loot preference map exceeds safe key limit");
+    warn(report, "Legacy loot preferences were ignored because they contain too many keys.");
+    return;
+  }
+
+  const candidatesByName = createLootPreferenceCandidatesByName(options.gameData);
+  const nextPrefs: LootPrefsState = {};
+  let importedRows = 0;
+
+  for (const [rawDropName, rawAction] of entries) {
+    const dropName = rawDropName.trim();
+    const fieldName = dropName ? `lootPrefs.${dropName}` : "lootPrefs";
+    if (!dropName || dropName.length > 180) {
+      skip(report, "lootPrefs", "expected a non-empty drop name up to 180 characters");
+      continue;
+    }
+
+    const action = LootActionSchema.safeParse(rawAction);
+    if (!action.success) {
+      skip(report, fieldName, "unknown loot action");
+      continue;
+    }
+
+    const candidates = candidatesByName.get(dropName);
+    if (!candidates || candidates.length === 0) {
+      skip(report, fieldName, "unknown loot preference row name");
+      continue;
+    }
+
+    let importedForName = 0;
+    for (const candidate of candidates) {
+      if (candidate.ambiguous) {
+        skip(
+          report,
+          `lootPrefs.${candidate.monsterId}.${dropName}`,
+          "ambiguous legacy drop name for monster"
+        );
+        continue;
+      }
+      nextPrefs[candidate.monsterId] = {
+        ...(nextPrefs[candidate.monsterId] ?? {}),
+        [candidate.rowId]: action.data
+      };
+      importedRows += 1;
+      importedForName += 1;
+    }
+    if (importedForName === 0) {
+      warn(report, `Legacy loot preference '${dropName}' did not resolve to an importable row.`);
+    }
+  }
+
+  if (importedRows === 0) {
+    if (entries.length > 0) {
+      warn(report, "Legacy loot preferences did not contain any safely importable rows.");
+    }
+    return;
+  }
+
+  const validated = LootPrefsStateSchema.safeParse(nextPrefs);
+  if (!validated.success) {
+    skip(report, "lootPrefs", "legacy loot preferences failed rewrite validation");
+    warn(report, "Legacy loot preferences were ignored because they failed rewrite validation.");
+    return;
+  }
+
+  report.lootPrefs = validated.data;
+  importField(report, "lootPrefs");
+}
+
+function inspectLegacyHiddenGearTiers(
+  storage: KeyValueStorage,
+  report: LegacySetupMigrationReport,
+  maxBytes = DEFAULT_MAX_LEGACY_UI_STATE_BYTES
+): void {
+  const rawValue = storage.getItem("sim_hidden_tiers_v1");
+  if (rawValue == null) return;
+
+  const parsed = parseLegacyJsonStorageValue(
+    rawValue,
+    "sim_hidden_tiers_v1",
+    maxBytes,
+    report,
+    "Legacy hidden gear tiers"
+  );
+  if (!parsed.ok) return;
+  if (!isRecord(parsed.value)) {
+    skip(report, "hiddenGearTiers", "expected an object");
+    warn(report, "Legacy hidden gear tiers were ignored because the value is not an object.");
+    return;
+  }
+
+  const flags: Partial<Record<GearTierId, boolean>> = {};
+  let knownFlagCount = 0;
+  for (const [tierId, value] of Object.entries(parsed.value)) {
+    if (!HIDDEN_GEAR_TIER_IDS.has(tierId as GearTierId)) {
+      skip(report, `hiddenGearTiers.${tierId}`, "unknown hidden tier id");
+      continue;
+    }
+    if (typeof value !== "boolean") {
+      skip(report, `hiddenGearTiers.${tierId}`, "expected a boolean");
+      continue;
+    }
+    flags[tierId as GearTierId] = value;
+    knownFlagCount += 1;
+  }
+
+  if (knownFlagCount === 0) {
+    warn(report, "Legacy hidden gear tiers did not contain any known tier flags.");
+    return;
+  }
+
+  const validated = HiddenGearTiersStateSchema.safeParse(flags);
+  if (!validated.success) {
+    skip(report, "hiddenGearTiers", "legacy hidden tiers failed rewrite validation");
+    warn(report, "Legacy hidden gear tiers were ignored because they failed rewrite validation.");
+    return;
+  }
+
+  report.hiddenGearTiers = validated.data;
+  importField(report, "hiddenGearTiers");
+}
+
+function inspectLegacyCompareSort(
+  storage: KeyValueStorage,
+  report: LegacySetupMigrationReport,
+  maxBytes = DEFAULT_MAX_LEGACY_UI_STATE_BYTES
+): void {
+  const rawValue = storage.getItem("sim_compare_sort_v1");
+  if (rawValue == null) return;
+
+  const parsed = parseLegacyJsonStorageValue(
+    rawValue,
+    "sim_compare_sort_v1",
+    maxBytes,
+    report,
+    "Legacy compare sort"
+  );
+  if (!parsed.ok) return;
+  if (!isRecord(parsed.value)) {
+    skip(report, "compare.sort", "expected an object");
+    warn(report, "Legacy compare sort was ignored because the value is not an object.");
+    return;
+  }
+
+  const legacyKey = readString(parsed.value, ["key"]);
+  const mappedKey = legacyKey ? LEGACY_COMPARE_SORT_KEY_MAP[legacyKey] : null;
+  if (!legacyKey || !mappedKey) {
+    skip(report, "compare.sort", "unknown compare sort key");
+    warn(report, "Legacy compare sort was ignored because its sort key is not supported.");
+    return;
+  }
+
+  const direction = legacyCompareSortDirection(legacyKey, parsed.value);
+  if (!direction) {
+    skip(report, "compare.sort", "unknown compare sort direction");
+    warn(report, "Legacy compare sort was ignored because its direction is not supported.");
+    return;
+  }
+
+  const validated = DenseCompareSortStateSchema.safeParse({ key: mappedKey, direction });
+  if (!validated.success) {
+    skip(report, "compare.sort", "legacy compare sort failed rewrite validation");
+    warn(report, "Legacy compare sort was ignored because it failed rewrite validation.");
+    return;
+  }
+
+  report.denseCompareSort = validated.data;
+  importField(report, "compare.sort");
+}
+
+function inspectLegacyIrrelevantMonsters(
+  options: LegacySetupMigrationOptions,
+  report: LegacySetupMigrationReport,
+  maxBytes = DEFAULT_MAX_LEGACY_UI_STATE_BYTES
+): void {
+  const rawValue = options.storage.getItem("sim_irrelevant_v1");
+  if (rawValue == null) return;
+
+  const parsed = parseLegacyJsonStorageValue(
+    rawValue,
+    "sim_irrelevant_v1",
+    maxBytes,
+    report,
+    "Legacy compare relevance"
+  );
+  if (!parsed.ok) return;
+  if (!Array.isArray(parsed.value)) {
+    skip(report, "compare.irrelevantMonsterIds", "expected an array");
+    warn(report, "Legacy compare relevance was ignored because the value is not an array.");
+    return;
+  }
+  if (parsed.value.length > MAX_LEGACY_IRRELEVANT_MONSTER_IDS) {
+    skip(
+      report,
+      "compare.irrelevantMonsterIds",
+      "legacy irrelevant monster list exceeds safe size limit"
+    );
+    warn(report, "Legacy compare relevance was ignored because it has too many monster ids.");
+    return;
+  }
+
+  const validMonsterIds = new Set(Object.keys(options.gameData.monsters));
+  const nextIds: string[] = [];
+  const seen = new Set<string>();
+  let acceptedInputCount = 0;
+  for (const value of parsed.value) {
+    if (typeof value !== "string" || !value.trim()) {
+      skip(report, "compare.irrelevantMonsterIds", "expected monster id strings");
+      continue;
+    }
+    const monsterId = value.trim();
+    if (!validMonsterIds.has(monsterId)) {
+      skip(report, `compare.irrelevantMonsterIds.${monsterId}`, "unknown monster id");
+      continue;
+    }
+    acceptedInputCount += 1;
+    if (!seen.has(monsterId)) {
+      seen.add(monsterId);
+      nextIds.push(monsterId);
+    }
+  }
+
+  if (parsed.value.length > 0 && acceptedInputCount === 0) {
+    warn(report, "Legacy compare relevance did not contain any known monster ids.");
+    return;
+  }
+
+  report.irrelevantMonsterIds = nextIds;
+  importField(report, "compare.irrelevantMonsterIds");
 }
 
 function inspectLegacyPlannerBoundary(
@@ -461,7 +790,9 @@ function inspectLegacyPriceHistory(
   storage: KeyValueStorage,
   report: LegacySetupMigrationReport
 ): void {
-  const hasLegacyPriceHistory = LEGACY_PRICE_HISTORY_KEYS.some((key) => storage.getItem(key) != null);
+  const hasLegacyPriceHistory = LEGACY_PRICE_HISTORY_KEYS.some(
+    (key) => storage.getItem(key) != null
+  );
   if (!hasLegacyPriceHistory) return;
   skip(report, "prices.history", "legacy price history migration is not supported in this flow");
   warn(report, "Legacy price history was detected but not imported.");
@@ -476,7 +807,11 @@ function createReport(foundKeys: LegacyStorageKey[]): LegacySetupMigrationReport
     warnings: [],
     setup: null,
     hiscoresPlayer: null,
-    priceSet: null
+    priceSet: null,
+    lootPrefs: null,
+    hiddenGearTiers: null,
+    denseCompareSort: null,
+    irrelevantMonsterIds: null
   };
 }
 
@@ -546,7 +881,8 @@ function mapMonster(
   gameData: GameDataSnapshot,
   report: LegacySetupMigrationReport
 ): void {
-  const monsterId = readString(legacy, ["_monsterId", "monsterId"]) ?? readEntityObjectId(legacy.monster);
+  const monsterId =
+    readString(legacy, ["_monsterId", "monsterId"]) ?? readEntityObjectId(legacy.monster);
   if (monsterId == null) return;
   if (gameData.monsters[monsterId]) {
     draft.monsterId = monsterId;
@@ -866,23 +1202,39 @@ function byteLength(text: string): number {
 
 function parseLegacyJsonStorageValue(
   rawValue: string,
-  key: LegacyStorageKey,
+  field: LegacyJsonField,
   maxBytes: number,
-  report: LegacySetupMigrationReport
+  report: LegacySetupMigrationReport,
+  subject = "Legacy price data"
 ): { ok: true; value: unknown } | { ok: false } {
   if (byteLength(rawValue) > maxBytes) {
-    skip(report, key, "legacy value exceeds safe size limit");
-    warn(report, "Legacy price data was ignored because it exceeds the safe size limit.");
+    skip(report, field, "legacy value exceeds safe size limit");
+    warn(report, `${subject} was ignored because it exceeds the safe size limit.`);
     return { ok: false };
   }
 
   try {
     return { ok: true, value: JSON.parse(rawValue) };
   } catch {
-    skip(report, key, "invalid JSON");
-    warn(report, "Legacy price data could not be parsed as JSON.");
+    skip(report, field, "invalid JSON");
+    warn(report, `${subject} could not be parsed as JSON.`);
     return { ok: false };
   }
+}
+
+function legacyCompareSortDirection(
+  legacyKey: string,
+  legacySort: LegacyRecord
+): DenseCompareSortState["direction"] | null {
+  const direction = readString(legacySort, ["direction"]);
+  if (direction === "asc" || direction === "desc") return direction;
+
+  const legacyDir = readNumber(legacySort, ["dir"]);
+  if (legacyDir == null || legacyDir === 0) return null;
+  if (legacyKey === "name" || legacyKey === "monsterName") {
+    return legacyDir < 0 ? "asc" : "desc";
+  }
+  return legacyDir < 0 ? "desc" : "asc";
 }
 
 function createdAtFromLegacyScrapedAt(
@@ -917,6 +1269,41 @@ function unknownPriceKeys(priceSet: PriceSet, gameData: GameDataSnapshot): strin
   return [...keys]
     .filter((key) => !itemIds.has(key))
     .sort((left, right) => left.localeCompare(right));
+}
+
+function createLootPreferenceCandidatesByName(
+  gameData: GameDataSnapshot
+): Map<string, LootPreferenceCandidate[]> {
+  const candidates = new Map<string, LootPreferenceCandidate[]>();
+  for (const monster of Object.values(gameData.monsters)) {
+    const drops = flattenMonsterLoot(monster);
+    const rowIds = lootPreferenceKeysForMonster(monster);
+    const nameCounts = new Map<string, number>();
+    for (const drop of drops) {
+      nameCounts.set(drop.name, (nameCounts.get(drop.name) ?? 0) + 1);
+    }
+
+    for (const [index, drop] of drops.entries()) {
+      const rowId = rowIds[index] ?? lootPreferenceKey(drop, index);
+      const list = candidates.get(drop.name) ?? [];
+      list.push({
+        monsterId: monster.id,
+        rowId,
+        ambiguous: (nameCounts.get(drop.name) ?? 0) > 1
+      });
+      candidates.set(drop.name, list);
+    }
+  }
+  return candidates;
+}
+
+function flattenMonsterLoot(monster: MonsterDefinition): DropDefinition[] {
+  const drops: DropDefinition[] = [];
+  for (const entry of monster.loot ?? []) {
+    if (Array.isArray(entry)) drops.push(...entry);
+    else drops.push(entry);
+  }
+  return drops;
 }
 
 function isOneOf<const Values extends readonly string[]>(

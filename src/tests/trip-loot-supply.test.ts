@@ -434,17 +434,40 @@ describe("trip/loot/supply unit rules", () => {
       cycleSec: tripResult.cycleSec,
       killsPerTrip: tripResult.trip.killsPerTrip
     });
+    const over = recommendPotionCarry({
+      request: input.request,
+      trip: {
+        ...input.trip,
+        singleDose: false,
+        potionSets: mismatch.recommendedVials + 1
+      },
+      cycleSec: tripResult.cycleSec,
+      killsPerTrip: tripResult.trip.killsPerTrip
+    });
 
     expect(tripResult.potionRecommendation.active).toBe(true);
     expect(mismatch).toMatchObject({
       active: true,
+      status: "under",
+      canApply: true,
       recommendedVials: 1,
       recommendedDoses: 1,
       matched: false
     });
     expect(mismatch.tripMinutes).toBeGreaterThan(0);
     expect(mismatch.repotIntervalMinutes).toBeGreaterThan(0);
-    expect(matched.matched).toBe(true);
+    expect(matched).toMatchObject({
+      active: true,
+      status: "matched",
+      canApply: false,
+      matched: true
+    });
+    expect(over).toMatchObject({
+      active: true,
+      status: "over",
+      canApply: true,
+      matched: false
+    });
   });
 
   it("recommends single-dose carry and scales above one vial for long trips", () => {
@@ -473,13 +496,15 @@ describe("trip/loot/supply unit rules", () => {
     });
 
     expect(longTrip.active).toBe(true);
+    expect(longTrip.status).toBe("under");
+    expect(longTrip.canApply).toBe(true);
     expect(longTrip.recommendedDoses).toBeGreaterThan(4);
     expect(longTrip.recommendedVials).toBeGreaterThan(1);
     expect(longTrip.matched).toBe(false);
-    expect(matched.matched).toBe(true);
+    expect(matched).toMatchObject({ status: "matched", canApply: false, matched: true });
   });
 
-  it("falls back safely without general boosts or finite trip length", () => {
+  it("reports inactive recommendation states for sustained-off, no boosts and manual trips", () => {
     const runtime = createLegacyRuntime();
     const context = domainContextFromLegacy(runtime);
     const definition = definitionsById.get("ranged_magic_shortbow_rock_crab_safespot");
@@ -487,6 +512,12 @@ describe("trip/loot/supply unit rules", () => {
     if (!definition) throw new Error("Missing no-boost fixture definition");
 
     const input = buildTripInput(runtime, definition, context);
+    const sustainedOff = recommendPotionCarry({
+      request: { ...input.request, boosts: { keys: ["ranging"] }, sustained: false },
+      trip: input.trip ?? {},
+      cycleSec: 60,
+      killsPerTrip: 10
+    });
     const noBoost = recommendPotionCarry({
       request: { ...input.request, sustained: true, repotThreshold: null },
       trip: input.trip ?? {},
@@ -505,14 +536,29 @@ describe("trip/loot/supply unit rules", () => {
       killsPerTrip: Infinity
     });
 
-    expect(noBoost).toMatchObject({
+    expect(sustainedOff).toMatchObject({
       active: false,
+      status: "inactive",
+      canApply: false,
       recommendedVials: 0,
       recommendedDoses: 0,
       matched: false
     });
-    expect(noBoost.reason).toContain("No general combat potion boost");
-    expect(unsafeTrip.active).toBe(false);
+    expect(sustainedOff.reason).toContain("Sustained is off");
+    expect(noBoost).toMatchObject({
+      active: false,
+      status: "no-boost",
+      canApply: false,
+      recommendedVials: 0,
+      recommendedDoses: 0,
+      matched: false
+    });
+    expect(noBoost.reason).toContain("general combat boost");
+    expect(unsafeTrip).toMatchObject({
+      active: false,
+      status: "manual",
+      canApply: false
+    });
     expect(unsafeTrip.warnings.join(" ")).toContain("finite");
   });
 

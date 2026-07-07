@@ -194,9 +194,10 @@ test("shows Stats XP routing trip summary and hit distribution", async ({ page }
   );
   await expect(xpRouting).toContainText("Hitpoints");
   await expect(xpRouting).toContainText("Prayer XP/hr");
-  await expect(xpRouting).toContainText("partial");
   await expect(xpRouting).toContainText("Magic (alch) XP/hr");
-  await expect(xpRouting).toContainText("not modeled");
+  await expect(xpRouting).toContainText("No in-trip high-alch casts");
+  await expect(xpRouting).not.toContainText("partial");
+  await expect(xpRouting).not.toContainText("not modeled");
   await expect(xpRouting).not.toContainText("Cannon ranged XP/hr");
 
   const tripBanking = analysis.getByRole("region", {
@@ -210,7 +211,7 @@ test("shows Stats XP routing trip summary and hit distribution", async ({ page }
   await expect(tripTable).toContainText("Bank time");
   await expect(tripTable).toContainText("Current trip bound");
   await expect(tripTable).toContainText("Safespot");
-  await expect(tripTable).toContainText("Protection");
+  await expect(tripTable).toContainText("Protection prayer");
 
   const panel = analysis.getByRole("region", { name: "Hit distribution", exact: true });
   await expect(panel.getByRole("heading", { name: "Hit distribution" })).toBeVisible();
@@ -528,6 +529,31 @@ test("reviews and imports compatible legacy setup data", async ({ page }) => {
     window.localStorage.setItem("sim_alch_v1", JSON.stringify({ lobster: 90, big_bones: 0 }));
     window.localStorage.setItem("sim_scraped_at_v1", "1700000000");
     window.localStorage.setItem("sim_scraped_keys_v1", JSON.stringify(["lobster", "big_bones"]));
+    window.localStorage.setItem(
+      "sim_loot_prefs_v1",
+      JSON.stringify({ "Big bones": "bury", "Not a real drop": "skip" })
+    );
+    window.localStorage.setItem(
+      "index-sim:loot-prefs",
+      JSON.stringify({
+        version: 1,
+        savedAt: "2026-07-06T12:00:00.000Z",
+        data: {
+          giant: {
+            key_iron_full_helm_1: "skip"
+          }
+        }
+      })
+    );
+    window.localStorage.setItem(
+      "sim_hidden_tiers_v1",
+      JSON.stringify({ bronze: true, red_dhide: true, not_a_tier: true })
+    );
+    window.localStorage.setItem("sim_compare_sort_v1", JSON.stringify({ key: "name", dir: -1 }));
+    window.localStorage.setItem(
+      "sim_irrelevant_v1",
+      JSON.stringify(["rock_crab", "not_a_monster"])
+    );
     window.localStorage.setItem("sim_price_history_v1", "[]");
     window.localStorage.setItem("sim_hiscore_player", "Fixture Player");
   });
@@ -538,12 +564,31 @@ test("reviews and imports compatible legacy setup data", async ({ page }) => {
   await expect(migration).toBeVisible();
   await expect(migration.getByLabel("Legacy data summary")).toContainText("Legacy setup ready");
   await expect(migration.getByLabel("Legacy data summary")).toContainText("Hiscores player ready");
+  await expect(migration.getByLabel("Legacy data summary")).toContainText(
+    "Loot preferences ready"
+  );
+  await expect(migration.getByLabel("Legacy data summary")).toContainText(
+    "Hidden gear tiers ready"
+  );
+  await expect(migration.getByLabel("Legacy data summary")).toContainText("Compare state ready");
   await expect(migration.getByLabel("Legacy data summary")).toContainText("Planner data found");
   await expect(migration.getByLabel("Legacy data summary")).toContainText("Prices ready");
   await expect(migration.getByLabel("Legacy data summary")).toContainText("Price history found");
   await expect(migration.getByLabel("Legacy data summary")).toContainText("Review needed");
   await expect(migration.getByLabel("Legacy import and review plan")).toContainText(
     "Compatible setup fields"
+  );
+  await expect(migration.getByLabel("Legacy import and review plan")).toContainText(
+    "Loot preferences into rewrite per-monster drop actions"
+  );
+  await expect(migration.getByLabel("Legacy import and review plan")).toContainText(
+    "Hidden gear tiers into rewrite gear-menu preferences"
+  );
+  await expect(migration.getByLabel("Legacy import and review plan")).toContainText(
+    "Compare sort into dense compare state"
+  );
+  await expect(migration.getByLabel("Legacy import and review plan")).toContainText(
+    "Compare hidden monsters into dense compare state"
   );
   await expect(migration.getByLabel("Legacy import and review plan")).toContainText(
     "sim_planner_v1: review only"
@@ -556,10 +601,23 @@ test("reviews and imports compatible legacy setup data", async ({ page }) => {
   );
   const keyReview = migration.getByRole("table", { name: "Legacy storage key review" });
   await expect(keyReview.getByRole("row", { name: /sim_input_v3.*migrate/ })).toBeVisible();
+  await expect(keyReview.getByRole("row", { name: /sim_loot_prefs_v1.*migrate/ })).toBeVisible();
+  await expect(keyReview.getByRole("row", { name: /sim_hidden_tiers_v1.*migrate/ })).toBeVisible();
+  await expect(keyReview.getByRole("row", { name: /sim_compare_sort_v1.*migrate/ })).toBeVisible();
+  await expect(keyReview.getByRole("row", { name: /sim_irrelevant_v1.*migrate/ })).toBeVisible();
   await expect(keyReview.getByRole("row", { name: /sim_planner_v1.*review only/ })).toBeVisible();
   await expect(
     keyReview.getByRole("row", { name: /sim_scraped_keys_v1.*intentional reset/ })
   ).toBeVisible();
+  await expect(migration.getByLabel("Legacy import and review plan")).toContainText(
+    "hiddenGearTiers.not_a_tier: unknown hidden tier id"
+  );
+  await expect(migration.getByLabel("Legacy import and review plan")).toContainText(
+    "lootPrefs.Not a real drop: unknown loot preference row name"
+  );
+  await expect(migration.getByLabel("Legacy import and review plan")).toContainText(
+    "compare.irrelevantMonsterIds.not_a_monster: unknown monster id"
+  );
 
   await migration.getByRole("button", { name: "Import compatible data" }).click();
   await expect(migration).toHaveCount(0);
@@ -570,8 +628,28 @@ test("reviews and imports compatible legacy setup data", async ({ page }) => {
     return (
       saved.includes('"combatStyle":"ranged"') &&
       saved.includes('"monsterId":"greater_demon"') &&
+      saved.includes('"denseCompare"') &&
+      saved.includes('"key":"monsterName"') &&
+      saved.includes('"direction":"asc"') &&
+      saved.includes('"irrelevantMonsterIds":["rock_crab"]') &&
+      (window.localStorage.getItem("index-sim:hidden-gear-tiers") ?? "").includes(
+        '"bronze":true'
+      ) &&
+      (window.localStorage.getItem("index-sim:hidden-gear-tiers") ?? "").includes(
+        '"red_dhide":true'
+      ) &&
+      (window.localStorage.getItem("index-sim:loot-prefs") ?? "").includes(
+        '"key_big_bones_0":"bury"'
+      ) &&
+      (window.localStorage.getItem("index-sim:loot-prefs") ?? "").includes(
+        '"key_iron_full_helm_1":"skip"'
+      ) &&
       window.localStorage.getItem("sim_input_v3") !== null &&
       window.localStorage.getItem("sim_planner_v1") !== null &&
+      window.localStorage.getItem("sim_loot_prefs_v1") !== null &&
+      window.localStorage.getItem("sim_hidden_tiers_v1") !== null &&
+      window.localStorage.getItem("sim_compare_sort_v1") !== null &&
+      window.localStorage.getItem("sim_irrelevant_v1") !== null &&
       window.localStorage.getItem("sim_prices_v1") !== null &&
       window.localStorage.getItem("sim_alch_v1") !== null &&
       window.localStorage.getItem("sim_scraped_at_v1") !== null &&
@@ -1047,10 +1125,19 @@ test("selects special attacks and shows special metrics", async ({ page }) => {
   const special = page.locator('section[aria-label="Special attack"]');
 
   await expect(special).toBeVisible();
+  await special.getByLabel("Spec weapon").selectOption("dragon_halberd");
+  await expect(page.locator('[aria-label="Special attack metrics"]')).toContainText("Spec max hit");
+  await expect(page.locator('[aria-label="Special attack metrics"]')).toContainText(
+    "NPC size data is not modeled"
+  );
+
   await special.getByLabel("Spec weapon").selectOption("dragon_dagger_p");
 
   await expect(page.locator('[aria-label="Special attack metrics"]')).toContainText("Spec max hit");
   await expect(page.locator('[aria-label="Special attack metrics"]')).toContainText("DPS gain");
+  await expect(page.locator('[aria-label="Special attack metrics"]')).not.toContainText(
+    "NPC size data is not modeled"
+  );
   await page.waitForFunction(() => {
     const saved = window.localStorage.getItem("index-sim:rewrite-setup") ?? "";
     return saved.includes('"weaponId":"dragon_dagger_p"');
@@ -1068,7 +1155,25 @@ test("selects special attacks and shows special metrics", async ({ page }) => {
 
   await page.getByLabel("TYPE", { exact: true }).selectOption("magic");
   await expect(special.getByLabel("Spec weapon")).toBeDisabled();
-  await expect(special).toContainText("Magic DPS specs unavailable");
+  await expect(special.getByLabel("Spec weapon")).toHaveValue("none");
+  await expect(special).toContainText("unsupported");
+  await expect(special).toContainText("Magic special attacks are not modeled yet.");
+  await expect(page.locator('[aria-label="Special attack metrics"]')).toHaveCount(0);
+
+  await page.getByLabel("TYPE", { exact: true }).selectOption("melee");
+  await page.getByLabel("Boost", { exact: true }).selectOption("dba_spec");
+  await expect(special.getByLabel("Spec weapon")).toBeDisabled();
+  await expect(special.getByLabel("Spec weapon")).toHaveValue("none");
+  await expect(special).toContainText("DBA boost");
+  await expect(special).toContainText("DBA boost uses spec energy as a boost");
+  await expect(page.locator('[aria-label="Special attack metrics"]')).toHaveCount(0);
+
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Trip" }).click();
+  const trip = page.locator('section[aria-label="Trip assumptions"]');
+  await expect(trip.getByLabel("DBA restore")).toBeVisible();
+  await expect(page.locator('[aria-label="Inventory reserve trip summary"]')).toContainText(
+    "DBA restore"
+  );
 });
 
 test("sorts the full monster table and selects a target row", async ({ page }) => {
@@ -1626,6 +1731,7 @@ test("updates trip survival controls and keeps the trip summary visible", async 
 
   await expect(summary).toContainText("Off");
   await expect(summary).toContainText("Melee");
+  await expect(summary).toContainText("Protection prayer");
   await expect(summary).toContainText("Antifire");
   await expect(summary).toContainText("Antipoison");
   await expect(summary).toContainText("Scarce status");
@@ -1688,7 +1794,8 @@ test("updates manual food controls and recoil ring count", async ({ page }) => {
   await trip.getByLabel("Recoil rings").fill("6");
 
   await expect(summary).toContainText("Food count");
-  await expect(summary).toContainText("Auto food");
+  await expect(summary).toContainText("Manual 4");
+  await expect(summary).toContainText("Auto estimate");
   await expect(summary).toContainText("Food left");
   await expect(summary).toContainText("Recoil/kill");
   await expect(summary).toContainText("Recoil gp/kill");
@@ -1725,8 +1832,13 @@ test("updates trip food, banking and inventory reserve controls across styles", 
   await expect(trip.getByLabel("Bank time")).toHaveValue("auto");
   await expect(trip.getByLabel("Bank sec")).toBeDisabled();
   await expect(trip.getByLabel("Recover ammo")).toBeDisabled();
-  await expect(trip.getByLabel("DBA restore")).toBeDisabled();
+  await expect(trip.getByLabel("DBA restore")).toBeHidden();
   await expect(trip.getByLabel("Rune slots")).toBeDisabled();
+  await expect(summary).toContainText("Auto 90s");
+  await expect(summary).toContainText("Food count");
+  await expect(summary).toContainText(/Auto [0-9]+/);
+  await expect(summary).toContainText("Loot capacity");
+  await expect(summary).toContainText("Effective K/hr");
 
   await trip.getByLabel("Food", { exact: true }).selectOption("swordfish");
   await trip.getByLabel("Bank time").selectOption("manual");
@@ -1804,6 +1916,7 @@ test("updates trip potion carry controls and grouped potion summary", async ({ p
   const trip = page.locator('section[aria-label="Trip assumptions"]');
   const summary = page.locator('[aria-label="Trip summary"]');
   const recommendation = trip.getByLabel("Potion recommendation");
+  const applyRecommendation = recommendation.getByRole("button", { name: "Apply recommendation" });
 
   await expect(trip.getByLabel("Single-dose")).not.toBeChecked();
   await expect(trip.getByLabel("Potion vials")).toBeEnabled();
@@ -1811,13 +1924,18 @@ test("updates trip potion carry controls and grouped potion summary", async ({ p
   await expect(recommendation).toContainText("Potion recommendation");
   await expect(recommendation).toContainText("Recommended carry");
   await expect(recommendation).toContainText("Matches recommendation");
+  await expect(applyRecommendation).toBeDisabled();
   await trip.getByLabel("Potion vials").fill("0");
-  await expect(recommendation).toContainText("Apply recommendation");
-  await recommendation.getByRole("button", { name: "Apply recommendation" }).click();
+  await expect(recommendation).toContainText("Below recommendation");
+  await expect(applyRecommendation).toBeEnabled();
+  await applyRecommendation.click();
   await expect(trip.getByLabel("Potion vials")).toHaveValue("1");
   await expect(recommendation).toContainText("Matches recommendation");
+  await expect(applyRecommendation).toBeDisabled();
   await trip.getByLabel("Potion vials").fill("2");
+  await expect(recommendation).toContainText("Above recommendation");
 
+  await expect(summary).toContainText("Potions");
   await expect(summary).toContainText("Potion slots");
   await expect(summary).toContainText("Potion carry");
   await expect(summary).toContainText("2 vials/type");
@@ -1826,10 +1944,12 @@ test("updates trip potion carry controls and grouped potion summary", async ({ p
   await trip.getByLabel("Single-dose").check();
   await expect(trip.getByLabel("Potion vials")).toBeDisabled();
   await expect(trip.getByLabel("Potion doses")).toBeEnabled();
-  await expect(recommendation).toContainText("Apply recommendation");
-  await recommendation.getByRole("button", { name: "Apply recommendation" }).click();
+  await expect(recommendation).toContainText("Above recommendation");
+  await expect(applyRecommendation).toBeEnabled();
+  await applyRecommendation.click();
   await expect(trip.getByLabel("Potion doses")).toHaveValue("1");
   await expect(recommendation).toContainText("Matches recommendation");
+  await expect(applyRecommendation).toBeDisabled();
   await trip.getByLabel("Potion doses").fill("6");
   await expect(summary).toContainText("6 doses/type");
   await page.waitForFunction(() => {
@@ -1850,9 +1970,34 @@ test("updates trip potion carry controls and grouped potion summary", async ({ p
   await expect(reloadedTrip.getByLabel("Single-dose")).toBeChecked();
   await expect(reloadedTrip.getByLabel("Potion vials")).toBeDisabled();
   await expect(reloadedTrip.getByLabel("Potion doses")).toHaveValue("6");
-  await expect(page.locator('[aria-label="Potion slots trip summary"]')).toContainText(
+  await expect(page.locator('[aria-label="Potions trip summary"]')).toContainText(
     "6 doses/type"
   );
+});
+
+test("shows inactive trip potion recommendation states", async ({ page }) => {
+  await page.goto("/");
+  const tabs = page.getByLabel("Workbench tabs");
+  await tabs.getByRole("button", { name: "Melee" }).click();
+  await page.getByLabel("Boost", { exact: true }).selectOption("none");
+  await tabs.getByRole("button", { name: "Trip" }).click();
+
+  const trip = page.locator('section[aria-label="Trip assumptions"]');
+  const recommendation = trip.getByLabel("Potion recommendation");
+  const applyRecommendation = recommendation.getByRole("button", { name: "Apply recommendation" });
+
+  await expect(recommendation).toContainText("No combat boost selected");
+  await expect(recommendation).toContainText("Select a general combat boost");
+  await expect(applyRecommendation).toBeDisabled();
+
+  await tabs.getByRole("button", { name: "Melee" }).click();
+  await page.getByLabel("Boost", { exact: true }).selectOption("super_att");
+  await page.getByLabel("Sustained").uncheck();
+  await tabs.getByRole("button", { name: "Trip" }).click();
+
+  await expect(recommendation).toContainText("Inactive");
+  await expect(recommendation).toContainText("Sustained is off");
+  await expect(applyRecommendation).toBeDisabled();
 });
 
 test("updates prayer restore detail controls and keeps the trip summary visible", async ({
@@ -1865,12 +2010,14 @@ test("updates prayer restore detail controls and keeps the trip summary visible"
   const summary = page.locator('[aria-label="Trip summary"]');
 
   await expect(trip.getByLabel("Prayer mode")).toHaveValue("potions");
+  await expect(summary).toContainText("Prayer restore");
+  await expect(summary).toContainText(/Auto [0-9]+ vials/);
   await expect(summary).toContainText("Prayer/kill");
 
   await trip.getByLabel("Prayer restore").selectOption("manual_doses");
   await expect(trip.getByLabel("Prayer doses")).toBeEnabled();
   await trip.getByLabel("Prayer doses").fill("8");
-  await expect(summary).toContainText("Manual doses");
+  await expect(summary).toContainText("Manual 8 doses");
   await expect(summary).toContainText("Prayer slots");
   await expect(summary).toContainText("Max kills prayer");
   await page.waitForFunction(() => {
@@ -1881,7 +2028,7 @@ test("updates prayer restore detail controls and keeps the trip summary visible"
   await trip.getByLabel("Prayer restore").selectOption("manual_vials");
   await expect(trip.getByLabel("Prayer vials")).toBeEnabled();
   await trip.getByLabel("Prayer vials").fill("3");
-  await expect(summary).toContainText("Manual vials");
+  await expect(summary).toContainText("Manual 3 vials");
   await page.waitForFunction(() => {
     const saved = window.localStorage.getItem("index-sim:rewrite-setup") ?? "";
     return saved.includes('"prayerPotionSets":3') && saved.includes('"prayerPotionDoses":null');
@@ -2088,7 +2235,7 @@ test("matches browser-rendered numeric snapshots for loot action and trip overri
       "Prayer/kill": "29.21",
       "Prayer slots": "2",
       "Max kills prayer": "6.1",
-      "Food count": "4",
+      "Food count": "Manual 4",
       "Food/kill": "0.50",
       "Kills/trip": "6.1",
       "Effective K/hr": "45",
