@@ -161,6 +161,7 @@ test("loads the dense combat spreadsheet root", async ({ page }) => {
   await expect(page.getByLabel("Dense combat spreadsheet")).toBeVisible();
   await expect(page.getByLabel("Combat setup")).toBeVisible();
   await expect(page.getByLabel("Simulation results")).toBeVisible();
+  await expect(page.getByLabel("Active assumptions")).toBeVisible();
   await expect(page.getByLabel("Monster stats")).toBeVisible();
   await expect(activeMonsterDefence(page.getByLabel("Monster card"))).toContainText(
     "Slash defence"
@@ -169,15 +170,143 @@ test("loads the dense combat spreadsheet root", async ({ page }) => {
   await expect(page.getByText("All monsters")).toBeVisible();
   await expect(page.getByText("DPS").first()).toBeVisible();
   await expect(
-    page.getByText("Hiscores disabled: runtime or upstream not configured")
+    page.getByText("Live hiscores lookup is not configured in this run.")
   ).toBeVisible();
   await page.getByLabel("Workbench tabs").getByRole("button", { name: "Economy" }).click();
   await expect(
-    page.getByText("Market sync disabled: runtime or upstream not configured")
+    page.getByText("Live market sync is not configured in this run.")
   ).toBeVisible();
   await expect(page.getByText("run_sim.py")).toHaveCount(0);
   await expect(page.getByText("/api/prices")).toHaveCount(0);
   await expect(page.getByText("/api/scrape")).toHaveCount(0);
+});
+
+test("keeps hiscores disabled fallback focused on manual Player levels", async ({ page }) => {
+  let lookupRequested = false;
+  await page.route("**/api/hiscores/status", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        available: false,
+        source: { id: "disabled", label: "Hiscores provider disabled" },
+        limits: { requestsPerMinute: 30 }
+      })
+    });
+  });
+  await page.route("**/api/hiscores?*", async (route) => {
+    lookupRequested = true;
+    await route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({
+        error: { code: "upstream-unavailable", message: "Hiscores provider is unavailable" }
+      })
+    });
+  });
+
+  await page.goto("/");
+  const hiscores = page.getByLabel("Hiscores");
+  const playerLevels = page.getByLabel("Player levels");
+
+  await expect(hiscores.getByLabel("Player", { exact: true })).toBeVisible();
+  await expect(hiscores.getByLabel("Player", { exact: true })).toBeEnabled();
+  await expect(hiscores.getByRole("button", { name: "Lookup" })).toBeDisabled();
+  await expect(hiscores).toContainText("Live hiscores lookup is not configured in this run.");
+  await expect(hiscores).toContainText("Use the Player level fields above to edit levels manually.");
+
+  await playerLevels.getByLabel("ATT", { exact: true }).fill("66");
+  await playerLevels.getByLabel("STR", { exact: true }).fill("67");
+  await expect(playerLevels.getByLabel("ATT", { exact: true })).toHaveValue("66");
+  await expect(playerLevels.getByLabel("STR", { exact: true })).toHaveValue("67");
+  await expect(page.getByText("run_sim.py")).toHaveCount(0);
+  expect(lookupRequested).toBe(false);
+});
+
+test("keeps market disabled fallback focused on imported PriceSets", async ({ page }) => {
+  let syncRequested = false;
+  await page.route("**/api/market/status", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        available: false,
+        source: { id: "disabled", label: "Market provider disabled" },
+        cache: { enabled: false },
+        limits: { maxItemsPerRequest: 200, requestsPerSecond: 20 }
+      })
+    });
+  });
+  await page.route("**/api/market/sync", async (route) => {
+    syncRequested = true;
+    await route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({
+        error: { code: "upstream-unavailable", message: "Market provider is unavailable" }
+      })
+    });
+  });
+
+  await page.goto("/");
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Economy" }).click();
+  const market = page.locator('section[aria-label="Market sync"]');
+  const activePriceSetSummary = market.getByLabel("Market active PriceSet summary");
+
+  await expect(market.getByRole("button", { name: "Sync monster" })).toBeDisabled();
+  await expect(market.getByRole("button", { name: "Sync all" })).toBeDisabled();
+  await expect(market).toContainText("Live market sync is not configured in this run.");
+  await expect(market).toContainText(
+    "Simulations continue to use the active bundled or imported PriceSet."
+  );
+  await expect(activePriceSetSummary).toContainText(/Label .*bundled legacy prices/i);
+  await expect(activePriceSetSummary).toContainText("Source bundled");
+  await expect(activePriceSetSummary).toContainText(/Item prices [0-9,]+/);
+  await expect(activePriceSetSummary).toContainText(/Alch values [0-9,]+/);
+
+  const importedPriceSet = {
+    id: "manual-disabled-market",
+    label: "Disabled market imported prices",
+    source: "manual",
+    createdAt: "2026-07-07T12:00:00.000Z",
+    itemPrices: { big_bones: 910, lobster: 90 },
+    alchValues: { big_bones: 0, lobster: 0 }
+  };
+  await market
+    .locator("label.file-button")
+    .filter({ hasText: "Import PriceSet" })
+    .locator('input[type="file"]')
+    .setInputFiles({
+      name: "disabled-market-prices.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(JSON.stringify(importedPriceSet))
+    });
+
+  await expect(market.getByLabel("Price import notice")).toContainText("Imported price set");
+  await expect(activePriceSetSummary).toContainText("Label Disabled market imported prices");
+  await expect(activePriceSetSummary).toContainText("Source manual");
+  await expect(activePriceSetSummary).toContainText("Item prices 2");
+  await expect(activePriceSetSummary).toContainText("Alch values 2");
+  await expect(page.getByLabel("Price history summary")).toContainText("Snapshots 1");
+  await expect(market.getByRole("button", { name: "Sync monster" })).toBeDisabled();
+  await expect(market.getByRole("button", { name: "Sync all" })).toBeDisabled();
+
+  const persistedHistory = await page.evaluate(() =>
+    JSON.parse(window.localStorage.getItem("index-sim:price-history") ?? "null")
+  );
+  expect(persistedHistory).toMatchObject({
+    version: 1,
+    data: {
+      snapshots: [
+        {
+          sourcePriceSetId: "manual-disabled-market",
+          label: "Disabled market imported prices",
+          itemPrices: { big_bones: 910, lobster: 90 }
+        }
+      ]
+    }
+  });
+  expect(syncRequested).toBe(false);
 });
 
 test("shows Stats XP routing trip summary and hit distribution", async ({ page }) => {
@@ -186,6 +315,23 @@ test("shows Stats XP routing trip summary and hit distribution", async ({ page }
 
   const analysis = page.getByLabel("Stats analysis");
   await expect(analysis).toBeVisible();
+  await expect(page.getByLabel("Active assumptions")).toBeVisible();
+
+  const sourceBreakdown = analysis.getByRole("region", {
+    name: "Source breakdown",
+    exact: true
+  });
+  await expect(sourceBreakdown).toBeVisible();
+  await expect(sourceBreakdown.getByRole("list", { name: "Source breakdown rows" })).toBeVisible();
+  await expect(
+    sourceBreakdown.getByRole("listitem", { name: /Normal attack: modeled/i })
+  ).toContainText("DPS");
+  await expect(
+    sourceBreakdown.getByRole("listitem", { name: /Special attack: inactive/i })
+  ).toContainText("No supported melee/ranged DPS special selected");
+  await expect(sourceBreakdown.getByRole("listitem", { name: /Cannon: inactive/i })).toContainText(
+    "Cannon is off"
+  );
 
   const xpRouting = analysis.getByRole("region", { name: "XP routing", exact: true });
   await expect(xpRouting).toBeVisible();
@@ -235,11 +381,29 @@ test("shows Stats XP routing trip summary and hit distribution", async ({ page }
   await cannon.getByLabel("Mobs at spot").fill("6");
   await cannon.getByLabel("Respawn").fill("30");
   await page.getByLabel("Workbench tabs").getByRole("button", { name: "Stats" }).click();
+  const assumptions = page.getByLabel("Active assumptions");
+  await expect(assumptions).toContainText("Cannon");
+  await assumptions.getByRole("button", { name: "Review Cannon" }).click();
+  await expect(page.getByLabel("Workbench tabs").getByRole("button", { name: "Cannon" })).toHaveAttribute(
+    "aria-pressed",
+    "true"
+  );
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Stats" }).click();
   await expect(
     analysis
       .getByRole("list", { name: "XP routing chips" })
       .getByRole("listitem", { name: /Cannon ranged XP\/hr/i })
   ).toBeVisible();
+  await expect(sourceBreakdown.getByRole("listitem", { name: /Cannon: modeled/i })).toContainText(
+    "Cannon overlay"
+  );
+  await expect(sourceBreakdown.getByRole("listitem", { name: /Cannon: modeled/i })).toContainText(
+    "XP/hr"
+  );
+  await assumptions.getByRole("button", { name: "Reset current monster cannon" }).click();
+  await expect(assumptions).not.toContainText("Cannon");
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Cannon" }).click();
+  await expect(cannon.getByLabel("Set up cannon")).not.toBeChecked();
 });
 
 test("switches the target through MonsterCard and keeps shell state in sync", async ({ page }) => {
@@ -478,6 +642,23 @@ test("uses the Duel tab to snapshot rename load delete and persist setup compari
   await page.evaluate(() => window.localStorage.setItem("duel_unrelated_key", "keep"));
   await reloadedTable.getByRole("button", { name: "Delete" }).click();
   await expect(reloadedTable).toContainText("No snapshots");
+  const duelUndo = page.getByLabel("Local state undo");
+  await expect(duelUndo).toContainText("Deleted Duel snapshot: Melee saved");
+  await duelUndo.getByRole("button", { name: "Undo" }).click();
+  await expect(reloadedTable.getByLabel("Rename snapshot Melee saved")).toBeVisible();
+  await page.waitForFunction(() => {
+    const raw = window.localStorage.getItem("index-sim:duel-snapshots");
+    if (!raw) return false;
+    const saved = JSON.parse(raw);
+    return (
+      saved.version === 1 &&
+      saved.data?.snapshots?.[0]?.name === "Melee saved" &&
+      window.localStorage.getItem("duel_unrelated_key") === "keep"
+    );
+  });
+
+  await reloadedTable.getByRole("button", { name: "Delete" }).click();
+  await expect(reloadedTable).toContainText("No snapshots");
   await page.waitForFunction(() => {
     const raw = window.localStorage.getItem("index-sim:duel-snapshots");
     if (!raw) return false;
@@ -694,6 +875,8 @@ test("updates manual combat overrides and resets to derived values", async ({ pa
   await setup.getByLabel("ACC+").fill("120");
   await setup.getByLabel("DMG+").fill("95");
   await setup.getByLabel("SPD").fill("1.2");
+  const assumptions = page.getByLabel("Active assumptions");
+  await expect(assumptions).toContainText("Manual combat overrides");
 
   await page.waitForFunction(() => {
     const saved = window.localStorage.getItem("index-sim:rewrite-setup") ?? "";
@@ -705,13 +888,11 @@ test("updates manual combat overrides and resets to derived values", async ({ pa
     );
   });
 
+  await assumptions.getByRole("button", { name: "Reset manual combat overrides" }).click();
+  await expect(assumptions).not.toContainText("Manual combat overrides");
+
   await page.getByLabel("Workbench tabs").getByRole("button", { name: "Melee" }).click();
   const overrides = page.getByLabel("Manual combat overrides");
-  await expect(overrides.getByLabel("Accuracy bonus")).toHaveValue("120");
-  await expect(overrides.getByLabel("Damage bonus")).toHaveValue("95");
-  await expect(overrides.getByLabel("Attack speed sec")).toHaveValue("1.2");
-  await overrides.getByRole("button", { name: "Reset all overrides" }).click();
-
   await expect(overrides.getByLabel("Accuracy bonus")).toHaveValue("");
   await expect(overrides.getByLabel("Damage bonus")).toHaveValue("");
   await expect(overrides.getByLabel("Attack speed sec")).toHaveValue("");
@@ -835,6 +1016,144 @@ test("does not overwrite an existing rewrite setup before import action", async 
     const saved = window.localStorage.getItem("index-sim:rewrite-setup") ?? "";
     return saved.includes('"monsterId":"dagannoth"') && !saved.includes('"greater_demon"');
   });
+});
+
+test("keeps setup import failures non-fatal and retryable", async ({ page }) => {
+  await page.goto("/");
+  await page.getByLabel("TARGET", { exact: true }).selectOption("dagannoth");
+  await page.waitForFunction(() => {
+    const saved = window.localStorage.getItem("index-sim:rewrite-setup") ?? "";
+    return saved.includes('"monsterId":"dagannoth"');
+  });
+
+  const beforeMetrics = await resultMetricSnapshot(page);
+  const savedBefore = await page.evaluate(() =>
+    window.localStorage.getItem("index-sim:rewrite-setup")
+  );
+  const setupInput = page
+    .locator(".topbar")
+    .locator("label.file-button")
+    .filter({ hasText: "Import setup" })
+    .locator('input[type="file"]');
+
+  await setupInput.setInputFiles({
+    name: "broken-setup.json",
+    mimeType: "application/json",
+    buffer: Buffer.from("{not-json")
+  });
+
+  await expect(page.getByLabel("Workbench shell")).toBeVisible();
+  await expect(page.getByLabel("Setup import notice")).toContainText("not valid JSON");
+  await expect(page.getByLabel("TARGET", { exact: true })).toHaveValue("dagannoth");
+  expect(await resultMetricSnapshot(page)).toEqual(beforeMetrics);
+  expect(await page.evaluate(() => window.localStorage.getItem("index-sim:rewrite-setup"))).toBe(
+    savedBefore
+  );
+  await expect(setupInput).toHaveValue("");
+
+  await setupInput.setInputFiles({
+    name: "wrong-version-setup.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(
+      JSON.stringify({
+        version: 999,
+        savedAt: "2026-07-07T12:00:00.000Z",
+        data: {}
+      })
+    )
+  });
+
+  await expect(page.getByLabel("Workbench shell")).toBeVisible();
+  await expect(page.getByLabel("Setup import notice")).toContainText("version");
+  await expect(page.getByLabel("TARGET", { exact: true })).toHaveValue("dagannoth");
+  expect(await resultMetricSnapshot(page)).toEqual(beforeMetrics);
+  expect(await page.evaluate(() => window.localStorage.getItem("index-sim:rewrite-setup"))).toBe(
+    savedBefore
+  );
+});
+
+test("keeps PriceSet import failures non-fatal and recoverable", async ({ page }) => {
+  await page.goto("/");
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Settings" }).click();
+  const settings = page.locator('[aria-label="Price data settings"]');
+  const priceSetSummary = settings.locator('[aria-label="Active PriceSet summary"]');
+  const historySummary = page.locator('[aria-label="Price history summary"]');
+  const summaryText = async (locator: Locator) =>
+    (await locator.locator("span").allTextContents()).map((text) => text.trim()).join(" | ");
+
+  const priceSetBefore = await summaryText(priceSetSummary);
+  const historyBefore = await summaryText(historySummary);
+  const storedHistoryBefore = await page.evaluate(() =>
+    window.localStorage.getItem("index-sim:price-history")
+  );
+  const topbarPriceInput = page
+    .locator(".topbar")
+    .locator("label.file-button")
+    .filter({ hasText: "Import prices" })
+    .locator('input[type="file"]');
+
+  await topbarPriceInput.setInputFiles({
+    name: "bad-price-set.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(
+      JSON.stringify({
+        id: "bad-price-set",
+        label: "Bad price set",
+        source: "manual",
+        createdAt: "2026-07-07T12:00:00.000Z",
+        itemPrices: { lobster: -1, shark: "expensive" },
+        alchValues: { lobster: 0 }
+      })
+    )
+  });
+
+  await expect(page.getByLabel("Workbench shell")).toBeVisible();
+  await expect(page.locator(".topbar").getByLabel("Price import notice")).toContainText(
+    "Code validation_failed"
+  );
+  await expect(page.locator(".topbar").getByLabel("Price import notice")).toContainText(
+    "itemPrices.lobster"
+  );
+  await expect(page.locator(".topbar").getByLabel("Price import notice")).toContainText(
+    "Import was not applied"
+  );
+  await expect(page.locator(".topbar").getByLabel("Price import notice")).not.toContainText(
+    "SyntaxError"
+  );
+  await expect(page.locator(".topbar").getByLabel("Price import notice")).not.toContainText(
+    "expensive"
+  );
+  await expect(page.locator(".topbar").getByLabel("Price import notice")).not.toContainText(
+    process.cwd()
+  );
+  await expect(topbarPriceInput).toHaveValue("");
+  expect(await summaryText(priceSetSummary)).toBe(priceSetBefore);
+  expect(await summaryText(historySummary)).toBe(historyBefore);
+  expect(await page.evaluate(() => window.localStorage.getItem("index-sim:price-history"))).toBe(
+    storedHistoryBefore
+  );
+
+  const importedPriceSet = {
+    id: "manual-after-error",
+    label: "Imported after error prices",
+    source: "manual",
+    createdAt: "2026-07-07T12:00:00.000Z",
+    itemPrices: { big_bones: 900, lobster: 80 },
+    alchValues: { big_bones: 0, lobster: 0 }
+  };
+  await settings
+    .locator("label.file-button")
+    .filter({ hasText: "Import PriceSet" })
+    .locator('input[type="file"]')
+    .setInputFiles({
+      name: "manual-after-error-prices.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(JSON.stringify(importedPriceSet))
+    });
+
+  await expect(settings.getByLabel("Price import notice")).toContainText("Imported price set");
+  await expect(priceSetSummary).toContainText("Label Imported after error prices");
+  await expect(historySummary).toContainText("Snapshots 1");
 });
 
 test("updates results when the combat style changes", async ({ page }) => {
@@ -1107,6 +1426,29 @@ test("creates, restores and removes monster-specific custom setups", async ({ pa
   await expect(
     page.getByLabel("Equipment loadout").getByLabel("Weapon", { exact: true })
   ).toHaveValue("rune_scimitar");
+  const customSetupUndo = page.getByLabel("Local state undo");
+  await expect(customSetupUndo).toContainText("Removed custom setup for Hill Giant");
+  await customSetupUndo.getByRole("button", { name: "Undo" }).click();
+  await expect(setupContext).toContainText("Custom setup");
+  await expect(
+    page.getByLabel("Equipment loadout").getByLabel("Weapon", { exact: true })
+  ).toHaveValue("dragon_halberd");
+  await page.waitForFunction(() => {
+    const raw = window.localStorage.getItem("index-sim:rewrite-setup");
+    if (!raw) return false;
+    const saved = JSON.parse(raw);
+    return (
+      saved.data?.setupMode === "custom" &&
+      saved.data?.form?.monsterId === "giant" &&
+      saved.data?.customSetupsByMonster?.giant?.weaponId === "dragon_halberd"
+    );
+  });
+
+  await setupContext.getByRole("button", { name: "Remove custom setup" }).click();
+  await expect(setupContext).toContainText("Default setup");
+  await expect(
+    page.getByLabel("Equipment loadout").getByLabel("Weapon", { exact: true })
+  ).toHaveValue("rune_scimitar");
   await page.waitForFunction(() => {
     const raw = window.localStorage.getItem("index-sim:rewrite-setup");
     if (!raw) return false;
@@ -1142,6 +1484,13 @@ test("selects special attacks and shows special metrics", async ({ page }) => {
     const saved = window.localStorage.getItem("index-sim:rewrite-setup") ?? "";
     return saved.includes('"weaponId":"dragon_dagger_p"');
   });
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Stats" }).click();
+  await expect(
+    page
+      .getByRole("region", { name: "Source breakdown", exact: true })
+      .getByRole("listitem", { name: /Special attack: modeled/i })
+  ).toContainText("DPS gain");
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Melee" }).click();
 
   await page.getByLabel("TYPE", { exact: true }).selectOption("ranged");
   await special.getByLabel("Spec weapon").selectOption("magic_shortbow");
@@ -1159,6 +1508,13 @@ test("selects special attacks and shows special metrics", async ({ page }) => {
   await expect(special).toContainText("unsupported");
   await expect(special).toContainText("Magic special attacks are not modeled yet.");
   await expect(page.locator('[aria-label="Special attack metrics"]')).toHaveCount(0);
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Stats" }).click();
+  await expect(
+    page
+      .getByRole("region", { name: "Source breakdown", exact: true })
+      .getByRole("listitem", { name: /Special attack: not modeled/i })
+  ).toContainText("Magic DPS special attacks are not modeled yet.");
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Melee" }).click();
 
   await page.getByLabel("TYPE", { exact: true }).selectOption("melee");
   await page.getByLabel("Boost", { exact: true }).selectOption("dba_spec");
@@ -2100,6 +2456,53 @@ test("updates per-monster loot settings and keeps them after reload", async ({ p
   await expect(reloadedLoot.getByLabel("Talisman spot")).toHaveValue("overground");
 });
 
+test("resets one Active modifiers loot row while preserving neighboring loot state", async ({
+  page
+}) => {
+  await page.goto("/");
+  await page.getByLabel("TARGET", { exact: true }).selectOption("green_dragon");
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Loot" }).click();
+
+  const tabs = page.getByLabel("Workbench tabs");
+  const loot = page.locator('section[aria-label="Current monster loot"]');
+  const dragonBonesAction = page.getByLabel(/Action for Dragon bones/).first();
+  await expect(loot).toBeVisible();
+  await expect(dragonBonesAction).toBeVisible();
+
+  await loot.getByLabel("High alch").selectOption("enabled");
+  await loot.getByLabel("Overhead", { exact: true }).selectOption("manual");
+  await loot.getByLabel("Overhead sec").fill("12.5");
+  await loot.getByLabel("Talisman spot").selectOption("overground");
+  await dragonBonesAction.selectOption("skip");
+
+  await tabs.getByRole("button", { name: "Stats" }).click();
+  const assumptions = page.getByLabel("Active assumptions");
+  await expect(assumptions).toContainText("Loot settings");
+  await expect(assumptions).toContainText("Loot action overrides");
+
+  await assumptions.getByRole("button", { name: "Reset current monster loot settings" }).click();
+  await expect(assumptions).not.toContainText("Loot settings");
+  await expect(assumptions).toContainText("Loot action overrides");
+  const settingsUndo = page.getByLabel("Local state undo");
+  await expect(settingsUndo).toContainText("Reset loot settings for Green Dragon");
+  await settingsUndo.getByRole("button", { name: "Undo" }).click();
+  await expect(assumptions).toContainText("Loot settings");
+  await expect(assumptions).toContainText("Loot action overrides");
+
+  await tabs.getByRole("button", { name: "Loot" }).click();
+  await expect(loot.getByLabel("High alch")).toHaveValue("enabled");
+  await expect(loot.getByLabel("Overhead", { exact: true })).toHaveValue("manual");
+  await expect(loot.getByLabel("Overhead sec")).toHaveValue("12.5");
+  await expect(loot.getByLabel("Talisman spot")).toHaveValue("overground");
+  await expect(dragonBonesAction).toHaveValue("skip");
+
+  await loot.getByRole("button", { name: "Reset settings" }).click();
+  await expect(loot.getByLabel("High alch")).toHaveValue("disabled");
+  await expect(loot.getByLabel("Overhead", { exact: true })).toHaveValue("auto");
+  await expect(loot.getByLabel("Talisman spot")).toHaveValue("underground");
+  await expect(dragonBonesAction).toHaveValue("skip");
+});
+
 test("updates current monster loot actions, reset and optimize", async ({ page }) => {
   await page.goto("/");
   await page.getByLabel("Workbench tabs").getByRole("button", { name: "Loot" }).click();
@@ -2123,9 +2526,22 @@ test("updates current monster loot actions, reset and optimize", async ({ page }
 
   await loot.getByRole("button", { name: "Reset current" }).click();
   await expect(bigBonesAction).toHaveValue("bury");
+  const resetUndo = page.getByLabel("Local state undo");
+  await expect(resetUndo).toContainText("Reset loot overrides for Hill Giant");
+  await resetUndo.getByRole("button", { name: "Undo" }).click();
+  await expect(bigBonesAction).toHaveValue("loot");
+
+  await loot.getByRole("button", { name: "Reset current" }).click();
+  await expect(bigBonesAction).toHaveValue("bury");
 
   await loot.getByRole("button", { name: "Optimize net GP/hr" }).click();
-  await expect(loot.locator(".loot-status")).toContainText("Optimized");
+  await expect(page.getByLabel("Local state undo")).toContainText("Optimized loot actions for Hill Giant");
+  await expect(page.getByLabel("Local state undo")).not.toContainText("Reset loot overrides");
+  await expect(loot.locator(".loot-status")).toContainText("Optimized loot actions");
+  await expect(bigBonesAction).toHaveValue("loot");
+  await page.getByLabel("Local state undo").getByRole("button", { name: "Undo" }).click();
+  await expect(bigBonesAction).toHaveValue("bury");
+  await expect(loot.locator(".loot-status")).toContainText("Restored loot actions for Hill Giant");
   await expect(page.locator('[aria-label="Loot action summary"]')).toBeVisible();
 });
 
@@ -2422,9 +2838,9 @@ test("syncs market prices through the same-origin API and shows the report", asy
           }
         },
         report: {
-          requested: 2,
+          requested: 3,
           updated: 1,
-          skipped: 0,
+          skipped: 1,
           failed: 1,
           startedAt: "2026-07-05T12:00:00.000Z",
           finishedAt: "2026-07-05T12:00:05.000Z",
@@ -2447,6 +2863,12 @@ test("syncs market prices through the same-origin API and shows the report", asy
               sourceSlug: "lobster",
               status: "failed",
               reason: "Mock upstream timeout"
+            },
+            {
+              itemId: "rune_scimitar",
+              sourceSlug: "rune_scimitar",
+              status: "skipped",
+              reason: "No recent market samples"
             }
           ],
           warnings: [
@@ -2469,7 +2891,28 @@ test("syncs market prices through the same-origin API and shows the report", asy
 
   await expect(page.getByLabel("Market sync report")).toContainText("Mock LostCity market");
   await expect(page.getByLabel("Market sync report")).toContainText("Updated 1");
+  await expect(page.getByLabel("Market sync report")).toContainText("Skipped 1");
   await expect(page.getByLabel("Market sync report")).toContainText("Failed 1");
+  await expect(page.getByLabel("Market sync warnings")).toContainText("lobster");
+  await expect(page.getByLabel("Market sync warnings")).toContainText(
+    "One mocked item failed; successful prices remain usable"
+  );
+  const marketDiagnostics = page.getByLabel("Market sync item diagnostics");
+  await expect(marketDiagnostics.locator("tbody tr").first()).toContainText("Lobster");
+  await expect(marketDiagnostics.locator("tbody tr").first()).toContainText("failed");
+  await expect(marketDiagnostics.locator("tbody tr").first()).toContainText(
+    "Mock upstream timeout"
+  );
+  await expect(marketDiagnostics).toContainText("rune_scimitar");
+  await expect(marketDiagnostics).toContainText("No recent market samples");
+  await expect(marketDiagnostics).toContainText("big_bones");
+  await marketDiagnostics.getByRole("button", { name: "Failed 1" }).click();
+  await expect(marketDiagnostics).toContainText("Lobster");
+  await expect(marketDiagnostics).not.toContainText("Big bones");
+  await marketDiagnostics.getByRole("button", { name: "Skipped 1" }).click();
+  await expect(marketDiagnostics).toContainText("rune_scimitar");
+  await expect(marketDiagnostics).not.toContainText("Lobster");
+  await marketDiagnostics.getByRole("button", { name: "All 3" }).click();
   await expect(page.locator(".topbar").getByText("Mock market sync")).toBeVisible();
   await expect(page.getByLabel("Price history summary")).toContainText("Snapshots 1");
   await expect(page.getByLabel("Price history summary")).toContainText("Items 2");

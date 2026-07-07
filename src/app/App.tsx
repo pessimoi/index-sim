@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
+import { ZodError } from "zod";
 import {
   downloadJsonFile,
   loadBundledLegacyContext,
@@ -17,6 +18,7 @@ import {
   parsePriceSetFileText,
   syncMarketPrices
 } from "@/adapters/market";
+import { PRICE_SET_IMPORT_MAX_BYTES } from "@/data/schemas";
 import {
   clearPersisted,
   createMemoryStorage,
@@ -54,7 +56,12 @@ import type {
   SimulationContext
 } from "@/domain/shared";
 import { FOOD, defaultOverhead, lootPreferenceKeysForMonster, type LootAction } from "@/domain/trip";
-import { applyMarketSyncResponse, summarizeMarketSyncReport } from "./state/market-sync";
+import {
+  applyMarketSyncResponse,
+  formatMarketSyncReportDetails,
+  summarizeMarketSyncReport,
+  type MarketReportStatusFilter
+} from "./state/market-sync";
 import {
   LEGACY_MIGRATION_DISMISSED_STORAGE_KEY,
   LEGACY_MIGRATION_DISMISSED_VERSION,
@@ -125,6 +132,11 @@ import {
   type PriceHistoryMoverSortState
 } from "./state/price-history";
 import {
+  createPriceImportSuccessNotice,
+  describePriceImportError,
+  type PriceImportNotice
+} from "./state/price-import";
+import {
   PLANNER_METRICS,
   PLANNER_SKILLS,
   loadPlannerUiState,
@@ -190,6 +202,9 @@ import {
   equipmentSlotOptions,
   optimizeLootPrefsForMonster,
   plannerAllowedPool,
+  type ActiveAssumptionResetTarget,
+  type ActiveAssumptionReviewTarget,
+  type ActiveAssumptionsSummaryViewModel,
   type DenseCompareScaleCellViewModel,
   type DenseCompareRowViewModel,
   type DuelComparisonRowViewModel,
@@ -308,6 +323,32 @@ type DisplayMetric = {
   value: string;
   tone?: string;
 };
+
+interface SetupImportNotice {
+  tone: "success" | "error";
+  message: string;
+  details?: string[];
+}
+
+interface PendingUndo {
+  id: string;
+  label: string;
+  restoreLabel: string;
+  createdAt: number;
+  restore: () => void;
+}
+
+type PriceImportSurface = "topbar" | "settings" | "market";
+type ScopedPriceImportNotice = PriceImportNotice & { surface: PriceImportSurface };
+
+const SETUP_IMPORT_MAX_BYTES = 250_000;
+
+const MARKET_REPORT_STATUS_FILTERS: Array<{ id: MarketReportStatusFilter; label: string }> = [
+  { id: "all", label: "All" },
+  { id: "updated", label: "Updated" },
+  { id: "skipped", label: "Skipped" },
+  { id: "failed", label: "Failed" }
+];
 
 const COMBAT_STYLE_OPTIONS: SelectOption[] = [
   { id: "melee", label: "melee" },
@@ -525,6 +566,36 @@ function DenseScaleCell({
   );
 }
 
+function InlineImportNotice({
+  notice,
+  ariaLabel,
+  className = ""
+}: {
+  notice: SetupImportNotice | PriceImportNotice;
+  ariaLabel: string;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`${className} inline-status ${notice.tone}`.trim()}
+      role={notice.tone === "error" ? "alert" : "status"}
+      aria-label={ariaLabel}
+    >
+      <span>{notice.message}</span>
+      {"code" in notice && notice.code ? (
+        <span className="import-error-code">Code {notice.code}</span>
+      ) : null}
+      {notice.details?.length ? (
+        <ul>
+          {notice.details.map((detail) => (
+            <li key={detail}>{detail}</li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
 const WORKBENCH_TABS = [
   { id: "stats", label: "Stats" },
   { id: "melee", label: "Melee", combatStyle: "melee" },
@@ -722,6 +793,10 @@ function duelSnapshotId(): string {
   return `duel-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function localUndoId(): string {
+  return `undo-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 function defaultDuelSnapshotName(
   vm: ReturnType<typeof createSimulationViewModel>,
   snapshotCount: number
@@ -794,6 +869,100 @@ function CalculationWarningSummary({
       ))}
       {warnings.length > visible.length && <span>{formatNumber(warnings.length - visible.length)} more</span>}
     </div>
+  );
+}
+
+function ActiveAssumptionsSummary({
+  summary,
+  onReview,
+  onReset
+}: {
+  summary: ActiveAssumptionsSummaryViewModel;
+  onReview: (tab: ActiveAssumptionReviewTarget) => void;
+  onReset: (target: ActiveAssumptionResetTarget, statusLabel: string) => void;
+}) {
+  const renderRow = (row: ActiveAssumptionsSummaryViewModel["visibleRows"][number]) => {
+    const resetAction = row.resetAction;
+    return (
+      <li className={`active-assumption-row ${row.tone}`} key={row.id}>
+        <div className="active-assumption-copy">
+          <strong>{row.label}</strong>
+          <span>{row.detail}</span>
+        </div>
+        <em>{row.value}</em>
+        <div className="active-assumption-actions">
+          <button
+            type="button"
+            className="compact-action"
+            aria-label={`Review ${row.label}`}
+            onClick={() => onReview(row.reviewTab)}
+          >
+            Review
+          </button>
+          {resetAction ? (
+            <button
+              type="button"
+              className="compact-action"
+              aria-label={resetAction.ariaLabel}
+              onClick={() => onReset(resetAction.target, resetAction.statusLabel)}
+            >
+              {resetAction.label}
+            </button>
+          ) : null}
+        </div>
+      </li>
+    );
+  };
+
+  return (
+    <section className="active-assumptions-summary" aria-label="Active assumptions">
+      <div className="section-title-row">
+        <div>
+          <h2>Active assumptions</h2>
+          <span className="section-subtitle">Modifiers affecting current result</span>
+        </div>
+        <span className={`status-pill ${summary.hasActiveRows ? "ready" : ""}`}>
+          {summary.statusLabel}
+        </span>
+      </div>
+
+      {summary.hasActiveRows ? (
+        <>
+          <ul className="active-assumption-list">{summary.visibleRows.map(renderRow)}</ul>
+          {summary.hiddenRows.length > 0 ? (
+            <details className="active-assumption-more">
+              <summary>+{formatNumber(summary.hiddenCount)} more</summary>
+              <ul className="active-assumption-list">{summary.hiddenRows.map(renderRow)}</ul>
+            </details>
+          ) : null}
+        </>
+      ) : (
+        <p className="active-assumptions-empty">{summary.statusLabel}</p>
+      )}
+    </section>
+  );
+}
+
+function PendingUndoStatus({
+  pendingUndo,
+  onUndo
+}: {
+  pendingUndo: PendingUndo | null;
+  onUndo: () => void;
+}) {
+  if (!pendingUndo) return null;
+  return (
+    <section
+      className="pending-undo-strip"
+      role="status"
+      aria-live="polite"
+      aria-label="Local state undo"
+    >
+      <span>{pendingUndo.label}</span>
+      <button type="button" onClick={onUndo}>
+        Undo
+      </button>
+    </section>
   );
 }
 
@@ -1022,10 +1191,10 @@ function describeHiscoresError(error: unknown): string {
         ? `Rate limited. Try again in ${error.retryAfterSeconds}s`
         : "Rate limited";
     }
-    if (error.code === "upstream-unavailable") return "Hiscores unavailable";
+    if (error.code === "upstream-unavailable") return hiscoresUnavailableMessage(null);
     if (error.code === "upstream-invalid") return "Hiscores response invalid";
   }
-  return "Hiscores lookup failed";
+  return "Hiscores lookup failed. Player level fields still work for manual edits.";
 }
 
 function describeMarketError(error: unknown): string {
@@ -1037,10 +1206,62 @@ function describeMarketError(error: unknown): string {
         ? `Rate limited. Try again in ${error.retryAfterSeconds}s`
         : "Rate limited";
     }
-    if (error.code === "upstream-unavailable") return "Market sync unavailable";
+    if (error.code === "upstream-unavailable") return marketUnavailableMessage(null);
     if (error.code === "upstream-invalid") return "Market sync response invalid";
   }
-  return "Market sync failed";
+  return "Market sync failed. Bundled and imported PriceSets still work.";
+}
+
+function sanitizeImportDetail(value: string): string {
+  return value
+    .replace(/(?:[A-Za-z]:)?[\\/][^\s"']+/g, "[path]")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 180);
+}
+
+function formatZodIssuePath(path: PropertyKey[]): string {
+  return path.length > 0 ? path.map(String).join(".") : "setup";
+}
+
+function zodIssueSummaries(error: ZodError): string[] {
+  return error.issues.slice(0, 3).map((issue) => {
+    const path = formatZodIssuePath(issue.path);
+    const message = sanitizeImportDetail(issue.message);
+    return `${path}: ${message}`;
+  });
+}
+
+function describeSetupImportError(error: unknown): SetupImportNotice {
+  if (error instanceof SyntaxError) {
+    return { tone: "error", message: "Setup import failed: the file is not valid JSON." };
+  }
+
+  if (error instanceof Error && /^File exceeds \d+ bytes$/.test(error.message)) {
+    return {
+      tone: "error",
+      message: "Setup import failed: the file is too large. Choose an exported setup JSON under 250 KB."
+    };
+  }
+
+  if (error instanceof ZodError) {
+    const details = zodIssueSummaries(error);
+    const hasVersionIssue = error.issues.some((issue) => issue.path[0] === "version");
+    if (hasVersionIssue) {
+      return {
+        tone: "error",
+        message: `Setup import failed: this app only supports rewrite setup version ${REWRITE_SETUP_VERSION}. Export a fresh setup and try again.`,
+        details
+      };
+    }
+    return {
+      tone: "error",
+      message: "Setup import failed: the file is not a valid rewrite setup export.",
+      details
+    };
+  }
+
+  return { tone: "error", message: "Setup import failed. Check the file and try again." };
 }
 
 function statusText(
@@ -1054,14 +1275,14 @@ function statusText(
 
 function hiscoresUnavailableMessage(status: HiscoresStatusResponse | null): string {
   return status?.source.id === "disabled"
-    ? "Hiscores disabled: runtime or upstream not configured"
-    : "Hiscores unavailable";
+    ? "Live hiscores lookup is not configured in this run. Use the Player level fields above to edit levels manually."
+    : "Hiscores lookup is unavailable right now. Use the Player level fields above to edit levels manually.";
 }
 
 function marketUnavailableMessage(status: MarketStatusResponse | null): string {
   return status?.source.id === "disabled"
-    ? "Market sync disabled: runtime or upstream not configured"
-    : "Market sync unavailable";
+    ? "Live market sync is not configured in this run. Simulations continue to use the active bundled or imported PriceSet."
+    : "Market sync is unavailable right now. Bundled and imported PriceSets still work.";
 }
 
 function SelectField({
@@ -1415,7 +1636,9 @@ export function App() {
   const [legacyClearPending, setLegacyClearPending] = useState(false);
   const [readyToPersist, setReadyToPersist] = useState(false);
   const [status, setStatus] = useState("Loading bundled data");
-  const [error, setError] = useState<string | null>(null);
+  const [fatalError, setFatalError] = useState<string | null>(null);
+  const [setupImportNotice, setSetupImportNotice] = useState<SetupImportNotice | null>(null);
+  const [priceImportNotice, setPriceImportNotice] = useState<ScopedPriceImportNotice | null>(null);
   const [priceLabel, setPriceLabel] = useState("Bundled legacy prices");
   const [hiscoresStatus, setHiscoresStatus] = useState<HiscoresStatusResponse | null>(null);
   const [hiscoresPlayer, setHiscoresPlayer] = useState(() => loadLastHiscoresPlayer(storage));
@@ -1428,6 +1651,8 @@ export function App() {
   const [marketStatus, setMarketStatus] = useState<MarketStatusResponse | null>(null);
   const [marketBusy, setMarketBusy] = useState<MarketSyncScope | null>(null);
   const [marketReport, setMarketReport] = useState<MarketSyncReport | null>(null);
+  const [marketReportFilter, setMarketReportFilter] =
+    useState<MarketReportStatusFilter>("all");
   const [marketNotice, setMarketNotice] = useState<{
     tone: "neutral" | "success" | "error";
     message: string;
@@ -1442,6 +1667,7 @@ export function App() {
   });
   const [priceHistoryClearPending, setPriceHistoryClearPending] = useState(false);
   const [lootNotice, setLootNotice] = useState<string | null>(null);
+  const [pendingUndo, setPendingUndo] = useState<PendingUndo | null>(null);
   const [activeTab, setActiveTab] = useState<WorkbenchTabId>("compare");
   const heavyForm = useDebouncedValue(form, 250);
 
@@ -1495,7 +1721,7 @@ export function App() {
         setReadyToPersist(true);
       })
       .catch((caught: unknown) => {
-        if (!cancelled) setError(caught instanceof Error ? caught.message : String(caught));
+        if (!cancelled) setFatalError(caught instanceof Error ? caught.message : String(caught));
       });
     return () => {
       cancelled = true;
@@ -1678,6 +1904,11 @@ export function App() {
             lootSettingsByMonster,
             {
               lootPriceHistoryByItem,
+              activeAssumptions: {
+                setupMode,
+                hasCustomSetup: customSetupsByMonster[form.monsterId] != null,
+                hiddenGearTierCount: Object.values(hiddenGearTiers).filter(Boolean).length
+              },
               monsterCard: {
                 setupMode,
                 hasCustomSetup: customSetupsByMonster[form.monsterId] != null
@@ -1691,6 +1922,7 @@ export function App() {
       currentLootPrefs,
       customSetupsByMonster,
       form,
+      hiddenGearTiers,
       lootPriceHistoryByItem,
       lootSettingsByMonster,
       setupMode
@@ -1999,27 +2231,56 @@ export function App() {
     });
   };
 
+  const setUndoableStatus = (
+    label: string,
+    restoreLabel: string,
+    restore: () => void
+  ) => {
+    setPendingUndo({
+      id: localUndoId(),
+      label,
+      restoreLabel,
+      createdAt: Date.now(),
+      restore
+    });
+    setStatus(label);
+  };
+
+  const undoPendingAction = () => {
+    if (!pendingUndo) return;
+    pendingUndo.restore();
+    setStatus(pendingUndo.restoreLabel);
+    setPendingUndo(null);
+  };
+
   const acceptPriceSet = (priceSet: PriceSet, acceptedAt: Date, nextStatus: string) => {
     setContext((current) => (current ? { ...current, priceSet } : current));
     setPriceHistory((current) => appendAcceptedPriceSetToHistory(current, priceSet, acceptedAt));
     setPriceLabel(priceSet.label);
     setStatus(nextStatus);
     setMarketNotice({ tone: "success", message: `${nextStatus}: ${priceSet.label}` });
-    setError(null);
+    setFatalError(null);
   };
 
-  const importPrices = async (event: ChangeEvent<HTMLInputElement>) => {
+  const importPrices = async (
+    event: ChangeEvent<HTMLInputElement>,
+    surface: PriceImportSurface
+  ) => {
     const file = event.target.files?.[0];
     if (!file || !context) return;
     try {
-      const priceSet = parsePriceSetFileText(await readBrowserFileText(file, 1_000_000));
+      setPriceImportNotice(null);
+      const priceSet = parsePriceSetFileText(
+        await readBrowserFileText(file, PRICE_SET_IMPORT_MAX_BYTES),
+        { maxBytes: PRICE_SET_IMPORT_MAX_BYTES }
+      );
       acceptPriceSet(priceSet, new Date(), "Imported price set");
-    } catch (caught) {
-      const message = caught instanceof Error ? caught.message : String(caught);
-      setMarketNotice({
-        tone: "error",
-        message: `Price import failed: ${message.replace(/\s+/g, " ").slice(0, 240)}`
+      setPriceImportNotice({
+        ...createPriceImportSuccessNotice(priceSet.label),
+        surface
       });
+    } catch (caught) {
+      setPriceImportNotice({ ...describePriceImportError(caught), surface });
     } finally {
       event.target.value = "";
     }
@@ -2029,8 +2290,9 @@ export function App() {
     const file = event.target.files?.[0];
     if (!file) return;
     try {
+      setSetupImportNotice(null);
       const parsed = SavedSetupEnvelopeSchema.parse(
-        JSON.parse(await readBrowserFileText(file, 250_000))
+        JSON.parse(await readBrowserFileText(file, SETUP_IMPORT_MAX_BYTES))
       );
       const setup = parsed.data;
       setForm(normalizeFormState(setup.form));
@@ -2040,9 +2302,10 @@ export function App() {
       setDenseCompare(setup.denseCompare);
       setCannonByMonster(setup.cannonByMonster);
       setStatus("Imported rewrite setup");
-      setError(null);
+      setSetupImportNotice({ tone: "success", message: "Imported rewrite setup." });
+      setFatalError(null);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : String(caught));
+      setSetupImportNotice(describeSetupImportError(caught));
     } finally {
       event.target.value = "";
     }
@@ -2130,7 +2393,7 @@ export function App() {
       setPriceHistory((current) => appendAcceptedPriceSetToHistory(current, priceSet, acceptedAt));
       setPriceLabel(priceSet.label);
     }
-    setError(null);
+    setFatalError(null);
     dismissLegacyMigration(legacyMigrationReport, "Imported compatible legacy data");
   };
 
@@ -2197,6 +2460,7 @@ export function App() {
     }
 
     setMarketBusy(scope);
+    setMarketReportFilter("all");
     setMarketNotice({ tone: "neutral", message: "Syncing market prices" });
     try {
       const response = await syncMarketPrices({
@@ -2259,12 +2523,12 @@ export function App() {
     );
   };
 
-  if (error) {
+  if (fatalError) {
     return (
       <main className="app-shell">
         <section className="fatal" role="alert">
           <h1>2004scape Combat Simulator</h1>
-          <p>{error}</p>
+          <p>{fatalError}</p>
         </section>
       </main>
     );
@@ -2282,6 +2546,11 @@ export function App() {
 
   const setCombatStyle = (combatStyle: CombatStyle) =>
     setFormSafe((current) => switchCombatStyleLoadout(current, combatStyle));
+
+  const reviewActiveAssumption = (tab: ActiveAssumptionReviewTarget) => {
+    setActiveTab(tab);
+    if (tab === "melee" || tab === "ranged" || tab === "magic") setCombatStyle(tab);
+  };
 
   const updateLevel = (skill: keyof CombatSetupFormState["levels"], value: number) =>
     setFormSafe((current) =>
@@ -2438,8 +2707,15 @@ export function App() {
   };
   const deleteDuelSnapshot = (snapshotId: string) => {
     const snapshot = duelSnapshots.snapshots.find((candidate) => candidate.id === snapshotId);
+    const previousDuelSnapshots = duelSnapshots;
     setDuelSnapshots((current) => removeDuelSnapshot(current, snapshotId));
-    setStatus(snapshot ? `Deleted Duel snapshot: ${snapshot.name}` : "Deleted Duel snapshot");
+    const label = snapshot ? `Deleted Duel snapshot: ${snapshot.name}` : "Deleted Duel snapshot";
+    const restoreLabel = snapshot
+      ? `Restored Duel snapshot: ${snapshot.name}`
+      : "Restored Duel snapshot";
+    setUndoableStatus(label, restoreLabel, () => {
+      setDuelSnapshots(previousDuelSnapshots);
+    });
   };
   const createCustomSetup = () => {
     const customForm = normalizeFormState(form);
@@ -2462,11 +2738,25 @@ export function App() {
     setStatus(`Editing custom setup for ${currentMonster?.name ?? form.monsterId}`);
   };
   const removeCurrentCustomSetup = () => {
+    const monsterName = currentMonster?.name ?? form.monsterId;
+    const previousCustomSetupsByMonster = customSetupsByMonster;
+    const previousSetupMode = setupMode;
+    const previousForm = form;
+    const previousDefaultForm = defaultForm;
     setCustomSetupsByMonster((current) => removeCustomSetupForMonster(current, form.monsterId));
     const target = normalizeFormState({ ...defaultForm, monsterId: form.monsterId });
     setSetupMode("default");
     setForm(target);
-    setStatus(`Removed custom setup for ${currentMonster?.name ?? form.monsterId}`);
+    setUndoableStatus(
+      `Removed custom setup for ${monsterName}`,
+      `Restored custom setup for ${monsterName}`,
+      () => {
+        setCustomSetupsByMonster(previousCustomSetupsByMonster);
+        setSetupMode(previousSetupMode);
+        setDefaultForm(previousDefaultForm);
+        setForm(previousForm);
+      }
+    );
   };
   const currentCannon = cannonByMonster[form.monsterId] ?? DEFAULT_CANNON_SETTINGS;
   const currentCannonOutput = viewModel.trip.cannon;
@@ -2718,14 +3008,71 @@ export function App() {
     setLootNotice(`${row.name}: ${actionLabel(action)}`);
   };
   const resetCurrentLootOverrides = () => {
+    const monsterName = currentMonster?.name ?? form.monsterId;
+    const previousLootPrefsByMonster = lootPrefsByMonster;
     setLootPrefsByMonster((current) => resetLootPrefsForMonster(current, form.monsterId));
-    setLootNotice("Reset current monster loot overrides");
+    const label = `Reset loot overrides for ${monsterName}`;
+    const restoreLabel = `Restored loot overrides for ${monsterName}`;
+    setLootNotice(label);
+    setUndoableStatus(label, restoreLabel, () => {
+      setLootPrefsByMonster(previousLootPrefsByMonster);
+      setLootNotice(restoreLabel);
+    });
   };
   const resetCurrentLootSettings = () => {
+    const monsterName = currentMonster?.name ?? form.monsterId;
+    const previousLootSettingsByMonster = lootSettingsByMonster;
     setLootSettingsByMonster((current) => resetLootSettingsForMonster(current, form.monsterId));
-    setLootNotice("Reset current monster loot settings");
+    const label = `Reset loot settings for ${monsterName}`;
+    const restoreLabel = `Restored loot settings for ${monsterName}`;
+    setLootNotice(label);
+    setUndoableStatus(label, restoreLabel, () => {
+      setLootSettingsByMonster(previousLootSettingsByMonster);
+      setLootNotice(restoreLabel);
+    });
+  };
+  const resetTripSafespotOverride = () =>
+    setFormSafe((current) =>
+      updateForm(current, {
+        trip: {
+          ...current.trip,
+          safespot: null
+        }
+      })
+    );
+  const resetTripScarceSpot = () =>
+    setFormSafe((current) =>
+      updateForm(current, {
+        trip: {
+          ...current.trip,
+          scarceSpot: false
+        }
+      })
+    );
+  const resetActiveAssumption = (
+    target: ActiveAssumptionResetTarget,
+    statusLabel: string
+  ) => {
+    if (target === "manual-combat-overrides") {
+      resetManualOverrides();
+    } else if (target === "cannon-enabled") {
+      resetCannonForCurrentMonster();
+    } else if (target === "loot-settings") {
+      resetCurrentLootSettings();
+    } else if (target === "loot-action-overrides") {
+      resetCurrentLootOverrides();
+    } else if (target === "scarce-spot") {
+      resetTripScarceSpot();
+    } else if (target === "explicit-safespot") {
+      resetTripSafespotOverride();
+    } else if (target === "hidden-gear-tiers") {
+      setHiddenGearTiers(DEFAULT_HIDDEN_GEAR_TIERS_STATE);
+    }
+    setStatus(statusLabel);
   };
   const optimizeCurrentLoot = () => {
+    const monsterName = currentMonster?.name ?? form.monsterId;
+    const previousLootPrefsByMonster = lootPrefsByMonster;
     const result = optimizeLootPrefsForMonster(
       form,
       context,
@@ -2735,9 +3082,16 @@ export function App() {
     setLootPrefsByMonster((current) =>
       replaceLootPrefsForMonster(current, form.monsterId, result.prefs)
     );
-    setLootNotice(
-      `Optimized ${formatNumber(result.changedRows)} rows (${formatDelta(result.deltaNetGpPerHour)} net GP/hr)`
-    );
+    const label = `Optimized loot actions for ${monsterName}`;
+    const detail = `${label}: ${formatNumber(result.changedRows)} rows (${formatDelta(
+      result.deltaNetGpPerHour
+    )} net GP/hr)`;
+    const restoreLabel = `Restored loot actions for ${monsterName}`;
+    setLootNotice(detail);
+    setUndoableStatus(detail, restoreLabel, () => {
+      setLootPrefsByMonster(previousLootPrefsByMonster);
+      setLootNotice(restoreLabel);
+    });
   };
   const accuracyLabel = form.combatStyle === "magic" ? "M+%" : "ACC+";
   const damageLabel = form.combatStyle === "magic" ? "DMG%" : "DMG+";
@@ -2802,6 +3156,12 @@ export function App() {
     ? Object.keys(activePriceSet.alchValues).length
     : 0;
   const priceDataStatusMessage = marketNotice?.message ?? status;
+  const marketReportDetails = marketReport
+    ? formatMarketSyncReportDetails(marketReport, {
+        filter: marketReportFilter,
+        itemLabel: (itemId) => context?.gameData.items[itemId]?.name
+      })
+    : null;
 
   return (
     <main className="app-shell">
@@ -2815,7 +3175,11 @@ export function App() {
         <div className="actions">
           <label className="file-button">
             Import prices
-            <input type="file" accept="application/json,.json" onChange={importPrices} />
+            <input
+              type="file"
+              accept="application/json,.json"
+              onChange={(event) => void importPrices(event, "topbar")}
+            />
           </label>
           <label className="file-button">
             Import setup
@@ -2840,8 +3204,24 @@ export function App() {
           >
             Export setup
           </button>
+          {priceImportNotice?.surface === "topbar" && (
+            <InlineImportNotice
+              notice={priceImportNotice}
+              ariaLabel="Price import notice"
+              className="topbar-import-notice price-import-notice"
+            />
+          )}
+          {setupImportNotice && (
+            <InlineImportNotice
+              notice={setupImportNotice}
+              ariaLabel="Setup import notice"
+              className="topbar-import-notice setup-import-notice"
+            />
+          )}
         </div>
       </header>
+
+      <PendingUndoStatus pendingUndo={pendingUndo} onUndo={undoPendingAction} />
 
       {legacyMigrationReport && (
         <section
@@ -3313,6 +3693,11 @@ export function App() {
                   warnings={viewModel.moneyWarnings}
                   label="Result price warnings"
                 />
+                <ActiveAssumptionsSummary
+                  summary={viewModel.activeAssumptions}
+                  onReview={reviewActiveAssumption}
+                  onReset={resetActiveAssumption}
+                />
               </div>
 
               <section
@@ -3320,6 +3705,74 @@ export function App() {
                 aria-label="Stats analysis"
                 hidden={activeTab !== "stats"}
               >
+                <section
+                  className="stats-panel source-breakdown-panel"
+                  aria-label="Source breakdown"
+                >
+                  <div className="section-title-row">
+                    <div>
+                      <h2>Source breakdown</h2>
+                      <span className="section-subtitle">DPS, XP and supply sources</span>
+                    </div>
+                    <span className="status-pill ready">
+                      {formatNumber(viewModel.statsSourceBreakdown.rows.length)} sources
+                    </span>
+                  </div>
+                  <div
+                    className="source-breakdown-grid"
+                    role="list"
+                    aria-label="Source breakdown rows"
+                  >
+                    {viewModel.statsSourceBreakdown.rows.map((row) => (
+                      <article
+                        className={`source-breakdown-row ${row.status}`}
+                        role="listitem"
+                        aria-label={`${row.label}: ${row.statusLabel}`}
+                        key={row.id}
+                      >
+                        <div className="source-breakdown-heading">
+                          <div>
+                            <strong>{row.label}</strong>
+                          </div>
+                          <em>{row.statusLabel}</em>
+                        </div>
+                        <div className="source-breakdown-metrics">
+                          <div>
+                            <span>DPS</span>
+                            <strong>{row.dpsLabel}</strong>
+                            {row.dpsDetail && <small>{row.dpsDetail}</small>}
+                          </div>
+                          <div>
+                            <span>XP/hr</span>
+                            <strong>{row.xpPerHourLabel}</strong>
+                          </div>
+                          <div>
+                            <span>Hit %</span>
+                            <strong>{row.hitChanceLabel}</strong>
+                          </div>
+                          <div>
+                            <span>Max</span>
+                            <strong>{row.maxHitLabel}</strong>
+                          </div>
+                          <div>
+                            <span>Supply/hr</span>
+                            <strong>{row.supplyCostPerHourLabel}</strong>
+                          </div>
+                          <div>
+                            <span>Supply/kill</span>
+                            <strong>{row.supplyCostPerKillLabel}</strong>
+                          </div>
+                        </div>
+                        <ul>
+                          {row.notes.map((note) => (
+                            <li key={note}>{note}</li>
+                          ))}
+                        </ul>
+                      </article>
+                    ))}
+                  </div>
+                </section>
+
                 <div className="stats-analysis-grid">
                   <section className="stats-panel" aria-label="XP routing">
                     <div className="section-title-row">
@@ -5459,7 +5912,11 @@ export function App() {
                     <div className="market-sync-bar">
                       <label className="file-button">
                         Import PriceSet
-                        <input type="file" accept="application/json,.json" onChange={importPrices} />
+                        <input
+                          type="file"
+                          accept="application/json,.json"
+                          onChange={(event) => void importPrices(event, "settings")}
+                        />
                       </label>
                     </div>
                     <p
@@ -5468,6 +5925,13 @@ export function App() {
                     >
                       {priceDataStatusMessage}
                     </p>
+                    {priceImportNotice?.surface === "settings" && (
+                      <InlineImportNotice
+                        notice={priceImportNotice}
+                        ariaLabel="Price import notice"
+                        className="price-import-panel-notice"
+                      />
+                    )}
                   </section>
                 )}
                 {activeTab === "settings" && (
@@ -5542,6 +6006,14 @@ export function App() {
                     >
                       {marketBusy === "all-supported" ? "Syncing" : "Sync all"}
                     </button>
+                    <label className="file-button">
+                      Import PriceSet
+                      <input
+                        type="file"
+                        accept="application/json,.json"
+                        onChange={(event) => void importPrices(event, "market")}
+                      />
+                    </label>
                     <button type="button" disabled={!context} onClick={snapshotCurrentPriceSet}>
                       Snapshot now
                     </button>
@@ -5563,6 +6035,18 @@ export function App() {
                         Clear history
                       </button>
                     )}
+                  </div>
+                  <div
+                    className="price-history-summary"
+                    aria-label="Market active PriceSet summary"
+                  >
+                    <span>Label {activePriceSet?.label ?? priceLabel}</span>
+                    <span>Source {activePriceSet?.source ?? "-"}</span>
+                    <span>Created {activePriceSet?.createdAt ?? "-"}</span>
+                    <span>Age {formatAge(activePriceSetAgeSeconds)}</span>
+                    <span>Item prices {formatNumber(activePriceSetItemCount)}</span>
+                    <span>Alch values {formatNumber(activePriceSetAlchCount)}</span>
+                    <span>Status {status}</span>
                   </div>
                   <div className="price-history-summary" aria-label="Price history summary">
                     <span>Snapshots {formatNumber(priceHistorySummary.snapshotCount)}</span>
@@ -5588,6 +6072,13 @@ export function App() {
                       {marketNotice.message}
                     </p>
                   )}
+                  {priceImportNotice?.surface === "market" && (
+                    <InlineImportNotice
+                      notice={priceImportNotice}
+                      ariaLabel="Price import notice"
+                      className="price-import-panel-notice"
+                    />
+                  )}
                   {marketReport && (
                     <div className="market-report" aria-label="Market sync report">
                       <span>Source {marketReport.source.label}</span>
@@ -5595,6 +6086,95 @@ export function App() {
                       <span>Updated {marketReport.updated}</span>
                       <span>Skipped {marketReport.skipped}</span>
                       <span>Failed {marketReport.failed}</span>
+                      {marketReportDetails && marketReportDetails.warnings.length > 0 && (
+                        <div
+                          className="market-report-warnings"
+                          role="status"
+                          aria-label="Market sync warnings"
+                        >
+                          <strong>Warnings</strong>
+                          {marketReportDetails.warnings.slice(0, 4).map((warning) => (
+                            <span className={warning.severity} key={warning.id}>
+                              {warning.itemId ? `${warning.itemId}: ` : ""}
+                              {warning.message}
+                            </span>
+                          ))}
+                          {marketReportDetails.warnings.length > 4 && (
+                            <span>
+                              {formatNumber(marketReportDetails.warnings.length - 4)} more
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {marketReportDetails && (
+                        <div
+                          className="market-report-detail-panel"
+                          aria-label="Market sync item diagnostics"
+                        >
+                          <div
+                            className="segmented market-report-filters"
+                            aria-label="Market report status filter"
+                          >
+                            {MARKET_REPORT_STATUS_FILTERS.map((filter) => (
+                              <button
+                                type="button"
+                                className={marketReportFilter === filter.id ? "active" : ""}
+                                aria-pressed={marketReportFilter === filter.id}
+                                onClick={() => setMarketReportFilter(filter.id)}
+                                key={filter.id}
+                              >
+                                {filter.label}{" "}
+                                {formatNumber(marketReportDetails.counts[filter.id])}
+                              </button>
+                            ))}
+                          </div>
+                          <table>
+                            <thead>
+                              <tr>
+                                <th>Item</th>
+                                <th>Status</th>
+                                <th>Price</th>
+                                <th>Alch</th>
+                                <th>Source slug</th>
+                                <th>Reason</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {marketReportDetails.items.length > 0 ? (
+                                marketReportDetails.items.map((item) => (
+                                  <tr
+                                    className={`market-report-item-${item.status}`}
+                                    key={item.itemId}
+                                  >
+                                    <td>
+                                      <span>{item.itemLabel}</span>
+                                      {item.itemLabel !== item.itemId && (
+                                        <small>{item.itemId}</small>
+                                      )}
+                                    </td>
+                                    <td>{item.status}</td>
+                                    <td className="numeric">
+                                      <span>{item.priceLabel}</span>
+                                      {item.sampleSizeLabel !== "-" && (
+                                        <small>Samples {item.sampleSizeLabel}</small>
+                                      )}
+                                    </td>
+                                    <td className="numeric">{item.alchValueLabel}</td>
+                                    <td>{item.sourceSlug}</td>
+                                    <td>{item.reason}</td>
+                                  </tr>
+                                ))
+                              ) : (
+                                <tr>
+                                  <td colSpan={6}>
+                                    No {marketReportFilter} items in this report.
+                                  </td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
                     </div>
                   )}
                 </section>

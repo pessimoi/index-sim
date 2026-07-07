@@ -130,6 +130,14 @@ function activeDefenceKeys(card: ReturnType<typeof createMonsterCardViewModel>):
   return card.defenceRows.filter((row) => row.active).map((row) => row.key);
 }
 
+function activeAssumptionRows(result: ReturnType<typeof createSimulationViewModel>) {
+  return [...result.activeAssumptions.visibleRows, ...result.activeAssumptions.hiddenRows];
+}
+
+function activeAssumptionRow(result: ReturnType<typeof createSimulationViewModel>, id: string) {
+  return activeAssumptionRows(result).find((row) => row.id === id);
+}
+
 describe("rewrite UI view models", () => {
   it("keeps form state separate from SimulationRequest", async () => {
     const { context } = await loadBundledLegacyContext();
@@ -139,6 +147,53 @@ describe("rewrite UI view models", () => {
     expect(request).not.toHaveProperty("plannerTargets");
     expect(request).not.toHaveProperty("trip");
     expect(context.gameData.monsters[request.monsterId]).toBeDefined();
+  });
+
+  it("summarizes default active assumptions as an empty read-only state", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const result = createSimulationViewModel(DEFAULT_FORM_STATE, {
+      ...context,
+      priceSet: {
+        ...context.priceSet,
+        itemPrices: {
+          ...context.priceSet.itemPrices,
+          chaos_talisman: 500,
+          dragon_spear: 39000,
+          dragonshield_a: 50000,
+          rune_spear: 30000
+        }
+      }
+    });
+
+    expect(result.activeAssumptions).toMatchObject({
+      statusLabel: "Default assumptions active",
+      totalCount: 0,
+      hasActiveRows: false,
+      hiddenCount: 0
+    });
+    expect(result.activeAssumptions.visibleRows).toEqual([]);
+    expect(result.activeAssumptions.hiddenRows).toEqual([]);
+  });
+
+  it("keeps inherited trip loot settings review-only in active assumptions", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const result = createSimulationViewModel(
+      {
+        ...DEFAULT_FORM_STATE,
+        trip: {
+          ...DEFAULT_FORM_STATE.trip,
+          alching: true
+        }
+      },
+      context
+    );
+
+    expect(activeAssumptionRow(result, "loot-settings")).toMatchObject({
+      label: "Loot settings",
+      detail: "high alch on",
+      reviewTab: "loot"
+    });
+    expect(activeAssumptionRow(result, "loot-settings")?.resetAction).toBeUndefined();
   });
 
   it("maps normalized multi-prayer and multi-boost selections into SimulationRequest", () => {
@@ -411,6 +466,48 @@ describe("rewrite UI view models", () => {
     expect(overridden.combat.hitChance).toBeGreaterThan(derived.combat.hitChance);
     expect(overridden.combat.maxHit).toBeGreaterThan(derived.combat.maxHit);
     expect(overridden.combat.dps).toBeGreaterThan(derived.combat.dps);
+    expect(activeAssumptionRow(overridden, "manual-combat-overrides")).toMatchObject({
+      label: "Manual combat overrides",
+      value: "3 fields",
+      reviewTab: "melee",
+      detail: expect.stringContaining("accuracy +350"),
+      resetAction: {
+        target: "manual-combat-overrides",
+        label: "Reset",
+        ariaLabel: "Reset manual combat overrides",
+        statusLabel: "Manual overrides reset"
+      }
+    });
+    expect(activeAssumptionRow(overridden, "manual-combat-overrides")?.detail).toContain(
+      "speed 1.2s"
+    );
+  });
+
+  it("summarizes enabled cannon settings with a Cannon review target", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const result = createSimulationViewModel(
+      DEFAULT_FORM_STATE,
+      context,
+      {
+        giant: {
+          enabled: true,
+          targets: 6,
+          respawnSec: 30
+        }
+      }
+    );
+
+    expect(activeAssumptionRow(result, "cannon-enabled")).toMatchObject({
+      label: "Cannon",
+      value: expect.stringContaining("Enabled"),
+      reviewTab: "cannon",
+      detail: "targets 6, respawn 30s",
+      resetAction: {
+        target: "cannon-enabled",
+        ariaLabel: "Reset current monster cannon",
+        statusLabel: "Current monster cannon reset"
+      }
+    });
   });
 
   it("builds MonsterCard active defence rows from melee attack types", async () => {
@@ -567,6 +664,233 @@ describe("rewrite UI view models", () => {
       ])
     );
     expect(result.warnings.join("\n")).toContain("Using alias price");
+    expect(activeAssumptionRow(result, "price-warnings")).toMatchObject({
+      label: "Price confidence",
+      reviewTab: "economy",
+      value: `${result.moneyWarnings.length} warnings`,
+      detail: result.moneyWarnings[0]?.message
+    });
+  });
+
+  it("summarizes imported and synced PriceSet modifiers", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const imported = createSimulationViewModel(DEFAULT_FORM_STATE, {
+      ...context,
+      priceSet: {
+        ...context.priceSet,
+        id: "imported-empty",
+        label: "Imported empty",
+        source: "imported",
+        itemPrices: {},
+        alchValues: {}
+      }
+    });
+    const synced = createSimulationViewModel(DEFAULT_FORM_STATE, {
+      ...context,
+      priceSet: {
+        ...context.priceSet,
+        id: "synced-test",
+        label: "Synced test snapshot",
+        source: "scraped"
+      }
+    });
+
+    expect(activeAssumptionRow(imported, "active-price-set")).toMatchObject({
+      label: "Active PriceSet",
+      value: "Imported",
+      detail: "Imported empty",
+      reviewTab: "economy"
+    });
+    expect(activeAssumptionRow(imported, "active-price-set")?.resetAction).toBeUndefined();
+    expect(activeAssumptionRow(imported, "price-warnings")).toMatchObject({
+      label: "Price confidence",
+      reviewTab: "economy"
+    });
+    expect(activeAssumptionRow(imported, "price-warnings")?.resetAction).toBeUndefined();
+    expect(activeAssumptionRow(synced, "active-price-set")).toMatchObject({
+      value: "Synced",
+      detail: "Synced test snapshot"
+    });
+  });
+
+  it("keeps active assumption priority order and five-row visibility stable", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const form: CombatSetupFormState = {
+      ...DEFAULT_FORM_STATE,
+      manualOverrides: {
+        accuracyBonus: 12,
+        damageBonus: 5,
+        attackSpeedSec: 2.4
+      },
+      trip: {
+        ...DEFAULT_FORM_STATE.trip,
+        bankSeconds: 120,
+        foodCount: 8,
+        prayerPotionDoses: 6,
+        potionSets: 2,
+        protect: "melee",
+        safespot: false,
+        scarceSpot: true,
+        targetsAtSpot: 2,
+        respawnSeconds: 45
+      }
+    };
+    const result = createSimulationViewModel(
+      form,
+      {
+        ...context,
+        priceSet: {
+          ...context.priceSet,
+          id: "imported-empty",
+          label: "Imported empty",
+          source: "imported",
+          itemPrices: {},
+          alchValues: {}
+        }
+      },
+      {
+        giant: {
+          enabled: true,
+          targets: 4,
+          respawnSec: 45
+        }
+      },
+      {},
+      {
+        giant: {
+          highAlch: true,
+          overheadSec: 12.5,
+          talismanSpot: "overground"
+        }
+      },
+      {
+        activeAssumptions: {
+          setupMode: "custom",
+          hasCustomSetup: true,
+          hiddenGearTierCount: 2
+        }
+      }
+    );
+
+    expect(result.activeAssumptions.visibleRows).toHaveLength(5);
+    expect(result.activeAssumptions.hiddenCount).toBeGreaterThan(0);
+    expect(result.activeAssumptions.visibleRows.map((row) => row.id)).toEqual([
+      "price-warnings",
+      "custom-setup",
+      "cannon-enabled",
+      "manual-combat-overrides",
+      "active-price-set"
+    ]);
+    expect(activeAssumptionRows(result).map((row) => row.id)).toEqual([
+      "price-warnings",
+      "custom-setup",
+      "cannon-enabled",
+      "manual-combat-overrides",
+      "active-price-set",
+      "loot-settings",
+      "scarce-spot",
+      "explicit-safespot",
+      "protection-prayer",
+      "manual-trip-controls",
+      "supply-settings",
+      "hidden-gear-tiers"
+    ]);
+    expect(activeAssumptionRow(result, "hidden-gear-tiers")?.resetAction).toMatchObject({
+      target: "hidden-gear-tiers",
+      ariaLabel: "Reset hidden gear tiers",
+      statusLabel: "Hidden gear tiers shown"
+    });
+  });
+
+  it("keeps targeted active-assumption resets scoped in the view model", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const form: CombatSetupFormState = {
+      ...DEFAULT_FORM_STATE,
+      manualOverrides: {
+        accuracyBonus: 12,
+        damageBonus: null,
+        attackSpeedSec: null
+      },
+      trip: {
+        ...DEFAULT_FORM_STATE.trip,
+        protect: "magic",
+        safespot: false,
+        scarceSpot: true,
+        targetsAtSpot: 6,
+        respawnSeconds: 30
+      }
+    };
+    const beforeReset = createSimulationViewModel(form, context, {
+      giant: { enabled: true, targets: 6, respawnSec: 30 }
+    });
+    const afterManualReset = createSimulationViewModel(
+      { ...form, manualOverrides: DEFAULT_FORM_STATE.manualOverrides },
+      context,
+      {
+        giant: { enabled: true, targets: 6, respawnSec: 30 }
+      }
+    );
+    const afterSafespotResetForm: CombatSetupFormState = {
+      ...form,
+      trip: {
+        ...form.trip,
+        safespot: null
+      }
+    };
+    const afterSafespotReset = createSimulationViewModel(afterSafespotResetForm, context, {
+      giant: { enabled: true, targets: 6, respawnSec: 30 }
+    });
+    const afterScarceResetForm: CombatSetupFormState = {
+      ...form,
+      trip: {
+        ...form.trip,
+        scarceSpot: false
+      }
+    };
+    const afterScarceReset = createSimulationViewModel(afterScarceResetForm, context, {
+      giant: { enabled: true, targets: 6, respawnSec: 30 }
+    });
+    const afterCannonReset = createSimulationViewModel(form, context, {});
+
+    expect(activeAssumptionRow(beforeReset, "manual-combat-overrides")).toBeDefined();
+    expect(activeAssumptionRow(beforeReset, "explicit-safespot")).toMatchObject({
+      label: "Safespot override",
+      value: "Off",
+      resetAction: {
+        target: "explicit-safespot",
+        ariaLabel: "Reset safespot override",
+        statusLabel: "Safespot override reset to auto"
+      }
+    });
+    expect(activeAssumptionRow(beforeReset, "protection-prayer")).toMatchObject({
+      label: "Protection prayer",
+      value: "Protect from magic",
+      reviewTab: "trip"
+    });
+    expect(activeAssumptionRow(beforeReset, "protection-prayer")?.resetAction).toBeUndefined();
+    expect(activeAssumptionRow(beforeReset, "scarce-spot")?.resetAction).toMatchObject({
+      target: "scarce-spot",
+      ariaLabel: "Reset scarce spot",
+      statusLabel: "Scarce spot disabled; target and respawn values kept"
+    });
+
+    expect(activeAssumptionRow(afterManualReset, "manual-combat-overrides")).toBeUndefined();
+    expect(activeAssumptionRow(afterManualReset, "explicit-safespot")).toBeDefined();
+
+    expect(activeAssumptionRow(afterSafespotReset, "explicit-safespot")).toBeUndefined();
+    expect(activeAssumptionRow(afterSafespotReset, "protection-prayer")).toBeDefined();
+
+    expect(afterScarceResetForm.trip.targetsAtSpot).toBe(6);
+    expect(afterScarceResetForm.trip.respawnSeconds).toBe(30);
+    expect(activeAssumptionRow(afterScarceReset, "scarce-spot")).toBeUndefined();
+    expect(activeAssumptionRow(afterScarceReset, "explicit-safespot")).toBeDefined();
+
+    expect(afterCannonReset.trip.cannon).toBeNull();
+    expect(afterCannonReset.trip.trip.scarce.enabled).toBe(true);
+    expect(afterCannonReset.trip.trip.scarce.targetsAtSpot).toBe(6);
+    expect(afterCannonReset.trip.trip.scarce.respawnSeconds).toBe(30);
+    expect(activeAssumptionRow(afterCannonReset, "cannon-enabled")).toBeUndefined();
+    expect(activeAssumptionRow(afterCannonReset, "scarce-spot")).toBeDefined();
   });
 
   it("maps extended trip controls to the domain policy without leaking into SimulationRequest", async () => {
@@ -918,6 +1242,19 @@ describe("rewrite UI view models", () => {
     expect(result.combat.specialAttack?.specsPerHour).toBeGreaterThan(0);
     expect(result.combat.effectiveDps).toBe(result.combat.specialAttack?.dpsWithSpec);
     expect(result.specialWarnings).toEqual([]);
+    expect(
+      result.statsSourceBreakdown.rows.find((row) => row.id === "special-attack")
+    ).toMatchObject({
+      label: "Special attack",
+      status: "modeled",
+      dpsGainPct: result.combat.specialAttack?.dpsGainPct,
+      hitChance: result.combat.specialAttack?.hitChance,
+      maxHit: result.combat.specialAttack?.maxHit
+    });
+    expect(result.statsSourceBreakdown.rows.find((row) => row.id === "special-attack")?.dps).toBe(
+      (result.combat.specialAttack?.dpsWithSpec ?? 0) -
+        (result.combat.specialAttack?.dpsBase ?? 0)
+    );
   });
 
   it("surfaces dragon halberd NPC-size fallback warning only for that special path", async () => {
@@ -955,6 +1292,23 @@ describe("rewrite UI view models", () => {
       }
     ]);
     expect(halberdResult.warnings).toContain(warningText);
+    expect(activeAssumptionRow(halberdResult, "special-warnings")).toMatchObject({
+      label: "Special attack assumption",
+      reviewTab: "melee",
+      detail: warningText
+    });
+    expect(
+      halberdResult.statsSourceBreakdown.rows.find((row) => row.id === "special-attack")
+    ).toMatchObject({
+      label: "Special attack",
+      status: "partial",
+      statusLabel: "partial"
+    });
+    expect(
+      halberdResult.statsSourceBreakdown.rows
+        .find((row) => row.id === "special-attack")
+        ?.notes.join("\n")
+    ).toContain(warningText);
   });
 
   it("maps prayer restore detail controls only for the active restore mode", () => {
@@ -1132,6 +1486,69 @@ describe("rewrite UI view models", () => {
     });
   }, 15_000);
 
+  it("builds Stats source breakdown rows from current combat and trip outputs", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const result = createSimulationViewModel(DEFAULT_FORM_STATE, context);
+    const rows = new Map(result.statsSourceBreakdown.rows.map((row) => [row.id, row]));
+
+    expect(result.statsSourceBreakdown.rows).toHaveLength(3);
+    expect(rows.get("normal-attack")).toMatchObject({
+      label: "Normal attack",
+      status: "modeled",
+      statusLabel: "modeled",
+      dps: result.combat.dps,
+      xpPerHour: result.playerEffectiveXpPerHour,
+      hitChance: result.combat.hitChance,
+      maxHit: result.combat.maxHit,
+      supplyCostPerKill: result.trip.supply.supplyCostPerKill
+    });
+    expect(rows.get("normal-attack")?.supplyCostPerHour).toBeCloseTo(
+      result.trip.supply.supplyCostPerKill * result.trip.effectiveKph
+    );
+    expect(rows.get("special-attack")).toMatchObject({
+      label: "Special attack",
+      status: "inactive",
+      statusLabel: "inactive",
+      dps: null,
+      xpPerHour: null
+    });
+    expect(rows.get("special-attack")?.notes.join("\n")).toContain(
+      "No supported melee/ranged DPS special selected."
+    );
+    expect(rows.get("cannon")).toMatchObject({
+      label: "Cannon",
+      status: "inactive",
+      statusLabel: "inactive",
+      dps: null,
+      xpPerHour: null
+    });
+    expect(rows.get("cannon")?.notes.join("\n")).toContain("Cannon is off");
+  }, 15_000);
+
+  it("marks magic special source breakdown as not modeled without adding formulas", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const magicForm = normalizeFormState({
+      ...switchCombatStyleLoadout(DEFAULT_FORM_STATE, "magic"),
+      weaponId: "staff_of_fire",
+      spellId: "fire_wave",
+      styleId: "accurate"
+    });
+    const result = createSimulationViewModel(magicForm, context);
+    const special = result.statsSourceBreakdown.rows.find((row) => row.id === "special-attack");
+
+    expect(result.combat.specialAttack).toBeNull();
+    expect(special).toMatchObject({
+      label: "Special attack",
+      status: "not-modeled",
+      statusLabel: "not modeled",
+      dps: null,
+      xpPerHour: null,
+      hitChance: null,
+      maxHit: null
+    });
+    expect(special?.notes.join("\n")).toContain("Magic DPS special attacks are not modeled yet.");
+  }, 15_000);
+
   it("models Magic alch XP from tracked in-trip alch casts", async () => {
     const { context } = await loadBundledLegacyContext();
     const form = normalizeFormState({
@@ -1187,6 +1604,12 @@ describe("rewrite UI view models", () => {
     });
     const withoutRows = new Map(withoutCannon.xpRouting.rows.map((row) => [row.id, row]));
     const withRows = new Map(withCannon.xpRouting.rows.map((row) => [row.id, row]));
+    const withoutCannonSource = withoutCannon.statsSourceBreakdown.rows.find(
+      (row) => row.id === "cannon"
+    );
+    const withCannonSource = withCannon.statsSourceBreakdown.rows.find(
+      (row) => row.id === "cannon"
+    );
 
     expect(withoutRows.has("cannon-ranged")).toBe(false);
     expect(withRows.get("cannon-ranged")).toMatchObject({
@@ -1195,6 +1618,23 @@ describe("rewrite UI view models", () => {
       status: "modeled"
     });
     expect(withCannon.cannonEffectiveXpPerHour).toBeGreaterThan(0);
+
+    expect(withoutCannonSource).toMatchObject({
+      label: "Cannon",
+      status: "inactive"
+    });
+    expect(withCannonSource).toMatchObject({
+      label: "Cannon",
+      status: "modeled",
+      dps: withCannon.trip.cannon?.cannonDps,
+      xpPerHour: withCannon.cannonEffectiveXpPerHour,
+      hitChance: withCannon.combat.hitChance,
+      maxHit: withCannon.trip.cannon?.maxBall,
+      supplyCostPerKill: withCannon.trip.supply.ballCostPerKill
+    });
+    expect(withCannonSource?.supplyCostPerHour).toBeCloseTo(
+      withCannon.trip.supply.ballCostPerKill * withCannon.trip.effectiveKph
+    );
   }, 15_000);
 
   it("builds the Stats Trip and banking summary from the trip result", async () => {
@@ -1579,6 +2019,73 @@ describe("rewrite UI view models", () => {
     expect(forcedAlch.trip.alchCastsPerKill).toBeGreaterThan(alchDisabled.trip.alchCastsPerKill);
     expect(slowOverhead.trip.killsPerHour).toBeLessThan(alchDisabled.trip.killsPerHour);
     expect(overground.trip.gpPerKill).not.toBe(alchDisabled.trip.gpPerKill);
+
+    const overrideAction = alchable.availableActions.find((action) => action !== alchable.defaultPref);
+    expect(overrideAction).toBeDefined();
+    if (!overrideAction) throw new Error("Expected an available loot override action");
+    const summarized = createSimulationViewModel(
+      form,
+      context,
+      {},
+      { [alchable.rowId]: overrideAction },
+      {
+        green_dragon: {
+          highAlch: true,
+          overheadSec: 12.5,
+          talismanSpot: "overground"
+        }
+      }
+    );
+    expect(activeAssumptionRow(summarized, "loot-settings")).toMatchObject({
+      label: "Loot settings",
+      reviewTab: "loot",
+      detail: expect.stringContaining("high alch on"),
+      resetAction: {
+        target: "loot-settings",
+        ariaLabel: "Reset current monster loot settings",
+        statusLabel: "Current monster loot settings reset"
+      }
+    });
+    expect(activeAssumptionRow(summarized, "loot-settings")?.detail).toContain("overhead 12.5s");
+    expect(activeAssumptionRow(summarized, "loot-settings")?.detail).toContain(
+      "talisman overground"
+    );
+    expect(activeAssumptionRow(summarized, "loot-action-overrides")).toMatchObject({
+      label: "Loot action overrides",
+      value: "1 drop",
+      reviewTab: "loot",
+      resetAction: {
+        target: "loot-action-overrides",
+        ariaLabel: "Reset current monster loot overrides",
+        statusLabel: "Current monster loot overrides reset"
+      }
+    });
+
+    const afterLootSettingsReset = createSimulationViewModel(
+      form,
+      context,
+      {},
+      { [alchable.rowId]: overrideAction },
+      {}
+    );
+    expect(activeAssumptionRow(afterLootSettingsReset, "loot-settings")).toBeUndefined();
+    expect(activeAssumptionRow(afterLootSettingsReset, "loot-action-overrides")).toBeDefined();
+
+    const afterLootPrefsReset = createSimulationViewModel(
+      form,
+      context,
+      {},
+      {},
+      {
+        green_dragon: {
+          highAlch: true,
+          overheadSec: 12.5,
+          talismanSpot: "overground"
+        }
+      }
+    );
+    expect(activeAssumptionRow(afterLootPrefsReset, "loot-settings")).toBeDefined();
+    expect(activeAssumptionRow(afterLootPrefsReset, "loot-action-overrides")).toBeUndefined();
   });
 
   it("optimizes loot prefs deterministically from canonical defaults", async () => {

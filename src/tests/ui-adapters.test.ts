@@ -31,6 +31,7 @@ import {
   LOOT_PREFS_STORAGE_KEY,
   LOOT_PREFS_VERSION,
   LootPrefsStateSchema,
+  resetLootPrefsForMonster,
   selectLootPrefsForMonster
 } from "../app/state/loot-prefs";
 import {
@@ -39,6 +40,7 @@ import {
   LOOT_SETTINGS_VERSION,
   LootSettingsByMonsterSchema,
   lootSettingsForMonster,
+  resetLootSettingsForMonster,
   setLootSettingsForMonster
 } from "../app/state/loot-settings";
 import {
@@ -1239,6 +1241,22 @@ describe("versioned loot preference persistence", () => {
       foundVersion: LOOT_PREFS_VERSION + 1
     });
   });
+
+  it("resets only the selected monster loot prefs", () => {
+    const prefs = LootPrefsStateSchema.parse({
+      giant: {
+        key_big_bones_0: "loot"
+      },
+      green_dragon: {
+        key_dragon_bones_0: "loot"
+      }
+    });
+
+    const reset = resetLootPrefsForMonster(prefs, "giant");
+
+    expect(reset.giant).toBeUndefined();
+    expect(reset.green_dragon).toEqual({ key_dragon_bones_0: "loot" });
+  });
 });
 
 describe("versioned per-monster loot settings persistence", () => {
@@ -1313,6 +1331,24 @@ describe("versioned per-monster loot settings persistence", () => {
       overheadSec: null,
       talismanSpot: "underground"
     });
+  });
+
+  it("resets only per-monster loot settings without touching row prefs", () => {
+    const prefs = LootPrefsStateSchema.parse({
+      giant: {
+        key_big_bones_0: "loot"
+      }
+    });
+    const settings = setLootSettingsForMonster(DEFAULT_LOOT_SETTINGS_STATE, "giant", {
+      highAlch: true,
+      overheadSec: 4.5,
+      talismanSpot: "overground"
+    });
+
+    const resetSettings = resetLootSettingsForMonster(settings, "giant");
+
+    expect(resetSettings.giant).toBeUndefined();
+    expect(prefs.giant).toEqual({ key_big_bones_0: "loot" });
   });
 });
 

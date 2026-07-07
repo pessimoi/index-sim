@@ -66,6 +66,7 @@ import {
 } from "../state/planner";
 import {
   type CannonByMonsterState,
+  DEFAULT_FORM_STATE,
   formToSimulationRequest,
   formToTripPolicy,
   normalizeFormState,
@@ -80,6 +81,8 @@ export interface SimulationViewModel {
   hitDistribution: HitDistributionViewModel;
   xpRouting: XpRoutingViewModel;
   tripBankingSummary: StatsTripBankingSummaryViewModel;
+  statsSourceBreakdown: StatsSourceBreakdownViewModel;
+  activeAssumptions: ActiveAssumptionsSummaryViewModel;
   monsterCard: MonsterCardViewModel;
   trip: TripLootSupplyResult;
   playerEffectiveXpPerHour: number;
@@ -160,6 +163,87 @@ export interface StatsTripBankingSummaryRowViewModel {
 
 export interface StatsTripBankingSummaryViewModel {
   rows: StatsTripBankingSummaryRowViewModel[];
+}
+
+export type StatsSourceBreakdownStatus = "modeled" | "partial" | "not-modeled" | "inactive";
+
+export type StatsSourceBreakdownRowId = "normal-attack" | "special-attack" | "cannon";
+
+export interface StatsSourceBreakdownRowViewModel {
+  id: StatsSourceBreakdownRowId;
+  label: string;
+  status: StatsSourceBreakdownStatus;
+  statusLabel: string;
+  dps: number | null;
+  dpsLabel: string;
+  dpsDetail: string | null;
+  dpsGainPct: number | null;
+  xpPerHour: number | null;
+  xpPerHourLabel: string;
+  hitChance: number | null;
+  hitChanceLabel: string;
+  maxHit: number | null;
+  maxHitLabel: string;
+  supplyCostPerHour: number | null;
+  supplyCostPerHourLabel: string;
+  supplyCostPerKill: number | null;
+  supplyCostPerKillLabel: string;
+  notes: string[];
+}
+
+export interface StatsSourceBreakdownViewModel {
+  rows: StatsSourceBreakdownRowViewModel[];
+}
+
+export type ActiveAssumptionCategory = "warning" | "setup" | "loot" | "trip" | "settings";
+
+export type ActiveAssumptionReviewTarget =
+  | "stats"
+  | "melee"
+  | "ranged"
+  | "magic"
+  | "compare"
+  | "loot"
+  | "trip"
+  | "cannon"
+  | "economy"
+  | "settings";
+
+export type ActiveAssumptionResetTarget =
+  | "manual-combat-overrides"
+  | "cannon-enabled"
+  | "loot-settings"
+  | "loot-action-overrides"
+  | "scarce-spot"
+  | "explicit-safespot"
+  | "hidden-gear-tiers";
+
+export interface ActiveAssumptionResetActionViewModel {
+  target: ActiveAssumptionResetTarget;
+  label: string;
+  ariaLabel: string;
+  statusLabel: string;
+}
+
+export interface ActiveAssumptionRowViewModel {
+  id: string;
+  category: ActiveAssumptionCategory;
+  label: string;
+  value: string;
+  detail: string;
+  reviewTab: ActiveAssumptionReviewTarget;
+  tone: "default" | "info" | "warning";
+  priority: number;
+  resetAction?: ActiveAssumptionResetActionViewModel;
+}
+
+export interface ActiveAssumptionsSummaryViewModel {
+  statusLabel: string;
+  totalCount: number;
+  hasActiveRows: boolean;
+  visibleRows: ActiveAssumptionRowViewModel[];
+  hiddenRows: ActiveAssumptionRowViewModel[];
+  hiddenCount: number;
 }
 
 export type MonsterCardStatKey =
@@ -245,6 +329,11 @@ export interface SimulationViewModelOptions {
   includeLootRows?: boolean;
   monsterCard?: MonsterCardViewModelOptions;
   lootPriceHistoryByItem?: Record<string, LootPriceHistoryItemContext | undefined>;
+  activeAssumptions?: {
+    setupMode?: SetupMode;
+    hasCustomSetup?: boolean;
+    hiddenGearTierCount?: number;
+  };
 }
 
 export interface CalculationWarningViewModel {
@@ -1071,6 +1160,12 @@ const MONEY_WARNING_CODES = new Set([
   "approximate-data-source"
 ]);
 const SPECIAL_WARNING_CODES = new Set(["dragon-halberd-npc-size-fallback"]);
+const ACTIVE_ASSUMPTIONS_VISIBLE_LIMIT = 5;
+const PROTECT_PRAYER_LABELS: Record<Exclude<CombatSetupFormState["trip"]["protect"], "none">, string> = {
+  melee: "Protect from melee",
+  missiles: "Protect from missiles",
+  magic: "Protect from magic"
+};
 
 function warningViewModel(warning: SimulationWarning): CalculationWarningViewModel {
   return {
@@ -1095,6 +1190,395 @@ function calculationWarningViewModels(
   }
 
   return out;
+}
+
+function activeAssumptionCountLabel(count: number, noun: string): string {
+  return `${formatNumber(count)} ${noun}${count === 1 ? "" : "s"}`;
+}
+
+function activeAssumptionSourceLabel(source: SimulationContext["priceSet"]["source"]): string {
+  if (source === "scraped") return "Synced";
+  return source.charAt(0).toUpperCase() + source.slice(1);
+}
+
+function activeAssumptionSigned(value: number): string {
+  return `${value > 0 ? "+" : ""}${formatNumber(value, Number.isInteger(value) ? 0 : 1)}`;
+}
+
+function activeAssumptionManualOverrideParts(
+  overrides: CombatSetupFormState["manualOverrides"]
+): string[] {
+  const parts: string[] = [];
+  if (overrides.accuracyBonus != null) {
+    parts.push(`accuracy ${activeAssumptionSigned(overrides.accuracyBonus)}`);
+  }
+  if (overrides.damageBonus != null) {
+    parts.push(`damage ${activeAssumptionSigned(overrides.damageBonus)}`);
+  }
+  if (overrides.attackSpeedSec != null) {
+    parts.push(`speed ${formatNumber(overrides.attackSpeedSec, 1)}s`);
+  }
+  return parts;
+}
+
+function activeAssumptionLootSettingParts(
+  form: CombatSetupFormState,
+  settings: ReturnType<typeof lootSettingsForMonster>,
+  rawSettings: LootSettingsByMonsterState[string] | undefined
+): string[] {
+  const parts: string[] = [];
+  if (rawSettings?.highAlch != null) {
+    parts.push(`high alch ${rawSettings.highAlch ? "on" : "off"}`);
+  } else if (form.trip.alching) {
+    parts.push("high alch on");
+  }
+  if (rawSettings?.overheadSec != null) parts.push(`overhead ${formatNumber(settings.overheadSec ?? 0, 1)}s`);
+  if (rawSettings?.talismanSpot === "overground") parts.push("talisman overground");
+  return parts;
+}
+
+function activeAssumptionTripManualParts(form: CombatSetupFormState): string[] {
+  const parts: string[] = [];
+  if (form.trip.bankSeconds != null) parts.push(`bank ${formatNumber(form.trip.bankSeconds)}s`);
+  if (form.trip.foodCount != null) parts.push(`food ${formatNumber(form.trip.foodCount)}`);
+  if (form.trip.foodPerKillOverride != null) {
+    parts.push(`food/kill ${formatNumber(form.trip.foodPerKillOverride, 2)}`);
+  }
+  if (form.trip.prayerMode === "potions") {
+    if (form.trip.prayerPotionDoses != null) {
+      parts.push(`prayer ${formatNumber(form.trip.prayerPotionDoses)} doses`);
+    } else if (form.trip.prayerPotionSets != null) {
+      parts.push(`prayer ${formatNumber(form.trip.prayerPotionSets)} vials`);
+    }
+  } else if (form.trip.prayerMode === "altar" && form.trip.altarSeconds != null) {
+    parts.push(`altar ${formatNumber(form.trip.altarSeconds)}s`);
+  }
+  return parts;
+}
+
+function activeAssumptionSupplyParts(form: CombatSetupFormState): string[] {
+  const defaults = DEFAULT_FORM_STATE.trip;
+  const parts: string[] = [];
+  if (form.trip.potionSets !== defaults.potionSets) {
+    parts.push(`boost vials ${formatNumber(form.trip.potionSets)}`);
+  }
+  if (form.trip.potionDoses !== defaults.potionDoses) {
+    parts.push(`boost doses ${formatNumber(form.trip.potionDoses)}`);
+  }
+  if (form.trip.singleDose !== defaults.singleDose) {
+    parts.push(form.trip.singleDose ? "single-dose boosts" : "vial boosts");
+  }
+  if (form.trip.dbaRestore !== defaults.dbaRestore) {
+    parts.push(form.trip.dbaRestore ? "DBA restore on" : "DBA restore off");
+  }
+  if (form.trip.antifire !== defaults.antifire) parts.push(`antifire ${form.trip.antifire ? "on" : "off"}`);
+  if (form.trip.antipoison !== defaults.antipoison) {
+    parts.push(`antipoison ${form.trip.antipoison ? "on" : "off"}`);
+  }
+  if (form.trip.recoilRings !== defaults.recoilRings) {
+    parts.push(`recoil rings ${formatNumber(form.trip.recoilRings)}`);
+  }
+  if (form.combatStyle === "magic" && form.trip.runeSlots !== defaults.runeSlots) {
+    parts.push(`rune slots ${formatNumber(form.trip.runeSlots)}`);
+  }
+  return parts;
+}
+
+function activeAssumptionValidLootOverrideCount(
+  lootPrefs: Record<string, LootAction | string | undefined>,
+  effectiveOverrideCount: number
+): number {
+  if (effectiveOverrideCount > 0) return effectiveOverrideCount;
+  return Object.values(lootPrefs).filter((value) =>
+    LOOT_ACTION_ORDER.includes(value as LootAction)
+  ).length;
+}
+
+function createActiveAssumptionsSummaryViewModel(input: {
+  form: CombatSetupFormState;
+  request: SimulationRequest;
+  context: SimulationContext;
+  trip: TripLootSupplyResult;
+  cannonByMonster: CannonByMonsterState;
+  lootPrefs: Record<string, LootAction | string | undefined>;
+  lootSettingsByMonster: LootSettingsByMonsterState;
+  lootOverrideCount: number;
+  specialWarnings: readonly CalculationWarningViewModel[];
+  moneyWarnings: readonly CalculationWarningViewModel[];
+  options?: SimulationViewModelOptions["activeAssumptions"];
+}): ActiveAssumptionsSummaryViewModel {
+  const rows: ActiveAssumptionRowViewModel[] = [];
+  const monsterName =
+    input.context.gameData.monsters[input.request.monsterId]?.name ?? input.request.monsterId;
+  const combatReviewTab = input.request.combatStyle;
+
+  if (input.moneyWarnings.length > 0) {
+    rows.push({
+      id: "price-warnings",
+      category: "warning",
+      label: "Price confidence",
+      value: activeAssumptionCountLabel(input.moneyWarnings.length, "warning"),
+      detail: input.moneyWarnings[0]?.message ?? "Price warnings affect this result.",
+      reviewTab: "economy",
+      tone: "warning",
+      priority: 10
+    });
+  }
+
+  if (input.specialWarnings.length > 0) {
+    rows.push({
+      id: "special-warnings",
+      category: "warning",
+      label: "Special attack assumption",
+      value: activeAssumptionCountLabel(input.specialWarnings.length, "warning"),
+      detail: input.specialWarnings[0]?.message ?? "Special attack assumptions affect this result.",
+      reviewTab: combatReviewTab,
+      tone: "warning",
+      priority: 11
+    });
+  }
+
+  if (input.options?.setupMode === "custom" && input.options.hasCustomSetup === true) {
+    rows.push({
+      id: "custom-setup",
+      category: "setup",
+      label: "Custom setup",
+      value: monsterName,
+      detail: "Monster-specific setup snapshot is active for this result.",
+      reviewTab: combatReviewTab,
+      tone: "info",
+      priority: 20
+    });
+  }
+
+  const currentCannon = input.cannonByMonster[input.request.monsterId];
+  if (currentCannon?.enabled === true) {
+    const output = input.trip.cannon;
+    const respawn = currentCannon.respawnSec ?? output?.respawnSec ?? null;
+    rows.push({
+      id: "cannon-enabled",
+      category: "setup",
+      label: "Cannon",
+      value: output?.idle ? "Enabled, idle" : "Enabled",
+      detail: [
+        `targets ${formatNumber(currentCannon.targets ?? 3)}`,
+        respawn != null ? `respawn ${formatNumber(respawn)}s` : null
+      ]
+        .filter(Boolean)
+        .join(", "),
+      reviewTab: "cannon",
+      tone: output?.idle ? "warning" : "info",
+      priority: 21,
+      resetAction: {
+        target: "cannon-enabled",
+        label: "Reset",
+        ariaLabel: "Reset current monster cannon",
+        statusLabel: "Current monster cannon reset"
+      }
+    });
+  }
+
+  const manualOverrideParts = activeAssumptionManualOverrideParts(input.form.manualOverrides);
+  if (manualOverrideParts.length > 0) {
+    rows.push({
+      id: "manual-combat-overrides",
+      category: "setup",
+      label: "Manual combat overrides",
+      value: activeAssumptionCountLabel(manualOverrideParts.length, "field"),
+      detail: manualOverrideParts.join(", "),
+      reviewTab: combatReviewTab,
+      tone: "info",
+      priority: 22,
+      resetAction: {
+        target: "manual-combat-overrides",
+        label: "Reset",
+        ariaLabel: "Reset manual combat overrides",
+        statusLabel: "Manual overrides reset"
+      }
+    });
+  }
+
+  if (input.context.priceSet.source !== "bundled") {
+    rows.push({
+      id: "active-price-set",
+      category: "loot",
+      label: "Active PriceSet",
+      value: activeAssumptionSourceLabel(input.context.priceSet.source),
+      detail: input.context.priceSet.label,
+      reviewTab: "economy",
+      tone: "info",
+      priority: 40
+    });
+  }
+
+  const rawLootSettings = input.lootSettingsByMonster[input.request.monsterId];
+  const lootSettings = lootSettingsForMonster(input.lootSettingsByMonster, input.request.monsterId);
+  const lootSettingParts = activeAssumptionLootSettingParts(
+    input.form,
+    lootSettings,
+    rawLootSettings
+  );
+  if (lootSettingParts.length > 0) {
+    rows.push({
+      id: "loot-settings",
+      category: "loot",
+      label: "Loot settings",
+      value: activeAssumptionCountLabel(lootSettingParts.length, "modifier"),
+      detail: lootSettingParts.join(", "),
+      reviewTab: "loot",
+      tone: "info",
+      priority: 41,
+      resetAction:
+        rawLootSettings == null
+          ? undefined
+          : {
+              target: "loot-settings",
+              label: "Reset",
+              ariaLabel: "Reset current monster loot settings",
+              statusLabel: "Current monster loot settings reset"
+            }
+    });
+  }
+
+  const lootOverrideCount = activeAssumptionValidLootOverrideCount(
+    input.lootPrefs,
+    input.lootOverrideCount
+  );
+  if (lootOverrideCount > 0) {
+    rows.push({
+      id: "loot-action-overrides",
+      category: "loot",
+      label: "Loot action overrides",
+      value: activeAssumptionCountLabel(lootOverrideCount, "drop"),
+      detail: "Current monster drop actions differ from canonical defaults.",
+      reviewTab: "loot",
+      tone: "info",
+      priority: 42,
+      resetAction: {
+        target: "loot-action-overrides",
+        label: "Reset",
+        ariaLabel: "Reset current monster loot overrides",
+        statusLabel: "Current monster loot overrides reset"
+      }
+    });
+  }
+
+  if (input.form.trip.scarceSpot) {
+    rows.push({
+      id: "scarce-spot",
+      category: "trip",
+      label: "Scarce spot",
+      value: "On",
+      detail: [
+        `targets ${formatNumber(input.form.trip.targetsAtSpot ?? input.trip.trip.scarce.targetsAtSpot)}`,
+        `respawn ${formatNumber(input.form.trip.respawnSeconds ?? input.trip.trip.scarce.respawnSeconds)}s`
+      ].join(", "),
+      reviewTab: "trip",
+      tone: "info",
+      priority: 60,
+      resetAction: {
+        target: "scarce-spot",
+        label: "Reset",
+        ariaLabel: "Reset scarce spot",
+        statusLabel: "Scarce spot disabled; target and respawn values kept"
+      }
+    });
+  }
+
+  if (input.form.trip.safespot != null) {
+    rows.push({
+      id: "explicit-safespot",
+      category: "trip",
+      label: "Safespot override",
+      value: input.form.trip.safespot ? "On" : "Off",
+      detail: `Explicit safespot ${input.form.trip.safespot ? "on" : "off"}; auto detection is bypassed.`,
+      reviewTab: "trip",
+      tone: "info",
+      priority: 61,
+      resetAction: {
+        target: "explicit-safespot",
+        label: "Reset",
+        ariaLabel: "Reset safespot override",
+        statusLabel: "Safespot override reset to auto"
+      }
+    });
+  }
+
+  if (input.form.trip.protect !== "none") {
+    rows.push({
+      id: "protection-prayer",
+      category: "trip",
+      label: "Protection prayer",
+      value: PROTECT_PRAYER_LABELS[input.form.trip.protect],
+      detail: "Incoming damage uses the selected protection prayer.",
+      reviewTab: "trip",
+      tone: "info",
+      priority: 62
+    });
+  }
+
+  const tripManualParts = activeAssumptionTripManualParts(input.form);
+  if (tripManualParts.length > 0) {
+    rows.push({
+      id: "manual-trip-controls",
+      category: "trip",
+      label: "Manual trip controls",
+      value: activeAssumptionCountLabel(tripManualParts.length, "field"),
+      detail: tripManualParts.join(", "),
+      reviewTab: "trip",
+      tone: "info",
+      priority: 63
+    });
+  }
+
+  const supplyParts = activeAssumptionSupplyParts(input.form);
+  if (supplyParts.length > 0) {
+    rows.push({
+      id: "supply-settings",
+      category: "settings",
+      label: "Supply settings",
+      value: activeAssumptionCountLabel(supplyParts.length, "modifier"),
+      detail: supplyParts.join(", "),
+      reviewTab: "trip",
+      tone: "info",
+      priority: 70
+    });
+  }
+
+  const hiddenGearTierCount = input.options?.hiddenGearTierCount ?? 0;
+  if (hiddenGearTierCount > 0) {
+    rows.push({
+      id: "hidden-gear-tiers",
+      category: "settings",
+      label: "Hidden gear tiers",
+      value: activeAssumptionCountLabel(hiddenGearTierCount, "tier"),
+      detail: "Gear candidate lists hide these tiers in setup controls.",
+      reviewTab: "settings",
+      tone: "info",
+      priority: 80,
+      resetAction: {
+        target: "hidden-gear-tiers",
+        label: "Reset",
+        ariaLabel: "Reset hidden gear tiers",
+        statusLabel: "Hidden gear tiers shown"
+      }
+    });
+  }
+
+  rows.sort((left, right) => left.priority - right.priority || left.label.localeCompare(right.label));
+  const visibleRows = rows.slice(0, ACTIVE_ASSUMPTIONS_VISIBLE_LIMIT);
+  const hiddenRows = rows.slice(ACTIVE_ASSUMPTIONS_VISIBLE_LIMIT);
+  return {
+    statusLabel:
+      rows.length === 0
+        ? "Default assumptions active"
+        : `${activeAssumptionCountLabel(rows.length, "active modifier")}`,
+    totalCount: rows.length,
+    hasActiveRows: rows.length > 0,
+    visibleRows,
+    hiddenRows,
+    hiddenCount: hiddenRows.length
+  };
 }
 
 function tripInputFor(
@@ -1464,6 +1948,140 @@ function createXpRoutingViewModel(input: {
   };
 }
 
+function statsSourceStatusLabel(status: StatsSourceBreakdownStatus): string {
+  if (status === "modeled") return "modeled";
+  if (status === "partial") return "partial";
+  if (status === "not-modeled") return "not modeled";
+  return "inactive";
+}
+
+function optionalStatsNumber(value: number | null, digits = 0): string {
+  return value == null ? "-" : formatNumber(value, digits);
+}
+
+function optionalStatsPercent(value: number | null): string {
+  return value == null ? "-" : `${formatNumber(value * 100, 1)}%`;
+}
+
+function statsSourceBreakdownRow(
+  input: Omit<
+    StatsSourceBreakdownRowViewModel,
+    | "statusLabel"
+    | "dpsLabel"
+    | "xpPerHourLabel"
+    | "hitChanceLabel"
+    | "maxHitLabel"
+    | "supplyCostPerHourLabel"
+    | "supplyCostPerKillLabel"
+  >
+): StatsSourceBreakdownRowViewModel {
+  return {
+    ...input,
+    statusLabel: statsSourceStatusLabel(input.status),
+    dpsLabel: optionalStatsNumber(input.dps, 2),
+    xpPerHourLabel: optionalStatsNumber(input.xpPerHour),
+    hitChanceLabel: optionalStatsPercent(input.hitChance),
+    maxHitLabel: optionalStatsNumber(input.maxHit),
+    supplyCostPerHourLabel: optionalStatsNumber(input.supplyCostPerHour),
+    supplyCostPerKillLabel: optionalStatsNumber(input.supplyCostPerKill)
+  };
+}
+
+function createStatsSourceBreakdownViewModel(input: {
+  form: CombatSetupFormState;
+  combat: ReturnType<typeof simulateCombat>;
+  trip: TripLootSupplyResult;
+  playerEffectiveXpPerHour: number;
+  cannonEffectiveXpPerHour: number;
+  specialWarnings: readonly CalculationWarningViewModel[];
+}): StatsSourceBreakdownViewModel {
+  const cannon = input.trip.cannon;
+  const cannonSupplyCostPerKill = cannon?.ballCostPerKill ?? 0;
+  const normalSupplyCostPerKill = Math.max(
+    0,
+    input.trip.supply.supplyCostPerKill - cannonSupplyCostPerKill
+  );
+  const normalSupplyCostPerHour = normalSupplyCostPerKill * input.trip.effectiveKph;
+  const special = input.combat.specialAttack;
+  const specialDps = special ? special.dpsWithSpec - special.dpsBase : null;
+  const specialStatus: StatsSourceBreakdownStatus = special
+    ? input.specialWarnings.length > 0
+      ? "partial"
+      : "modeled"
+    : input.form.combatStyle === "magic"
+      ? "not-modeled"
+      : "inactive";
+  const specialNotes =
+    special == null
+      ? [
+          input.form.combatStyle === "magic"
+            ? "Magic DPS special attacks are not modeled yet."
+            : "No supported melee/ranged DPS special selected."
+        ]
+      : [
+          `${formatNumber(special.specsPerHour, 1)} specs/hr from the current special attack model.`,
+          ...(input.specialWarnings.length > 0
+            ? input.specialWarnings.map((warning) => warning.message)
+            : ["DPS gain is shown as modeled special DPS above the normal attack baseline."])
+        ];
+
+  return {
+    rows: [
+      statsSourceBreakdownRow({
+        id: "normal-attack",
+        label: "Normal attack",
+        status: "modeled",
+        dps: input.combat.dps,
+        dpsDetail: special ? "Baseline before special attacks" : null,
+        dpsGainPct: null,
+        xpPerHour: input.playerEffectiveXpPerHour,
+        hitChance: input.combat.hitChance,
+        maxHit: input.combat.maxHit,
+        supplyCostPerHour: normalSupplyCostPerHour,
+        supplyCostPerKill: normalSupplyCostPerKill,
+        notes: ["Base player attack after trip efficiency and current supply model."]
+      }),
+      statsSourceBreakdownRow({
+        id: "special-attack",
+        label: "Special attack",
+        status: specialStatus,
+        dps: specialDps,
+        dpsDetail: special ? `DPS gain ${formatNumber(special.dpsGainPct, 1)}%` : null,
+        dpsGainPct: special?.dpsGainPct ?? null,
+        xpPerHour: null,
+        hitChance: special?.hitChance ?? null,
+        maxHit: special?.maxHit ?? null,
+        supplyCostPerHour: null,
+        supplyCostPerKill: null,
+        notes: specialNotes
+      }),
+      statsSourceBreakdownRow({
+        id: "cannon",
+        label: "Cannon",
+        status: cannon ? "modeled" : "inactive",
+        dps: cannon?.cannonDps ?? null,
+        dpsDetail: cannon ? `${formatNumber(cannon.activeFrac * 100, 1)}% active` : null,
+        dpsGainPct: null,
+        xpPerHour: cannon ? input.cannonEffectiveXpPerHour : null,
+        hitChance: cannon ? input.combat.hitChance : null,
+        maxHit: cannon?.maxBall ?? null,
+        supplyCostPerHour: cannon ? cannonSupplyCostPerKill * input.trip.effectiveKph : null,
+        supplyCostPerKill: cannon ? cannonSupplyCostPerKill : null,
+        notes: cannon
+          ? [
+              `Cannon overlay: ${formatNumber(cannon.effTargets, 1)} effective targets, ${formatNumber(
+                cannon.ballsPerHour
+              )} balls/hr before trip efficiency.`,
+              cannon.respawnBound
+                ? "Respawn-bound cannon overlay."
+                : "Cannon overlay is not respawn-bound."
+            ]
+          : ["Cannon is off for the current monster."]
+      })
+    ]
+  };
+}
+
 function finiteMinutesLabel(minutes: number): string {
   return Number.isFinite(minutes) ? `${formatNumber(minutes, 1)}m` : "unlimited";
 }
@@ -1710,6 +2328,19 @@ export function createSimulationViewModel(
   const moneyWarnings = calculationWarnings.filter((warning) =>
     MONEY_WARNING_CODES.has(warning.code)
   );
+  const activeAssumptions = createActiveAssumptionsSummaryViewModel({
+    form,
+    request,
+    context,
+    trip,
+    cannonByMonster,
+    lootPrefs,
+    lootSettingsByMonster,
+    lootOverrideCount: lootRows.overrideCount,
+    specialWarnings,
+    moneyWarnings,
+    options: options.activeAssumptions
+  });
 
   return {
     request,
@@ -1724,6 +2355,15 @@ export function createSimulationViewModel(
       totalXpPerHour
     }),
     tripBankingSummary: createTripBankingSummaryViewModel(form, trip),
+    statsSourceBreakdown: createStatsSourceBreakdownViewModel({
+      form,
+      combat,
+      trip,
+      playerEffectiveXpPerHour,
+      cannonEffectiveXpPerHour,
+      specialWarnings
+    }),
+    activeAssumptions,
     monsterCard: monsterCardFromResult(request, context, combat, options.monsterCard),
     trip,
     playerEffectiveXpPerHour,

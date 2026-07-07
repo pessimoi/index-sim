@@ -84,6 +84,32 @@ Formatting requirements:
 - XP/hr and GP/hr use compact thousands formatting when large.
 - The mapping between legacy `result.dps` and rewrite `combat.effectiveDps` must be verified before full replacement, especially once special attacks and cannon controls are exposed.
 
+### Active Assumptions / Modifiers Summary
+
+The shared Stats/Compare result area must include a summary of active
+assumptions and modifiers that affect the current result. It is view-model data,
+not DOM-derived state.
+
+Required behavior:
+
+- Show a subdued `Default assumptions active` state when no summary rows are active.
+- Show at most five priority rows by default, with a `+N more` expandable list for overflow.
+- Prioritize calculation confidence warnings, then custom setup/cannon/manual combat overrides, loot/economy modifiers, trip-rate modifiers and settings modifiers.
+- Include a `Review` action per row that switches to the owning workbench tab without resetting or mutating the underlying setting.
+- Include a `Reset` action only for active rows with a narrow, already-owned reset path: manual combat overrides, current-monster cannon settings, current-monster loot settings, current-monster loot action overrides, explicit safespot override, Trip scarce spot enablement and hidden gear tiers.
+- Reset actions must affect only the row's modifier family, keep `Review` available, announce a short status message and stay keyboard/screen-reader accessible.
+- Keep calculation confidence warnings, special fallback warnings, active PriceSet/source rows, custom setup rows, protection prayer, inherited Trip high-alch rows, manual Trip controls and supply settings review-only until a separate unambiguous reset policy exists.
+- Do not add fields to `SimulationRequest`, persisted setup schema versions, live provider paths or legacy migration policy.
+
+Current implementation note: `createSimulationViewModel()` returns
+`activeAssumptions`, built from the validated current form/context and existing
+view-model warning data. It covers price and special-attack confidence warnings,
+active custom setup, manual combat overrides, enabled per-monster cannon settings,
+per-monster loot settings, loot action overrides, active non-bundled PriceSet,
+scarce spot, explicit safespot override, protection prayer, manual food/bank/prayer controls,
+changed supply settings and hidden gear tiers. Stats and Compare render the same
+summary below the metric strip. `Review` only changes the active tab. `Reset` is shown only on the scoped resettable rows above; for example, resetting current-monster loot settings does not remove loot action overrides, resetting loot action overrides does not remove per-monster loot settings, resetting current-monster cannon does not change Trip scarce state, resetting explicit safespot returns to Auto and resetting Trip scarce spot leaves the target-count and respawn values in place.
+
 ### Dense Monster Table
 
 The table must show all monsters in `GameDataSnapshot`, not just the top N rows.
@@ -433,21 +459,27 @@ Required content:
 - XP routing chips.
 
 Current implementation note: the rewrite Stats pane now includes the shared
-metric strip, XP routing chips, a Trip & banking summary and a
-normal-player-attack hit distribution histogram. XP routing is derived in the
-view-model from the current combat XP breakdown and trip output: player combat
-XP/hr is always shown, cannon ranged XP/hr appears only when cannon contributes,
-skill-specific combat XP rows are listed, Prayer XP is modeled from current bury
-loot rows and Magic alch XP is modeled from tracked in-trip alch casts. The
-`totalXpPerHour` value is composed from those modeled XP source rows. The
-Trip & banking summary mirrors the current trip result for kills/trip, trip
-length, bank time, effective kills/hr, supply/kill, net GP/hr, current bound,
-safespot and protection state. Hit distribution bucket data is derived from the
-current combat result through the domain/view-model boundary, with bounded hit
-chance/max-hit inputs, a combined miss/zero bucket, damage buckets, accessible
-bucket labels and a max-hit marker. This does not change the `SimulationResult`
-contract or combat golden baselines. Combat roll metric expansion and
-special/cannon hit distributions remain open parity work.
+metric strip, active assumptions/modifiers summary, a compact source breakdown,
+XP routing chips, a Trip & banking summary and a normal-player-attack hit
+distribution histogram. The source breakdown is derived in the view-model from
+existing combat, special attack, trip and cannon outputs. It lists normal attack,
+special attack and cannon with modeled, partial, not modeled or inactive status
+and shows available DPS, DPS gain context, XP/hr, hit chance, max hit,
+supply-cost and note fields without changing formulas or adding new provider
+dependencies. XP routing is derived in the view-model from the current combat XP
+breakdown and trip output: player combat XP/hr is always shown, cannon ranged
+XP/hr appears only when cannon contributes, skill-specific combat XP rows are
+listed, Prayer XP is modeled from current bury loot rows and Magic alch XP is
+modeled from tracked in-trip alch casts. The `totalXpPerHour` value is composed
+from those modeled XP source rows. The Trip & banking summary mirrors the
+current trip result for kills/trip, trip length, bank time, effective kills/hr,
+supply/kill, net GP/hr, current bound, safespot and protection state. Hit
+distribution bucket data is derived from the current combat result through the
+domain/view-model boundary, with bounded hit chance/max-hit inputs, a combined
+miss/zero bucket, damage buckets, accessible bucket labels and a max-hit marker.
+This does not change the `SimulationResult` contract or combat golden baselines.
+Combat roll metric expansion and special/cannon hit distributions remain open
+parity work.
 
 ### Melee, Ranged and Magic
 
@@ -485,6 +517,9 @@ Required content:
 - Custom setup marker.
 - Relevant/irrelevant toggle and persisted relevance.
 - Bar visualization for XP/hr and GP/hr.
+
+Current implementation note: Compare shares the metric strip and active
+assumptions/modifiers summary with Stats above the dense monster table.
 
 ### Loot
 

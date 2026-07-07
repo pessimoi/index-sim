@@ -229,7 +229,7 @@ They cover:
 - versioned last-player persistence with no legacy key migration
 - preview/apply behavior for Attack, Strength, Defence, Hitpoints, Prayer, Ranged and Magic
 
-The Playwright scaffold includes a mocked `/api/hiscores/status` and `/api/hiscores` smoke path. It also checks the default disabled-provider copy and absence of stale production `run_sim.py` instructions. It must stay mocked; automated tests must not call a live hiscores upstream.
+The Playwright scaffold includes a mocked `/api/hiscores/status` and `/api/hiscores` smoke path. It also checks the default disabled-provider copy, disabled Lookup behavior, editable manual Player level fields and absence of stale production `run_sim.py` instructions. It must stay mocked; automated tests must not call a live hiscores upstream.
 
 ## Legacy storage migration tests
 
@@ -253,12 +253,13 @@ The market same-origin implementation tests live in:
 - `src/tests/market-server.test.ts`
 - `src/tests/market-adapter.test.ts`
 - `src/tests/market-ui-state.test.ts`
+- `src/tests/price-import-notice.test.ts`
 - `src/tests/e2e/scaffold.spec.ts`
 
 Run focused coverage with:
 
 ```sh
-npm run test -- src/tests/market-sync-items.test.ts src/tests/market-server.test.ts src/tests/market-adapter.test.ts src/tests/market-ui-state.test.ts
+npm run test -- src/tests/market-sync-items.test.ts src/tests/market-server.test.ts src/tests/market-adapter.test.ts src/tests/market-ui-state.test.ts src/tests/price-import-notice.test.ts
 ```
 
 They cover:
@@ -271,11 +272,11 @@ They cover:
 - partial failure reports that keep successful validated prices
 - service-unavailable, rate-limited, timeout and upstream-invalid failures
 - browser adapter cross-origin refusal and invalid-payload handling
-- UI state helpers that swap `PriceSet` only on success and keep the current one on failure
+- UI state helpers and import notices that swap `PriceSet` only on success, keep the current one on failure, format item-level market report diagnostics with failed/skipped rows first and report imported `PriceSet` invalid JSON, duplicate keys, invalid schema data and oversized files with visible validation codes, bounded issue paths and no raw dumps
 - browser-local price history snapshots only for accepted imported or synced `PriceSet` values, with failed import/sync paths leaving history unchanged
 - browser-local Economy movers analysis for latest-vs-previous, latest-vs-first and explicit snapshot baselines, including filter/sort behavior and missing or zero baseline prices without `NaN`/`Infinity`
 
-The Playwright scaffold includes a mocked `/api/market/status` and `/api/market/sync` smoke path. It also checks Settings Price data counts and validated `PriceSet` import, the browser-local price history summary, Economy movers analysis, Snapshot now, confirmed Clear history, browser-rendered metric-strip numbers after a mocked market `PriceSet` is accepted, Result/Loot/Economy price-warning surfacing for imported price sets, the default disabled-provider copy and absence of stale production `/api/prices` or `/api/scrape` instructions. It must stay mocked; automated tests must not call a live market upstream.
+The Playwright scaffold includes a mocked `/api/market/status` and `/api/market/sync` smoke path. It also checks Settings Price data counts, validated `PriceSet` import, non-fatal failed PriceSet import recovery with validation code, schema-path diagnostics, unchanged active `PriceSet` and unchanged browser-local history, the Market sync disabled-provider fallback with disabled sync buttons, active `PriceSet` summary and local import path, item-level Market sync diagnostics for failed/skipped rows, sanitized reasons, compact report warnings and status filters, the browser-local price history summary, Economy movers analysis, Snapshot now, confirmed Clear history, browser-rendered metric-strip numbers after a mocked market `PriceSet` is accepted, Result/Loot/Economy price-warning surfacing for imported price sets, the default disabled-provider copy and absence of stale production `/api/prices` or `/api/scrape` instructions. It must stay mocked; automated tests must not call a live market upstream.
 
 The same scaffold also covers Settings Gear menu tier filtering for rewrite-owned
 hidden gear preferences: hiding a tier removes matching unselected options from
@@ -375,7 +376,8 @@ They cover:
 - scarce/AFK Trip controls, inventory reserve details, prayer restore capacity, Trip summary Auto/Manual wording and derived general potion recommendation status/`canApply` state in the UI view model
 - domain-backed result, compare and planner view models
 - Stats hit distribution view-model labels, bucket accessibility text and probability-total invariants
-- Stats XP routing view-model rows, cannon-only XP row visibility, modeled Prayer/Magic-alch total-XP rows and Trip/banking summary mapping
+- Stats source breakdown view-model rows for normal attack, special attack and cannon statuses, plus XP routing rows, cannon-only XP row visibility, modeled Prayer/Magic-alch total-XP rows and Trip/banking summary mapping
+- active assumptions/modifiers summary view-model rows for empty/default state, manual combat overrides, enabled cannon settings, loot settings, loot action overrides, imported/synced PriceSet modifiers, money warnings, dragon-halberd special warning, explicit safespot and protection-prayer split rows, targeted reset metadata, review-only boundaries, reset scoping and stable priority order/five-row overflow
 - Duel comparison view-model rows for live setup and saved snapshots against the current monster, including deltas and best-marker fields
 - structured money warning view models for price alias and fallback surfacing
 - dense compare monster/drop filters, irrelevant monster state, active-target forced visibility and derived row state markers
@@ -394,7 +396,7 @@ They cover:
 - active weapon, gear, ammo and spell selection mapping into `SimulationRequest`, including two-handed weapon shield lock/clear behavior
 - deterministic visible-candidate gear quick actions for the active combat style, including current-selection ties and shield-lock disabled state
 - rewrite-owned monster-specific custom setup create/restore/remove helpers, persisted schema validation and dense row marker/calculation mapping
-- per-monster loot settings for high-alch enablement, kill overhead and talisman spot, with separate persistence from `index-sim:loot-prefs`
+- per-monster loot settings for high-alch enablement, kill overhead and talisman spot, with separate persistence and reset helpers from `index-sim:loot-prefs`
 - defaulting and sanitization for newly modeled trip-control fields in persisted rewrite setups
 - defaulting and sanitization for special attack controls in persisted rewrite setups, including unknown, combat-style-incompatible and DBA-conflicting active/per-style/custom setup state
 - versioned per-monster cannon settings persistence in the rewrite setup envelope
@@ -402,8 +404,9 @@ They cover:
 - versioned last-player hiscores and browser-local price history persistence through `PersistedEnvelope<T>`
 - browser-local Economy movers analysis, Snapshot now and confirmed Clear history that removes only `index-sim:price-history`
 - refusal to implicitly migrate mismatched persisted versions
-- validated `PriceSet` import errors
-- Playwright smoke for the workbench shell, PlayerSidebar, legacy-order TabBar, right-side MonsterCard rail, mobile MonsterCard ordering, MonsterCard target switch/drop-filter sharing/active defence highlights, dense spreadsheet Compare pane, Dense Compare mobile/tablet page-width containment and internal horizontal table scroll, dense XP/net-GP scale indicators, metric strip, Stats XP routing, Trip & banking summary and hit distribution histogram, combat-style switching, per-combat-type loadout restore, multi-prayer/multi-boost workbench controls with compact-strip primary edits and `+N` markers, active-style gear quick actions with two-handed shield lock, manual combat override persistence/reset, SetupBar custom setup create/restore/remove, Melee/Ranged/Magic equipment pane edits with searchable selectors and persisted selections, tab-routed special attack controls/metrics, dragon halberd NPC-size fallback warning, DBA boost special suppression, magic special unsupported state, trip survival/food/recoil controls, Trip summary Auto/Manual labels for bank time, food count and prayer restore, trip potion recommendation apply/disabled/inactive states, dense row markers, browser-rendered dense numeric release-path snapshots for default melee, melee alch-relevant, ranged safespot, ranged cannon, magic safespot and custom loot-settings marker rows, browser-rendered metric-strip acceptance snapshots for those target selections plus default melee, ranged safespot, cannon-enabled ranged, loot action override, manual food/prayer trip, imported PriceSet, mocked market sync and compatible legacy import paths, final Cannon tab controls with sparse-link/reset behavior and expanded output snapshots for effective targets, cannon DPS, balls/hr, balls/kill, cannon ranged XP/hr, effective XP/hr, effective net GP/hr, ball costs, cannonballs/trip and K/hr uplift, Duel tab snapshot/rename/load/delete/persistence flow, Planner tab open/metric/current-XP/target/skill-lock/gear-pool/Recompute/training-order/timeline/chart persistence flow, per-monster loot settings persistence, full monster table row count, table sorting, dense compare filters/relevance persistence, row target selection, per-monster cannon controls, Economy price-history controls, mocked hiscores lookup/apply flow and mocked market sync/report/history flow
+- validated `PriceSet` import errors with non-fatal UI notices and retry recovery
+- non-fatal rewrite setup import failures for invalid JSON, unsupported setup versions, invalid schema data and oversized files, preserving the visible and persisted setup while leaving file input retryable
+- Playwright smoke for the workbench shell, PlayerSidebar, legacy-order TabBar, right-side MonsterCard rail, mobile MonsterCard ordering, MonsterCard target switch/drop-filter sharing/active defence highlights, dense spreadsheet Compare pane, Dense Compare mobile/tablet page-width containment and internal horizontal table scroll, dense XP/net-GP scale indicators, metric strip, active assumptions/modifiers summary in Compare and Stats with Review-to-Cannon tab switching plus targeted Reset actions for manual combat overrides, current-monster loot settings and current-monster cannon settings, Stats source breakdown, Stats XP routing, Trip & banking summary and hit distribution histogram, combat-style switching, per-combat-type loadout restore, multi-prayer/multi-boost workbench controls with compact-strip primary edits and `+N` markers, active-style gear quick actions with two-handed shield lock, manual combat override persistence/reset, SetupBar custom setup create/restore/remove plus one-step Undo for remove, rewrite setup import failure retry/notice behavior, PriceSet import failure retry/notice behavior, Melee/Ranged/Magic equipment pane edits with searchable selectors and persisted selections, tab-routed special attack controls/metrics, dragon halberd NPC-size fallback warning, DBA boost special suppression, magic special unsupported state, trip survival/food/recoil controls, Trip summary Auto/Manual labels for bank time, food count and prayer restore, trip potion recommendation apply/disabled/inactive states, dense row markers, browser-rendered dense numeric release-path snapshots for default melee, melee alch-relevant, ranged safespot, ranged cannon, magic safespot and custom loot-settings marker rows, browser-rendered metric-strip acceptance snapshots for those target selections plus default melee, ranged safespot, cannon-enabled ranged, loot action override, manual food/prayer trip, imported PriceSet, mocked market sync and compatible legacy import paths, final Cannon tab controls with sparse-link/reset behavior and expanded output snapshots for effective targets, cannon DPS, balls/hr, balls/kill, cannon ranged XP/hr, effective XP/hr, effective net GP/hr, ball costs, cannonballs/trip and K/hr uplift, Duel tab snapshot/rename/load/delete/undo/persistence flow, Planner tab open/metric/current-XP/target/skill-lock/gear-pool/Recompute/training-order/timeline/chart persistence flow, per-monster loot settings persistence plus loot reset/optimize Undo, full monster table row count, table sorting, dense compare filters/relevance persistence, row target selection, per-monster cannon controls, Economy price-history controls, mocked hiscores lookup/apply flow and mocked market sync/report/history flow
 
 Run the focused browser smoke for the visible Stats workflow with:
 
@@ -421,6 +424,12 @@ Run the focused browser smoke for Dense Compare release-path numeric snapshots w
 
 ```sh
 npm run test:e2e -- --grep "release-path dense"
+```
+
+Run the focused browser smoke for local destructive-action Undo coverage with:
+
+```sh
+npm run test:e2e -- --grep "Duel tab|custom setups|loot actions|Active modifiers loot"
 ```
 
 Dense/Compare release classification: D-032 accepts the current release-path
