@@ -44,6 +44,7 @@ The legacy `views.jsx` `ArchitectureBoard` is only a docs-link panel. Treat the 
 - Legacy planner domain logic: `planner-core.js`
 - Rewrite planner domain logic: `src/domain/planner`
 - Price snapshots: `prices.json`, `alch.json`, `price-history.json`
+- Generated game-data foundation: `scripts/generate-game-data.ts`, `scripts/game-data-generator-core.ts`, `src/data/generated/`, `docs/project/revision-impact/current.md`
 - Styling: `styles.css`
 - Rewrite implementation: `src/app`, `src/domain`, `src/data`, `src/adapters`, `src/tests`
 - Documentation map: `docs/README.md`
@@ -79,9 +80,9 @@ No CI config, database schema or backend source is present in this checkout as o
 ### Data or config change
 
 - Read first: [docs/product/README.md](docs/product/README.md), [docs/technical/architecture.md](docs/technical/architecture.md).
-- Check code/data: `gamedata.js`, `prices.json`, `alch.json`, `price-history.json`, `market.js`, `engine.js`.
-- Risks: source provenance, placeholder prices, localStorage price overrides, duplicate item keys, loot table shape.
-- Validate: JSON parse for data files, `node --check` for affected `.js`, and `npm run test:golden` for simulation-impacting changes.
+- Check code/data: `gamedata.js`, `prices.json`, `alch.json`, `price-history.json`, `market.js`, `engine.js`, `scripts/generate-game-data.ts`, `scripts/game-data-generator-core.ts`, `src/data/generated/`.
+- Risks: source provenance, placeholder prices, localStorage price overrides, duplicate item keys, loot table shape, raw upstream dumps, historical generated snapshot archives.
+- Validate: JSON parse for data files, `node --check` for affected `.js`, `npm run test -- src/tests/data-generator.test.ts` for generated-data workflow changes, and `npm run test:golden` for simulation-impacting changes.
 - Update docs when source tags, price workflow or data ownership changes.
 
 ### Auth or permission change

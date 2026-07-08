@@ -42,12 +42,12 @@ Current market run behavior:
 - Vite dev and preview expose same-origin `GET /api/market/status` and `POST /api/market/sync` through repo-owned middleware.
 - The default market provider is disabled, so local runs show the disabled service state unless a test injects a provider.
 - The rewrite UI keeps JSON price import available as the offline fallback.
-- The rewrite UI stores the selected active imported, synced or compatible legacy `PriceSet` in browser-local `index-sim:price-set:selected` using a versioned envelope. Reload restores a valid selected `PriceSet` over the bundled context without adding a price-history snapshot. Reset to bundled prices clears only this selected key and keeps local price history.
+- The rewrite UI stores the selected active imported, synced or compatible legacy `PriceSet` in browser-local `index-sim:price-set:selected` using a versioned envelope. Reload restores a valid selected `PriceSet` over the scheduled static snapshot or bundled fallback without adding a price-history snapshot. Reset local override clears only this selected key, keeps local price history and returns to scheduled prices when available, otherwise bundled prices.
 - The rewrite UI stores accepted imported, synced, compatible legacy or manually captured active price snapshots in browser-local `index-sim:price-history` using a versioned envelope. The Economy tab can analyze this local history with baseline movers, create Snapshot now entries and clear only this local history key after confirmation. Clearing site data removes both browser-local price keys; no server cleanup or migration is involved.
 - The rewrite UI can export the currently active `PriceSet` as JSON that the same `PriceSet` import parser accepts.
 - The Settings tab can show a rewrite-local state recovery view when a known rewrite-owned browser key is invalid or uses an unsupported version. The report exports metadata only: state labels, storage keys, status, expected/found versions and sanitized reasons. Per-key Clear and Clear invalid local data operate only on allowlisted rewrite-owned keys and do not remove legacy or unknown localStorage keys.
 - The rewrite UI can detect known legacy browser storage keys and show an import/keep/clear choice. Import writes only rewrite-owned setup, hiscores last-player, selected active price set, accepted price-history and dismissed keys and keeps legacy keys. Clear removes only known legacy keys after explicit user confirmation; no server cleanup, account context or tenant cleanup is involved.
-- No live market upstream provider, secret, account model, database, server-managed shared price history or scheduled writer is configured in this repo.
+- No live market upstream provider, secret, account model, database, server-managed shared price history or GitHub Actions scheduled workflow is configured in this repo. A local scheduled writer script exists for normalized fixture/input validation and future cron wiring.
 
 Accepted market price writer target:
 
@@ -61,6 +61,7 @@ Accepted market price writer target:
 - It has no `workflow_dispatch` manual trigger.
 - It avoids artifact upload and large caches by default.
 - No browser, user action or production runtime request triggers upstream market fetches.
+- Local writer foundation: `npm run prices:write-scheduled -- --input <normalized-upstream.json>` validates a normalized `markets.lostcity.rs` input contract, updates `prices.json`, `alch.json` and `price-history.json` candidates only after all outputs validate, keeps one shared price-history snapshot per 12-hour UTC bucket and skips unchanged file writes. Use `--dry-run` for local verification. The fixture/dev `--item-ids` option can narrow the allowlist for small local fixtures; production cron wiring should omit it.
 
 ## Live integration release copy audit
 
@@ -121,31 +122,47 @@ Known files:
 Current validation:
 
 ```sh
+npm run test -- src/tests/market-writer.test.ts
 npm run test -- src/tests/data-economy.test.ts
+npm run prices:write-scheduled -- --input src/tests/fixtures/market-writer/upstream-valid.json --item-ids lobster,rune_scimitar,dragon_bones --now 2026-07-08T00:15:00.000Z --dry-run
 node -e "for (const f of ['prices.json','alch.json','price-history.json']) JSON.parse(require('fs').readFileSync(f,'utf8'))"
 ```
 
-The rewrite data layer can adapt current legacy runtime data into a validated `GameDataSnapshot`, including the browser sandbox bootstrap used by the Vite UI. It can validate `PriceSet` imports. In local runs where the market provider is disabled, the Market sync UI keeps sync actions disabled but still shows the active bundled/imported `PriceSet` summary, the same validated `PriceSet` import path, active `PriceSet` export and reset-to-bundled controls. This is not yet an authoritative generation workflow.
+The rewrite data layer can adapt current legacy runtime data into a validated `GameDataSnapshot`, including the browser sandbox bootstrap used by the Vite UI. It can validate `PriceSet` imports. In local runs where the market provider is disabled, the visible Market UI stays scheduled-only: no user-triggered refresh controls are shown, and the active scheduled/imported/bundled `PriceSet` summary, validated `PriceSet` import path, active `PriceSet` export and local-override reset controls remain available. This is not yet an authoritative game-data generation workflow.
 
-Accepted workflow target: the authoritative shared refresh is scheduled-only repo automation from `markets.lostcity.rs`. Latest prices stay in `prices.json`, latest high-alch values stay in `alch.json`, and retained 12-hour shared snapshots stay in `price-history.json`. The writer must validate these files and commit only real diffs. No database, backend-managed shared history or user-triggered upstream refresh is accepted for market prices.
+Accepted workflow target: the authoritative shared refresh is scheduled-only repo automation from `markets.lostcity.rs`. Latest prices stay in `prices.json`, latest high-alch values stay in `alch.json`, and retained 12-hour shared snapshots stay in `price-history.json`. The local writer validates these files and skips unchanged writes; the future GitHub Actions workflow must commit only real diffs. No database, backend-managed shared history or user-triggered upstream refresh is accepted for market prices.
 
-Open question: the exact upstream response contract and writer implementation are not present in the repo.
+Open question: the exact raw live upstream response adapter for `markets.lostcity.rs` and the GitHub Actions cron/commit workflow are not present in the repo. The current writer contract starts from normalized fixture/input JSON.
 
-Game revision updates are different from price refreshes. A new game revision must be handled as a reviewed development change through the accepted manual `npm run data:generate` target workflow: update or pin the gitignored `.sources/lostcity-content/` checkout, overwrite the normalized current `src/data/generated/game-data.json` snapshot and `src/data/generated/source-pin.json`, update `docs/project/revision-impact/current.md`, run validation and parity/golden checks, review changed calculation outputs and merge only after the revision bump is accepted. The generated snapshot should contain only simulator-consumed domain data, not raw upstream files or unused source-only content. The revision-impact report must list old/new source refs, generator metadata, generated-data changes, merge-blocking hybrid-suite DPS/kills/hr/XP/hr/GP/hr/GP/XP diffs, informational all-monster scan outliers from fixed simple melee/ranged/magic baselines, accepted intentional deltas and validation results; changed representative-suite outputs block merge until accepted or fixed. Informational outliers are DPS, kills/hr or XP/hr changes over 10%, GP/hr or GP/XP changes over 25%, missing required combat/drop/economy data, warning-count increases and monsters entering or leaving the scan. Do not add scheduled or automatic main-branch game-data updates, and do not retain old generated snapshots outside git history.
+Game revision updates are different from price refreshes. A new game revision must be handled as a reviewed development change through the accepted manual `npm run data:generate` target workflow. The current command foundation validates the repository-local source path and writes schema-valid foundation `src/data/generated/source-pin.json`, `src/data/generated/game-data.json` and `docs/project/revision-impact/current.md` outputs; it does not yet parse LostCityRS/Content file bodies, run the full hybrid calculation-impact suite or switch the runtime bootstrap. The complete workflow should update or pin the gitignored `.sources/lostcity-content/` checkout, overwrite the normalized current `src/data/generated/game-data.json` snapshot and `src/data/generated/source-pin.json`, update `docs/project/revision-impact/current.md`, run validation and parity/golden checks, review changed calculation outputs and merge only after the revision bump is accepted. The generated snapshot should contain only simulator-consumed domain data, not raw upstream files or unused source-only content. The revision-impact report must list old/new source refs, generator metadata, generated-data changes, merge-blocking hybrid-suite DPS/kills/hr/XP/hr/GP/hr/GP/XP diffs, informational all-monster scan outliers from fixed simple melee/ranged/magic baselines, accepted intentional deltas and validation results; changed representative-suite outputs block merge until accepted or fixed. Informational outliers are DPS, kills/hr or XP/hr changes over 10%, GP/hr or GP/XP changes over 25%, missing required combat/drop/economy data, warning-count increases and monsters entering or leaving the scan. Do not add scheduled or automatic main-branch game-data updates, and do not retain old generated snapshots outside git history.
+
+Run the foundation command against the local gitignored checkout with:
+
+```sh
+npm run data:generate -- --source-dir .sources/lostcity-content --output-root .
+```
+
+For deterministic local verification without live upstream data, use the committed fixture and dry-run output root:
+
+```sh
+npm run data:generate -- --source-dir src/tests/fixtures/data-generator/lostcity-content --output-root .vite/data-generator-output --generated-at 2026-07-08T00:00:00.000Z --dry-run
+```
+
+The generator includes a repo-local output hygiene assertion before writing. It must keep output to the current source pin, current normalized game-data snapshot and current revision-impact report, and must not commit raw upstream checkouts, historical generated snapshot archives, absolute local paths or market price history into generated game data.
 
 ## Current release evidence snapshot
 
-The latest V1 release-evidence pass was consolidated on 2026-07-06 for the current Vite/React rewrite path.
+The latest V1 release-evidence check was consolidated on 2026-07-08 for the current Vite/React rewrite path. Core checks pass, but the default browser smoke currently fails and is release-blocking until resolved or explicitly reclassified.
 
 | Area | Status | Evidence | Operational follow-up |
 | --- | --- | --- | --- |
-| Core commands | `pass` | `npm run typecheck`, `npm run test`, `npm run test:golden`, `npm run build` and `git diff --check` passed. | Re-run before release and after any source changes. |
-| Browser smoke | `pass after sandbox escalation` | `npm run test:e2e` passed 41 Playwright tests in about 1.3 minutes after the documented Codex localhost `EPERM` sandbox limitation required explicit escalation. | Keep the smoke mocked/same-origin; do not treat it as live provider evidence. |
+| Core commands | `pass` | `npm run typecheck`, `npm run test` (25 files, 406 tests), `npm run test:golden` (19 tests), `npm run build` and `git diff --check` passed. | Re-run before release and after any source changes. |
+| Browser smoke | `fail after sandbox escalation` | The sandboxed `npm run test:e2e` hit the documented Codex localhost `EPERM` limitation. The escalated default Playwright run completed with 29 passed and 22 failed out of 51 tests in about 5.1 minutes. | Keep the smoke mocked/same-origin; investigate or explicitly reclassify the failures before release. Do not treat it as live provider evidence. |
 | Dependency audit | `pass` | `npm audit` reported 0 vulnerabilities. | Re-run after dependency changes. |
 | Security/static copy audit | `pass with classified residuals` | Static searches found only the trusted bundled legacy-data sandbox bootstrap, false-positive secret strings, typed same-origin contract/test paths, archived legacy evidence and documentation/history. | Continue classifying hits before release. Do not remove legacy evidence or add legacy `/api/*` shims without a separate decision. |
-| Production live integrations | `partial decision` | Hiscores and market sync have same-origin dev/preview boundaries and mocked tests. Market price refresh now has an accepted scheduled static JSON model, but no writer is implemented. Hiscores still lacks production runtime/provider wiring. | Do not describe live hiscores or scheduled-current market prices as production-available until the relevant provider/writer is configured and validated. |
+| Production live integrations | `partial decision` | Hiscores and market sync have same-origin dev/preview boundaries and mocked tests. Market price refresh now has an accepted scheduled static JSON model and local writer foundation, but GitHub Actions wiring and the exact raw upstream adapter are not implemented. Hiscores still lacks production runtime/provider wiring. | Do not describe live hiscores or scheduled-current market prices as production-available until the relevant provider/writer is configured and validated. |
 | Deploy/security headers | `not selected yet` | Static-host headers are recommended below, but no deploy target is accepted. | Confirm the target host can set the required headers before a real deployment. |
-| Generated data workflow | `partly accepted` | Current UI still bootstraps from trusted bundled legacy data through a sandbox adapter. Revision bumps are accepted only as reviewed development PRs through the future `npm run data:generate` workflow, and the output policy is a single normalized current snapshot plus source pin and current impact report. The generator script and committed generated files are not implemented. | Replace with an authoritative generated `GameDataSnapshot` after the source/generator workflow is implemented. |
+| Generated data workflow | `partly accepted` | Current UI still bootstraps from trusted bundled legacy data through a sandbox adapter. Revision bumps are accepted only as reviewed development PRs through `npm run data:generate`, and the output policy is a single normalized current snapshot plus source pin and current impact report. The command currently writes schema-valid foundation source-pin/game-data/report outputs; authoritative parser, full hybrid calculation-impact suite and runtime consumption are not implemented. | Replace with an authoritative generated `GameDataSnapshot` after the source/generator workflow is implemented. |
 
 ## Release checklist, current app
 

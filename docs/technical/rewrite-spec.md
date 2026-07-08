@@ -106,6 +106,8 @@ Required scripts:
     "test:golden": "$NODE node_modules/vitest/vitest.mjs run --config vitest.config.ts src/tests/legacy-golden.test.ts",
     "test:watch": "$NODE node_modules/vitest/vitest.mjs --config vitest.config.ts",
     "fixtures:capture": "$NODE node_modules/vite-node/vite-node.mjs --config vitest.config.ts scripts/capture-legacy-golden.ts",
+    "data:generate": "$NODE node_modules/vite-node/vite-node.mjs --config vitest.config.ts scripts/generate-game-data.ts",
+    "prices:write-scheduled": "$NODE node_modules/vite-node/vite-node.mjs --config vitest.config.ts scripts/write-scheduled-market-prices.ts",
     "test:e2e": "playwright test",
     "typecheck": "tsc -b",
     "lint": "$NODE node_modules/eslint/bin/eslint.js .",
@@ -199,7 +201,8 @@ Target source:
 - The committed `GameDataSnapshot` is a normalized, purpose-built runtime snapshot for this simulator. It must not mirror raw LostCityRS/Content files or carry source areas that are not needed by the accepted app scope.
 - V1 included scope: monster definitions, item identity/stackability/equipment metadata needed by app workflows, equipment registry, weapons, ammo, spells, drop rows and nested drop expansions, planner/loadout item requirements, and provenance/warning metadata for generated, manual, approximate or uncertain values.
 - V1 excluded scope: raw upstream file bodies, source-only NPC/dialog/quest/world/map content, historical revisions, unused future content areas, speculative fields not consumed by current domain/UI workflows and market price history. Current prices remain owned by `PriceSet` and the market price workflow, not by the generated game-data snapshot.
-- The accepted generator entrypoint is `npm run data:generate`. It should read the pinned local `.sources/lostcity-content/` checkout and overwrite `src/data/generated/source-pin.json`, `src/data/generated/game-data.json` and `docs/project/revision-impact/current.md`.
+- The accepted generator entrypoint is `npm run data:generate`. The current foundation command validates a repository-local source checkout path, rejects forbidden generated output shapes before writing and writes deterministic, schema-valid foundation `src/data/generated/source-pin.json`, `src/data/generated/game-data.json` and `docs/project/revision-impact/current.md` outputs from a normalized foundation manifest. It does not parse LostCityRS/Content file bodies, run the full hybrid calculation-impact suite or change runtime data loading yet.
+- The complete target generator should read the pinned local `.sources/lostcity-content/` checkout and overwrite `src/data/generated/source-pin.json`, `src/data/generated/game-data.json` and `docs/project/revision-impact/current.md`.
 - Keep only the current accepted generated snapshot in the working tree. Do not add historical generated snapshot files; older accepted snapshots remain available through git history and PR diffs.
 - Game revision bumps are development changes. They must happen through a reviewed PR with generated snapshot diffs, validation, test/golden impact and explicit accepted calculation deltas.
 - Do not add scheduled or automatic main-branch game-data updates.
@@ -268,7 +271,7 @@ Accepted target source:
 - Market refresh is scheduled-only repo automation. It writes `prices.json`, `alch.json` and `price-history.json`, validates them and commits only real diffs.
 - The scheduler is GitHub Actions cron at 00:15 and 12:15 UTC, using the repository `GITHUB_TOKEN` with `contents: write` and no `workflow_dispatch` manual trigger.
 - Do not add databases, user-triggered upstream refresh or deploy-specific shared storage for market prices.
-- The writer implementation and exact upstream response contract are not present yet.
+- The local writer and normalized fixture/input contract are present. The GitHub Actions workflow and exact raw live upstream adapter are not present yet.
 
 Core model:
 
@@ -289,7 +292,7 @@ Rules:
 - Simulation must receive a `PriceSet`; it must not discover one from browser state.
 - Imported prices must be validated before use.
 - Missing prices must produce structured warnings, not silent global fallback mutation.
-- Shared price history snapshots are file-backed in `price-history.json`; the concrete scheduled writer is not implemented yet.
+- Shared price history snapshots are file-backed in `price-history.json`; the local scheduled writer foundation exists, while GitHub Actions wiring and the exact raw upstream adapter are not implemented yet.
 
 Current implementation note: `src/data/schemas` validates `GameDataSnapshot`, item/drop/equipment data, `PriceSet` imports and committed price history. `src/data/legacy-adapter.ts` can adapt the current legacy runtime objects into a validated snapshot. `src/domain/economy` provides pure lookup helpers that return structured missing-price or missing-alch warnings without mutating the `PriceSet`.
 
@@ -538,7 +541,7 @@ Current checkout status: Phase 3 is partially started. `src/domain/combat` and `
 - Move price loading into `src/economy` and browser adapters.
 - Remove global price mutation from the core path.
 
-Current checkout status: Phase 4 is partially started. Zod schemas, a legacy snapshot adapter, browser sandbox bootstrap, `PriceSet` validation, committed price-file validation, validated rewrite price-file import, typed same-origin market sync validation and pure missing-price warning helpers exist. Legacy `market.js` remains archived evidence; the authoritative generated data workflow is still open.
+Current checkout status: Phase 4 is partially started. Zod schemas, a legacy snapshot adapter, browser sandbox bootstrap, `PriceSet` validation, committed price-file validation, validated rewrite price-file import, typed same-origin market sync validation, pure missing-price warning helpers and schema-valid generated-data foundation outputs exist. Legacy `market.js` remains archived evidence; the authoritative generated data workflow is still open.
 
 ### Phase 5: UI rebuild
 
@@ -583,9 +586,9 @@ Current acceptance status: the 2026-07-06 consolidated release-evidence pass is 
 - Backend/runtime: still required for accepted hiscores if direct browser APIs are not viable, but concrete framework, hosting, cache and deployment shape remain undecided. Market price refresh uses scheduled static JSON instead of a user-triggered backend sync path.
 - Database: no database for market price refresh; broader database use is still undecided.
 - Live integrations: implement hiscores and market price refresh according to [live-integrations-spec.md](live-integrations-spec.md); hiscores waits for the authoritative API answer.
-- Price history: 12-hour retained snapshots live in `price-history.json`; the GitHub Actions scheduled writer and exact upstream response contract are not implemented yet.
-- Data generator implementation: `npm run data:generate` is the accepted target entrypoint, output path policy and high-level snapshot scope, but the generator script and exact normalized field schema are not implemented yet.
-- Game revision updates: the PR/review policy, report format and hybrid calculation-impact suite shape are accepted, but the generator implementation, case file format and concrete item/spell/equipment ids for the fixed scan baselines are not present yet.
+- Price history: 12-hour retained snapshots live in `price-history.json`; the local writer and normalized fixture/input contract exist, while the GitHub Actions workflow and exact raw live upstream adapter are not implemented yet.
+- Data generator implementation: `npm run data:generate` is the accepted target entrypoint, output path policy and high-level snapshot scope. The command foundation now writes schema-valid `source-pin.json`, `game-data.json` and revision-impact foundation report outputs, but the authoritative LostCityRS/Content parser, full hybrid calculation-impact suite and exact final normalized field extraction are not implemented yet.
+- Game revision updates: the PR/review policy, foundation report and hybrid calculation-impact suite shape are accepted, but the authoritative parser/calculation-impact implementation, case file format and concrete item/spell/equipment ids for the fixed scan baselines are not present yet.
 - Local storage: migrate old keys or reset on rewrite?
 - Cannon UI parity: where should cannon settings and overlay metrics live in the final workbench?
 - Full result composition: how should combat/equipment, trip/loot/supply and economy slices be exposed to the future React view models?

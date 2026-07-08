@@ -10,7 +10,7 @@ The current app is a valuable static prototype of a 2004scape combat simulator. 
 - isolated React UI
 - repeatable tests
 - documented intentional deltas when LostCityRS/Content or accepted decisions supersede legacy behavior
-- reviewed game revision bumps through a manual `npm run data:generate` workflow that update the current accepted revision only after validation and calculation-impact evidence
+- reviewed game revision bumps through a manual `npm run data:generate` workflow that update only the current accepted normalized snapshot after validation and calculation-impact evidence, without committing raw upstream dumps or historical snapshot archives
 
 Implementation requirements for the rewrite live in [../technical/rewrite-spec.md](../technical/rewrite-spec.md).
 

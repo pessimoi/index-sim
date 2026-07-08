@@ -374,7 +374,7 @@ Keep the rewrite's domain boundaries, but model the legacy UI state explicitly:
 - `SimulationRequest` remains clean and domain-facing.
 - UI form state must include per-combat-type loadouts.
 - Versioned persisted state must account for per-monster custom setups, default setup, current target, loot prefs, hidden gear tiers, compare relevance, compare sort, planner UI config, duel snapshots, cannon settings, per-monster alch, overhead and jewel-spot maps.
-- Legacy keys now have an import/keep/clear UX for known keys, compatible `sim_input_v3` setup fields, compatible hidden tiers, dense compare state and unambiguous loot preferences. `sim_planner_v1`, legacy custom setup state, cannon maps and legacy price-history keys still need either deeper migration, intentional reset handling or an accepted no-migration decision.
+- Legacy keys now have an import/keep/clear UX for known keys, compatible `sim_input_v3` setup fields, compatible hidden tiers, dense compare state and unambiguous loot preferences. Legacy custom setup snapshots (`monsterSetups`) and cannon maps (`cannonByMonster`) live inside `sim_input_v3`, not under separate keys, and are not part of the compatible active-setup import. `sim_planner_v1`, legacy custom setup state, cannon maps and legacy price-history keys still need either deeper migration, intentional reset handling or an accepted no-migration decision.
 - Per-monster settings must not be hidden inside generic trip state. They must appear where users expect them: setup scope in SetupBar, alch/overhead in Loot, cannon in Cannon/Trip, target selection in MonsterCard.
 
 Current implementation note: rewrite setup persistence is version 3. The active
@@ -390,7 +390,14 @@ default setup with the selected monster otherwise. Loot prefs, dense sort and
 cannon maps remain separate shared state outside per-style loadouts and custom
 setup snapshots. Older rewrite setup versions still follow the existing
 version-mismatch rejection path; no implicit v1/v2 rewrite setup migration is
-implemented in this slice.
+implemented in this slice. Legacy migration implementation note: archived runtime
+`sim_input_v3` persisted custom setups as `monsterSetups` snapshots and per-spot
+cannon settings as `cannonByMonster`. The current migration flow parses
+`sim_input_v3` only for compatible active setup fields, detects those nested
+maps with bounded metadata for the review/reset plan, leaves them out of
+rewrite-owned custom setup/cannon state on Import and removes them only through
+confirmed Clear of the known `sim_input_v3` key. A future deep parser or
+different intentional-reset UI needs a separate product decision.
 
 ## Required Panes
 
@@ -464,13 +471,18 @@ Required content:
 
 Current implementation note: the rewrite Stats pane now includes the shared
 metric strip, active assumptions/modifiers summary, a compact source breakdown,
-XP routing chips, a Trip & banking summary and a normal-player-attack hit
-distribution histogram. The source breakdown is derived in the view-model from
-existing combat, special attack, trip and cannon outputs. It lists normal attack,
-special attack and cannon with modeled, partial, not modeled or inactive status
-and shows available DPS, DPS gain context, XP/hr, hit chance, max hit,
-supply-cost and note fields without changing formulas or adding new provider
-dependencies. The same view-model now also exposes per-source detail records for
+combat roll detail metrics, XP routing chips, a Trip & banking summary and a
+normal-player-attack hit distribution histogram. The source breakdown and combat
+roll detail are derived in the view-model from existing combat, special attack,
+trip and cannon outputs. The source breakdown lists normal attack, special
+attack and cannon with modeled, partial, not modeled or inactive status and shows
+available DPS, DPS gain context, XP/hr, hit chance, max hit, supply-cost and note
+fields without changing formulas or adding new provider dependencies. Combat
+roll detail shows normal-attack effective accuracy, effective damage, attack
+roll, active monster defence roll, hit chance, max hit, average hit, attack
+speed seconds, attack cycle ticks and the current result TTK, kills/hr and
+GP/kill. Missing, non-finite or unsupported values stay `null`/`-` instead of
+being displayed as zero. The same view-model now also exposes per-source detail records for
 UI expansion: each detail carries status, status label, metrics, notes, warnings
 and an optional histogram. The Stats UI renders source-detail cards for special
 attack and cannon from that contract. Special detail shows the spec weapon, hit
@@ -497,8 +509,8 @@ distribution bucket data is derived from the current combat result through the
 domain/view-model boundary, with bounded hit chance/max-hit inputs, a combined
 miss/zero bucket, damage buckets, accessible bucket labels and a max-hit marker.
 This does not change the `SimulationResult` contract or combat golden baselines.
-Combat roll metric expansion and special/cannon hit distributions remain open
-parity work.
+Further combat roll edge-case parity, special/cannon hit distributions, full
+browser-display expansion and visual regression remain open parity work.
 
 ### Melee, Ranged and Magic
 
@@ -762,7 +774,7 @@ Required content if price history remains a product feature:
 - Item filter.
 - Movers table with item, trend sparkline, price, baseline, GP delta and percent delta.
 
-Current implementation note: the Economy tab records capped browser-local history snapshots only after validated imported or synced `PriceSet` values are accepted active, and `Snapshot now` can capture the current active `PriceSet` without calling a network service. The tab shows active/latest price-set labels, latest snapshot age, tracked item count, snapshot count, moved item count, Previous/First/Snapshot baseline selection, item filter, top gainers/fallers and a movers table with latest price, baseline price, GP delta and percent delta. Missing or zero baseline prices render without `Infinity`/`NaN`. `Clear history` requires confirmation and removes only the rewrite-owned `index-sim:price-history` key. Trend sparklines and fuller economy workflows remain open.
+Current implementation note: the Economy tab shows the scheduled static price snapshot status, active `PriceSet` source/label/created age/counts and browser-local history summary. It records capped browser-local history snapshots only after validated imported/compatible legacy `PriceSet` values are accepted active or when `Snapshot now` captures the current active `PriceSet`; scheduled restore itself does not append history. The tab uses valid selected local override, valid scheduled static snapshot, then bundled prices as its fallback order. It shows active/latest price-set labels, latest snapshot age, tracked item count, snapshot count, moved item count, Previous/First/Snapshot baseline selection, item filter, top gainers/fallers and a movers table with latest price, baseline price, GP delta and percent delta. Missing or zero baseline prices render without `Infinity`/`NaN`. `Clear history` requires confirmation and removes only the rewrite-owned `index-sim:price-history` key. Trend sparklines and fuller economy workflows remain open.
 
 ### Settings
 
@@ -771,10 +783,10 @@ Required content:
 - Price and alch import inside Settings.
 - Gear-tier hiding controls.
 - Price/alch counts and import status.
-- Market sync controls following [live-integrations-spec.md](live-integrations-spec.md).
-- Service-aware `available`, `unavailable` or disabled-runtime state for live sync when the accepted integration endpoint or provider is unavailable. Production copy must not point users to `run_sim.py`.
+- Scheduled static price snapshot status following [live-integrations-spec.md](live-integrations-spec.md).
+- Service-aware scheduled/unavailable/fallback state for market prices. Production copy must not point users to `run_sim.py` or imply user-triggered upstream refresh.
 
-Current implementation note: Settings now has a Price data panel that shows the active `PriceSet` label, source, created timestamp, age, item price count, alch value count and current import/status notice. Its import control uses the same validated `parsePriceSetFileText` path as the existing topbar shortcut, accepts only the current `PriceSet` schema and updates the active price set, browser-local accepted price history, topbar price label/status and visible notice. The topbar import remains a shortcut. Economy remains the owner of browser-local price-history analysis. Settings also has a Gear menu panel backed by the rewrite-owned versioned `index-sim:hidden-gear-tiers` state. It can hide the accepted metal, d-hide, leather, low-bow and 1 defence magic tier groups from weapon, ammo, special-attack and equipment pickers while preserving `None` and the current selected item. Compatible legacy `sim_hidden_tiers_v1` flags can be imported into the rewrite-owned state through the explicit migration UX.
+Current implementation note: Settings now has a Price data panel that shows scheduled static snapshot status plus the active `PriceSet` label, source, created timestamp, age, item price count, alch value count, active source and current import/status notice. Its import control uses the same validated `parsePriceSetFileText` path as the existing topbar shortcut, accepts only the current `PriceSet` schema and updates the active price set, browser-local accepted price history, topbar price label/status and visible notice. Reset clears only the selected local override and returns to scheduled static prices when valid, otherwise bundled prices, while preserving browser-local history. The topbar import remains a shortcut. Economy remains the owner of browser-local price-history analysis. Settings also has a Gear menu panel backed by the rewrite-owned versioned `index-sim:hidden-gear-tiers` state. It can hide the accepted metal, d-hide, leather, low-bow and 1 defence magic tier groups from weapon, ammo, special-attack and equipment pickers while preserving `None` and the current selected item. Compatible legacy `sim_hidden_tiers_v1` flags can be imported into the rewrite-owned state through the explicit migration UX.
 
 ## Implementation Phases
 
@@ -834,7 +846,7 @@ custom setup migration remain open.
 - Extend browser-rendered numeric snapshots from the current dense table row and
   metric-strip workflow coverage to any remaining representative legacy fixtures
   once those workflows become release blockers.
-- Extend migration/reset UX for remaining review-only legacy `localStorage` keys if deeper migration is accepted. The current rewrite already classifies known keys in the review UI, imports compatible setup, prices, hidden tiers, dense compare and unambiguous loot prefs, shows what import/keep/clear will do and hardens `sim_planner_v1` as detect/review-only rather than importing it into rewrite Planner state.
+- Extend migration/reset UX for remaining review-only legacy `localStorage` areas if deeper migration is accepted. The current rewrite already classifies known keys in the review UI, imports compatible setup, prices, hidden tiers, dense compare and unambiguous loot prefs, shows what import/keep/clear will do, hardens `sim_planner_v1` as detect/review-only rather than importing it into rewrite Planner state, and shows legacy `monsterSetups`/`cannonByMonster` as nested `sim_input_v3` review-only areas that are not deeply imported.
 - Update [rewrite-parity-report.md](rewrite-parity-report.md) when browser UI parity evidence exists.
 
 ## Acceptance Criteria
