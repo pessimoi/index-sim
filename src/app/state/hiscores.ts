@@ -34,6 +34,21 @@ function isFormLevelSkill(skill: HiscoresSkill): skill is FormLevelSkill {
   return FORM_LEVEL_SKILL_SET.has(skill);
 }
 
+export function normalizeHiscoresPlayerInput(player: string): string {
+  return player.trim().replace(/\s+/g, " ").toLocaleLowerCase();
+}
+
+export function isHiscoresPreviewCurrent(
+  playerInput: string,
+  response: HiscoresResponse | null | undefined
+): response is HiscoresResponse {
+  if (!response) return false;
+  const currentPlayer = normalizeHiscoresPlayerInput(playerInput);
+  if (!currentPlayer) return false;
+  const responsePlayer = normalizeHiscoresPlayerInput(response.normalizedPlayer || response.player);
+  return currentPlayer === responsePlayer;
+}
+
 export function createHiscoresPreviewRows(
   form: CombatSetupFormState,
   response: HiscoresResponse
@@ -55,6 +70,15 @@ export function createHiscoresPreviewRows(
 
 export function countApplicableHiscoresSkills(response: HiscoresResponse): number {
   return FORM_LEVEL_SKILLS.filter((skill) => response.skills[skill]?.level !== undefined).length;
+}
+
+export function canApplyHiscoresPreview(
+  playerInput: string,
+  response: HiscoresResponse | null | undefined
+): boolean {
+  return (
+    isHiscoresPreviewCurrent(playerInput, response) && countApplicableHiscoresSkills(response) > 0
+  );
 }
 
 export function applyHiscoresLevels(

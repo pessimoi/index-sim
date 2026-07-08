@@ -138,6 +138,21 @@ function activeAssumptionRow(result: ReturnType<typeof createSimulationViewModel
   return activeAssumptionRows(result).find((row) => row.id === id);
 }
 
+type StatsSourceDetailForTest = ReturnType<
+  typeof createSimulationViewModel
+>["statsSourceBreakdown"]["details"][number];
+
+function statsSourceDetail(
+  result: ReturnType<typeof createSimulationViewModel>,
+  id: StatsSourceDetailForTest["id"]
+) {
+  return result.statsSourceBreakdown.details.find((detail) => detail.id === id);
+}
+
+function statsSourceMetrics(detail: StatsSourceDetailForTest | undefined) {
+  return new Map((detail?.metrics ?? []).map((metric) => [metric.id, metric]));
+}
+
 describe("rewrite UI view models", () => {
   it("keeps form state separate from SimulationRequest", async () => {
     const { context } = await loadBundledLegacyContext();
@@ -330,6 +345,88 @@ describe("rewrite UI view models", () => {
       itemId: "none",
       disabled: true,
       reason: "Shield locked by two-handed weapon"
+    });
+  });
+
+  it("includes unmet requirements in gear quick action reasons", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const action = gearQuickActionForSlot({
+      gameData: context.gameData,
+      slot: "helm",
+      combatStyle: "melee",
+      weaponId: "rune_scimitar",
+      styleId: "aggressive",
+      currentItemId: "rune_full_helm",
+      levels: { ...DEFAULT_FORM_STATE.levels, defence: 1 },
+      options: equipmentSlotOptions(context.gameData, "helm")
+    });
+
+    expect(action).toMatchObject({
+      itemId: "berserker_helm",
+      disabled: false,
+      reason: "Apply Berserker helm - requires Defence 45, current 1"
+    });
+  });
+
+  it("keeps normal gear quick action reasons when requirements are met", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const action = gearQuickActionForSlot({
+      gameData: context.gameData,
+      slot: "helm",
+      combatStyle: "melee",
+      weaponId: "rune_scimitar",
+      styleId: "aggressive",
+      currentItemId: "rune_full_helm",
+      levels: DEFAULT_FORM_STATE.levels,
+      options: equipmentSlotOptions(context.gameData, "helm")
+    });
+
+    expect(action).toMatchObject({
+      itemId: "berserker_helm",
+      disabled: false,
+      reason: "Apply Berserker helm"
+    });
+  });
+
+  it("includes unmet requirements when the current gear is already the best option", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const action = gearQuickActionForSlot({
+      gameData: context.gameData,
+      slot: "body",
+      combatStyle: "melee",
+      weaponId: "rune_scimitar",
+      styleId: "aggressive",
+      currentItemId: "rune_platebody",
+      levels: { ...DEFAULT_FORM_STATE.levels, defence: 1 },
+      options: equipmentSlotOptions(context.gameData, "body")
+    });
+
+    expect(action).toMatchObject({
+      itemId: "rune_platebody",
+      disabled: true,
+      reason: "Best visible option: Rune platebody - requires Defence 40, current 1"
+    });
+  });
+
+  it("does not add requirement copy for gear with no known requirement", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const action = gearQuickActionForSlot({
+      gameData: context.gameData,
+      slot: "amulet",
+      combatStyle: "melee",
+      weaponId: "rune_scimitar",
+      styleId: "aggressive",
+      currentItemId: "none",
+      levels: { ...DEFAULT_FORM_STATE.levels, attack: 1, defence: 1 },
+      options: equipmentSlotOptions(context.gameData, "amulet").filter(
+        (option) => option.id === "none" || option.id === "amu_power"
+      )
+    });
+
+    expect(action).toMatchObject({
+      itemId: "amu_power",
+      disabled: false,
+      reason: "Apply Amulet of power"
     });
   });
 
@@ -670,6 +767,103 @@ describe("rewrite UI view models", () => {
       value: `${result.moneyWarnings.length} warnings`,
       detail: result.moneyWarnings[0]?.message
     });
+  });
+
+  it("surfaces unmet setup requirements for low defence rune armour", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const result = createSimulationViewModel(
+      {
+        ...DEFAULT_FORM_STATE,
+        levels: { ...DEFAULT_FORM_STATE.levels, defence: 1 }
+      },
+      context
+    );
+    const runeBodyWarning = result.setupRequirements.warnings.find(
+      (warning) => warning.itemId === "rune_platebody" && warning.skill === "defence"
+    );
+
+    expect(runeBodyWarning).toMatchObject({
+      itemName: "Rune platebody",
+      slot: "body",
+      slotLabel: "Body",
+      skillLabel: "Defence",
+      requiredLevel: 40,
+      currentLevel: 1,
+      severity: "warning"
+    });
+    expect(runeBodyWarning?.message).toContain("Rune platebody requires Defence 40");
+    expect(activeAssumptionRow(result, "setup-requirements")).toMatchObject({
+      label: "Setup requirements",
+      reviewTab: "melee",
+      tone: "warning"
+    });
+    expect(activeAssumptionRow(result, "setup-requirements")?.resetAction).toBeUndefined();
+  });
+
+  it("surfaces unmet setup requirements for low attack dragon weapons", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const form = applyWeaponSelection(
+      {
+        ...DEFAULT_FORM_STATE,
+        levels: { ...DEFAULT_FORM_STATE.levels, attack: 1 }
+      },
+      "dragon_longsword",
+      context.gameData
+    );
+    const result = createSimulationViewModel(form, context);
+
+    expect(result.setupRequirements.warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          itemId: "dragon_longsword",
+          itemName: "Dragon longsword",
+          slot: "weapon",
+          slotLabel: "Weapon",
+          skill: "attack",
+          skillLabel: "Attack",
+          requiredLevel: 60,
+          currentLevel: 1
+        })
+      ])
+    );
+    expect(activeAssumptionRow(result, "setup-requirements")).toMatchObject({
+      reviewTab: "melee"
+    });
+  });
+
+  it("keeps matching setup levels free of requirement warnings", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const result = createSimulationViewModel(DEFAULT_FORM_STATE, context);
+
+    expect(result.setupRequirements.warnings).toEqual([]);
+    expect(activeAssumptionRow(result, "setup-requirements")).toBeUndefined();
+  });
+
+  it("ignores selected gear with no known setup requirement", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const form = applyWeaponSelection(
+      {
+        ...DEFAULT_FORM_STATE,
+        levels: { ...DEFAULT_FORM_STATE.levels, attack: 1, defence: 1 },
+        gear: {
+          helm: "none",
+          amulet: "amu_power",
+          body: "none",
+          legs: "none",
+          shield: "none",
+          gloves: "none",
+          boots: "none",
+          cape: "none",
+          ring: "none"
+        }
+      },
+      "iron_scimitar",
+      context.gameData
+    );
+    const result = createSimulationViewModel(form, context);
+
+    expect(result.setupRequirements.warnings).toEqual([]);
+    expect(activeAssumptionRow(result, "setup-requirements")).toBeUndefined();
   });
 
   it("summarizes imported and synced PriceSet modifiers", async () => {
@@ -1192,6 +1386,20 @@ describe("rewrite UI view models", () => {
     expect(formToSimulationRequest(dbaBoostForm, context.gameData).specialAttack).toBeUndefined();
     expect(formToSimulationRequest(magicForm, context.gameData).specialAttack).toBeUndefined();
     expect(createSimulationViewModel(dbaBoostForm, context).combat.specialAttack).toBeNull();
+    const dbaBoostResult = createSimulationViewModel(dbaBoostForm, context);
+    const dbaSpecialDetail = statsSourceDetail(dbaBoostResult, "special-attack");
+    const dbaSpecialMetrics = statsSourceMetrics(dbaSpecialDetail);
+
+    expect(dbaSpecialDetail).toMatchObject({
+      status: "inactive",
+      statusLabel: "inactive",
+      histogram: null,
+      warnings: []
+    });
+    expect(dbaSpecialDetail?.notes.join("\n")).toContain(
+      "DBA special boost is modeled as a boost, not a DPS special attack."
+    );
+    expect(dbaSpecialMetrics.get("dps")).toMatchObject({ value: "-", numericValue: null });
     expect(magicForm.specialAttack).toEqual({ weaponId: "none", ammoId: "none" });
   });
 
@@ -1221,6 +1429,25 @@ describe("rewrite UI view models", () => {
       weaponId: "magic_shortbow",
       ammoId: "mith_arrow"
     });
+    const rangedResult = createSimulationViewModel(bowMainForm, context);
+    const rangedSpecialDetail = statsSourceDetail(rangedResult, "special-attack");
+    const rangedSpecialMetrics = statsSourceMetrics(rangedSpecialDetail);
+
+    expect(rangedResult.combat.specialAttack?.key).toBe("magic_shortbow");
+    expect(rangedSpecialDetail).toMatchObject({
+      status: "modeled",
+      statusLabel: "modeled",
+      histogram: null,
+      warnings: []
+    });
+    expect(rangedSpecialMetrics.get("specs-hr")?.numericValue).toBeGreaterThan(0);
+    expect(rangedSpecialMetrics.get("spec-weapon")?.value).toBe("Magic shortbow");
+    expect(rangedSpecialMetrics.get("dps-with-spec")?.numericValue).toBe(
+      rangedResult.combat.specialAttack?.dpsWithSpec
+    );
+    expect(rangedSpecialMetrics.get("dps-gain")?.numericValue).toBe(
+      rangedResult.combat.specialAttack?.dpsGainPct
+    );
   });
 
   it("exposes special attack metrics in the simulation view model", async () => {
@@ -1231,6 +1458,8 @@ describe("rewrite UI view models", () => {
       specialAttack: { weaponId: "dragon_dagger_p", ammoId: "none" }
     };
     const result = createSimulationViewModel(form, context);
+    const specialDetail = statsSourceDetail(result, "special-attack");
+    const specialMetrics = statsSourceMetrics(specialDetail);
 
     expect(result.request.specialAttack).toEqual({ weaponId: "dragon_dagger_p" });
     expect(result.combat.specialAttack).toMatchObject({
@@ -1254,6 +1483,28 @@ describe("rewrite UI view models", () => {
     expect(result.statsSourceBreakdown.rows.find((row) => row.id === "special-attack")?.dps).toBe(
       (result.combat.specialAttack?.dpsWithSpec ?? 0) -
         (result.combat.specialAttack?.dpsBase ?? 0)
+    );
+    expect(specialDetail).toMatchObject({
+      id: "special-attack",
+      label: "Special attack",
+      status: "modeled",
+      statusLabel: "modeled",
+      histogram: null,
+      warnings: []
+    });
+    expect(specialMetrics.get("dps-gain")?.numericValue).toBe(
+      result.combat.specialAttack?.dpsGainPct
+    );
+    expect(specialMetrics.get("spec-weapon")?.value).toBe("Dragon dagger(p)");
+    expect(specialMetrics.get("dps-with-spec")?.numericValue).toBe(
+      result.combat.specialAttack?.dpsWithSpec
+    );
+    expect(specialMetrics.get("specs-hr")?.numericValue).toBe(
+      result.combat.specialAttack?.specsPerHour
+    );
+    expect(specialMetrics.get("hits")?.numericValue).toBe(result.combat.specialAttack?.hits);
+    expect(specialDetail?.notes.join("\n")).toContain(
+      "Special attack XP is included in player combat XP/hr"
     );
   });
 
@@ -1309,6 +1560,15 @@ describe("rewrite UI view models", () => {
         .find((row) => row.id === "special-attack")
         ?.notes.join("\n")
     ).toContain(warningText);
+    expect(statsSourceDetail(halberdResult, "special-attack")).toMatchObject({
+      status: "partial",
+      statusLabel: "partial",
+      histogram: null,
+      warnings: halberdResult.specialWarnings
+    });
+    expect(statsSourceDetail(halberdResult, "special-attack")?.notes.join("\n")).toContain(
+      warningText
+    );
   });
 
   it("maps prayer restore detail controls only for the active restore mode", () => {
@@ -1490,8 +1750,14 @@ describe("rewrite UI view models", () => {
     const { context } = await loadBundledLegacyContext();
     const result = createSimulationViewModel(DEFAULT_FORM_STATE, context);
     const rows = new Map(result.statsSourceBreakdown.rows.map((row) => [row.id, row]));
+    const normalDetail = statsSourceDetail(result, "normal-attack");
+    const specialDetail = statsSourceDetail(result, "special-attack");
+    const cannonDetail = statsSourceDetail(result, "cannon");
+    const normalMetrics = statsSourceMetrics(normalDetail);
+    const specialMetrics = statsSourceMetrics(specialDetail);
 
     expect(result.statsSourceBreakdown.rows).toHaveLength(3);
+    expect(result.statsSourceBreakdown.details).toHaveLength(3);
     expect(rows.get("normal-attack")).toMatchObject({
       label: "Normal attack",
       status: "modeled",
@@ -1505,6 +1771,23 @@ describe("rewrite UI view models", () => {
     expect(rows.get("normal-attack")?.supplyCostPerHour).toBeCloseTo(
       result.trip.supply.supplyCostPerKill * result.trip.effectiveKph
     );
+    expect(normalDetail).toMatchObject({
+      id: "normal-attack",
+      label: "Normal attack",
+      status: "modeled",
+      statusLabel: "modeled",
+      warnings: result.moneyWarnings
+    });
+    expect(normalDetail?.histogram).toBe(result.hitDistribution);
+    expect(normalMetrics.get("dps")).toMatchObject({
+      value: formatNumber(result.combat.dps, 2),
+      numericValue: result.combat.dps
+    });
+    expect(normalMetrics.get("xp-hr")?.numericValue).toBe(result.playerEffectiveXpPerHour);
+    expect(normalMetrics.get("hit-chance")).toMatchObject({
+      value: `${formatNumber(result.combat.hitChance * 100, 1)}%`,
+      numericValue: result.combat.hitChance
+    });
     expect(rows.get("special-attack")).toMatchObject({
       label: "Special attack",
       status: "inactive",
@@ -1515,6 +1798,13 @@ describe("rewrite UI view models", () => {
     expect(rows.get("special-attack")?.notes.join("\n")).toContain(
       "No supported melee/ranged DPS special selected."
     );
+    expect(specialDetail).toMatchObject({
+      status: "inactive",
+      statusLabel: "inactive",
+      histogram: null,
+      warnings: []
+    });
+    expect(specialMetrics.get("dps")).toMatchObject({ value: "-", numericValue: null });
     expect(rows.get("cannon")).toMatchObject({
       label: "Cannon",
       status: "inactive",
@@ -1523,6 +1813,12 @@ describe("rewrite UI view models", () => {
       xpPerHour: null
     });
     expect(rows.get("cannon")?.notes.join("\n")).toContain("Cannon is off");
+    expect(cannonDetail).toMatchObject({
+      status: "inactive",
+      statusLabel: "inactive",
+      histogram: null,
+      warnings: []
+    });
   }, 15_000);
 
   it("marks magic special source breakdown as not modeled without adding formulas", async () => {
@@ -1535,6 +1831,8 @@ describe("rewrite UI view models", () => {
     });
     const result = createSimulationViewModel(magicForm, context);
     const special = result.statsSourceBreakdown.rows.find((row) => row.id === "special-attack");
+    const detail = statsSourceDetail(result, "special-attack");
+    const metrics = statsSourceMetrics(detail);
 
     expect(result.combat.specialAttack).toBeNull();
     expect(special).toMatchObject({
@@ -1547,6 +1845,14 @@ describe("rewrite UI view models", () => {
       maxHit: null
     });
     expect(special?.notes.join("\n")).toContain("Magic DPS special attacks are not modeled yet.");
+    expect(detail).toMatchObject({
+      status: "not-modeled",
+      statusLabel: "not modeled",
+      histogram: null,
+      warnings: []
+    });
+    expect(metrics.get("dps")).toMatchObject({ value: "-", numericValue: null });
+    expect(detail?.notes.join("\n")).toContain("Magic DPS special attacks are not modeled yet.");
   }, 15_000);
 
   it("models Magic alch XP from tracked in-trip alch casts", async () => {
@@ -1610,6 +1916,8 @@ describe("rewrite UI view models", () => {
     const withCannonSource = withCannon.statsSourceBreakdown.rows.find(
       (row) => row.id === "cannon"
     );
+    const withCannonDetail = statsSourceDetail(withCannon, "cannon");
+    const withCannonMetrics = statsSourceMetrics(withCannonDetail);
 
     expect(withoutRows.has("cannon-ranged")).toBe(false);
     expect(withRows.get("cannon-ranged")).toMatchObject({
@@ -1635,6 +1943,67 @@ describe("rewrite UI view models", () => {
     expect(withCannonSource?.supplyCostPerHour).toBeCloseTo(
       withCannon.trip.supply.ballCostPerKill * withCannon.trip.effectiveKph
     );
+    expect(withCannonDetail).toMatchObject({
+      label: "Cannon",
+      status: "modeled",
+      statusLabel: "modeled",
+      histogram: null
+    });
+    expect(withCannonMetrics.get("effective-targets")?.numericValue).toBe(
+      withCannon.trip.cannon?.effTargets
+    );
+    expect(withCannonMetrics.get("balls-hr")?.numericValue).toBe(
+      withCannon.trip.cannon?.ballsPerHour
+    );
+    expect(withCannonMetrics.get("respawn-bound")?.value).toBe(
+      withCannon.trip.cannon?.respawnBound ? "Yes" : "No"
+    );
+    expect(withCannonMetrics.get("cannon-ranged-xp-hr")?.numericValue).toBe(
+      withCannon.trip.cannon?.rangedXpPerHour
+    );
+    expect(withCannonMetrics.get("ball-cost-hour")?.numericValue).toBe(
+      withCannon.trip.cannon?.ballCostPerHour
+    );
+    expect(withCannonMetrics.get("ball-cost-kill")?.numericValue).toBe(
+      withCannon.trip.cannon?.ballCostPerKill
+    );
+    expect(withCannonMetrics.get("cannonballs-trip")?.numericValue).toBe(
+      withCannon.trip.cannon?.ballsPerTrip
+    );
+    expect(withCannonMetrics.get("sparse-state")?.value).toBe(
+      withCannon.trip.cannon?.idle
+        ? "Idle"
+        : withCannon.trip.cannon?.respawnBound
+          ? "Respawn-bound"
+          : "Active"
+    );
+  }, 15_000);
+
+  it("builds cannon source details for idle cannon spots without inventing a histogram", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const idleResult = createSimulationViewModel(rangedRockCrabForm(), context, {
+      rock_crab: { enabled: true, targets: 1, respawnSec: 3600 }
+    });
+    const detail = statsSourceDetail(idleResult, "cannon");
+    const metrics = statsSourceMetrics(detail);
+
+    expect(idleResult.trip.cannon).toMatchObject({
+      idle: true,
+      respawnBound: false,
+      cannonDps: 0
+    });
+    expect(detail).toMatchObject({
+      status: "inactive",
+      statusLabel: "inactive",
+      histogram: null
+    });
+    expect(detail?.notes.join("\n")).toContain(
+      "Idle: this spot is too sparse for the cannon to fire."
+    );
+    expect(metrics.get("dps")).toMatchObject({ value: "0.00", numericValue: 0 });
+    expect(metrics.get("sparse-state")?.value).toBe("Idle");
+    expect(metrics.get("idle")?.value).toBe("Yes");
+    expect(metrics.get("respawn-bound")?.value).toBe("No");
   }, 15_000);
 
   it("builds the Stats Trip and banking summary from the trip result", async () => {

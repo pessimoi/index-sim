@@ -58,7 +58,7 @@ The implementation target for those live integrations is [../technical/live-inte
 
 The repo contains a mix of generated-looking data, inline provenance comments, placeholder prices, scraped price snapshots and manual approximations. When changing data, preserve source notes and update [../technical/architecture.md](../technical/architecture.md) or [../project/decisions.md](../project/decisions.md) if the source-of-truth policy changes.
 
-Target data direction: use LostCityRS/Content Revision 274 as the primary game-content source when verified, generate a validated staged `GameDataSnapshot`, and surface uncertain or approximated values as lightweight warning/info markers in the UI.
+Target data direction: use the current accepted LostCityRS/Content game revision as the primary game-content source when verified, generate one validated normalized current `GameDataSnapshot` for the app, and surface uncertain or approximated values as lightweight warning/info markers in the UI. The snapshot scope is only simulator-consumed domain data, not raw upstream content. Revision bumps are reviewed development changes through the future manual `npm run data:generate` workflow, not scheduled refreshes or a generated snapshot archive.
 
 ## Rewrite product-scope notes
 

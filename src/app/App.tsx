@@ -1,4 +1,12 @@
-import { useEffect, useId, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent
+} from "react";
 import { ZodError } from "zod";
 import {
   downloadJsonFile,
@@ -20,10 +28,12 @@ import {
 } from "@/adapters/market";
 import { PRICE_SET_IMPORT_MAX_BYTES } from "@/data/schemas";
 import {
-  clearPersisted,
   createMemoryStorage,
   loadPersisted,
-  savePersisted
+  tryClearPersisted,
+  trySavePersisted,
+  type KeyValueStorage,
+  type VersionedStorageOptions
 } from "@/adapters/storage";
 import {
   LEGACY_INPUT_STORAGE_KEY,
@@ -68,9 +78,23 @@ import {
   LegacyMigrationDismissedStateSchema
 } from "./state/legacy-migration";
 import {
+  clearInvalidLocalState,
+  clearLocalStateItem,
+  createLocalStateHealthExport,
+  createLocalStateHealthReport,
+  localStateHealthNeedsAttention,
+  type LocalStateHealthItem,
+  type LocalStateHealthItemId,
+  type LocalStateHealthReport,
+  type LocalStateStorageFailure
+} from "./state/local-state-health";
+import {
   applyHiscoresLevels,
+  canApplyHiscoresPreview,
   countApplicableHiscoresSkills,
-  createHiscoresPreviewRows
+  createHiscoresPreviewRows,
+  isHiscoresPreviewCurrent,
+  normalizeHiscoresPlayerInput
 } from "./state/hiscores";
 import {
   DEFAULT_HIDDEN_GEAR_TIERS_STATE,
@@ -137,13 +161,21 @@ import {
   type PriceImportNotice
 } from "./state/price-import";
 import {
+  clearSelectedPriceSet,
+  loadSelectedPriceSet,
+  saveSelectedPriceSet,
+  type LoadSelectedPriceSetResult
+} from "./state/selected-price-set";
+import {
   PLANNER_METRICS,
   PLANNER_SKILLS,
+  PLANNER_UI_STORAGE_KEY,
+  PLANNER_UI_VERSION,
+  PlannerUiStateSchema,
   loadPlannerUiState,
   normalizePlannerUiState,
   plannerMetricLabel,
   resetPlannerGearPoolSlot,
-  savePlannerUiState,
   setPlannerGearPoolItem,
   type PlannerUiState
 } from "./state/planner";
@@ -214,6 +246,7 @@ import {
   type PlannerPanelViewModel,
   type LootDropRowViewModel,
   type LootPriceHistoryItemContext,
+  type StatsSourceDetailViewModel,
   formatNumber,
   monsterOptions,
   spellOptions,
@@ -221,7 +254,23 @@ import {
   weaponOptions
 } from "./view-models/simulation";
 
-const storage = typeof window !== "undefined" ? window.localStorage : createMemoryStorage();
+const LOCAL_STATE_PERSISTENCE_NOTICE =
+  "Local storage is unavailable. Changes may not persist after reload.";
+
+function createBrowserStorageAccess(): { storage: KeyValueStorage; unavailable: boolean } {
+  if (typeof window === "undefined") {
+    return { storage: createMemoryStorage(), unavailable: false };
+  }
+  try {
+    return { storage: window.localStorage, unavailable: false };
+  } catch {
+    return { storage: createMemoryStorage(), unavailable: true };
+  }
+}
+
+const browserStorageAccess = createBrowserStorageAccess();
+const storage = browserStorageAccess.storage;
+const localStorageAccessUnavailable = browserStorageAccess.unavailable;
 
 const setupStorageOptions = {
   key: REWRITE_SETUP_STORAGE_KEY,
@@ -272,6 +321,20 @@ const legacyMigrationDismissedStorageOptions = {
   storage
 };
 
+const plannerUiStorageOptions = {
+  key: PLANNER_UI_STORAGE_KEY,
+  version: PLANNER_UI_VERSION,
+  schema: PlannerUiStateSchema,
+  storage
+};
+
+const initialLocalStateHealthReport = createLocalStateHealthReport(storage, new Date(), {
+  storageUnavailable: localStorageAccessUnavailable
+});
+const initialLocalStateRecoveryBlockedIds = initialLocalStateHealthReport.items
+  .filter(localStateHealthNeedsAttention)
+  .map((item) => item.id);
+
 function loadInitialSavedSetup(): {
   loaded: boolean;
   setup: ReturnType<typeof savedSetupFromForm>;
@@ -314,6 +377,31 @@ function loadInitialPlannerUiState(): PlannerUiState {
 
 function loadInitialLegacyMigrationDismissed(): boolean {
   return loadPersisted(legacyMigrationDismissedStorageOptions).status === "loaded";
+}
+
+function describeSelectedPriceSetLoadIssue(result: LoadSelectedPriceSetResult): string | null {
+  if (result.status === "missing" || result.status === "loaded") return null;
+  if (result.status === "unavailable") {
+    return "Local storage is unavailable. Bundled prices were loaded and changes may not persist after reload.";
+  }
+  if (result.status === "version-mismatch") {
+    return "Saved active PriceSet uses an unsupported local version. Bundled prices were loaded.";
+  }
+  switch (result.reason) {
+    case "body_too_large":
+      return "Saved active PriceSet is too large. Bundled prices were loaded.";
+    case "invalid_json":
+      return "Saved active PriceSet is not valid JSON. Bundled prices were loaded.";
+    case "invalid_envelope":
+      return "Saved active PriceSet metadata is invalid. Bundled prices were loaded.";
+    case "invalid_data":
+      return "Saved active PriceSet data is invalid. Bundled prices were loaded.";
+  }
+}
+
+function priceSetExportFileName(priceSet: PriceSet): string {
+  const safeId = priceSet.id.replace(/[^a-z0-9._-]+/gi, "-").replace(/^-+|-+$/g, "");
+  return `index-sim-price-set-${safeId || "active"}.json`;
 }
 
 type SelectOption = { id: string; label: string; hint?: string };
@@ -869,6 +957,97 @@ function CalculationWarningSummary({
       ))}
       {warnings.length > visible.length && <span>{formatNumber(warnings.length - visible.length)} more</span>}
     </div>
+  );
+}
+
+const STATS_SOURCE_DETAIL_METRIC_IDS = {
+  "special-attack": [
+    "spec-weapon",
+    "hits",
+    "max-hit",
+    "hit-chance",
+    "specs-hr",
+    "dps-with-spec",
+    "dps-gain",
+    "dps",
+    "xp-hr"
+  ],
+  cannon: [
+    "effective-targets",
+    "dps",
+    "balls-hr",
+    "balls-kill",
+    "cannon-ranged-xp-hr",
+    "ball-cost-hour",
+    "ball-cost-kill",
+    "cannonballs-trip",
+    "sparse-state",
+    "xp-hr",
+    "supply-cost-hour",
+    "supply-cost-kill"
+  ]
+} as const;
+
+function statsSourceDetailMetricLabel(
+  detail: StatsSourceDetailViewModel,
+  metric: StatsSourceDetailViewModel["metrics"][number]
+): string {
+  if (detail.id === "special-attack" && metric.id === "dps") return "DPS gain";
+  if (detail.id === "cannon" && metric.id === "dps") return "Cannon DPS";
+  return metric.label;
+}
+
+function orderedStatsSourceDetailMetrics(detail: StatsSourceDetailViewModel) {
+  const metricById = new Map(detail.metrics.map((metric) => [metric.id, metric]));
+  const ids =
+    detail.id === "special-attack"
+      ? STATS_SOURCE_DETAIL_METRIC_IDS["special-attack"]
+      : detail.id === "cannon"
+        ? STATS_SOURCE_DETAIL_METRIC_IDS.cannon
+        : detail.metrics.map((metric) => metric.id);
+
+  return ids.flatMap((id) => {
+    const metric = metricById.get(id);
+    return metric ? [metric] : [];
+  });
+}
+
+function StatsSourceDetailCard({ detail }: { detail: StatsSourceDetailViewModel }) {
+  const metrics = orderedStatsSourceDetailMetrics(detail);
+
+  return (
+    <article
+      className={`source-detail-card ${detail.status}`}
+      role="listitem"
+      aria-label={`${detail.label} detail: ${detail.statusLabel}`}
+    >
+      <div className="source-detail-heading">
+        <div>
+          <h3>{detail.label} detail</h3>
+          <span>{detail.statusLabel}</span>
+        </div>
+      </div>
+      <div className="source-detail-metrics">
+        {metrics.map((metric) => (
+          <div key={metric.id}>
+            <span>{statsSourceDetailMetricLabel(detail, metric)}</span>
+            <strong>{metric.value}</strong>
+          </div>
+        ))}
+      </div>
+      <CalculationWarningSummary
+        warnings={detail.warnings}
+        label={`${detail.label} source warnings`}
+        title={`${detail.label} note`}
+      />
+      {detail.notes.length > 0 ? (
+        <ul className="source-detail-notes">
+          {detail.notes.map((note) => (
+            <li key={note}>{note}</li>
+          ))}
+        </ul>
+      ) : null}
+    </article>
   );
 }
 
@@ -1598,6 +1777,54 @@ function ReadOnlyField({
   );
 }
 
+function localStateStatusLabel(item: LocalStateHealthItem): string {
+  if (item.status === "loaded") return "Loaded";
+  if (item.status === "missing") return "Not saved";
+  if (item.status === "version-mismatch") return "Unsupported version";
+  if (item.status === "unavailable") return "Storage unavailable";
+  if (item.status === "save-failed") return "Save failed";
+  return "Invalid";
+}
+
+function localStateReasonLabel(item: LocalStateHealthItem): string {
+  if (item.status === "missing") return "Using defaults until this state is saved.";
+  if (item.status === "loaded") return "Local data is valid.";
+  if (item.status === "unavailable") {
+    return "Local storage could not be read. Defaults are active and changes may not persist after reload.";
+  }
+  if (item.status === "save-failed") {
+    return item.reason === "clear_failed"
+      ? "Local storage could not be cleared. Current session data remains active, but reload may restore the saved state."
+      : "Local storage could not be saved. Current session data remains active, but changes may not persist after reload.";
+  }
+  if (item.status === "version-mismatch") {
+    return `Found v${formatNumber(item.foundVersion ?? 0)}, expected v${formatNumber(
+      item.expectedVersion
+    )}. Defaults are active until this key is cleared or replaced.`;
+  }
+  if (item.reason === "body_too_large") {
+    return "Saved data is too large. Defaults are active until this key is cleared or replaced.";
+  }
+  if (item.reason === "invalid_json") {
+    return "Saved data is not valid JSON. Defaults are active until this key is cleared or replaced.";
+  }
+  if (item.reason === "invalid_envelope") {
+    return "Saved metadata is invalid. Defaults are active until this key is cleared or replaced.";
+  }
+  return "Saved data failed validation. Defaults are active until this key is cleared or replaced.";
+}
+
+function localStateHealthExportFileName(report: LocalStateHealthReport): string {
+  const safeTimestamp = report.generatedAt.replace(/[^0-9A-Za-z._-]+/g, "-");
+  return `index-sim-local-state-health-${safeTimestamp}.json`;
+}
+
+function localStateRecoveryStatus(report: LocalStateHealthReport): string {
+  return report.hasAttention
+    ? `${formatNumber(report.attentionCount)} need attention`
+    : "Healthy";
+}
+
 export function App() {
   const [context, setContext] = useState<SimulationContext | null>(null);
   const [initialSavedSetup] = useState(loadInitialSavedSetup);
@@ -1627,6 +1854,7 @@ export function App() {
     useState<DuelSnapshotsState>(loadInitialDuelSnapshots);
   const [priceHistory, setPriceHistory] =
     useState<BrowserPriceHistoryState>(loadInitialPriceHistory);
+  const [bundledPriceSet, setBundledPriceSet] = useState<PriceSet | null>(null);
   const [plannerState, setPlannerState] = useState<PlannerUiState>(loadInitialPlannerUiState);
   const [plannerComputedState, setPlannerComputedState] =
     useState<PlannerUiState>(loadInitialPlannerUiState);
@@ -1634,6 +1862,21 @@ export function App() {
     loadInitialLegacyMigrationDismissed
   );
   const [legacyClearPending, setLegacyClearPending] = useState(false);
+  const [localStateHealthReport, setLocalStateHealthReport] =
+    useState<LocalStateHealthReport>(() => initialLocalStateHealthReport);
+  const [localStateRecoveryBlockedIds, setLocalStateRecoveryBlockedIds] = useState<
+    LocalStateHealthItemId[]
+  >(() => initialLocalStateRecoveryBlockedIds);
+  const [localStateClearPendingId, setLocalStateClearPendingId] = useState<
+    LocalStateHealthItemId | "invalid-all" | null
+  >(null);
+  const [localStateStorageFailures, setLocalStateStorageFailures] = useState<
+    LocalStateStorageFailure[]
+  >([]);
+  const [localStateRecoveryNotice, setLocalStateRecoveryNotice] = useState<string | null>(() =>
+    localStorageAccessUnavailable ? LOCAL_STATE_PERSISTENCE_NOTICE : null
+  );
+  const skipNextLocalStatePersistRef = useRef<Set<LocalStateHealthItemId>>(new Set());
   const [readyToPersist, setReadyToPersist] = useState(false);
   const [status, setStatus] = useState("Loading bundled data");
   const [fatalError, setFatalError] = useState<string | null>(null);
@@ -1648,6 +1891,8 @@ export function App() {
     tone: "neutral" | "success" | "error";
     message: string;
   } | null>(null);
+  const hiscoresPlayerRef = useRef(hiscoresPlayer);
+  const hiscoresLookupSequenceRef = useRef(0);
   const [marketStatus, setMarketStatus] = useState<MarketStatusResponse | null>(null);
   const [marketBusy, setMarketBusy] = useState<MarketSyncScope | null>(null);
   const [marketReport, setMarketReport] = useState<MarketSyncReport | null>(null);
@@ -1666,10 +1911,86 @@ export function App() {
     direction: "desc"
   });
   const [priceHistoryClearPending, setPriceHistoryClearPending] = useState(false);
+  const [priceSetResetPending, setPriceSetResetPending] = useState(false);
   const [lootNotice, setLootNotice] = useState<string | null>(null);
   const [pendingUndo, setPendingUndo] = useState<PendingUndo | null>(null);
   const [activeTab, setActiveTab] = useState<WorkbenchTabId>("compare");
   const heavyForm = useDebouncedValue(form, 250);
+  const localStateRecoveryBlocked = (itemId: LocalStateHealthItemId): boolean =>
+    localStateRecoveryBlockedIds.includes(itemId);
+  const shouldSkipLocalStatePersist = (itemId: LocalStateHealthItemId): boolean => {
+    if (skipNextLocalStatePersistRef.current.has(itemId)) {
+      skipNextLocalStatePersistRef.current.delete(itemId);
+      return true;
+    }
+    return localStateRecoveryBlocked(itemId);
+  };
+  const refreshLocalStateHealthReport = (
+    storageFailures: readonly LocalStateStorageFailure[] = localStateStorageFailures
+  ): LocalStateHealthReport => {
+    const report = createLocalStateHealthReport(storage, new Date(), {
+      storageUnavailable: localStorageAccessUnavailable,
+      storageFailures
+    });
+    setLocalStateHealthReport(report);
+    return report;
+  };
+  const recordLocalStateStorageFailure = (
+    itemId: LocalStateHealthItemId,
+    reason: LocalStateStorageFailure["reason"]
+  ): void => {
+    setLocalStateStorageFailures((current) => {
+      return [...current.filter((failure) => failure.id !== itemId), { id: itemId, reason }];
+    });
+    setLocalStateRecoveryNotice(LOCAL_STATE_PERSISTENCE_NOTICE);
+    setStatus(LOCAL_STATE_PERSISTENCE_NOTICE);
+  };
+  const clearLocalStateStorageFailures = (itemIds: readonly LocalStateHealthItemId[]): void => {
+    if (!itemIds.length) return;
+    setLocalStateStorageFailures((current) => {
+      const next = current.filter((failure) => !itemIds.includes(failure.id));
+      return next;
+    });
+  };
+  const persistLocalState = <T,>(
+    itemId: LocalStateHealthItemId,
+    options: VersionedStorageOptions<T>,
+    value: T
+  ): boolean => {
+    const result = trySavePersisted(options, value);
+    if (result.status === "saved") {
+      if (localStorageAccessUnavailable) {
+        setLocalStateRecoveryNotice(LOCAL_STATE_PERSISTENCE_NOTICE);
+        setStatus(LOCAL_STATE_PERSISTENCE_NOTICE);
+        return false;
+      }
+      clearLocalStateStorageFailures([itemId]);
+      return true;
+    }
+    recordLocalStateStorageFailure(itemId, result.reason);
+    return false;
+  };
+  const releaseLocalStateRecoveryBlocks = (itemIds: readonly LocalStateHealthItemId[]): void => {
+    if (!itemIds.length) return;
+    for (const itemId of itemIds) skipNextLocalStatePersistRef.current.add(itemId);
+    setLocalStateRecoveryBlockedIds((current) =>
+      current.filter((itemId) => !itemIds.includes(itemId))
+    );
+  };
+  const unblockReplacedLocalState = (itemIds: readonly LocalStateHealthItemId[]): void => {
+    if (!itemIds.length) return;
+    setLocalStateRecoveryBlockedIds((current) =>
+      current.filter((itemId) => !itemIds.includes(itemId))
+    );
+  };
+
+  useEffect(() => {
+    refreshLocalStateHealthReport(localStateStorageFailures);
+  }, [localStateStorageFailures]);
+
+  useEffect(() => {
+    hiscoresPlayerRef.current = hiscoresPlayer;
+  }, [hiscoresPlayer]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1716,8 +2037,34 @@ export function App() {
     loadBundledLegacyContext()
       .then((result) => {
         if (cancelled) return;
-        setStatus(initialSavedSetup.loaded ? "Loaded saved rewrite setup" : "Loaded bundled data");
-        setContext(result.context);
+        const bundledContext = result.context;
+        const selectedPriceSet = loadSelectedPriceSet(storage);
+        setBundledPriceSet(bundledContext.priceSet);
+        if (selectedPriceSet.status === "loaded") {
+          const restoredPriceSet = selectedPriceSet.value.priceSet;
+          setStatus(
+            initialSavedSetup.loaded
+              ? "Loaded saved rewrite setup and selected PriceSet"
+              : "Loaded selected PriceSet"
+          );
+          setContext({ ...bundledContext, priceSet: restoredPriceSet });
+          setPriceLabel(restoredPriceSet.label);
+          setMarketNotice({
+            tone: "success",
+            message: `Restored selected PriceSet: ${restoredPriceSet.label}`
+          });
+        } else {
+          const selectedPriceSetIssue = describeSelectedPriceSetLoadIssue(selectedPriceSet);
+          setStatus(
+            selectedPriceSetIssue ??
+              (initialSavedSetup.loaded ? "Loaded saved rewrite setup" : "Loaded bundled data")
+          );
+          setContext(bundledContext);
+          setPriceLabel(bundledContext.priceSet.label);
+          if (selectedPriceSetIssue) {
+            setMarketNotice({ tone: "error", message: selectedPriceSetIssue });
+          }
+        }
         setReadyToPersist(true);
       })
       .catch((caught: unknown) => {
@@ -1730,8 +2077,12 @@ export function App() {
 
   const legacyMigrationReport = useMemo<LegacySetupMigrationReport | null>(() => {
     if (!context || legacyMigrationDismissed) return null;
-    const report = inspectLegacySetupMigration({ storage, gameData: context.gameData });
-    return report.foundKeys.length > 0 ? report : null;
+    try {
+      const report = inspectLegacySetupMigration({ storage, gameData: context.gameData });
+      return report.foundKeys.length > 0 ? report : null;
+    } catch {
+      return null;
+    }
   }, [context, legacyMigrationDismissed]);
   const denseCompareForGameData = useMemo(
     () =>
@@ -1757,8 +2108,9 @@ export function App() {
   }, [context, lootPrefsByMonster]);
 
   useEffect(() => {
-    if (!readyToPersist) return;
-    savePersisted(
+    if (!readyToPersist || shouldSkipLocalStatePersist("rewrite-setup")) return;
+    persistLocalState(
+      "rewrite-setup",
       setupStorageOptions,
       savedSetupFromForm(
         form,
@@ -1775,39 +2127,46 @@ export function App() {
     defaultForm,
     denseCompareForGameData,
     form,
+    localStateRecoveryBlockedIds,
     readyToPersist,
     setupMode
   ]);
 
   useEffect(() => {
-    if (!readyToPersist) return;
-    savePersisted(lootPrefsStorageOptions, lootPrefsForGameData);
-  }, [lootPrefsForGameData, readyToPersist]);
+    if (!readyToPersist || shouldSkipLocalStatePersist("loot-prefs")) return;
+    persistLocalState("loot-prefs", lootPrefsStorageOptions, lootPrefsForGameData);
+  }, [localStateRecoveryBlockedIds, lootPrefsForGameData, readyToPersist]);
 
   useEffect(() => {
-    if (!readyToPersist) return;
-    savePersisted(lootSettingsStorageOptions, lootSettingsByMonster);
-  }, [lootSettingsByMonster, readyToPersist]);
+    if (!readyToPersist || shouldSkipLocalStatePersist("loot-settings")) return;
+    persistLocalState("loot-settings", lootSettingsStorageOptions, lootSettingsByMonster);
+  }, [localStateRecoveryBlockedIds, lootSettingsByMonster, readyToPersist]);
 
   useEffect(() => {
-    if (!readyToPersist) return;
-    savePersisted(hiddenGearTiersStorageOptions, hiddenGearTiers);
-  }, [hiddenGearTiers, readyToPersist]);
+    if (!readyToPersist || shouldSkipLocalStatePersist("hidden-gear-tiers")) return;
+    persistLocalState("hidden-gear-tiers", hiddenGearTiersStorageOptions, hiddenGearTiers);
+  }, [hiddenGearTiers, localStateRecoveryBlockedIds, readyToPersist]);
 
   useEffect(() => {
-    if (!readyToPersist) return;
-    savePersisted(duelSnapshotsStorageOptions, duelSnapshots);
-  }, [duelSnapshots, readyToPersist]);
+    if (!readyToPersist || shouldSkipLocalStatePersist("duel-snapshots")) return;
+    persistLocalState("duel-snapshots", duelSnapshotsStorageOptions, duelSnapshots);
+  }, [duelSnapshots, localStateRecoveryBlockedIds, readyToPersist]);
 
   useEffect(() => {
-    if (!readyToPersist || priceHistory.snapshots.length === 0) return;
-    savePersisted(priceHistoryStorageOptions, priceHistory);
-  }, [priceHistory, readyToPersist]);
+    if (
+      !readyToPersist ||
+      priceHistory.snapshots.length === 0 ||
+      shouldSkipLocalStatePersist("price-history")
+    ) {
+      return;
+    }
+    persistLocalState("price-history", priceHistoryStorageOptions, priceHistory);
+  }, [localStateRecoveryBlockedIds, priceHistory, readyToPersist]);
 
   useEffect(() => {
-    if (!readyToPersist) return;
-    savePlannerUiState(storage, plannerState);
-  }, [plannerState, readyToPersist]);
+    if (!readyToPersist || shouldSkipLocalStatePersist("planner-ui")) return;
+    persistLocalState("planner-ui", plannerUiStorageOptions, plannerState);
+  }, [localStateRecoveryBlockedIds, plannerState, readyToPersist]);
 
   const currentLootRowIds = useMemo(() => {
     if (!context) return [];
@@ -1986,18 +2345,32 @@ export function App() {
       lootPrefsForGameData
     ]
   );
+  const denseComparePending = useMemo(
+    () => JSON.stringify(form) !== JSON.stringify(heavyForm),
+    [form, heavyForm]
+  );
+  const denseCompareFreshnessLabel = denseComparePending ? "Updating" : "Current";
+  const denseCompareFreshnessSummary = denseComparePending
+    ? "rows may reflect previous loadout"
+    : "current loadout";
+  const denseCompareFreshnessAria = denseComparePending
+    ? "Compare calculation status: Updating. Rows may reflect the previous loadout."
+    : "Compare calculation status: Current. Rows match the live setup.";
   const denseCompareScale = useMemo(
     () => createDenseCompareScaleModel(denseCompareRows),
     [denseCompareRows]
   );
   const denseCompareTotalRows = context ? Object.keys(context.gameData.monsters).length : 0;
   const hiscoresPreviewRows = useMemo(
-    () => (hiscoresResponse ? createHiscoresPreviewRows(form, hiscoresResponse) : []),
-    [form, hiscoresResponse]
+    () =>
+      isHiscoresPreviewCurrent(hiscoresPlayer, hiscoresResponse)
+        ? createHiscoresPreviewRows(form, hiscoresResponse)
+        : [],
+    [form, hiscoresPlayer, hiscoresResponse]
   );
   const hiscoresAvailable = hiscoresStatus?.available === true;
   const hiscoresStatusText = statusText(hiscoresStatus, hiscoresAvailable);
-  const canApplyHiscores = hiscoresPreviewRows.some((row) => row.canApply);
+  const canApplyHiscores = canApplyHiscoresPreview(hiscoresPlayer, hiscoresResponse);
   const marketAvailable = marketStatus?.available === true;
   const marketStatusText = statusText(marketStatus, marketAvailable);
 
@@ -2061,6 +2434,7 @@ export function App() {
                 weaponId: form.weaponId,
                 styleId: form.styleId,
                 currentItemId: form.gear[slot] ?? "none",
+                levels: form.levels,
                 options: gearSelectOptions[slot],
                 shieldLocked: slot === "shield" && currentWeaponTwoHanded
               })
@@ -2077,6 +2451,7 @@ export function App() {
       currentWeaponTwoHanded,
       form.combatStyle,
       form.gear,
+      form.levels,
       form.styleId,
       form.weaponId,
       gearSelectOptions
@@ -2253,12 +2628,37 @@ export function App() {
     setPendingUndo(null);
   };
 
+  const persistSelectedActivePriceSet = (priceSet: PriceSet, selectedAt: Date): boolean => {
+    try {
+      saveSelectedPriceSet(storage, priceSet, { now: () => selectedAt });
+      if (localStorageAccessUnavailable) {
+        setLocalStateRecoveryNotice(LOCAL_STATE_PERSISTENCE_NOTICE);
+        refreshLocalStateHealthReport();
+        return false;
+      }
+      clearLocalStateStorageFailures(["selected-price-set"]);
+      refreshLocalStateHealthReport();
+      setPriceSetResetPending(false);
+      return true;
+    } catch {
+      recordLocalStateStorageFailure("selected-price-set", "save_failed");
+      return false;
+    }
+  };
+
   const acceptPriceSet = (priceSet: PriceSet, acceptedAt: Date, nextStatus: string) => {
+    const selectedPersisted = persistSelectedActivePriceSet(priceSet, acceptedAt);
+    unblockReplacedLocalState(["price-history", "selected-price-set"]);
     setContext((current) => (current ? { ...current, priceSet } : current));
     setPriceHistory((current) => appendAcceptedPriceSetToHistory(current, priceSet, acceptedAt));
     setPriceLabel(priceSet.label);
     setStatus(nextStatus);
-    setMarketNotice({ tone: "success", message: `${nextStatus}: ${priceSet.label}` });
+    setMarketNotice({
+      tone: selectedPersisted ? "success" : "neutral",
+      message: selectedPersisted
+        ? `${nextStatus}: ${priceSet.label}`
+        : `${nextStatus}: ${priceSet.label}. Local restore was not saved.`
+    });
     setFatalError(null);
   };
 
@@ -2295,14 +2695,22 @@ export function App() {
         JSON.parse(await readBrowserFileText(file, SETUP_IMPORT_MAX_BYTES))
       );
       const setup = parsed.data;
+      const persisted = persistLocalState("rewrite-setup", setupStorageOptions, setup);
       setForm(normalizeFormState(setup.form));
       setDefaultForm(normalizeFormState(setup.defaultForm));
       setSetupMode(setup.setupMode);
       setCustomSetupsByMonster(setup.customSetupsByMonster);
       setDenseCompare(setup.denseCompare);
       setCannonByMonster(setup.cannonByMonster);
-      setStatus("Imported rewrite setup");
-      setSetupImportNotice({ tone: "success", message: "Imported rewrite setup." });
+      unblockReplacedLocalState(["rewrite-setup"]);
+      refreshLocalStateHealthReport();
+      setStatus(persisted ? "Imported rewrite setup" : "Imported rewrite setup for this session");
+      setSetupImportNotice({
+        tone: "success",
+        message: persisted
+          ? "Imported rewrite setup."
+          : "Imported rewrite setup for this session. Local storage is unavailable, so changes may not persist after reload."
+      });
       setFatalError(null);
     } catch (caught) {
       setSetupImportNotice(describeSetupImportError(caught));
@@ -2312,7 +2720,7 @@ export function App() {
   };
 
   const dismissLegacyMigration = (report: LegacySetupMigrationReport, message: string): void => {
-    savePersisted(legacyMigrationDismissedStorageOptions, {
+    persistLocalState("legacy-migration-dismissed", legacyMigrationDismissedStorageOptions, {
       dismissedAt: new Date().toISOString(),
       foundKeys: report.foundKeys
     });
@@ -2365,35 +2773,47 @@ export function App() {
             defaultForm,
             setupMode
           );
-      savePersisted(setupStorageOptions, setup);
+      persistLocalState("rewrite-setup", setupStorageOptions, setup);
       setForm(normalizeFormState(setup.form));
       setDefaultForm(normalizeFormState(setup.defaultForm));
       setSetupMode(setup.setupMode);
       setCustomSetupsByMonster(setup.customSetupsByMonster);
       setDenseCompare(setup.denseCompare);
       setCannonByMonster(setup.cannonByMonster);
+      unblockReplacedLocalState(["rewrite-setup"]);
     }
     if (legacyMigrationReport.lootPrefs != null) {
       const nextLootPrefs = mergeLootPrefsState(lootPrefsForGameData, legacyMigrationReport.lootPrefs);
-      savePersisted(lootPrefsStorageOptions, nextLootPrefs);
+      persistLocalState("loot-prefs", lootPrefsStorageOptions, nextLootPrefs);
       setLootPrefsByMonster(nextLootPrefs);
+      unblockReplacedLocalState(["loot-prefs"]);
     }
     if (legacyMigrationReport.hiddenGearTiers != null) {
-      savePersisted(hiddenGearTiersStorageOptions, legacyMigrationReport.hiddenGearTiers);
+      persistLocalState(
+        "hidden-gear-tiers",
+        hiddenGearTiersStorageOptions,
+        legacyMigrationReport.hiddenGearTiers
+      );
       setHiddenGearTiers(legacyMigrationReport.hiddenGearTiers);
+      unblockReplacedLocalState(["hidden-gear-tiers"]);
     }
     if (legacyMigrationReport.hiscoresPlayer) {
-      saveLastHiscoresPlayer(storage, legacyMigrationReport.hiscoresPlayer);
+      try {
+        saveLastHiscoresPlayer(storage, legacyMigrationReport.hiscoresPlayer);
+        clearLocalStateStorageFailures(["hiscores-last-player"]);
+      } catch {
+        recordLocalStateStorageFailure("hiscores-last-player", "save_failed");
+      }
       setHiscoresPlayer(legacyMigrationReport.hiscoresPlayer);
+      unblockReplacedLocalState(["hiscores-last-player"]);
     }
     if (legacyMigrationReport.priceSet) {
       const priceSet = legacyMigrationReport.priceSet;
       const acceptedAt = new Date();
-      setContext((current) => (current ? { ...current, priceSet } : current));
-      setPriceHistory((current) => appendAcceptedPriceSetToHistory(current, priceSet, acceptedAt));
-      setPriceLabel(priceSet.label);
+      acceptPriceSet(priceSet, acceptedAt, "Imported compatible legacy PriceSet");
     }
     setFatalError(null);
+    refreshLocalStateHealthReport();
     dismissLegacyMigration(legacyMigrationReport, "Imported compatible legacy data");
   };
 
@@ -2404,16 +2824,81 @@ export function App() {
 
   const confirmClearLegacyData = () => {
     if (!legacyMigrationReport) return;
-    const clearedKeys = clearKnownLegacyStorageKeys(storage);
+    let clearedKeys: LegacyStorageKey[];
+    try {
+      clearedKeys = clearKnownLegacyStorageKeys(storage);
+    } catch {
+      recordLocalStateStorageFailure("legacy-migration-dismissed", "clear_failed");
+      setLocalStateRecoveryNotice(LOCAL_STATE_PERSISTENCE_NOTICE);
+      setStatus("Could not clear legacy data. Local storage is unavailable.");
+      return;
+    }
     dismissLegacyMigration(
       { ...legacyMigrationReport, foundKeys: clearedKeys },
       `Cleared ${clearedKeys.length} legacy keys`
     );
   };
 
+  const exportLocalStateRecoveryReport = () => {
+    const report = refreshLocalStateHealthReport();
+    downloadJsonFile(localStateHealthExportFileName(report), createLocalStateHealthExport(report));
+    setLocalStateClearPendingId(null);
+    setLocalStateRecoveryNotice("Exported local state recovery report");
+    setStatus("Exported local state recovery report");
+  };
+
+  const confirmClearLocalStateItem = (item: LocalStateHealthItem) => {
+    const result = clearLocalStateItem(storage, item.id);
+    clearLocalStateStorageFailures(result.clearedItems.map((clearedItem) => clearedItem.id));
+    for (const failed of result.failedItems) {
+      recordLocalStateStorageFailure(failed.item.id, failed.reason);
+    }
+    releaseLocalStateRecoveryBlocks(result.clearedItems.map((clearedItem) => clearedItem.id));
+    refreshLocalStateHealthReport();
+    setLocalStateClearPendingId(null);
+    const message =
+      result.failedItems.length > 0
+        ? `Could not clear ${item.label}. Local storage is unavailable.`
+        : result.clearedItems.length > 0
+          ? `Cleared ${item.label}`
+          : `${item.label} had no local data to clear`;
+    setLocalStateRecoveryNotice(message);
+    setStatus(message);
+  };
+
+  const confirmClearInvalidLocalState = () => {
+    const result = clearInvalidLocalState(storage, localStateHealthReport);
+    clearLocalStateStorageFailures(result.clearedItems.map((item) => item.id));
+    for (const failed of result.failedItems) {
+      recordLocalStateStorageFailure(failed.item.id, failed.reason);
+    }
+    releaseLocalStateRecoveryBlocks(result.clearedItems.map((item) => item.id));
+    refreshLocalStateHealthReport();
+    setLocalStateClearPendingId(null);
+    const message =
+      result.failedItems.length > 0
+        ? `Could not clear ${formatNumber(result.failedItems.length)} local state keys. Local storage is unavailable.`
+        : result.clearedItems.length > 0
+          ? `Cleared ${formatNumber(result.clearedItems.length)} invalid local state keys`
+          : "No invalid local state keys to clear";
+    setLocalStateRecoveryNotice(message);
+    setStatus(message);
+  };
+
+  const handleHiscoresPlayerChange = (value: string) => {
+    hiscoresPlayerRef.current = value;
+    setHiscoresPlayer(value);
+    if (hiscoresResponse && !isHiscoresPreviewCurrent(value, hiscoresResponse)) {
+      setHiscoresResponse(null);
+      setHiscoresNotice((notice) => (notice?.tone === "success" ? null : notice));
+    }
+  };
+
   const handleHiscoresLookup = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!hiscoresPlayer.trim()) {
+    const lookupPlayer = hiscoresPlayer;
+    const lookupPlayerKey = normalizeHiscoresPlayerInput(lookupPlayer);
+    if (!lookupPlayerKey) {
       setHiscoresNotice({ tone: "error", message: "Enter a player name" });
       return;
     }
@@ -2422,12 +2907,31 @@ export function App() {
       return;
     }
 
+    const requestSequence = (hiscoresLookupSequenceRef.current += 1);
     setHiscoresBusy(true);
     setHiscoresNotice({ tone: "neutral", message: "Looking up hiscores" });
     try {
-      const response = await lookupHiscores(hiscoresPlayer);
+      const response = await lookupHiscores(lookupPlayer);
+      const latestRequest = requestSequence === hiscoresLookupSequenceRef.current;
+      if (!latestRequest || !isHiscoresPreviewCurrent(hiscoresPlayerRef.current, response)) {
+        if (latestRequest) {
+          setHiscoresResponse(null);
+          setHiscoresNotice({
+            tone: "neutral",
+            message: "Player changed before lookup completed. Run Lookup again."
+          });
+        }
+        return;
+      }
       setHiscoresResponse(response);
-      saveLastHiscoresPlayer(storage, response.player);
+      try {
+        saveLastHiscoresPlayer(storage, response.player);
+        clearLocalStateStorageFailures(["hiscores-last-player"]);
+      } catch {
+        recordLocalStateStorageFailure("hiscores-last-player", "save_failed");
+      }
+      unblockReplacedLocalState(["hiscores-last-player"]);
+      refreshLocalStateHealthReport();
       setHiscoresNotice({
         tone: "success",
         message: createHiscoresPreviewRows(form, response).length
@@ -2435,15 +2939,31 @@ export function App() {
           : "No supported skills returned"
       });
     } catch (caught: unknown) {
+      const latestRequest = requestSequence === hiscoresLookupSequenceRef.current;
+      if (
+        !latestRequest ||
+        normalizeHiscoresPlayerInput(hiscoresPlayerRef.current) !== lookupPlayerKey
+      ) {
+        return;
+      }
       setHiscoresResponse(null);
       setHiscoresNotice({ tone: "error", message: describeHiscoresError(caught) });
     } finally {
-      setHiscoresBusy(false);
+      if (requestSequence === hiscoresLookupSequenceRef.current) {
+        setHiscoresBusy(false);
+      }
     }
   };
 
   const applyHiscoresPreview = () => {
-    if (!hiscoresResponse) return;
+    if (!isHiscoresPreviewCurrent(hiscoresPlayer, hiscoresResponse)) {
+      setHiscoresResponse(null);
+      setHiscoresNotice({
+        tone: "neutral",
+        message: "Hiscores preview no longer matches Player. Run Lookup again."
+      });
+      return;
+    }
     const applied = countApplicableHiscoresSkills(hiscoresResponse);
     setFormSafe((current) => applyHiscoresLevels(current, hiscoresResponse));
     setHiscoresNotice({
@@ -2469,6 +2989,7 @@ export function App() {
         includeAlch: true
       });
       const acceptedAt = new Date();
+      const selectedPersisted = persistSelectedActivePriceSet(response.priceSet, acceptedAt);
       setContext((current) =>
         current
           ? applyMarketSyncResponse(current, response)
@@ -2480,9 +3001,10 @@ export function App() {
       setPriceLabel(response.priceSet.label);
       setStatus("Synced market prices");
       setMarketReport(response.report);
+      const marketSummary = summarizeMarketSyncReport(response.report);
       setMarketNotice({
-        tone: response.report.failed ? "neutral" : "success",
-        message: summarizeMarketSyncReport(response.report)
+        tone: response.report.failed || !selectedPersisted ? "neutral" : "success",
+        message: selectedPersisted ? marketSummary : `${marketSummary}. Local restore was not saved.`
       });
     } catch (caught: unknown) {
       setMarketNotice({ tone: "error", message: describeMarketError(caught) });
@@ -2508,11 +3030,29 @@ export function App() {
   };
 
   const confirmClearPriceHistory = () => {
-    clearPersisted(priceHistoryStorageOptions);
+    const cleared = tryClearPersisted(priceHistoryStorageOptions);
+    const persistedClear = cleared.status === "cleared" && !localStorageAccessUnavailable;
+    if (cleared.status === "failed") {
+      recordLocalStateStorageFailure("price-history", cleared.reason);
+    } else if (persistedClear) {
+      clearLocalStateStorageFailures(["price-history"]);
+    } else {
+      setLocalStateRecoveryNotice(LOCAL_STATE_PERSISTENCE_NOTICE);
+    }
     setPriceHistory(DEFAULT_PRICE_HISTORY_STATE);
     setPriceHistoryClearPending(false);
-    setStatus("Cleared price history");
-    setMarketNotice({ tone: "success", message: "Cleared local price history" });
+    setStatus(
+      !persistedClear
+        ? "Cleared price history for this session"
+        : "Cleared price history"
+    );
+    setMarketNotice({
+      tone: !persistedClear ? "neutral" : "success",
+      message:
+        !persistedClear
+          ? "Cleared price history for this session. Local storage is unavailable, so reload may restore it."
+          : "Cleared local price history"
+    });
   };
 
   const updateEconomySort = (key: PriceHistoryMoverSortKey) => {
@@ -3125,6 +3665,12 @@ export function App() {
       ? `${legacyMigrationReport.importedFields.length} compatible fields`
       : "review only"
     : "";
+  const localStateRecoveryVisible =
+    activeTab === "settings" &&
+    (localStateHealthReport.hasAttention || localStateRecoveryNotice != null);
+  const localStateAttentionItems = localStateHealthReport.items.filter(
+    (item) => item.needsAttention
+  );
   const plannerPanel = plannerResult?.panel ?? null;
   const plannerStatus = plannerResult?.error
     ? "error"
@@ -3155,6 +3701,81 @@ export function App() {
   const activePriceSetAlchCount = activePriceSet
     ? Object.keys(activePriceSet.alchValues).length
     : 0;
+  const activePriceSetIsBundled = activePriceSet?.source === "bundled";
+  const canResetActivePriceSet = Boolean(
+    activePriceSet && bundledPriceSet && !activePriceSetIsBundled
+  );
+  const exportActivePriceSet = () => {
+    if (!activePriceSet) return;
+    downloadJsonFile(priceSetExportFileName(activePriceSet), activePriceSet);
+    setPriceSetResetPending(false);
+    setStatus("Exported active PriceSet");
+    setMarketNotice({
+      tone: "success",
+      message: `Exported active PriceSet: ${activePriceSet.label}`
+    });
+  };
+  const requestResetActivePriceSet = () => {
+    if (!canResetActivePriceSet) return;
+    setPriceSetResetPending(true);
+    setMarketNotice({
+      tone: "neutral",
+      message: "Confirm reset to bundled prices. Local price history will be kept."
+    });
+  };
+  const resetActivePriceSetToBundled = () => {
+    if (!bundledPriceSet) return;
+    let persistedReset = true;
+    try {
+      clearSelectedPriceSet(storage);
+      if (localStorageAccessUnavailable) {
+        persistedReset = false;
+        setLocalStateRecoveryNotice(LOCAL_STATE_PERSISTENCE_NOTICE);
+      } else {
+        clearLocalStateStorageFailures(["selected-price-set"]);
+      }
+    } catch {
+      persistedReset = false;
+      recordLocalStateStorageFailure("selected-price-set", "clear_failed");
+    }
+    refreshLocalStateHealthReport();
+    setContext((current) => (current ? { ...current, priceSet: bundledPriceSet } : current));
+    setPriceLabel(bundledPriceSet.label);
+    setPriceSetResetPending(false);
+    setStatus(persistedReset ? "Reset to bundled prices" : "Reset to bundled prices for this session");
+    setMarketNotice({
+      tone: persistedReset ? "success" : "neutral",
+      message: persistedReset
+        ? "Reset to bundled prices. Local price history was kept."
+        : "Reset to bundled prices for this session. Local storage is unavailable, so reload may restore the previous PriceSet."
+    });
+    setFatalError(null);
+  };
+  const renderPriceSetControls = () => (
+    <>
+      <button type="button" disabled={!activePriceSet} onClick={exportActivePriceSet}>
+        Export active PriceSet
+      </button>
+      {priceSetResetPending ? (
+        <>
+          <button type="button" onClick={resetActivePriceSetToBundled}>
+            Confirm reset to bundled prices
+          </button>
+          <button type="button" onClick={() => setPriceSetResetPending(false)}>
+            Cancel
+          </button>
+        </>
+      ) : (
+        <button
+          type="button"
+          disabled={!canResetActivePriceSet}
+          onClick={requestResetActivePriceSet}
+        >
+          Reset to bundled prices
+        </button>
+      )}
+    </>
+  );
   const priceDataStatusMessage = marketNotice?.message ?? status;
   const marketReportDetails = marketReport
     ? formatMarketSyncReportDetails(marketReport, {
@@ -3447,7 +4068,7 @@ export function App() {
                   type="text"
                   autoComplete="off"
                   value={hiscoresPlayer}
-                  onChange={(event) => setHiscoresPlayer(event.target.value)}
+                  onChange={(event) => handleHiscoresPlayerChange(event.target.value)}
                 />
               </div>
               <button type="submit" disabled={!hiscoresAvailable || hiscoresBusy}>
@@ -3464,6 +4085,18 @@ export function App() {
             )}
             {hiscoresPreviewRows.length > 0 && (
               <div className="hiscores-preview">
+                {hiscoresResponse && (
+                  <p className="hiscores-preview-meta">
+                    <span>
+                      Preview for{" "}
+                      <strong>
+                        {hiscoresResponse.normalizedPlayer || hiscoresResponse.player}
+                      </strong>
+                    </span>
+                    <span>Source: {hiscoresResponse.source.label}</span>
+                    <span>Fetched: {hiscoresResponse.fetchedAt}</span>
+                  </p>
+                )}
                 <table aria-label="Hiscores preview">
                   <thead>
                     <tr>
@@ -3770,6 +4403,21 @@ export function App() {
                         </ul>
                       </article>
                     ))}
+                  </div>
+                  <div className="source-detail-header">
+                    <h3>Source details</h3>
+                    <span>Special attack and cannon</span>
+                  </div>
+                  <div
+                    className="source-detail-grid"
+                    role="list"
+                    aria-label="Source detail panels"
+                  >
+                    {viewModel.statsSourceBreakdown.details
+                      .filter((detail) => detail.id === "special-attack" || detail.id === "cannon")
+                      .map((detail) => (
+                        <StatsSourceDetailCard detail={detail} key={detail.id} />
+                      ))}
                   </div>
                 </section>
 
@@ -4093,6 +4741,19 @@ export function App() {
                 </div>
                 {currentWeaponTwoHanded && (
                   <p className="inline-status neutral">Shield locked by two-handed weapon</p>
+                )}
+                {viewModel.setupRequirements.hasWarnings && (
+                  <div className="calculation-warning-slot">
+                    <CalculationWarningSummary
+                      warnings={viewModel.setupRequirements.warnings}
+                      label="Setup requirement warnings"
+                      title="Requirement warnings"
+                    />
+                    <p className="inline-status neutral">
+                      Manual requirement policy; generated authoritative requirements are not
+                      accepted yet.
+                    </p>
+                  </div>
                 )}
                 {loadoutBonuses && (
                   <div className="bonus-summary" aria-label="Equipment bonus summary">
@@ -5892,6 +6553,129 @@ export function App() {
                 aria-label={activeTab === "economy" ? "Economy" : "Live services"}
                 hidden={activeTab !== "economy" && activeTab !== "settings"}
               >
+                {localStateRecoveryVisible && (
+                  <section
+                    className="service-group local-state-recovery-panel"
+                    aria-label="Local state recovery"
+                  >
+                    <div className="section-title-row">
+                      <h2>Local state recovery</h2>
+                      <span
+                        className={`status-pill ${
+                          localStateHealthReport.hasAttention ? "warning" : "ready"
+                        }`}
+                      >
+                        {localStateRecoveryStatus(localStateHealthReport)}
+                      </span>
+                    </div>
+                    <p
+                      className={`inline-status ${
+                        localStateHealthReport.hasAttention ? "warning" : "success"
+                      }`}
+                      role={localStateHealthReport.hasAttention ? "alert" : "status"}
+                    >
+                      {localStateRecoveryNotice ??
+                        "Some browser-local rewrite state fell back to defaults."}
+                    </p>
+                    <div className="price-history-summary" aria-label="Local state health summary">
+                      <span>Known states {formatNumber(localStateHealthReport.itemCount)}</span>
+                      <span>Needs attention {formatNumber(localStateHealthReport.attentionCount)}</span>
+                      <span>Report {localStateHealthReport.generatedAt}</span>
+                    </div>
+                    <div className="market-sync-bar">
+                      <button type="button" onClick={exportLocalStateRecoveryReport}>
+                        Export recovery report
+                      </button>
+                      {localStateClearPendingId === "invalid-all" ? (
+                        <>
+                          <button
+                            type="button"
+                            className="danger-button"
+                            onClick={confirmClearInvalidLocalState}
+                          >
+                            Confirm clear invalid local data
+                          </button>
+                          <button type="button" onClick={() => setLocalStateClearPendingId(null)}>
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          className="danger-button"
+                          disabled={!localStateAttentionItems.some((item) => item.clearable)}
+                          onClick={() => setLocalStateClearPendingId("invalid-all")}
+                        >
+                          Clear invalid local data
+                        </button>
+                      )}
+                    </div>
+                    <table className="legacy-review-table">
+                      <thead>
+                        <tr>
+                          <th>State</th>
+                          <th>Key</th>
+                          <th>Status</th>
+                          <th>Version</th>
+                          <th>Recovery</th>
+                          <th>Clear</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {localStateHealthReport.items.map((item) => {
+                          const pending = localStateClearPendingId === item.id;
+                          return (
+                            <tr key={item.id}>
+                              <td>{item.label}</td>
+                              <td>
+                                <code>{item.storageKey}</code>
+                              </td>
+                              <td>{localStateStatusLabel(item)}</td>
+                              <td>
+                                v{formatNumber(item.expectedVersion)}
+                                {item.foundVersion != null
+                                  ? ` (found v${formatNumber(item.foundVersion)})`
+                                  : ""}
+                              </td>
+                              <td>{localStateReasonLabel(item)}</td>
+                              <td>
+                                {item.needsAttention && item.clearable ? (
+                                  pending ? (
+                                    <>
+                                      <button
+                                        type="button"
+                                        className="danger-button"
+                                        onClick={() => confirmClearLocalStateItem(item)}
+                                      >
+                                        Confirm clear {item.label}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setLocalStateClearPendingId(null)}
+                                      >
+                                        Cancel
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      className="danger-button"
+                                      onClick={() => setLocalStateClearPendingId(item.id)}
+                                    >
+                                      Clear {item.label}
+                                    </button>
+                                  )
+                                ) : (
+                                  "-"
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </section>
+                )}
                 {activeTab === "settings" && (
                   <section className="service-group price-data-panel" aria-label="Price data settings">
                     <div className="section-title-row">
@@ -5918,6 +6702,7 @@ export function App() {
                           onChange={(event) => void importPrices(event, "settings")}
                         />
                       </label>
+                      {renderPriceSetControls()}
                     </div>
                     <p
                       className={`inline-status ${marketNotice?.tone ?? "neutral"}`}
@@ -6014,6 +6799,7 @@ export function App() {
                         onChange={(event) => void importPrices(event, "market")}
                       />
                     </label>
+                    {activeTab === "economy" && renderPriceSetControls()}
                     <button type="button" disabled={!context} onClick={snapshotCurrentPriceSet}>
                       Snapshot now
                     </button>
@@ -6355,10 +7141,21 @@ export function App() {
               >
                 <div className="table-toolbar">
                   <div>
-                    <h2>All monsters</h2>
+                    <div className="table-title-row">
+                      <h2>All monsters</h2>
+                      <div
+                        className={`status-pill ${denseComparePending ? "pending" : "ready"}`}
+                        role="status"
+                        aria-live="polite"
+                        aria-atomic="true"
+                        aria-label={denseCompareFreshnessAria}
+                      >
+                        {denseCompareFreshnessLabel}
+                      </div>
+                    </div>
                     <span>
-                      {denseCompareRows.length} / {denseCompareTotalRows} monsters - current loadout
-                      - sort {sortDescription}
+                      {denseCompareRows.length} / {denseCompareTotalRows} monsters -{" "}
+                      {denseCompareFreshnessSummary} - sort {sortDescription}
                     </span>
                   </div>
                   <div className="dense-filter-bar" aria-label="Dense compare filters">

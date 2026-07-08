@@ -2,6 +2,7 @@ deploy
 simulator.zip
 scrape_prices.py
 backup
+.sources/
 node_modules
 dist
 coverage

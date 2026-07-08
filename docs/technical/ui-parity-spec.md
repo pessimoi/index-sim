@@ -136,6 +136,7 @@ Required behavior:
 - Numeric columns are right-aligned.
 - The active target row is highlighted and has a leading marker.
 - Row click selects the target monster and updates the setup strip, metric strip and current simulation.
+- The header/status strip shows whether dense rows are current for the live setup or still updating from the previous debounced calculation.
 - The table header stays visible while the table body scrolls.
 - Horizontal overflow stays inside the table container on small screens.
 - Existing custom setup, per-monster alch and per-monster overhead behavior must be represented once those state maps are ported. The current rewrite represents rewrite-owned custom setup rows and shows stable dense-row state markers for custom setup, high-alch override and kill-overhead override state.
@@ -225,7 +226,10 @@ belong to later workbench/parity fill.
 
 Current implementation note: complete for the initial root slice. Playwright
 smoke coverage checks full-table row count, Monster sorting and target
-selection through the dense table.
+selection through the dense table. The Compare toolbar also exposes a
+screen-reader-announced `Current`/`Updating` freshness status while the
+debounced dense calculation catches up; the table remains interactive during
+the pending state.
 
 #### Phase A3: legacy compare parity fill
 
@@ -466,11 +470,26 @@ existing combat, special attack, trip and cannon outputs. It lists normal attack
 special attack and cannon with modeled, partial, not modeled or inactive status
 and shows available DPS, DPS gain context, XP/hr, hit chance, max hit,
 supply-cost and note fields without changing formulas or adding new provider
-dependencies. XP routing is derived in the view-model from the current combat XP
-breakdown and trip output: player combat XP/hr is always shown, cannon ranged
-XP/hr appears only when cannon contributes, skill-specific combat XP rows are
-listed, Prayer XP is modeled from current bury loot rows and Magic alch XP is
-modeled from tracked in-trip alch casts. The `totalXpPerHour` value is composed
+dependencies. The same view-model now also exposes per-source detail records for
+UI expansion: each detail carries status, status label, metrics, notes, warnings
+and an optional histogram. The Stats UI renders source-detail cards for special
+attack and cannon from that contract. Special detail shows the spec weapon, hit
+count, max hit, hit chance, specs/hr, DPS with spec, DPS gain, warning notes and
+the current XP limitation note. Cannon detail shows effective targets, cannon
+DPS, balls/hr, balls/kill, cannon ranged XP/hr, ball cost/hr, ball cost/kill,
+cannonballs/trip and sparse/idle/respawn-bound state. The histogram is present
+only for the normal player attack because that is the only source with a reliable
+current hit distribution model; special attack and cannon details must keep
+histogram `null` until the domain provides supported distributions. Missing or
+unsupported metrics stay `null`/`-` instead of being displayed as zero. Magic DPS
+specials are `not modeled`, the DBA special boost path is `inactive` because it
+is modeled as a boost rather than a DPS special, and cannon idle/respawn-bound
+state is copied from the current Trip cannon output. XP routing is derived in the
+view-model from the current combat XP breakdown and trip output: player combat
+XP/hr is always shown, cannon ranged XP/hr appears only when cannon contributes,
+skill-specific combat XP rows are listed, Prayer XP is modeled from current bury
+loot rows and Magic alch XP is modeled from tracked in-trip alch casts. The
+`totalXpPerHour` value is composed
 from those modeled XP source rows. The Trip & banking summary mirrors the
 current trip result for kills/trip, trip length, bank time, effective kills/hr,
 supply/kill, net GP/hr, current bound, safespot and protection state. Hit
@@ -500,7 +519,7 @@ Required style-specific content:
 - Ranged: bow vs thrown mode, arrows, ranged special weapon and spec-arrow selection.
 - Magic: staff, spell, rune cost, god spell staff/charge handling and magic-specific boosts.
 
-Current implementation note: the rewrite workbench now exposes Melee, Ranged and Magic equipment panes backed by `GameDataSnapshot` option data. They provide searchable weapon selectors, style selectors, per-slot gear quick action buttons, primary prayer/boost selectors, multi-prayer and multi-boost checkbox controls with same-category replacement and canonical `None` handling, sustained/repot controls, manual accuracy/damage/speed override controls, equipment slot selectors, an equipment bonus summary, Ranged ammo selection and Magic spell selection. The gear quick action MVP scores only currently visible slot candidates for the active combat style: melee uses active attack-type bonus plus weighted strength, ranged uses ranged attack plus weighted ranged strength, and magic uses magic attack plus magic damage when present. It is not a full loadout optimizer and does not use prices, requirements, quests, future gear or hidden candidates. Selecting a two-handed weapon clears and locks the shield slot while the weapon remains active. These controls write the versioned per-combat-type loadout state and flow through `formToSimulationRequest()` as multi-value prayer/boost arrays. Manual overrides map to `SimulationRequest.manualOverrides`; invalid or out-of-range values are rejected by persisted-state validation and defensively ignored by the combat domain.
+Current implementation note: the rewrite workbench now exposes Melee, Ranged and Magic equipment panes backed by `GameDataSnapshot` option data. They provide searchable weapon selectors, style selectors, per-slot gear quick action buttons, primary prayer/boost selectors, multi-prayer and multi-boost checkbox controls with same-category replacement and canonical `None` handling, sustained/repot controls, manual accuracy/damage/speed override controls, equipment slot selectors, an equipment bonus summary, Ranged ammo selection and Magic spell selection. The setup view model also checks the selected weapon and equipped gear slots against the current manual Planner requirement policy and surfaces unmet item/skill/current-level/required-level warnings in the loadout pane and Active assumptions. This warning is read-only and non-blocking: gear selection remains allowed, Review routes to the active combat-style loadout tab and no reset action is added. The gear quick action MVP scores only currently visible slot candidates for the active combat style: melee uses active attack-type bonus plus weighted strength, ranged uses ranged attack plus weighted ranged strength, and magic uses magic attack plus magic damage when present. Its reason text uses the same manual requirement policy to disclose when the recommended or current-best visible item is above the current player levels, but it does not filter candidates or block selection. It is not a full loadout optimizer and does not use prices, quests, future gear, hidden candidates or generated authoritative requirements. Selecting a two-handed weapon clears and locks the shield slot while the weapon remains active. These controls write the versioned per-combat-type loadout state and flow through `formToSimulationRequest()` as multi-value prayer/boost arrays. Manual overrides map to `SimulationRequest.manualOverrides`; invalid or out-of-range values are rejected by persisted-state validation and defensively ignored by the combat domain.
 
 Current special-attack implementation note: the dense rewrite UI has an interim Special attack section that exposes the existing domain-supported melee and ranged DPS special weapons, ranged spec-arrow selection for bow specials and result metrics for spec max hit, hit chance, specs/hr, DPS with spec and DPS gain. The control writes versioned rewrite setup state and `formToSimulationRequest()` only emits `specialAttack` for valid supported selections. Magic special attack UI shows a compact unsupported state because no magic DPS special path is currently modeled, and it emits no `specialAttack` request. DBA special boost is modeled as a boost/spec-energy state instead of a DPS-special weapon: when the DBA boost is active the DPS-special selector is paused, no conflicting `specialAttack` request is emitted, and the Trip pane is the visible owner of the DBA restore carry toggle and summary row. Persisted setup normalization drops unknown, combat-style-incompatible and DBA-conflicting special state from active, per-style and custom setup state. Dragon halberd special keeps the current legacy NPC-size fallback assumption, but it now emits a structured info warning surfaced near the special metrics so the missing size-data behavior is visible. Final dragon-halberd/NPC-size behavior and new special formulas remain outside this slice.
 

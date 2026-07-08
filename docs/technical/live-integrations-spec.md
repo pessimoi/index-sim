@@ -1,14 +1,14 @@
 # Live integrations specification
 
 - Status: implementation target specification
-- Date: 2026-07-05
+- Date: 2026-07-08
 - Owner: technical docs
-- Related decision: [D-015](../project/decisions.md)
+- Related decisions: [D-015](../project/decisions.md), [D-021](../project/decisions.md), [D-033](../project/decisions.md)
 - Legacy evidence: `views.jsx` `HiscoresLookup`, `views.jsx` `SettingsPane`, `market.js`
 
 ## Purpose
 
-Hiscores lookup and live market sync are accepted product features, not static-only behavior, local-dev-only helpers or removal candidates. The current repo does not contain the legacy `run_sim.py` backend, so this spec defines the product behavior and API boundary needed to implement those features in the rewrite.
+Hiscores lookup and market price refresh are accepted product features, not local-dev-only helpers or removal candidates. The current repo does not contain the legacy `run_sim.py` backend, so this spec defines the product behavior and integration boundary needed to implement those features in the rewrite.
 
 The implementation must preserve the useful legacy workflows while replacing the fragile parts:
 
@@ -41,27 +41,39 @@ MVP behavior:
 - stores the last searched player name locally only when browser storage is available
 - provides understandable empty, not-found, rate-limited and service-unavailable states
 
-Current implementation note: the rewrite UI now exposes player input, service status, lookup, preview and Apply for these seven skills. It calls the same-origin hiscores API through `src/adapters/hiscores`, stores the last searched player with the rewrite `PersistedEnvelope<T>` helper and never calls a live upstream directly from the browser. The default repo provider remains disabled until an authoritative upstream is accepted. When the status source is `disabled`, the UI keeps the player input visible, disables Lookup and explains that live lookup is not configured for this run while the Player level fields remain the working manual fallback. Non-disabled unavailable/error states use the same manual-level fallback guidance without exposing runtime details.
+Current implementation note: the rewrite UI now exposes player input, service status, lookup, preview and Apply for these seven skills. It calls the same-origin hiscores API through `src/adapters/hiscores`, stores the last searched player with the rewrite `PersistedEnvelope<T>` helper only after a fresh response still matches the normalized current Player input and never calls a live upstream directly from the browser. Changing the Player input to a different normalized name clears the preview, late responses for old inputs are ignored, Apply rechecks freshness before mutating levels and the preview shows the returned player, source and fetchedAt metadata from the validated response. The default repo provider remains disabled until an authoritative upstream is accepted. When the status source is `disabled`, the UI keeps the player input visible, disables Lookup and explains that live lookup is not configured for this run while the Player level fields remain the working manual fallback. Non-disabled unavailable/error states use the same manual-level fallback guidance without exposing runtime details.
 
-### Live market sync
+### Market price refresh
 
-Users can refresh item prices and high-alch values from an approved market source, then run simulations with the refreshed `PriceSet`.
+Users should get current item prices and high-alch values from an approved market source, then run simulations with an explicit refreshed `PriceSet`.
 
 Accepted target source: `markets.lostcity.rs`.
 
-Accepted history direction: keep a latest price set plus retained 12-hour price history snapshots once the refresh writer is implemented. Browser-local accepted-price history is implemented as local UI state; the exact shared automation, storage path and deploy/hosting mechanism remain open.
+Accepted writer and storage model:
+
+- A scheduled repo automation is the only shared upstream writer.
+- No user-triggered, manually-triggered or browser-triggered upstream refresh is accepted for production.
+- No database is used for market prices or shared price history.
+- Latest item prices live in `prices.json`.
+- Latest high-alch values live in `alch.json`.
+- Retained 12-hour shared price snapshots live in `price-history.json`.
+- The scheduled writer validates generated JSON, runs the relevant data/economy checks and commits only when the generated files differ.
+- The scheduler is GitHub Actions cron, twice daily at 00:15 and 12:15 UTC.
+- The workflow uses the repository `GITHUB_TOKEN` with `contents: write` and commits directly to the same branch/repo only when the JSON files differ.
+- The workflow must not expose `workflow_dispatch`; manual upstream refresh is not part of the accepted production model.
+- The workflow should not upload artifacts or use large caches unless a future evidence-backed need appears.
+
+Browser-local accepted-price history is still local UI state for a user's selected imported or active `PriceSet`; it is separate from shared `price-history.json`.
 
 MVP behavior:
 
 - keeps existing file import as an offline fallback
-- syncs prices for the current monster
-- syncs the full supported loot/supply item allowlist
-- returns a validated `PriceSet` that the app can select explicitly
-- shows source, fetched time, updated count, skipped count, failed count, item-level status details and compact warnings
+- loads the latest scheduled static price files into an explicit `PriceSet`
+- shows source, fetched time, item/alch counts and compact warnings
 - preserves missing-price warnings instead of silently mutating fallback data
-- updates browser-local price history only after a validated price set is accepted by the UI
+- updates browser-local price history only after a validated price set is accepted by the UI or captured locally with Snapshot now
 
-Current implementation note: the rewrite UI now exposes current-monster and all-supported sync controls in the Loot and Economy panes. It calls the same-origin market API through `src/adapters/market`, validates the returned `MarketSyncResponse` and swaps the selected explicit `PriceSet` only after validation succeeds. The offline `PriceSet` file import reports invalid JSON, duplicate keys, invalid schema data and oversized files as non-fatal, sanitized UI notices with validation code, the first bounded issue/schema paths when available and an explicit note that the current `PriceSet` remains active and browser-local history is unchanged. The Market sync area keeps the import action and active `PriceSet` summary visible beside the sync controls, including disabled and unavailable service states; disabled sync buttons stay disabled, and copy directs users to the active bundled or imported `PriceSet` fallback instead of runtime setup instructions. Successful sync reports show source/fetched/count summary, compact report warnings, status-filtered item diagnostics for updated/skipped/failed rows, item label or id, status, price, alch value, source slug and sanitized reason text. The Settings Price data panel remains available with the same import/status path. A validated imported or synced `PriceSet` records a capped browser-local snapshot in `index-sim:price-history` after the UI accepts it as active; failed imports, failed syncs and invalid payloads do not update that history. The Economy tab can also capture the currently active validated `PriceSet` with Snapshot now, analyze local movers against Previous, First or an explicit snapshot baseline and clear only the local history key after confirmation. The default repo provider remains disabled until an authoritative market upstream is accepted.
+Current implementation note: the rewrite UI currently exposes current-monster and all-supported sync controls in the Loot and Economy panes through the same-origin market API, with the default provider disabled and mocked tests for the old interactive flow. After [D-033](../project/decisions.md), production provider wiring must not enable user-triggered upstream refresh. Those controls should either consume the scheduled static latest `PriceSet`, stay disabled, or be renamed/reworked when the scheduled writer is implemented. The offline `PriceSet` file import reports invalid JSON, duplicate keys, invalid schema data and oversized files as non-fatal, sanitized UI notices with validation code, the first bounded issue/schema paths when available and an explicit note that the current `PriceSet` remains active and browser-local history is unchanged. The Settings Price data panel remains available with the same import/status path plus active `PriceSet` export and reset-to-bundled controls. A validated imported, compatible legacy or mocked synced `PriceSet` records a capped browser-local snapshot in `index-sim:price-history` after the UI accepts it as active and persists the active selection in `index-sim:price-set:selected`; failed imports, failed syncs and invalid payloads update neither key. Reload restores a valid selected `PriceSet` over the bundled context without appending a new price-history snapshot. Invalid, oversized or unsupported selected-state envelopes fall back to bundled prices with non-fatal UI feedback. The Economy tab can also capture the currently active validated `PriceSet` with Snapshot now, analyze local movers against Previous, First or an explicit snapshot baseline, export the active `PriceSet`, reset active prices back to the bundled `PriceSet` by clearing only `index-sim:price-set:selected`, and clear only the local history key after confirmation.
 
 ## Non-goals for the first implementation
 
@@ -70,20 +82,22 @@ Current implementation note: the rewrite UI now exposes current-monster and all-
 - public third-party API guarantees
 - arbitrary URL scraping
 - browser-side scraping of upstream HTML
-- server-managed shared price history
+- user-triggered upstream market refresh
+- server-managed shared price history outside the accepted static JSON files
 - changing simulation math while adding the integrations
 
-Scheduled server market jobs remain out of scope. Static or repo-automation generated price snapshots are an accepted target only after a separate refresh workflow is implemented and reviewed; the first live integration implementation should still work with explicit user-triggered sync plus the existing bundled/imported price paths.
+The accepted market refresh target is scheduled repo automation that writes static JSON. Interactive market upstream refresh is no longer a production target; the existing mocked/current sync paths are compatibility scaffolding until the UI and adapter are aligned with scheduled snapshots.
 
 ## Architecture decision boundary
 
-The product decision accepts a repo-owned live integration boundary. It does not yet choose a backend framework, hosting model, database or cache provider.
+The product decision accepts repo-owned integration boundaries. It does not yet choose a backend framework or hosting model for hiscores. Market price refresh does not use a database or cache provider; it uses scheduled repo automation plus static JSON artifacts.
 
 Acceptable implementation shapes for the first pass:
 
 - a small same-origin development/preview service owned by this repo
 - Vite dev middleware plus equivalent production adapter once hosting is selected
 - serverless functions if deployment chooses a serverless host
+- scheduled CI/repo automation for market price files
 
 The browser app should depend on typed adapters, not on the concrete server framework.
 
@@ -205,9 +219,13 @@ type MarketStatusResponse = {
 };
 ```
 
+After [D-033](../project/decisions.md), production market availability can be satisfied by validated scheduled static price files. A same-origin status endpoint may still report the active static snapshot source, age and schedule status, but it must not imply that users can trigger upstream refresh.
+
 ### `POST /api/market/sync`
 
 Refreshes prices for an explicit allowlisted item set.
+
+Decision note: this endpoint exists in the current dev/preview and mocked test boundary, but it is not the accepted production writer after [D-033](../project/decisions.md). Production must not expose a user-triggered upstream market refresh. Keep or remove this endpoint later based on compatibility needs; if it remains, it should read/return scheduled static snapshot data rather than fetching upstream on demand.
 
 Request:
 
@@ -310,19 +328,19 @@ Recommended flow:
 
 The UI must not claim hiscores are unavailable simply because the app is not running on `localhost`. It should use `GET /api/hiscores/status` service availability or handle the hiscores endpoint response directly.
 
-Current implementation note: the rewrite follows this flow through the Levels panel. `GET /api/hiscores/status` drives the visible availability state; `GET /api/hiscores?player=...` returns a validated preview; Apply mutates only returned skills in the current setup model. Missing returned skills leave existing manual levels unchanged.
+Current implementation note: the rewrite follows this flow through the Levels panel. `GET /api/hiscores/status` drives the visible availability state; `GET /api/hiscores?player=...` returns a validated preview; Apply mutates only returned skills in the current setup model after verifying the preview still matches the normalized current Player input. Missing returned skills leave existing manual levels unchanged.
 When the status endpoint reports a disabled provider or unavailable service, the player-name input remains visible for continuity with the live workflow but Lookup stays disabled. The user-facing copy points to the Player level fields for manual editing, and the unavailable state must not clear or overwrite those manual levels.
 
-### Market sync
+### Market prices
 
-Recommended flow:
+Recommended production flow:
 
 1. UI loads bundled prices into an explicit `PriceSet`.
-2. User chooses current-monster sync or all-supported sync.
-3. UI calls `POST /api/market/sync`.
-4. UI validates the returned `PriceSet` with the same schema used by file import.
-5. UI selects the new `PriceSet` for simulations and records browser-local price history.
-6. UI surfaces partial failures without discarding successful validated prices.
+2. UI loads the latest scheduled static prices from `prices.json` and `alch.json` when available.
+3. UI validates the resulting `PriceSet` with the same schema used by file import.
+4. UI selects the latest scheduled `PriceSet` for simulations and can record browser-local price history after the user accepts or captures it locally.
+5. UI shows the scheduled snapshot source, timestamp, age and warnings.
+6. UI keeps file import available when the scheduled snapshot is missing, stale or invalid.
 
 The Settings/Economy UI should keep file import available even when the live service is down.
 
@@ -340,7 +358,7 @@ Suggested keys:
 
 All persisted values must use the existing `PersistedEnvelope<T>` pattern.
 
-Current implementation note: `index-sim:price-history` stores a versioned rewrite-owned envelope containing capped snapshots with `capturedAt`, `sourcePriceSetId`, `label` and `itemPrices`. It does not store upstream origins, source slugs, raw response bodies, player names or secrets. The current Economy UI reads this local envelope for summary and movers analysis, and its Clear history action removes only this key.
+Current implementation note: `index-sim:price-set:selected` stores a versioned rewrite-owned envelope with the active validated `PriceSet` and `selectedAt` timestamp after successful file import, compatible legacy price import or accepted mocked/current market sync. On app load, a valid selected envelope overrides only the bundled active `PriceSet`; restore does not write a browser-local history snapshot. Reset to bundled prices clears only this selected key and keeps `index-sim:price-history`. `index-sim:price-history` stores a separate versioned rewrite-owned envelope containing capped snapshots with `capturedAt`, `sourcePriceSetId`, `label` and `itemPrices`. It does not store upstream origins, source slugs, raw response bodies, player names or secrets. The current Economy UI reads this local envelope for summary and movers analysis, and its Clear history action removes only this key.
 
 Legacy compatibility note: the user-facing legacy import flow can read `sim_hiscore_player` into the rewrite-owned last-player key after current hiscores validation, and can convert compatible `sim_prices_v1` + `sim_alch_v1` + `sim_scraped_at_v1` data into an explicit imported `PriceSet` after price schema and known-item validation. Import keeps the legacy keys. `sim_price_history_v1` is detected and reported but not migrated; server-managed or full legacy price history migration still needs a separate decision.
 
@@ -350,6 +368,8 @@ Requirements:
 
 - Same-origin browser calls only.
 - Server-side upstream allowlist only.
+- No user-triggered upstream market refresh.
+- Market upstream calls are scheduler-only.
 - No arbitrary URL, host, path or slug from browser input.
 - Bounded request body size.
 - Bounded item count per sync.
@@ -373,6 +393,7 @@ Unit tests:
 - map item ids to market slugs without legacy `SLUG_MAP` globals
 - parse upstream market fixture payloads into `PriceSet`
 - preserve partial market failures in `MarketSyncReport`
+- validate the scheduled static `prices.json`, `alch.json` and `price-history.json` outputs when the writer exists
 
 Adapter tests:
 
@@ -389,8 +410,11 @@ UI tests:
 - market sync applies a returned `PriceSet`
 - market sync failure keeps current `PriceSet`
 - accepted imported or synced `PriceSet` records browser-local price history
+- accepted imported, compatible legacy or synced `PriceSet` persists as the selected active `PriceSet` across reloads without adding a restore-time history snapshot
 - failed import or failed sync keeps browser-local price history unchanged
+- reset to bundled clears only `index-sim:price-set:selected`; export produces JSON accepted by the `PriceSet` import parser
 - file import still works when live service is unavailable
+- scheduled static price load failure keeps bundled/import fallback available once that path exists
 
 No automated test should call live upstream services. Use fixtures and mocked fetches for repeatability.
 
@@ -409,12 +433,27 @@ Current implementation note: the first contract/fixture slice exists in `src/dom
 
 - Add repo-owned handlers for the typed API contract.
 - Add upstream allowlists, timeouts, rate limits and sanitized errors.
-- Add in-memory cache if needed to keep user-triggered sync responsive.
-- Keep database and scheduled jobs out of scope.
+- Do not add production user-triggered market upstream refresh.
+- Keep databases out of scope for the same-origin service.
 
 Current hiscores implementation note: `src/server/hiscores-core.ts` provides a framework-neutral status/lookup handler and `src/server/vite-hiscores-middleware.ts` exposes it in Vite dev/preview. The handler validates player input, uses a per-process lookup rate limit, enforces a provider timeout and returns sanitized `IntegrationErrorResponse` payloads for bad-request, not-found, rate-limited, upstream-unavailable, upstream-invalid and internal-error paths. The default provider is disabled and performs no live upstream call.
 
 Current market implementation note: `src/server/market-core.ts` provides a framework-neutral status/sync handler and `src/server/vite-market-middleware.ts` exposes it in Vite dev/preview. The handler validates body size, request JSON, item count, item allowlist and same-origin request shape; expands current-monster/all-supported item sets through `src/data/market-sync-items.ts`; enforces a per-process sync rate limit and provider timeout; and returns sanitized `IntegrationErrorResponse` payloads. The default provider is disabled and performs no live upstream call.
+
+Decision update: this current handler remains useful for mocked tests and local compatibility, but [D-033](../project/decisions.md) changes the production market target to scheduled static JSON. A future implementation should add the scheduled writer before enabling any live market provider in production.
+
+### Phase 2b: scheduled market snapshot writer
+
+- Fetch approved market data from `markets.lostcity.rs` on a fixed schedule.
+- Generate `prices.json`, `alch.json` and `price-history.json`.
+- Retain shared history at 12-hour snapshot cadence.
+- Validate the generated files with the data/economy schemas and relevant tests.
+- Commit only when the generated JSON differs.
+- Use GitHub Actions cron at 00:15 and 12:15 UTC.
+- Use the repository `GITHUB_TOKEN` with `contents: write`; do not add a separate app token unless the default token cannot satisfy the commit path.
+- Omit `workflow_dispatch` so users cannot trigger upstream refresh manually through GitHub UI.
+- Keep credentials in repo automation, not in the browser app.
+- Do not add a database or user-triggered upstream refresh.
 
 ### Phase 3: rewrite adapters
 
@@ -432,7 +471,7 @@ Current implementation note: `src/adapters/hiscores` validates status, success a
 - Add user-visible progress, partial failure summaries and source timestamps.
 - Remove or replace stale `python run_sim.py` copy from production UI paths.
 
-Current implementation note: hiscores lookup is wired into the rewrite Levels workflow with preview/apply behavior. Market status/sync is wired into the rewrite Loot and economy workflow with current-monster and all-supported controls plus report summary. The Market panel also shows browser-local price history summary: snapshot count, tracked item count, latest age and active/latest labels. Both features use service-aware `available`, `unavailable` and disabled-runtime states from same-origin status endpoints; production rewrite copy does not instruct users to run `python run_sim.py`.
+Current implementation note: hiscores lookup is wired into the rewrite Levels workflow with preview/apply behavior. Market status/sync is wired into the rewrite Loot and economy workflow with current-monster and all-supported controls plus report summary. The Market panel also shows browser-local price history summary: snapshot count, tracked item count, latest age and active/latest labels. Settings and Economy expose active `PriceSet` export and reset-to-bundled controls; reset clears only the selected active `PriceSet` key and keeps local history. Both features use service-aware `available`, `unavailable` and disabled-runtime states from same-origin status endpoints; production rewrite copy does not instruct users to run `python run_sim.py`.
 
 ### Phase 5: parity and cleanup
 
@@ -455,22 +494,21 @@ Current status: the same-origin API, browser adapter and UI apply flow meet the 
 
 Market sync is acceptable when:
 
-- a user can sync current-monster and all-supported prices through the rewrite UI
-- the returned data is a valid explicit `PriceSet`
+- scheduled repo automation writes validated latest prices and retained 12-hour history snapshots
+- the app can load the latest scheduled data as a valid explicit `PriceSet`
 - simulation results depend on the selected `PriceSet`, not hidden global mutation
-- partial failures are visible and do not discard successful prices
-- source, timestamp, updated/skipped/failed counts, item-level skipped/failed reasons and warnings are shown
+- source, timestamp, age and warnings are shown
 - file import remains available as an offline fallback
-- tests cover mapping, validation, partial failures and UI apply/failure behavior
+- tests cover mapping, validation, generated JSON files and UI load/fallback behavior
 
-Current status: the same-origin API, browser adapter, UI sync flow, item-level report diagnostics, disabled-service import fallback and browser-local accepted-price history meet the validation, explicit `PriceSet`, partial-failure, offline-import and local-history parts with mocked/provider tests. Full acceptance still requires the approved market upstream source and production runtime/hosting decision.
+Current status: the same-origin API, browser adapter, UI sync flow, item-level report diagnostics, disabled-service import fallback, selected active `PriceSet` persistence and browser-local accepted-price history meet the validation, explicit `PriceSet`, partial-failure, offline-import, reload-restore and local-history parts with mocked/provider tests. Full acceptance now requires the scheduled static writer, approved market upstream response contract and deploy automation wiring.
 
 ## Open questions
 
-- Which concrete backend/runtime should host the same-origin API?
+- Which concrete backend/runtime should host the hiscores same-origin API?
 - What is the production deployment target?
 - What is the authoritative hiscores upstream source?
 - What is the authoritative market API or scrape contract for `markets.lostcity.rs`?
-- What exact workflow writes the accepted 12-hour latest/history price snapshots?
+- What exact upstream response contract will the GitHub Actions writer use for `markets.lostcity.rs`?
 - Should remaining legacy market localStorage keys, especially full price history and unsupported metadata keys, be migrated or intentionally ignored?
 - Should temporary `/api/prices` and `/api/scrape` shims be kept for legacy parity testing?

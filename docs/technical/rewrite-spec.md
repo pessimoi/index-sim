@@ -9,7 +9,7 @@
 
 This document is the implementation-grade specification for a future rewrite. It does not describe the current app as an ideal architecture. Current-state details live in [architecture.md](architecture.md); this file describes the target system and the path to get there.
 
-The rewrite should be treated as a new implementation that preserves the same end-user workflows, not as a line-by-line preservation of legacy architecture or legacy calculation decisions. Legacy behavior is regression evidence; LostCityRS/Content Revision 274, accepted decisions and documented intentional deltas may supersede it.
+The rewrite should be treated as a new implementation that preserves the same end-user workflows, not as a line-by-line preservation of legacy architecture or legacy calculation decisions. Legacy behavior is regression evidence; the current accepted LostCityRS/Content revision, accepted decisions and documented intentional deltas may supersede it.
 
 The rewrite must preserve the useful user-facing behavior of the existing simulator while replacing the fragile parts:
 
@@ -48,7 +48,7 @@ The rewritten system should:
 - make data, prices and saved state explicit schemas
 - make simulation outputs reproducible for a given input snapshot
 - support golden tests against current behavior
-- use LostCityRS/Content Revision 274 as the primary game-content source when the data can be verified
+- use the current accepted LostCityRS/Content game revision as the primary game-content source when the data can be verified
 - support documented intentional deltas when the legacy app conflicts with better source evidence
 - isolate browser APIs in adapter modules
 - make future AI-agent changes small, bounded and verifiable
@@ -191,10 +191,49 @@ Owns game data snapshots and validation.
 
 Target source:
 
-- LostCityRS/Content Revision 274 is the primary source for generated game content when its files expose the needed truth.
+- LostCityRS/Content is the primary source for generated game content when its files expose the needed truth.
+- The app tracks one current accepted game revision at a time. It must not silently follow the latest available upstream revision.
+- A `GameDataSnapshot` must identify the game revision, upstream source reference, generator version and generation time.
 - A full 100% truth source is not assumed; gaps must be represented through provenance, warnings or open questions.
 - The v1 `GameDataSnapshot` scope is staged: include calculation-required data for combat, loot, economy, trip and planner first, and keep the format extensible for later content areas.
-- The snapshot update workflow is intentionally open. Do not invent an automatic update process without a recorded decision.
+- The committed `GameDataSnapshot` is a normalized, purpose-built runtime snapshot for this simulator. It must not mirror raw LostCityRS/Content files or carry source areas that are not needed by the accepted app scope.
+- V1 included scope: monster definitions, item identity/stackability/equipment metadata needed by app workflows, equipment registry, weapons, ammo, spells, drop rows and nested drop expansions, planner/loadout item requirements, and provenance/warning metadata for generated, manual, approximate or uncertain values.
+- V1 excluded scope: raw upstream file bodies, source-only NPC/dialog/quest/world/map content, historical revisions, unused future content areas, speculative fields not consumed by current domain/UI workflows and market price history. Current prices remain owned by `PriceSet` and the market price workflow, not by the generated game-data snapshot.
+- The accepted generator entrypoint is `npm run data:generate`. It should read the pinned local `.sources/lostcity-content/` checkout and overwrite `src/data/generated/source-pin.json`, `src/data/generated/game-data.json` and `docs/project/revision-impact/current.md`.
+- Keep only the current accepted generated snapshot in the working tree. Do not add historical generated snapshot files; older accepted snapshots remain available through git history and PR diffs.
+- Game revision bumps are development changes. They must happen through a reviewed PR with generated snapshot diffs, validation, test/golden impact and explicit accepted calculation deltas.
+- Do not add scheduled or automatic main-branch game-data updates.
+
+`docs/project/revision-impact/current.md` report requirements:
+
+- old accepted source revision/commit and new source revision/commit
+- generator version, command and generated-at timestamp
+- added, removed and changed monsters, items, equipment, weapons, ammo, spells, drop rows and nested drop expansions
+- planner/loadout requirement changes
+- provenance, manual-value, approximation and warning changes
+- representative calculation diffs for DPS, kills/hr, XP/hr, GP/hr and GP/XP from the merge-blocking hybrid suite
+- informational broad all-monster scan summary and notable outliers
+- explicit list of accepted intentional deltas
+- validation commands and pass/fail status
+- unresolved questions or required follow-up code/test changes
+
+Revision bump merge gate:
+
+- The revision-impact report must be committed in the PR.
+- Generated data, source pin and report must refer to the same source revision.
+- Any changed calculation output must be either accepted as an intentional delta in the report/decision log or fixed in code/tests before merge.
+- The broad all-monster scan is informational by default; it blocks merge only when a reviewer promotes a finding to a required fix or accepted decision.
+- A failed validation command blocks merge unless a human records a scoped exception as an accepted decision.
+
+Hybrid calculation-impact suite:
+
+- Merge-blocking representative suite starts from the current combat/trip/economy golden fixtures and planner golden fixtures.
+- Add focused generated-data cases when the existing fixtures do not cover cannon, recoil, alch, loot-heavy, high-defence and low-level behavior.
+- Report DPS, kills/hr, XP/hr, GP/hr and GP/XP deltas for each representative case.
+- Informational scan runs exactly one fixed simple melee, one fixed simple ranged and one fixed simple magic baseline setup across all generated monsters.
+- Informational scan baselines are explicit review fixtures, not best-in-slot search, optimizer output or gear progression.
+- Informational scan notable outliers are DPS, kills/hr or XP/hr changes over 10%, GP/hr or GP/XP changes over 25%, missing required combat/drop/economy data, warning-count increases and monsters entering or leaving the scan.
+- The exact case file format and concrete item/spell/equipment ids for the baseline setups are implementation details still to build, but the blocking/informational split and threshold policy are accepted.
 
 Responsibilities:
 
@@ -212,6 +251,7 @@ Each data record that is not fully generated from a verified source should be ab
 type DataProvenance = {
   source: "generated" | "manual" | "scraped" | "approximation" | "hypothetical";
   sourceRef?: string;
+  revision?: string;
   verifiedAt?: string;
   notes?: string;
 };
@@ -225,7 +265,10 @@ Accepted target source:
 
 - Use `markets.lostcity.rs` as the target source for live/current market prices.
 - The accepted history direction is to keep a latest `PriceSet` plus retained 12-hour price history snapshots.
-- The exact refresh implementation, automation and hosting path remain open. Do not add scheduled backend jobs, databases or deploy-specific storage without a recorded decision.
+- Market refresh is scheduled-only repo automation. It writes `prices.json`, `alch.json` and `price-history.json`, validates them and commits only real diffs.
+- The scheduler is GitHub Actions cron at 00:15 and 12:15 UTC, using the repository `GITHUB_TOKEN` with `contents: write` and no `workflow_dispatch` manual trigger.
+- Do not add databases, user-triggered upstream refresh or deploy-specific shared storage for market prices.
+- The writer implementation and exact upstream response contract are not present yet.
 
 Core model:
 
@@ -246,7 +289,7 @@ Rules:
 - Simulation must receive a `PriceSet`; it must not discover one from browser state.
 - Imported prices must be validated before use.
 - Missing prices must produce structured warnings, not silent global fallback mutation.
-- Price history snapshots are accepted as a target, but the concrete writer/refresh workflow is not implemented yet.
+- Shared price history snapshots are file-backed in `price-history.json`; the concrete scheduled writer is not implemented yet.
 
 Current implementation note: `src/data/schemas` validates `GameDataSnapshot`, item/drop/equipment data, `PriceSet` imports and committed price history. `src/data/legacy-adapter.ts` can adapt the current legacy runtime objects into a validated snapshot. `src/domain/economy` provides pure lookup helpers that return structured missing-price or missing-alch warnings without mutating the `PriceSet`.
 
@@ -537,18 +580,19 @@ Current acceptance status: the 2026-07-06 consolidated release-evidence pass is 
 ## 14. Open decisions
 
 - Initial scaffold uses npm; changing away from npm remains an open future decision.
-- Backend/runtime: required for accepted hiscores and live market sync product features if direct browser APIs are not viable, but concrete framework, hosting, cache and deployment shape remain undecided.
-- Database: still undecided.
-- Live integrations: implement hiscores and live market sync according to [live-integrations-spec.md](live-integrations-spec.md); hiscores waits for the authoritative API answer.
-- Price history: 12-hour retained snapshots are accepted, but the exact writer, storage path and review workflow remain open.
-- Data generator: where does LostCityRS/Content Revision 274 source live locally and how is it invoked?
-- Data generator update process: manual, scheduled or manually triggered diff/test workflow remains deferred.
+- Backend/runtime: still required for accepted hiscores if direct browser APIs are not viable, but concrete framework, hosting, cache and deployment shape remain undecided. Market price refresh uses scheduled static JSON instead of a user-triggered backend sync path.
+- Database: no database for market price refresh; broader database use is still undecided.
+- Live integrations: implement hiscores and market price refresh according to [live-integrations-spec.md](live-integrations-spec.md); hiscores waits for the authoritative API answer.
+- Price history: 12-hour retained snapshots live in `price-history.json`; the GitHub Actions scheduled writer and exact upstream response contract are not implemented yet.
+- Data generator implementation: `npm run data:generate` is the accepted target entrypoint, output path policy and high-level snapshot scope, but the generator script and exact normalized field schema are not implemented yet.
+- Game revision updates: the PR/review policy, report format and hybrid calculation-impact suite shape are accepted, but the generator implementation, case file format and concrete item/spell/equipment ids for the fixed scan baselines are not present yet.
 - Local storage: migrate old keys or reset on rewrite?
 - Cannon UI parity: where should cannon settings and overlay metrics live in the final workbench?
 - Full result composition: how should combat/equipment, trip/loot/supply and economy slices be exposed to the future React view models?
 - Planner item requirements: manual policy for now, or generated from authoritative item configs?
 - Future weapons: keep hidden until present in canonical data, or expose behind an explicit product toggle with hypothetical provenance?
 - UI language: keep English UI or localize?
+- Historical revisions: keep one current accepted revision only, or later support user-selectable historical revisions?
 
 ## 15. AI-agent implementation rules
 

@@ -5,6 +5,7 @@ import {
   summarizeMarketSyncReport
 } from "../app/state/market-sync";
 import { parsePriceSetFileText } from "../adapters/market";
+import { createMemoryStorage } from "../adapters/storage";
 import {
   analyzePriceHistoryMovers,
   appendAcceptedPriceSetToHistory,
@@ -12,10 +13,18 @@ import {
   DEFAULT_PRICE_HISTORY_STATE,
   keepPriceHistoryOnFailure,
   PRICE_HISTORY_MAX_SNAPSHOTS,
+  PRICE_HISTORY_STORAGE_KEY,
   priceHistorySnapshotKey,
   summarizePriceHistory
 } from "../app/state/price-history";
-import { PriceSetValidationError } from "../data/schemas";
+import {
+  clearSelectedPriceSet,
+  loadSelectedPriceSet,
+  saveSelectedPriceSet,
+  SELECTED_PRICE_SET_STORAGE_KEY,
+  SELECTED_PRICE_SET_VERSION
+} from "../app/state/selected-price-set";
+import { PRICE_SET_IMPORT_MAX_BYTES, PriceSetValidationError } from "../data/schemas";
 import type { MarketSyncResponse, PriceSet, SimulationContext } from "../domain/shared";
 
 function fixtureContext(): SimulationContext {
@@ -256,6 +265,176 @@ describe("market sync UI state helpers", () => {
       label: "Synced prices",
       itemPrices: { lobster: 210 }
     });
+  });
+
+  it("saves and loads the selected active PriceSet envelope", () => {
+    const storage = createMemoryStorage();
+    const priceSet = importedPriceSet("selected-manual");
+
+    const envelope = saveSelectedPriceSet(storage, priceSet, {
+      now: () => new Date("2026-07-05T13:01:00.000Z")
+    });
+    const loaded = loadSelectedPriceSet(storage);
+
+    expect(envelope).toMatchObject({
+      version: SELECTED_PRICE_SET_VERSION,
+      savedAt: "2026-07-05T13:01:00.000Z",
+      data: {
+        selectedAt: "2026-07-05T13:01:00.000Z",
+        priceSet: {
+          id: "selected-manual",
+          label: "Manual prices"
+        }
+      }
+    });
+    expect(loaded.status).toBe("loaded");
+    if (loaded.status === "loaded") {
+      expect(loaded.value.priceSet.id).toBe("selected-manual");
+      expect(loaded.value.selectedAt).toBe("2026-07-05T13:01:00.000Z");
+    }
+  });
+
+  it("classifies invalid selected PriceSet persisted payloads", () => {
+    const validData = {
+      priceSet: importedPriceSet("valid-selected"),
+      selectedAt: "2026-07-05T13:01:00.000Z"
+    };
+    const invalidJson = createMemoryStorage({
+      [SELECTED_PRICE_SET_STORAGE_KEY]: "{"
+    });
+    const invalidEnvelope = createMemoryStorage({
+      [SELECTED_PRICE_SET_STORAGE_KEY]: JSON.stringify({ data: validData })
+    });
+    const versionMismatch = createMemoryStorage({
+      [SELECTED_PRICE_SET_STORAGE_KEY]: JSON.stringify({
+        version: SELECTED_PRICE_SET_VERSION + 1,
+        savedAt: "2026-07-05T13:01:00.000Z",
+        data: validData
+      })
+    });
+    const invalidData = createMemoryStorage({
+      [SELECTED_PRICE_SET_STORAGE_KEY]: JSON.stringify({
+        version: SELECTED_PRICE_SET_VERSION,
+        savedAt: "2026-07-05T13:01:00.000Z",
+        data: {
+          priceSet: {
+            ...validData.priceSet,
+            itemPrices: { lobster: -1 }
+          },
+          selectedAt: "2026-07-05T13:01:00.000Z"
+        }
+      })
+    });
+    const oversized = createMemoryStorage({
+      [SELECTED_PRICE_SET_STORAGE_KEY]: "x".repeat(PRICE_SET_IMPORT_MAX_BYTES + 1)
+    });
+
+    expect(loadSelectedPriceSet(invalidJson)).toMatchObject({
+      status: "invalid",
+      reason: "invalid_json"
+    });
+    expect(loadSelectedPriceSet(invalidEnvelope)).toMatchObject({
+      status: "invalid",
+      reason: "invalid_envelope"
+    });
+    expect(loadSelectedPriceSet(versionMismatch)).toMatchObject({
+      status: "version-mismatch",
+      foundVersion: SELECTED_PRICE_SET_VERSION + 1
+    });
+    expect(loadSelectedPriceSet(invalidData)).toMatchObject({
+      status: "invalid",
+      reason: "invalid_data"
+    });
+    expect(loadSelectedPriceSet(oversized)).toMatchObject({
+      status: "invalid",
+      reason: "body_too_large"
+    });
+  });
+
+  it("clears only the selected active PriceSet key", () => {
+    const historyEnvelope = JSON.stringify({
+      version: 1,
+      savedAt: "2026-07-05T13:01:00.000Z",
+      data: DEFAULT_PRICE_HISTORY_STATE
+    });
+    const storage = createMemoryStorage({
+      [PRICE_HISTORY_STORAGE_KEY]: historyEnvelope
+    });
+    saveSelectedPriceSet(storage, importedPriceSet("selected-before-reset"), {
+      now: () => new Date("2026-07-05T13:01:00.000Z")
+    });
+
+    clearSelectedPriceSet(storage);
+
+    expect(storage.getItem(SELECTED_PRICE_SET_STORAGE_KEY)).toBeNull();
+    expect(storage.getItem(PRICE_HISTORY_STORAGE_KEY)).toBe(historyEnvelope);
+  });
+
+  it("restoring a selected PriceSet does not append a price history snapshot", () => {
+    const storage = createMemoryStorage();
+    const restoredPriceSet = importedPriceSet("restore-only");
+    saveSelectedPriceSet(storage, restoredPriceSet, {
+      now: () => new Date("2026-07-05T13:01:00.000Z")
+    });
+
+    const loaded = loadSelectedPriceSet(storage);
+    const summary = summarizePriceHistory(DEFAULT_PRICE_HISTORY_STATE, restoredPriceSet);
+
+    expect(loaded.status).toBe("loaded");
+    expect(summary.snapshotCount).toBe(0);
+    expect(DEFAULT_PRICE_HISTORY_STATE.snapshots).toHaveLength(0);
+  });
+
+  it("persists selected PriceSets after accepted imports and keeps them on failed imports", () => {
+    const storage = createMemoryStorage();
+    const originalPriceSet = importedPriceSet("selected-original");
+    saveSelectedPriceSet(storage, originalPriceSet, {
+      now: () => new Date("2026-07-05T13:01:00.000Z")
+    });
+
+    expect(() => parsePriceSetFileText("{")).toThrow(PriceSetValidationError);
+    const afterFailedImport = loadSelectedPriceSet(storage);
+    expect(afterFailedImport.status).toBe("loaded");
+    if (afterFailedImport.status === "loaded") {
+      expect(afterFailedImport.value.priceSet.id).toBe("selected-original");
+    }
+
+    const acceptedPriceSet = importedPriceSet("selected-after-import");
+    saveSelectedPriceSet(storage, acceptedPriceSet, {
+      now: () => new Date("2026-07-05T13:02:00.000Z")
+    });
+    const afterAcceptedImport = loadSelectedPriceSet(storage);
+    expect(afterAcceptedImport.status).toBe("loaded");
+    if (afterAcceptedImport.status === "loaded") {
+      expect(afterAcceptedImport.value.priceSet.id).toBe("selected-after-import");
+      expect(afterAcceptedImport.value.selectedAt).toBe("2026-07-05T13:02:00.000Z");
+    }
+  });
+
+  it("persists selected PriceSets after accepted syncs and keeps them on failed syncs", () => {
+    const storage = createMemoryStorage();
+    const originalContext = fixtureContext();
+    saveSelectedPriceSet(storage, originalContext.priceSet, {
+      now: () => new Date("2026-07-05T12:00:00.000Z")
+    });
+
+    const syncedContext = applyMarketSyncResponse(originalContext, syncResponse);
+    saveSelectedPriceSet(storage, syncedContext.priceSet, {
+      now: () => new Date("2026-07-05T12:00:06.000Z")
+    });
+    const afterAcceptedSync = loadSelectedPriceSet(storage);
+    expect(afterAcceptedSync.status).toBe("loaded");
+    if (afterAcceptedSync.status === "loaded") {
+      expect(afterAcceptedSync.value.priceSet.id).toBe("synced");
+    }
+
+    const failedContext = keepMarketSyncFailureContext(syncedContext);
+    const afterFailedSync = loadSelectedPriceSet(storage);
+    expect(failedContext.priceSet.id).toBe("synced");
+    expect(afterFailedSync.status).toBe("loaded");
+    if (afterFailedSync.status === "loaded") {
+      expect(afterFailedSync.value.priceSet.id).toBe("synced");
+    }
   });
 
   it("analyzes movers latest-vs-previous, latest-vs-first and explicit snapshot", () => {

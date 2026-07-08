@@ -10,6 +10,7 @@ The current app is a valuable static prototype of a 2004scape combat simulator. 
 - isolated React UI
 - repeatable tests
 - documented intentional deltas when LostCityRS/Content or accepted decisions supersede legacy behavior
+- reviewed game revision bumps through a manual `npm run data:generate` workflow that update the current accepted revision only after validation and calculation-impact evidence
 
 Implementation requirements for the rewrite live in [../technical/rewrite-spec.md](../technical/rewrite-spec.md).
 
@@ -21,11 +22,12 @@ Implementation requirements for the rewrite live in [../technical/rewrite-spec.m
 
 2. Add a modern toolchain.
    - Initial direction exists: TypeScript, React, Vite, Vitest, Playwright and Zod.
-   - Keep simulation/domain work static-first; hiscores and live market sync now have an accepted live integration spec.
+   - Keep simulation/domain work static-first; hiscores and market price refresh now have an accepted integration spec.
 
 3. Extract domain modules.
    - Move combat, trip, economy, data and planner logic behind explicit interfaces.
    - Remove `window.*` and `localStorage` dependencies from domain code.
+   - Keep game revision changes on a reviewed development path, not on an automatic refresh path.
 
 4. Rebuild the UI on top of the extracted model.
    - Keep workflows familiar.
@@ -34,9 +36,9 @@ Implementation requirements for the rewrite live in [../technical/rewrite-spec.m
    - Use lightweight warning/info markers for uncertain or approximated results.
 
 5. Add accepted live integrations.
-   - Hiscores lookup and live market sync should follow [../technical/live-integrations-spec.md](../technical/live-integrations-spec.md).
+   - Hiscores lookup and market price refresh should follow [../technical/live-integrations-spec.md](../technical/live-integrations-spec.md).
    - Hiscores is required for v1, but the authoritative API/hosting answer is pending.
-   - Market prices target `markets.lostcity.rs`; retained 12-hour history snapshots are accepted once a refresh workflow exists.
+   - Market prices target `markets.lostcity.rs`; scheduled-only GitHub Actions automation should write `prices.json`, `alch.json` and retained 12-hour `price-history.json` snapshots.
    - Shared setups, accounts and database storage remain open decisions.
 
 ## Not in scope yet

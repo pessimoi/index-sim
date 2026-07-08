@@ -6,7 +6,9 @@ The root app path uses the Vite/React rewrite and has npm scripts for TypeScript
 
 Use [rewrite-parity-report.md](rewrite-parity-report.md) to interpret which user-visible calculation areas are currently legacy-parity certified, partially covered or not ported.
 
-Accepted parity policy: legacy results are regression evidence, not the final truth source. Keep golden tests to catch accidental changes, but allow documented intentional deltas when LostCityRS/Content Revision 274 or another accepted source shows the legacy app should be replaced.
+Accepted parity policy: legacy results are regression evidence, not the final truth source. Keep golden tests to catch accidental changes, but allow documented intentional deltas when the current accepted LostCityRS/Content revision or another accepted source shows the legacy app should be replaced.
+
+Game revision bumps are development changes, not scheduled data refreshes. Once the generator exists, a revision PR should run `npm run data:generate`, schema validation, relevant domain tests, golden/parity checks and a calculation-impact report before any generated snapshot or formula change is accepted. The generated runtime data should be one normalized current snapshot at `src/data/generated/game-data.json`; old snapshots are not kept as separate files, because git history and PR diffs provide the review baseline. Snapshot validation should reject raw upstream dump shapes, historical snapshot archives and unused source-only content. The committed `docs/project/revision-impact/current.md` report must list source refs, generator metadata, generated-data diffs, merge-blocking hybrid-suite DPS/kills/hr/XP/hr/GP/hr/GP/XP diffs, informational all-monster scan outliers, intentional deltas and validation pass/fail status. Informational all-monster scan outliers use fixed simple melee/ranged/magic baselines and report DPS, kills/hr or XP/hr changes over 10%, GP/hr or GP/XP changes over 25%, missing required combat/drop/economy data, warning-count increases and monsters entering or leaving the scan. Until that script exists, do not fake a generated-data refresh by hand-editing source truth without documenting it as an open question or accepted manual exception.
 
 ## Rewrite scaffold commands
 
@@ -51,6 +53,27 @@ npm run test:e2e
 In the managed Codex sandbox, Node-based localhost connections can fail with `EPERM`.
 When that happens, run `npm run test:e2e` with explicit sandbox escalation instead of
 moving helper scripts outside the repository.
+
+## Rewrite local state health tests
+
+The rewrite-local state health tests live in:
+
+```sh
+npm run test -- src/tests/local-state-health.test.ts
+```
+
+They cover metadata-only health reporting for known rewrite-owned storage keys,
+including missing, loaded, invalid JSON, invalid envelope, invalid data and
+version-mismatch states, plus non-fatal `getItem`, `setItem` and `removeItem`
+failure handling. They also cover per-key clearing and clear-invalid behavior,
+with assertions that loaded, missing, legacy and unknown keys are not removed and
+that raw storage error text is not exported.
+
+The Playwright scaffold covers the Settings recovery view by pre-seeding an
+invalid rewrite-owned key, confirming the recovery notice, and clearing only the
+allowlisted invalid key while preserving legacy and unknown browser-local keys.
+It also smokes a rewrite-owned save failure path where current session edits stay
+visible while Settings shows a safe local-storage persistence notice.
 
 ## V1 release evidence snapshot
 
@@ -203,6 +226,7 @@ They cover:
 - fixture hygiene checks for local paths and known real player names
 
 They intentionally do not call live hiscores or market upstream services.
+Market price freshness is now scheduled-only GitHub Actions automation by decision. When that writer exists, tests should validate the generated `prices.json`, `alch.json` and `price-history.json` files with fixtures or mocked upstream data; app, unit and e2e tests should still avoid live market upstream calls. The scheduled workflow should use targeted JSON/data-economy validation rather than the full browser smoke suite.
 
 ## Hiscores API, adapter and UI state tests
 
@@ -227,9 +251,9 @@ They cover:
 - per-process rate-limit and provider-timeout guards
 - browser adapter cross-origin refusal and invalid-payload handling
 - versioned last-player persistence with no legacy key migration
-- preview/apply behavior for Attack, Strength, Defence, Hitpoints, Prayer, Ranged and Magic
+- preview/apply behavior for Attack, Strength, Defence, Hitpoints, Prayer, Ranged and Magic, including normalized player-name freshness checks that disable stale Apply paths
 
-The Playwright scaffold includes a mocked `/api/hiscores/status` and `/api/hiscores` smoke path. It also checks the default disabled-provider copy, disabled Lookup behavior, editable manual Player level fields and absence of stale production `run_sim.py` instructions. It must stay mocked; automated tests must not call a live hiscores upstream.
+The Playwright scaffold includes a mocked `/api/hiscores/status` and `/api/hiscores` smoke path. It also checks the default disabled-provider copy, disabled Lookup behavior, editable manual Player level fields, stale-preview clearing after Player input changes, late-response rejection and absence of stale production `run_sim.py` instructions. It must stay mocked; automated tests must not call a live hiscores upstream.
 
 ## Legacy storage migration tests
 
@@ -273,10 +297,11 @@ They cover:
 - service-unavailable, rate-limited, timeout and upstream-invalid failures
 - browser adapter cross-origin refusal and invalid-payload handling
 - UI state helpers and import notices that swap `PriceSet` only on success, keep the current one on failure, format item-level market report diagnostics with failed/skipped rows first and report imported `PriceSet` invalid JSON, duplicate keys, invalid schema data and oversized files with visible validation codes, bounded issue paths and no raw dumps
-- browser-local price history snapshots only for accepted imported or synced `PriceSet` values, with failed import/sync paths leaving history unchanged
+- browser-local selected active `PriceSet` persistence for accepted imported, compatible legacy and synced values, with invalid/oversized/version-mismatched restore falling back to bundled prices
+- browser-local price history snapshots only for accepted imported, compatible legacy or synced `PriceSet` values, with restore and failed import/sync paths leaving history unchanged
 - browser-local Economy movers analysis for latest-vs-previous, latest-vs-first and explicit snapshot baselines, including filter/sort behavior and missing or zero baseline prices without `NaN`/`Infinity`
 
-The Playwright scaffold includes a mocked `/api/market/status` and `/api/market/sync` smoke path. It also checks Settings Price data counts, validated `PriceSet` import, non-fatal failed PriceSet import recovery with validation code, schema-path diagnostics, unchanged active `PriceSet` and unchanged browser-local history, the Market sync disabled-provider fallback with disabled sync buttons, active `PriceSet` summary and local import path, item-level Market sync diagnostics for failed/skipped rows, sanitized reasons, compact report warnings and status filters, the browser-local price history summary, Economy movers analysis, Snapshot now, confirmed Clear history, browser-rendered metric-strip numbers after a mocked market `PriceSet` is accepted, Result/Loot/Economy price-warning surfacing for imported price sets, the default disabled-provider copy and absence of stale production `/api/prices` or `/api/scrape` instructions. It must stay mocked; automated tests must not call a live market upstream.
+The Playwright scaffold includes a mocked `/api/market/status` and `/api/market/sync` smoke path. It also checks Settings Price data counts, validated `PriceSet` import, selected active `PriceSet` persistence across reloads, active `PriceSet` export/reset controls, reset-to-bundled keeping local history, non-fatal failed PriceSet import recovery with validation code, schema-path diagnostics, unchanged active `PriceSet` and unchanged browser-local history, the Market sync disabled-provider fallback with disabled sync buttons, active `PriceSet` summary and local import path, item-level Market sync diagnostics for failed/skipped rows, sanitized reasons, compact report warnings and status filters, the browser-local price history summary, Economy movers analysis, Snapshot now, confirmed Clear history, browser-rendered metric-strip numbers after imported and mocked market `PriceSet` values are accepted and restored after reload, Result/Loot/Economy price-warning surfacing for imported price sets, the default disabled-provider copy and absence of stale production `/api/prices` or `/api/scrape` instructions. It must stay mocked; automated tests must not call a live market upstream.
 
 The same scaffold also covers Settings Gear menu tier filtering for rewrite-owned
 hidden gear preferences: hiding a tier removes matching unselected options from
@@ -376,7 +401,7 @@ They cover:
 - scarce/AFK Trip controls, inventory reserve details, prayer restore capacity, Trip summary Auto/Manual wording and derived general potion recommendation status/`canApply` state in the UI view model
 - domain-backed result, compare and planner view models
 - Stats hit distribution view-model labels, bucket accessibility text and probability-total invariants
-- Stats source breakdown view-model rows for normal attack, special attack and cannon statuses, plus XP routing rows, cannon-only XP row visibility, modeled Prayer/Magic-alch total-XP rows and Trip/banking summary mapping
+- Stats source breakdown view-model rows and source-detail records for normal attack, special attack and cannon statuses, including normal-only histogram exposure, melee/ranged modeled special detail, magic/DBA fallback detail, dragon-halberd partial warning detail, cannon-enabled metrics and idle cannon detail; plus XP routing rows, cannon-only XP row visibility, modeled Prayer/Magic-alch total-XP rows and Trip/banking summary mapping
 - active assumptions/modifiers summary view-model rows for empty/default state, manual combat overrides, enabled cannon settings, loot settings, loot action overrides, imported/synced PriceSet modifiers, money warnings, dragon-halberd special warning, explicit safespot and protection-prayer split rows, targeted reset metadata, review-only boundaries, reset scoping and stable priority order/five-row overflow
 - Duel comparison view-model rows for live setup and saved snapshots against the current monster, including deltas and best-marker fields
 - structured money warning view models for price alias and fallback surfacing
@@ -406,7 +431,7 @@ They cover:
 - refusal to implicitly migrate mismatched persisted versions
 - validated `PriceSet` import errors with non-fatal UI notices and retry recovery
 - non-fatal rewrite setup import failures for invalid JSON, unsupported setup versions, invalid schema data and oversized files, preserving the visible and persisted setup while leaving file input retryable
-- Playwright smoke for the workbench shell, PlayerSidebar, legacy-order TabBar, right-side MonsterCard rail, mobile MonsterCard ordering, MonsterCard target switch/drop-filter sharing/active defence highlights, dense spreadsheet Compare pane, Dense Compare mobile/tablet page-width containment and internal horizontal table scroll, dense XP/net-GP scale indicators, metric strip, active assumptions/modifiers summary in Compare and Stats with Review-to-Cannon tab switching plus targeted Reset actions for manual combat overrides, current-monster loot settings and current-monster cannon settings, Stats source breakdown, Stats XP routing, Trip & banking summary and hit distribution histogram, combat-style switching, per-combat-type loadout restore, multi-prayer/multi-boost workbench controls with compact-strip primary edits and `+N` markers, active-style gear quick actions with two-handed shield lock, manual combat override persistence/reset, SetupBar custom setup create/restore/remove plus one-step Undo for remove, rewrite setup import failure retry/notice behavior, PriceSet import failure retry/notice behavior, Melee/Ranged/Magic equipment pane edits with searchable selectors and persisted selections, tab-routed special attack controls/metrics, dragon halberd NPC-size fallback warning, DBA boost special suppression, magic special unsupported state, trip survival/food/recoil controls, Trip summary Auto/Manual labels for bank time, food count and prayer restore, trip potion recommendation apply/disabled/inactive states, dense row markers, browser-rendered dense numeric release-path snapshots for default melee, melee alch-relevant, ranged safespot, ranged cannon, magic safespot and custom loot-settings marker rows, browser-rendered metric-strip acceptance snapshots for those target selections plus default melee, ranged safespot, cannon-enabled ranged, loot action override, manual food/prayer trip, imported PriceSet, mocked market sync and compatible legacy import paths, final Cannon tab controls with sparse-link/reset behavior and expanded output snapshots for effective targets, cannon DPS, balls/hr, balls/kill, cannon ranged XP/hr, effective XP/hr, effective net GP/hr, ball costs, cannonballs/trip and K/hr uplift, Duel tab snapshot/rename/load/delete/undo/persistence flow, Planner tab open/metric/current-XP/target/skill-lock/gear-pool/Recompute/training-order/timeline/chart persistence flow, per-monster loot settings persistence plus loot reset/optimize Undo, full monster table row count, table sorting, dense compare filters/relevance persistence, row target selection, per-monster cannon controls, Economy price-history controls, mocked hiscores lookup/apply flow and mocked market sync/report/history flow
+- Playwright smoke for the workbench shell, PlayerSidebar, legacy-order TabBar, right-side MonsterCard rail, mobile MonsterCard ordering, MonsterCard target switch/drop-filter sharing/active defence highlights, dense spreadsheet Compare pane, Dense Compare mobile/tablet page-width containment and internal horizontal table scroll, dense XP/net-GP scale indicators, Compare calculation freshness status, metric strip, active assumptions/modifiers summary in Compare and Stats with Review-to-Cannon tab switching plus targeted Reset actions for manual combat overrides, current-monster loot settings and current-monster cannon settings, Stats source breakdown, visible Stats special/cannon source details for default inactive, active special, magic/DBA fallback and active cannon paths, Stats XP routing, Trip & banking summary and hit distribution histogram, combat-style switching, per-combat-type loadout restore, multi-prayer/multi-boost workbench controls with compact-strip primary edits and `+N` markers, active-style gear quick actions with two-handed shield lock, manual combat override persistence/reset, SetupBar custom setup create/restore/remove plus one-step Undo for remove, rewrite setup import failure retry/notice behavior, PriceSet import failure retry/notice behavior, Melee/Ranged/Magic equipment pane edits with searchable selectors and persisted selections, tab-routed special attack controls/metrics, dragon halberd NPC-size fallback warning, DBA boost special suppression, magic special unsupported state, trip survival/food/recoil controls, Trip summary Auto/Manual labels for bank time, food count and prayer restore, trip potion recommendation apply/disabled/inactive states, dense row markers, browser-rendered dense numeric release-path snapshots for default melee, melee alch-relevant, ranged safespot, ranged cannon, magic safespot and custom loot-settings marker rows, browser-rendered metric-strip acceptance snapshots for those target selections plus default melee, ranged safespot, cannon-enabled ranged, loot action override, manual food/prayer trip, imported PriceSet, mocked market sync and compatible legacy import paths, final Cannon tab controls with sparse-link/reset behavior and expanded output snapshots for effective targets, cannon DPS, balls/hr, balls/kill, cannon ranged XP/hr, effective XP/hr, effective net GP/hr, ball costs, cannonballs/trip and K/hr uplift, Duel tab snapshot/rename/load/delete/undo/persistence flow, Planner tab open/metric/current-XP/target/skill-lock/gear-pool/Recompute/training-order/timeline/chart persistence flow, per-monster loot settings persistence plus loot reset/optimize Undo, full monster table row count, table sorting, dense compare filters/relevance persistence, row and keyboard target selection, per-monster cannon controls, Economy price-history controls, mocked hiscores lookup/apply flow and mocked market sync/report/history flow
 
 Run the focused browser smoke for the visible Stats workflow with:
 
@@ -418,6 +443,12 @@ Run the focused browser smoke for the Dense Compare scale indicators with:
 
 ```sh
 npm run test:e2e -- --grep "dense XP"
+```
+
+Run the focused browser smoke for Dense Compare calculation freshness with:
+
+```sh
+npm run test:e2e -- --grep "calculation freshness"
 ```
 
 Run the focused browser smoke for Dense Compare release-path numeric snapshots with:
@@ -487,9 +518,9 @@ node -e "for (const f of ['prices.json','alch.json','price-history.json']) JSON.
 - Planner: `npm run test -- src/tests/planner-domain.test.ts` for gear eligibility, scoring, stance selection and golden plan fixtures. Run full `npm run test` if planner changes interact with combat, trip, data or economy contracts.
 - UI/view-model changes: `npm run test -- src/tests/ui-view-model.test.ts`, `npm run test`, `npm run build` and `npm run test:e2e` when browser behavior changes.
 - Performance-sensitive UI/view-model changes: include `src/tests/ui-performance.test.ts` and browser smoke where possible; compare the level-input path and representative compare/planner workloads against the accepted performance budget.
-- Market/import logic: unit tests with mocked price sources and malformed data; include `src/tests/ui-adapters.test.ts` for rewrite price imports.
+- Market/import logic: unit tests with mocked price sources and malformed data; include `src/tests/ui-adapters.test.ts` for rewrite price imports and `src/tests/market-ui-state.test.ts` for selected active `PriceSet` persistence, restore and failure behavior.
 - Live integrations: `npm run test -- src/tests/live-integrations.test.ts src/tests/hiscores-server.test.ts src/tests/hiscores-adapter.test.ts src/tests/hiscores-ui-state.test.ts src/tests/market-sync-items.test.ts src/tests/market-server.test.ts src/tests/market-adapter.test.ts src/tests/market-ui-state.test.ts` plus `npm run test` when shared schemas or API adapters are touched. Use mocked hiscores and market service tests only; do not call live upstream services in automated tests. Cover request validation, allowlisted market item mapping, upstream-invalid responses, partial market failures and UI apply/failure behavior.
-- Persistence changes: migration/version tests for `localStorage` keys; include `src/tests/ui-adapters.test.ts` and `src/tests/legacy-migration.test.ts` when legacy key detection or setup/hiscores/price compatibility mapping changes.
+- Persistence changes: migration/version tests for `localStorage` keys; include `src/tests/ui-adapters.test.ts` and `src/tests/market-ui-state.test.ts` for price selection/history keys, and include `src/tests/legacy-migration.test.ts` when legacy key detection or setup/hiscores/price compatibility mapping changes.
 - Release/deploy changes: build and smoke test commands once a build system exists.
 - Acceptance/security hardening: `npm run typecheck`, `npm run test`, `npm run test:golden`, `npm run build`, `npm run test:e2e`, performance-budget checks, `npm audit`, static risk searches and `git diff --check`.
 

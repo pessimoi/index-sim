@@ -11,6 +11,7 @@ import {
   defaultPool,
   SKILL_LABEL,
   SLOT_LABEL,
+  PLANNER_REQUIREMENT_PROVENANCE,
   reqOf,
   type PlannerInput,
   type PlannerOptions,
@@ -18,6 +19,7 @@ import {
   type PlannerGearSlot,
   type PlannerPlan,
   type PlannerPool,
+  type SkillRequirements,
   type PlannerSkill,
   type PlannerTransition
 } from "@/domain/planner";
@@ -29,10 +31,12 @@ import type {
   EquipmentSlot,
   EntityId,
   GameDataSnapshot,
+  PlayerLevels,
   SimulationContext,
   SimulationRequest,
   SimulationWarning
 } from "@/domain/shared";
+import { EQUIPMENT_SLOTS } from "@/domain/shared";
 import {
   HIGH_ALCH_MAGIC_XP_PER_CAST,
   simulateTripLootSupply,
@@ -82,6 +86,7 @@ export interface SimulationViewModel {
   xpRouting: XpRoutingViewModel;
   tripBankingSummary: StatsTripBankingSummaryViewModel;
   statsSourceBreakdown: StatsSourceBreakdownViewModel;
+  setupRequirements: SetupRequirementSummaryViewModel;
   activeAssumptions: ActiveAssumptionsSummaryViewModel;
   monsterCard: MonsterCardViewModel;
   trip: TripLootSupplyResult;
@@ -191,8 +196,27 @@ export interface StatsSourceBreakdownRowViewModel {
   notes: string[];
 }
 
+export interface StatsSourceDetailMetricViewModel {
+  id: string;
+  label: string;
+  value: string;
+  numericValue: number | null;
+}
+
+export interface StatsSourceDetailViewModel {
+  id: StatsSourceBreakdownRowId;
+  label: string;
+  status: StatsSourceBreakdownStatus;
+  statusLabel: string;
+  metrics: StatsSourceDetailMetricViewModel[];
+  notes: string[];
+  warnings: CalculationWarningViewModel[];
+  histogram: HitDistributionViewModel | null;
+}
+
 export interface StatsSourceBreakdownViewModel {
   rows: StatsSourceBreakdownRowViewModel[];
+  details: StatsSourceDetailViewModel[];
 }
 
 export type ActiveAssumptionCategory = "warning" | "setup" | "loot" | "trip" | "settings";
@@ -244,6 +268,29 @@ export interface ActiveAssumptionsSummaryViewModel {
   visibleRows: ActiveAssumptionRowViewModel[];
   hiddenRows: ActiveAssumptionRowViewModel[];
   hiddenCount: number;
+}
+
+export type SetupRequirementSkill = Extract<keyof SkillRequirements, PlannerSkill>;
+
+export type SetupRequirementSlot = "weapon" | EquipmentSlot;
+
+export interface SetupRequirementWarningViewModel extends CalculationWarningViewModel {
+  itemId: EntityId;
+  itemName: string;
+  slot: SetupRequirementSlot;
+  slotLabel: string;
+  skill: SetupRequirementSkill;
+  skillLabel: string;
+  requiredLevel: number;
+  currentLevel: number;
+}
+
+export interface SetupRequirementSummaryViewModel {
+  warnings: SetupRequirementWarningViewModel[];
+  warningCount: number;
+  hasWarnings: boolean;
+  policyLabel: string;
+  provenance: typeof PLANNER_REQUIREMENT_PROVENANCE;
 }
 
 export type MonsterCardStatKey =
@@ -624,6 +671,7 @@ export interface GearQuickActionInput {
   weaponId: EntityId;
   styleId: EntityId;
   currentItemId: EntityId;
+  levels?: PlayerLevels;
   options: readonly SelectOptionViewModel[];
   shieldLocked?: boolean;
 }
@@ -691,6 +739,23 @@ function gearQuickActionScore(
   return (item.magAtt ?? 0) + (item.magDmg ?? 0) * 2;
 }
 
+function gearQuickActionRequirementReason(
+  input: GearQuickActionInput,
+  item: { id: EntityId; label: string }
+): string | null {
+  if (!input.levels) return null;
+  const warning = createSetupRequirementWarnings(
+    {
+      slot: input.slot,
+      itemId: item.id,
+      itemName: item.label
+    },
+    input.levels
+  )[0];
+  if (!warning) return null;
+  return `requires ${warning.skillLabel} ${formatNumber(warning.requiredLevel)}, current ${formatNumber(warning.currentLevel)}`;
+}
+
 export function gearQuickActionForSlot(input: GearQuickActionInput): GearQuickActionViewModel {
   if (input.shieldLocked) {
     return {
@@ -742,13 +807,15 @@ export function gearQuickActionForSlot(input: GearQuickActionInput): GearQuickAc
   }
 
   const currentIsBest = best.id === input.currentItemId;
+  const baseReason = currentIsBest
+    ? `Best visible option: ${current?.label ?? best.label}`
+    : `Apply ${best.label}`;
+  const requirementReason = gearQuickActionRequirementReason(input, best);
   return {
     itemId: best.id,
     itemLabel: best.label,
     disabled: currentIsBest,
-    reason: currentIsBest
-      ? `Best visible option: ${current?.label ?? best.label}`
-      : `Apply ${best.label}`
+    reason: requirementReason ? `${baseReason} - ${requirementReason}` : baseReason
   };
 }
 
@@ -1294,6 +1361,94 @@ function activeAssumptionValidLootOverrideCount(
   ).length;
 }
 
+const SETUP_REQUIREMENT_SKILLS = ["attack", "defence", "ranged", "magic"] as const satisfies
+  readonly SetupRequirementSkill[];
+
+const SETUP_REQUIREMENT_SLOT_LABELS: Record<SetupRequirementSlot, string> = {
+  weapon: "Weapon",
+  helm: "Helm",
+  amulet: "Amulet",
+  body: "Body",
+  legs: "Legs",
+  shield: "Shield",
+  gloves: "Gloves",
+  boots: "Boots",
+  cape: "Cape",
+  ring: "Ring"
+};
+
+function setupRequirementItemName(
+  context: SimulationContext,
+  slot: SetupRequirementSlot,
+  itemId: EntityId
+): string {
+  if (slot === "weapon") return context.gameData.weapons[itemId]?.name ?? itemId;
+  return context.gameData.equipment[slot]?.[itemId]?.name ?? itemId;
+}
+
+function createSetupRequirementWarnings(
+  item: {
+    slot: SetupRequirementSlot;
+    itemId: EntityId;
+    itemName: string;
+  },
+  levels: PlayerLevels
+): SetupRequirementWarningViewModel[] {
+  if (item.itemId === "none") return [];
+  const requirement = reqOf(item.itemId);
+  return SETUP_REQUIREMENT_SKILLS.flatMap((skill) => {
+    const requiredLevel = requirement[skill] ?? 0;
+    if (requiredLevel <= 0) return [];
+    const currentLevel = levels[skill];
+    if (currentLevel >= requiredLevel) return [];
+    const skillLabel = SKILL_LABEL[skill];
+    return [
+      {
+        code: "setup-requirement-unmet",
+        severity: "warning",
+        message: `${item.itemName} requires ${skillLabel} ${formatNumber(requiredLevel)}; current ${skillLabel} ${formatNumber(currentLevel)}.`,
+        itemId: item.itemId,
+        itemName: item.itemName,
+        slot: item.slot,
+        slotLabel: SETUP_REQUIREMENT_SLOT_LABELS[item.slot],
+        skill,
+        skillLabel,
+        requiredLevel,
+        currentLevel
+      }
+    ];
+  });
+}
+
+function createSetupRequirementSummaryViewModel(
+  request: SimulationRequest,
+  context: SimulationContext
+): SetupRequirementSummaryViewModel {
+  const items = [
+    {
+      slot: "weapon" as const,
+      itemId: request.loadout.weaponId,
+      itemName: setupRequirementItemName(context, "weapon", request.loadout.weaponId)
+    },
+    ...EQUIPMENT_SLOTS.map((slot) => {
+      const itemId = request.loadout.gear[slot] ?? "none";
+      return {
+        slot,
+        itemId,
+        itemName: setupRequirementItemName(context, slot, itemId)
+      };
+    })
+  ];
+  const warnings = items.flatMap((item) => createSetupRequirementWarnings(item, request.levels));
+  return {
+    warnings,
+    warningCount: warnings.length,
+    hasWarnings: warnings.length > 0,
+    policyLabel: "Manual requirement policy",
+    provenance: PLANNER_REQUIREMENT_PROVENANCE
+  };
+}
+
 function createActiveAssumptionsSummaryViewModel(input: {
   form: CombatSetupFormState;
   request: SimulationRequest;
@@ -1303,6 +1458,7 @@ function createActiveAssumptionsSummaryViewModel(input: {
   lootPrefs: Record<string, LootAction | string | undefined>;
   lootSettingsByMonster: LootSettingsByMonsterState;
   lootOverrideCount: number;
+  setupRequirements: SetupRequirementSummaryViewModel;
   specialWarnings: readonly CalculationWarningViewModel[];
   moneyWarnings: readonly CalculationWarningViewModel[];
   options?: SimulationViewModelOptions["activeAssumptions"];
@@ -1335,6 +1491,21 @@ function createActiveAssumptionsSummaryViewModel(input: {
       reviewTab: combatReviewTab,
       tone: "warning",
       priority: 11
+    });
+  }
+
+  if (input.setupRequirements.hasWarnings) {
+    rows.push({
+      id: "setup-requirements",
+      category: "warning",
+      label: "Setup requirements",
+      value: activeAssumptionCountLabel(input.setupRequirements.warningCount, "warning"),
+      detail:
+        input.setupRequirements.warnings[0]?.message ??
+        "Manual requirement checks flag this loadout.",
+      reviewTab: combatReviewTab,
+      tone: "warning",
+      priority: 12
     });
   }
 
@@ -1987,6 +2158,77 @@ function statsSourceBreakdownRow(
   };
 }
 
+function statsSourceMetric(
+  id: string,
+  label: string,
+  numericValue: number | null,
+  value: string
+): StatsSourceDetailMetricViewModel {
+  return {
+    id,
+    label,
+    numericValue,
+    value
+  };
+}
+
+function statsSourceBaseMetrics(
+  row: StatsSourceBreakdownRowViewModel
+): StatsSourceDetailMetricViewModel[] {
+  const metrics = [
+    statsSourceMetric("dps", "DPS", row.dps, row.dpsLabel),
+    statsSourceMetric("xp-hr", "XP/hr", row.xpPerHour, row.xpPerHourLabel),
+    statsSourceMetric("hit-chance", "Hit chance", row.hitChance, row.hitChanceLabel),
+    statsSourceMetric("max-hit", "Max hit", row.maxHit, row.maxHitLabel),
+    statsSourceMetric(
+      "supply-cost-hour",
+      "Supply cost/hr",
+      row.supplyCostPerHour,
+      row.supplyCostPerHourLabel
+    ),
+    statsSourceMetric(
+      "supply-cost-kill",
+      "Supply cost/kill",
+      row.supplyCostPerKill,
+      row.supplyCostPerKillLabel
+    )
+  ];
+
+  if (row.dpsGainPct != null) {
+    metrics.splice(
+      1,
+      0,
+      statsSourceMetric(
+        "dps-gain",
+        "DPS gain",
+        row.dpsGainPct,
+        `${formatNumber(row.dpsGainPct, 1)}%`
+      )
+    );
+  }
+
+  return metrics;
+}
+
+function statsSourceDetail(input: {
+  row: StatsSourceBreakdownRowViewModel;
+  metrics?: StatsSourceDetailMetricViewModel[];
+  notes?: readonly string[];
+  warnings?: readonly CalculationWarningViewModel[];
+  histogram?: HitDistributionViewModel | null;
+}): StatsSourceDetailViewModel {
+  return {
+    id: input.row.id,
+    label: input.row.label,
+    status: input.row.status,
+    statusLabel: input.row.statusLabel,
+    metrics: input.metrics ?? statsSourceBaseMetrics(input.row),
+    notes: [...(input.notes ?? input.row.notes)],
+    warnings: [...(input.warnings ?? [])],
+    histogram: input.histogram ?? null
+  };
+}
+
 function createStatsSourceBreakdownViewModel(input: {
   form: CombatSetupFormState;
   combat: ReturnType<typeof simulateCombat>;
@@ -1994,6 +2236,8 @@ function createStatsSourceBreakdownViewModel(input: {
   playerEffectiveXpPerHour: number;
   cannonEffectiveXpPerHour: number;
   specialWarnings: readonly CalculationWarningViewModel[];
+  moneyWarnings: readonly CalculationWarningViewModel[];
+  hitDistribution: HitDistributionViewModel;
 }): StatsSourceBreakdownViewModel {
   const cannon = input.trip.cannon;
   const cannonSupplyCostPerKill = cannon?.ballCostPerKill ?? 0;
@@ -2004,6 +2248,8 @@ function createStatsSourceBreakdownViewModel(input: {
   const normalSupplyCostPerHour = normalSupplyCostPerKill * input.trip.effectiveKph;
   const special = input.combat.specialAttack;
   const specialDps = special ? special.dpsWithSpec - special.dpsBase : null;
+  const dbaBoostSpecialActive =
+    input.form.combatStyle === "melee" && input.form.boosts.includes("dba_spec");
   const specialStatus: StatsSourceBreakdownStatus = special
     ? input.specialWarnings.length > 0
       ? "partial"
@@ -2011,72 +2257,184 @@ function createStatsSourceBreakdownViewModel(input: {
     : input.form.combatStyle === "magic"
       ? "not-modeled"
       : "inactive";
+  const inactiveSpecialNote = dbaBoostSpecialActive
+    ? "DBA special boost is modeled as a boost, not a DPS special attack."
+    : input.form.combatStyle === "magic"
+      ? "Magic DPS special attacks are not modeled yet."
+      : "No supported melee/ranged DPS special selected.";
   const specialNotes =
     special == null
-      ? [
-          input.form.combatStyle === "magic"
-            ? "Magic DPS special attacks are not modeled yet."
-            : "No supported melee/ranged DPS special selected."
-        ]
+      ? [inactiveSpecialNote]
       : [
           `${formatNumber(special.specsPerHour, 1)} specs/hr from the current special attack model.`,
+          "Special attack XP is included in player combat XP/hr; separate special XP is not modeled.",
           ...(input.specialWarnings.length > 0
             ? input.specialWarnings.map((warning) => warning.message)
             : ["DPS gain is shown as modeled special DPS above the normal attack baseline."])
         ];
-
-  return {
-    rows: [
-      statsSourceBreakdownRow({
-        id: "normal-attack",
-        label: "Normal attack",
-        status: "modeled",
-        dps: input.combat.dps,
-        dpsDetail: special ? "Baseline before special attacks" : null,
-        dpsGainPct: null,
-        xpPerHour: input.playerEffectiveXpPerHour,
-        hitChance: input.combat.hitChance,
-        maxHit: input.combat.maxHit,
-        supplyCostPerHour: normalSupplyCostPerHour,
-        supplyCostPerKill: normalSupplyCostPerKill,
-        notes: ["Base player attack after trip efficiency and current supply model."]
-      }),
-      statsSourceBreakdownRow({
-        id: "special-attack",
-        label: "Special attack",
-        status: specialStatus,
-        dps: specialDps,
-        dpsDetail: special ? `DPS gain ${formatNumber(special.dpsGainPct, 1)}%` : null,
-        dpsGainPct: special?.dpsGainPct ?? null,
-        xpPerHour: null,
-        hitChance: special?.hitChance ?? null,
-        maxHit: special?.maxHit ?? null,
-        supplyCostPerHour: null,
-        supplyCostPerKill: null,
-        notes: specialNotes
-      }),
-      statsSourceBreakdownRow({
-        id: "cannon",
-        label: "Cannon",
-        status: cannon ? "modeled" : "inactive",
-        dps: cannon?.cannonDps ?? null,
-        dpsDetail: cannon ? `${formatNumber(cannon.activeFrac * 100, 1)}% active` : null,
-        dpsGainPct: null,
-        xpPerHour: cannon ? input.cannonEffectiveXpPerHour : null,
-        hitChance: cannon ? input.combat.hitChance : null,
-        maxHit: cannon?.maxBall ?? null,
-        supplyCostPerHour: cannon ? cannonSupplyCostPerKill * input.trip.effectiveKph : null,
-        supplyCostPerKill: cannon ? cannonSupplyCostPerKill : null,
-        notes: cannon
-          ? [
-              `Cannon overlay: ${formatNumber(cannon.effTargets, 1)} effective targets, ${formatNumber(
+  const cannonStatus: StatsSourceBreakdownStatus = cannon
+    ? cannon.idle
+      ? "inactive"
+      : "modeled"
+    : "inactive";
+  const normalRow = statsSourceBreakdownRow({
+    id: "normal-attack",
+    label: "Normal attack",
+    status: "modeled",
+    dps: input.combat.dps,
+    dpsDetail: special ? "Baseline before special attacks" : null,
+    dpsGainPct: null,
+    xpPerHour: input.playerEffectiveXpPerHour,
+    hitChance: input.combat.hitChance,
+    maxHit: input.combat.maxHit,
+    supplyCostPerHour: normalSupplyCostPerHour,
+    supplyCostPerKill: normalSupplyCostPerKill,
+    notes: ["Base player attack after trip efficiency and current supply model."]
+  });
+  const specialRow = statsSourceBreakdownRow({
+    id: "special-attack",
+    label: "Special attack",
+    status: specialStatus,
+    dps: specialDps,
+    dpsDetail: special ? `DPS gain ${formatNumber(special.dpsGainPct, 1)}%` : null,
+    dpsGainPct: special?.dpsGainPct ?? null,
+    xpPerHour: null,
+    hitChance: special?.hitChance ?? null,
+    maxHit: special?.maxHit ?? null,
+    supplyCostPerHour: null,
+    supplyCostPerKill: null,
+    notes: specialNotes
+  });
+  const cannonRow = statsSourceBreakdownRow({
+    id: "cannon",
+    label: "Cannon",
+    status: cannonStatus,
+    dps: cannon?.cannonDps ?? null,
+    dpsDetail: cannon ? `${formatNumber(cannon.activeFrac * 100, 1)}% active` : null,
+    dpsGainPct: null,
+    xpPerHour: cannon ? input.cannonEffectiveXpPerHour : null,
+    hitChance: cannon ? input.combat.hitChance : null,
+    maxHit: cannon?.maxBall ?? null,
+    supplyCostPerHour: cannon ? cannonSupplyCostPerKill * input.trip.effectiveKph : null,
+    supplyCostPerKill: cannon ? cannonSupplyCostPerKill : null,
+    notes: cannon
+      ? [
+          cannon.idle
+            ? "Idle: this spot is too sparse for the cannon to fire."
+            : `Cannon overlay: ${formatNumber(cannon.effTargets, 1)} effective targets, ${formatNumber(
                 cannon.ballsPerHour
               )} balls/hr before trip efficiency.`,
-              cannon.respawnBound
-                ? "Respawn-bound cannon overlay."
-                : "Cannon overlay is not respawn-bound."
-            ]
-          : ["Cannon is off for the current monster."]
+          cannon.respawnBound
+            ? "Respawn-bound cannon overlay."
+            : "Cannon overlay is not respawn-bound."
+        ]
+      : ["Cannon is off for the current monster."]
+  });
+  const specialMetrics = statsSourceBaseMetrics(specialRow);
+  if (special) {
+    specialMetrics.push(
+      statsSourceMetric("spec-weapon", "Spec weapon", null, special.weaponName),
+      statsSourceMetric(
+        "dps-with-spec",
+        "DPS with spec",
+        special.dpsWithSpec,
+        formatNumber(special.dpsWithSpec, 2)
+      ),
+      statsSourceMetric(
+        "specs-hr",
+        "Specs/hr",
+        special.specsPerHour,
+        formatNumber(special.specsPerHour, 1)
+      ),
+      statsSourceMetric("hits", "Hits", special.hits, formatNumber(special.hits))
+    );
+  }
+  const cannonMetrics = statsSourceBaseMetrics(cannonRow);
+  if (cannon) {
+    const sparseState = cannon.idle ? "Idle" : cannon.respawnBound ? "Respawn-bound" : "Active";
+    cannonMetrics.push(
+      statsSourceMetric(
+        "effective-targets",
+        "Effective targets",
+        cannon.effTargets,
+        formatNumber(cannon.effTargets, 1)
+      ),
+      statsSourceMetric(
+        "active-fraction",
+        "Active time",
+        cannon.activeFrac,
+        `${formatNumber(cannon.activeFrac * 100, 1)}%`
+      ),
+      statsSourceMetric(
+        "balls-hr",
+        "Balls/hr",
+        cannon.ballsPerHour,
+        formatNumber(cannon.ballsPerHour)
+      ),
+      statsSourceMetric(
+        "balls-kill",
+        "Balls/kill",
+        cannon.ballsPerKill,
+        formatNumber(cannon.ballsPerKill, 2)
+      ),
+      statsSourceMetric(
+        "ball-price",
+        "Ball price",
+        cannon.ballPrice,
+        formatNumber(cannon.ballPrice)
+      ),
+      statsSourceMetric(
+        "cannon-ranged-xp-hr",
+        "Cannon Ranged XP/hr",
+        cannon.rangedXpPerHour,
+        formatNumber(cannon.rangedXpPerHour)
+      ),
+      statsSourceMetric(
+        "ball-cost-hour",
+        "Ball cost/hr",
+        cannon.ballCostPerHour,
+        formatNumber(cannon.ballCostPerHour)
+      ),
+      statsSourceMetric(
+        "ball-cost-kill",
+        "Ball cost/kill",
+        cannon.ballCostPerKill,
+        formatNumber(cannon.ballCostPerKill)
+      ),
+      statsSourceMetric(
+        "cannonballs-trip",
+        "Cannonballs/trip",
+        cannon.ballsPerTrip ?? null,
+        cannon.ballsPerTrip == null ? "-" : formatNumber(cannon.ballsPerTrip)
+      ),
+      statsSourceMetric("sparse-state", "Sparse state", null, sparseState),
+      statsSourceMetric("idle", "Idle", null, cannon.idle ? "Yes" : "No"),
+      statsSourceMetric(
+        "respawn-bound",
+        "Respawn-bound",
+        null,
+        cannon.respawnBound ? "Yes" : "No"
+      )
+    );
+  }
+
+  return {
+    rows: [normalRow, specialRow, cannonRow],
+    details: [
+      statsSourceDetail({
+        row: normalRow,
+        warnings: input.moneyWarnings,
+        histogram: input.hitDistribution
+      }),
+      statsSourceDetail({
+        row: specialRow,
+        metrics: specialMetrics,
+        warnings: input.specialWarnings
+      }),
+      statsSourceDetail({
+        row: cannonRow,
+        metrics: cannonMetrics,
+        warnings: cannon ? input.moneyWarnings : []
       })
     ]
   };
@@ -2328,6 +2686,8 @@ export function createSimulationViewModel(
   const moneyWarnings = calculationWarnings.filter((warning) =>
     MONEY_WARNING_CODES.has(warning.code)
   );
+  const hitDistribution = createHitDistributionViewModel(combat);
+  const setupRequirements = createSetupRequirementSummaryViewModel(request, context);
   const activeAssumptions = createActiveAssumptionsSummaryViewModel({
     form,
     request,
@@ -2337,6 +2697,7 @@ export function createSimulationViewModel(
     lootPrefs,
     lootSettingsByMonster,
     lootOverrideCount: lootRows.overrideCount,
+    setupRequirements,
     specialWarnings,
     moneyWarnings,
     options: options.activeAssumptions
@@ -2345,7 +2706,7 @@ export function createSimulationViewModel(
   return {
     request,
     combat,
-    hitDistribution: createHitDistributionViewModel(combat),
+    hitDistribution,
     xpRouting: createXpRoutingViewModel({
       xp,
       trip,
@@ -2361,8 +2722,11 @@ export function createSimulationViewModel(
       trip,
       playerEffectiveXpPerHour,
       cannonEffectiveXpPerHour,
-      specialWarnings
+      specialWarnings,
+      moneyWarnings,
+      hitDistribution
     }),
+    setupRequirements,
     activeAssumptions,
     monsterCard: monsterCardFromResult(request, context, combat, options.monsterCard),
     trip,

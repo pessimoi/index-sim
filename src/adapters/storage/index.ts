@@ -24,7 +24,16 @@ export type LoadPersistedResult<T> =
   | { status: "missing"; value: null }
   | { status: "loaded"; value: T; envelope: PersistedEnvelope<T> }
   | { status: "version-mismatch"; value: null; foundVersion: number }
-  | { status: "invalid"; value: null; reason: string };
+  | { status: "invalid"; value: null; reason: string }
+  | { status: "unavailable"; value: null; reason: "read_failed" };
+
+export type SavePersistedResult<T> =
+  | { status: "saved"; envelope: PersistedEnvelope<T> }
+  | { status: "failed"; reason: "save_failed" };
+
+export type ClearPersistedResult =
+  | { status: "cleared" }
+  | { status: "failed"; reason: "clear_failed" };
 
 const EnvelopeSchema = z
   .object({
@@ -35,7 +44,12 @@ const EnvelopeSchema = z
   .strict();
 
 export function loadPersisted<T>(options: VersionedStorageOptions<T>): LoadPersistedResult<T> {
-  const raw = options.storage.getItem(options.key);
+  let raw: string | null;
+  try {
+    raw = options.storage.getItem(options.key);
+  } catch {
+    return { status: "unavailable", value: null, reason: "read_failed" };
+  }
   if (!raw) return { status: "missing", value: null };
 
   let parsed: unknown;
@@ -71,24 +85,56 @@ export function loadPersisted<T>(options: VersionedStorageOptions<T>): LoadPersi
   };
 }
 
-export function savePersisted<T>(
+function createPersistedEnvelope<T>(
   options: VersionedStorageOptions<T>,
   value: T
 ): PersistedEnvelope<T> {
   const data = options.schema.parse(value);
-  const envelope: PersistedEnvelope<T> = {
+  return {
     version: options.version,
     savedAt: (options.now ?? (() => new Date()))().toISOString(),
     data
   };
+}
+
+export function savePersisted<T>(
+  options: VersionedStorageOptions<T>,
+  value: T
+): PersistedEnvelope<T> {
+  const envelope = createPersistedEnvelope(options, value);
   options.storage.setItem(options.key, JSON.stringify(envelope));
   return envelope;
+}
+
+export function trySavePersisted<T>(
+  options: VersionedStorageOptions<T>,
+  value: T
+): SavePersistedResult<T> {
+  const envelope = createPersistedEnvelope(options, value);
+  const serialized = JSON.stringify(envelope);
+  try {
+    options.storage.setItem(options.key, serialized);
+    return { status: "saved", envelope };
+  } catch {
+    return { status: "failed", reason: "save_failed" };
+  }
 }
 
 export function clearPersisted(
   options: Pick<VersionedStorageOptions<unknown>, "key" | "storage">
 ): void {
   options.storage.removeItem(options.key);
+}
+
+export function tryClearPersisted(
+  options: Pick<VersionedStorageOptions<unknown>, "key" | "storage">
+): ClearPersistedResult {
+  try {
+    clearPersisted(options);
+    return { status: "cleared" };
+  } catch {
+    return { status: "failed", reason: "clear_failed" };
+  }
 }
 
 export function createMemoryStorage(initial: Record<string, string> = {}): KeyValueStorage {

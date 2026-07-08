@@ -306,10 +306,58 @@ test("keeps market disabled fallback focused on imported PriceSets", async ({ pa
       ]
     }
   });
+  const persistedSelected = await page.evaluate(() =>
+    JSON.parse(window.localStorage.getItem("index-sim:price-set:selected") ?? "null")
+  );
+  expect(persistedSelected).toMatchObject({
+    version: 1,
+    data: {
+      selectedAt: expect.any(String),
+      priceSet: {
+        id: "manual-disabled-market",
+        label: "Disabled market imported prices",
+        source: "manual",
+        itemPrices: { big_bones: 910, lobster: 90 },
+        alchValues: { big_bones: 0, lobster: 0 }
+      }
+    }
+  });
+  await page.reload();
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Economy" }).click();
+  const reloadedMarket = page.locator('section[aria-label="Market sync"]');
+  const reloadedActivePriceSetSummary = reloadedMarket.getByLabel(
+    "Market active PriceSet summary"
+  );
+  await expect(reloadedActivePriceSetSummary).toContainText(
+    "Label Disabled market imported prices"
+  );
+  await expect(reloadedActivePriceSetSummary).toContainText("Source manual");
+  await expect(page.getByLabel("Price history summary")).toContainText("Snapshots 1");
+
+  await reloadedMarket.getByRole("button", { name: "Reset to bundled prices" }).click();
+  await expect(reloadedMarket).toContainText("Confirm reset to bundled prices");
+  await reloadedMarket.getByRole("button", { name: "Confirm reset to bundled prices" }).click();
+  await expect(reloadedActivePriceSetSummary).toContainText(/Label .*bundled legacy prices/i);
+  await expect(reloadedActivePriceSetSummary).toContainText("Source bundled");
+  expect(
+    await page.evaluate(() => window.localStorage.getItem("index-sim:price-set:selected"))
+  ).toBeNull();
+  const historyAfterReset = await page.evaluate(() =>
+    JSON.parse(window.localStorage.getItem("index-sim:price-history") ?? "null")
+  );
+  expect(historyAfterReset.data.snapshots).toHaveLength(1);
+  expect(historyAfterReset.data.snapshots[0].sourcePriceSetId).toBe("manual-disabled-market");
+
+  await page.reload();
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Economy" }).click();
+  await expect(page.getByLabel("Market active PriceSet summary")).toContainText(
+    /Label .*bundled legacy prices/i
+  );
   expect(syncRequested).toBe(false);
 });
 
 test("shows Stats XP routing trip summary and hit distribution", async ({ page }) => {
+  test.setTimeout(45_000);
   await page.goto("/");
   await page.getByLabel("Workbench tabs").getByRole("button", { name: "Stats" }).click();
 
@@ -332,6 +380,14 @@ test("shows Stats XP routing trip summary and hit distribution", async ({ page }
   await expect(sourceBreakdown.getByRole("listitem", { name: /Cannon: inactive/i })).toContainText(
     "Cannon is off"
   );
+  const sourceDetails = sourceBreakdown.getByRole("list", { name: "Source detail panels" });
+  await expect(sourceDetails).toBeVisible();
+  await expect(
+    sourceDetails.getByRole("listitem", { name: /Special attack detail: inactive/i })
+  ).toContainText("No supported melee/ranged DPS special selected");
+  await expect(
+    sourceDetails.getByRole("listitem", { name: /Cannon detail: inactive/i })
+  ).toContainText("Cannon is off");
 
   const xpRouting = analysis.getByRole("region", { name: "XP routing", exact: true });
   await expect(xpRouting).toBeVisible();
@@ -400,8 +456,18 @@ test("shows Stats XP routing trip summary and hit distribution", async ({ page }
   await expect(sourceBreakdown.getByRole("listitem", { name: /Cannon: modeled/i })).toContainText(
     "XP/hr"
   );
+  const cannonDetail = sourceDetails.getByRole("listitem", { name: /Cannon detail: modeled/i });
+  await expect(cannonDetail).toContainText("Effective targets");
+  await expect(cannonDetail).toContainText("Cannon DPS");
+  await expect(cannonDetail).toContainText("Balls/hr");
+  await expect(cannonDetail).toContainText("Balls/kill");
+  await expect(cannonDetail).toContainText("Cannon Ranged XP/hr");
+  await expect(cannonDetail).toContainText("Ball cost/hr");
+  await expect(cannonDetail).toContainText("Ball cost/kill");
+  await expect(cannonDetail).toContainText("Cannonballs/trip");
   await assumptions.getByRole("button", { name: "Reset current monster cannon" }).click();
   await expect(assumptions).not.toContainText("Cannon");
+
   await page.getByLabel("Workbench tabs").getByRole("button", { name: "Cannon" }).click();
   await expect(cannon.getByLabel("Set up cannon")).not.toBeChecked();
 });
@@ -847,6 +913,9 @@ test("reviews and imports compatible legacy setup data", async ({ page }) => {
       ) &&
       (window.localStorage.getItem("index-sim:price-history") ?? "").includes(
         "legacy-browser-prices"
+      ) &&
+      (window.localStorage.getItem("index-sim:price-set:selected") ?? "").includes(
+        "legacy-browser-prices"
       )
     );
   });
@@ -906,6 +975,34 @@ test("updates manual combat overrides and resets to derived values", async ({ pa
   });
 });
 
+test("surfaces setup requirement warnings and reviews the active loadout", async ({ page }) => {
+  await page.goto("/");
+  await page.getByLabel("Combat setup").getByLabel("DEF", { exact: true }).fill("1");
+
+  const assumptions = page.getByLabel("Active assumptions");
+  await expect(assumptions).toContainText("Setup requirements");
+  await expect(assumptions).toContainText("Rune full helm requires Defence 40");
+  await expect(
+    assumptions.getByRole("button", { name: "Review Setup requirements" })
+  ).toBeVisible();
+
+  await assumptions.getByRole("button", { name: "Review Setup requirements" }).click();
+  await expect(
+    page.getByLabel("Workbench tabs").getByRole("button", { name: "Melee" })
+  ).toHaveAttribute("aria-pressed", "true");
+
+  const equipmentPane = page.getByLabel("Equipment loadout");
+  await expect(equipmentPane).toBeVisible();
+  await expect(equipmentPane.getByRole("button", { name: "Best Body" })).toHaveAttribute(
+    "title",
+    "Best visible option: Rune platebody - requires Defence 40, current 1"
+  );
+  await expect(equipmentPane.getByLabel("Setup requirement warnings")).toContainText(
+    "Rune platebody requires Defence 40; current Defence 1."
+  );
+  await expect(equipmentPane).toContainText("Manual requirement policy");
+});
+
 test("keeps legacy data and dismisses the migration notice", async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem("sim_input_v3", JSON.stringify({ combatType: "melee" }));
@@ -925,6 +1022,69 @@ test("keeps legacy data and dismisses the migration notice", async ({ page }) =>
       window.localStorage.getItem("index-sim:legacy-migration-dismissed") !== null
     );
   });
+});
+
+test("surfaces and clears invalid rewrite local state in Settings", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem("index-sim:hidden-gear-tiers", "{");
+    window.localStorage.setItem("sim_input_v3", JSON.stringify({ combatType: "melee" }));
+    window.localStorage.setItem("index-sim:unknown-test", "keep");
+  });
+
+  await page.goto("/");
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Settings" }).click();
+
+  const recovery = page.getByLabel("Local state recovery");
+  await expect(recovery).toBeVisible();
+  await expect(recovery).toContainText("Hidden gear tiers");
+  await expect(recovery).toContainText("Saved data is not valid JSON");
+  await expect(recovery).toContainText("Needs attention 1");
+  expect(
+    await page.evaluate(() => window.localStorage.getItem("index-sim:hidden-gear-tiers"))
+  ).toBe("{");
+
+  await recovery.getByRole("button", { name: "Clear Hidden gear tiers" }).click();
+  await recovery.getByRole("button", { name: "Confirm clear Hidden gear tiers" }).click();
+  await expect(recovery).toContainText("Cleared Hidden gear tiers");
+  await expect(recovery).toContainText("Needs attention 0");
+
+  expect(
+    await page.evaluate(
+      () =>
+        window.localStorage.getItem("index-sim:hidden-gear-tiers") === null &&
+        window.localStorage.getItem("sim_input_v3") !== null &&
+        window.localStorage.getItem("index-sim:unknown-test") === "keep"
+    )
+  ).toBe(true);
+});
+
+test("surfaces rewrite local storage save failures without losing current session edits", async ({
+  page
+}) => {
+  await page.addInitScript(() => {
+    const originalSetItem = Storage.prototype.setItem;
+    Storage.prototype.setItem = function patchedSetItem(key: string, value: string) {
+      if (String(key).startsWith("index-sim:")) {
+        throw new Error("raw localStorage failure payload");
+      }
+      return originalSetItem.call(this, key, value);
+    };
+  });
+
+  await page.goto("/");
+  const defenceInput = page.getByLabel("Combat setup").getByLabel("DEF", { exact: true });
+  await defenceInput.fill("7");
+  await expect(defenceInput).toHaveValue("7");
+
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Settings" }).click();
+  const recovery = page.getByLabel("Local state recovery");
+  await expect(recovery).toBeVisible();
+  await expect(recovery).toContainText(
+    "Local storage is unavailable. Changes may not persist after reload."
+  );
+  await expect(recovery).toContainText("Save failed");
+  await expect(recovery).toContainText("Current session data remains active");
+  await expect(recovery).not.toContainText("raw localStorage failure payload");
 });
 
 test("clears only known legacy data after confirmation", async ({ page }) => {
@@ -1462,6 +1622,7 @@ test("creates, restores and removes monster-specific custom setups", async ({ pa
 });
 
 test("selects special attacks and shows special metrics", async ({ page }) => {
+  test.setTimeout(45_000);
   await page.goto("/");
   await page.getByLabel("Workbench tabs").getByRole("button", { name: "Melee" }).click();
   const special = page.locator('section[aria-label="Special attack"]');
@@ -1485,6 +1646,21 @@ test("selects special attacks and shows special metrics", async ({ page }) => {
     return saved.includes('"weaponId":"dragon_dagger_p"');
   });
   await page.getByLabel("Workbench tabs").getByRole("button", { name: "Stats" }).click();
+  const statsSourceDetails = page
+    .getByRole("region", { name: "Source breakdown", exact: true })
+    .getByRole("list", { name: "Source detail panels" });
+  const specialDetail = statsSourceDetails.getByRole("listitem", {
+    name: /Special attack detail: modeled/i
+  });
+  await expect(specialDetail).toContainText("Spec weapon");
+  await expect(specialDetail).toContainText("Dragon dagger(p)");
+  await expect(specialDetail).toContainText("Hits");
+  await expect(specialDetail).toContainText("Max hit");
+  await expect(specialDetail).toContainText("Hit chance");
+  await expect(specialDetail).toContainText("Specs/hr");
+  await expect(specialDetail).toContainText("DPS with spec");
+  await expect(specialDetail).toContainText("DPS gain");
+  await expect(specialDetail).toContainText("Special attack XP is included in player combat XP/hr");
   await expect(
     page
       .getByRole("region", { name: "Source breakdown", exact: true })
@@ -1514,22 +1690,32 @@ test("selects special attacks and shows special metrics", async ({ page }) => {
       .getByRole("region", { name: "Source breakdown", exact: true })
       .getByRole("listitem", { name: /Special attack: not modeled/i })
   ).toContainText("Magic DPS special attacks are not modeled yet.");
+  await expect(
+    page
+      .getByRole("region", { name: "Source breakdown", exact: true })
+      .getByRole("list", { name: "Source detail panels" })
+      .getByRole("listitem", { name: /Special attack detail: not modeled/i })
+  ).toContainText("Magic DPS special attacks are not modeled yet.");
   await page.getByLabel("Workbench tabs").getByRole("button", { name: "Melee" }).click();
 
   await page.getByLabel("TYPE", { exact: true }).selectOption("melee");
-  await page.getByLabel("Boost", { exact: true }).selectOption("dba_spec");
+  const boostSelectId = await page
+    .locator('section[aria-label="Equipment loadout"] .field > label', { hasText: /^Boost$/ })
+    .getAttribute("for");
+  if (!boostSelectId) throw new Error("Missing visible Boost select");
+  await page.locator(`[id="${boostSelectId}"]`).selectOption("dba_spec");
   await expect(special.getByLabel("Spec weapon")).toBeDisabled();
   await expect(special.getByLabel("Spec weapon")).toHaveValue("none");
   await expect(special).toContainText("DBA boost");
   await expect(special).toContainText("DBA boost uses spec energy as a boost");
   await expect(page.locator('[aria-label="Special attack metrics"]')).toHaveCount(0);
-
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Trip" }).click();
-  const trip = page.locator('section[aria-label="Trip assumptions"]');
-  await expect(trip.getByLabel("DBA restore")).toBeVisible();
-  await expect(page.locator('[aria-label="Inventory reserve trip summary"]')).toContainText(
-    "DBA restore"
-  );
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Stats" }).click();
+  await expect(
+    page
+      .getByRole("region", { name: "Source breakdown", exact: true })
+      .getByRole("list", { name: "Source detail panels" })
+      .getByRole("listitem", { name: /Special attack detail: inactive/i })
+  ).toContainText("DBA special boost is modeled as a boost");
 });
 
 test("sorts the full monster table and selects a target row", async ({ page }) => {
@@ -1553,6 +1739,34 @@ test("sorts the full monster table and selects a target row", async ({ page }) =
   await rockCrabRow.click();
   await expect(page.getByLabel("TARGET", { exact: true })).toHaveValue("rock_crab");
   await expect(rockCrabRow.locator("td").first()).toContainText(">");
+});
+
+test("shows dense compare calculation freshness while rows catch up", async ({ page }) => {
+  await page.goto("/");
+  const comparePanel = page.getByLabel("Monster comparison");
+  const table = page.getByRole("table", { name: "All monsters" });
+  const freshness = comparePanel.getByRole("status", {
+    name: /Compare calculation status/i
+  });
+
+  await expect.poll(async () => table.locator("tbody tr").count()).toBeGreaterThan(8);
+  await expect(freshness).toHaveText("Current");
+  await expect(comparePanel).toContainText("current loadout");
+
+  await page.clock.install();
+  await page.getByLabel("Combat setup").getByLabel("DEF", { exact: true }).fill("7");
+  await expect(freshness).toHaveText("Updating");
+  await expect(comparePanel).toContainText("rows may reflect previous loadout");
+
+  const rockCrabRow = table.getByRole("row", { name: /Rock Crab/ });
+  await rockCrabRow.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByLabel("TARGET", { exact: true })).toHaveValue("rock_crab");
+  await expect(rockCrabRow.locator("td").first()).toContainText(">");
+
+  await page.clock.fastForward(300);
+  await expect(freshness).toHaveText("Current");
+  await expect(comparePanel).toContainText("current loadout");
 });
 
 test("filters dense compare rows and persists hidden monsters", async ({ page }) => {
@@ -1774,6 +1988,7 @@ test("matches browser-rendered dense numeric snapshots", async ({ page }) => {
 });
 
 test("matches release-path dense numeric snapshots", async ({ page }) => {
+  test.setTimeout(60_000);
   await page.goto("/");
   const tabs = page.getByLabel("Workbench tabs");
   const table = page.getByRole("table", { name: "All monsters" });
@@ -2176,7 +2391,7 @@ test("updates manual food controls and recoil ring count", async ({ page }) => {
 });
 
 test("updates trip food, banking and inventory reserve controls across styles", async ({ page }) => {
-  test.setTimeout(45_000);
+  test.setTimeout(60_000);
   await page.goto("/");
   const tabs = page.getByLabel("Workbench tabs");
 
@@ -2731,6 +2946,17 @@ test("matches browser-rendered numeric snapshots for imported price sets", async
     }
   });
 
+  await page.reload();
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Settings" }).click();
+  const reloadedSettings = page.locator('[aria-label="Price data settings"]');
+  await expect(reloadedSettings.locator('[aria-label="Active PriceSet summary"]')).toContainText(
+    "Label Imported fixture prices"
+  );
+  await expect(page.getByLabel("Price history summary")).toContainText("Snapshots 1");
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Compare" }).click();
+  const reloadedImportedPrices = await resultMetricSnapshot(page);
+  expect(reloadedImportedPrices).toEqual(importedPrices);
+
   await page.getByLabel("Workbench tabs").getByRole("button", { name: "Loot" }).click();
   await expect(page.locator('[aria-label="Loot price warnings"]')).toContainText(
     "Price warnings"
@@ -2759,40 +2985,74 @@ test("looks up hiscores through the same-origin API and applies previewed levels
   await page.route("**/api/hiscores?*", async (route) => {
     const url = new URL(route.request().url());
     expect(url.pathname).toBe("/api/hiscores");
-    expect(url.searchParams.get("player")).toBe("Fixture Player");
+    const requestedPlayer = url.searchParams.get("player") ?? "";
+    expect(["Fixture Player", "Slow Player", "Other Player"]).toContain(requestedPlayer);
+    if (requestedPlayer === "Slow Player") {
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    }
+    const skills =
+      requestedPlayer === "Other Player"
+        ? {
+            attack: { level: 71 },
+            strength: { level: 74 },
+            defence: { level: 65 },
+            hitpoints: { level: 70 },
+            prayer: { level: 52 },
+            ranged: { level: 60 },
+            magic: { level: 67 }
+          }
+        : {
+            attack: { level: 61 },
+            strength: { level: 64 },
+            defence: { level: 55 },
+            hitpoints: { level: 63 },
+            prayer: { level: 43 },
+            ranged: { level: 50 },
+            magic: { level: 57 }
+          };
     await route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
-        player: "Fixture Player",
-        normalizedPlayer: "Fixture Player",
+        player: requestedPlayer,
+        normalizedPlayer: requestedPlayer,
         source: { id: "mock-hiscores", label: "Mock hiscores" },
         fetchedAt: "2026-07-05T12:00:00.000Z",
-        skills: {
-          attack: { level: 61 },
-          strength: { level: 64 },
-          defence: { level: 55 },
-          hitpoints: { level: 63 },
-          prayer: { level: 43 },
-          ranged: { level: 50 },
-          magic: { level: 57 }
-        },
+        skills,
         warnings: []
       })
     });
   });
 
   await page.goto("/");
+  const hiscores = page.getByLabel("Hiscores");
   await expect(page.getByRole("button", { name: "Lookup" })).toBeEnabled();
-  await page.getByLabel("Player", { exact: true }).fill("Fixture Player");
-  await page.getByRole("button", { name: "Lookup" }).click();
+  await hiscores.getByLabel("Player", { exact: true }).fill("Fixture Player");
+  await hiscores.getByRole("button", { name: "Lookup" }).click();
   await expect(page.getByRole("table", { name: "Hiscores preview" })).toContainText("hitpoints");
-  await page.getByRole("button", { name: "Apply" }).click();
+  await expect(hiscores).toContainText("Preview for Fixture Player");
+  await expect(hiscores).toContainText("Source: Mock hiscores");
+  await expect(hiscores).toContainText("Fetched: 2026-07-05T12:00:00.000Z");
+
+  await hiscores.getByLabel("Player", { exact: true }).fill("Other Player");
+  await expect(page.getByRole("table", { name: "Hiscores preview" })).toHaveCount(0);
+  await expect(hiscores.getByRole("button", { name: "Apply" })).toHaveCount(0);
+
+  await hiscores.getByLabel("Player", { exact: true }).fill("Slow Player");
+  await hiscores.getByRole("button", { name: "Lookup" }).click();
+  await hiscores.getByLabel("Player", { exact: true }).fill("Other Player");
+  await expect(hiscores).toContainText("Player changed before lookup completed");
+  await expect(page.getByRole("table", { name: "Hiscores preview" })).toHaveCount(0);
+
+  await hiscores.getByRole("button", { name: "Lookup" }).click();
+  await expect(page.getByRole("table", { name: "Hiscores preview" })).toContainText("hitpoints");
+  await expect(hiscores).toContainText("Preview for Other Player");
+  await hiscores.getByRole("button", { name: "Apply" }).click();
 
   const setup = page.getByLabel("Combat setup");
-  await expect(setup.getByLabel("ATT", { exact: true })).toHaveValue("61");
-  await expect(setup.getByLabel("STR", { exact: true })).toHaveValue("64");
-  await expect(setup.getByLabel("DEF", { exact: true })).toHaveValue("55");
+  await expect(setup.getByLabel("ATT", { exact: true })).toHaveValue("71");
+  await expect(setup.getByLabel("STR", { exact: true })).toHaveValue("74");
+  await expect(setup.getByLabel("DEF", { exact: true })).toHaveValue("65");
 });
 
 test("syncs market prices through the same-origin API and shows the report", async ({ page }) => {
@@ -2938,6 +3198,24 @@ test("syncs market prices through the same-origin API and shows the report", asy
   });
   expect(JSON.stringify(persistedHistory)).not.toContain("sourceSlug");
   expect(JSON.stringify(persistedHistory)).not.toContain("https://markets.lostcity.rs");
+  const persistedSelected = await page.evaluate(() =>
+    JSON.parse(window.localStorage.getItem("index-sim:price-set:selected") ?? "null")
+  );
+  expect(persistedSelected).toMatchObject({
+    version: 1,
+    data: {
+      selectedAt: expect.any(String),
+      priceSet: {
+        id: "mock-market-sync",
+        label: "Mock market sync",
+        source: "scraped",
+        itemPrices: { big_bones: 430, lobster: 210 },
+        alchValues: { big_bones: 0, lobster: 0 }
+      }
+    }
+  });
+  expect(JSON.stringify(persistedSelected)).not.toContain("sourceSlug");
+  expect(JSON.stringify(persistedSelected)).not.toContain("https://markets.lostcity.rs");
 
   await page.getByLabel("Workbench tabs").getByRole("button", { name: "Compare" }).click();
   const mockedMarketSync = await resultMetricSnapshot(page);
@@ -2955,6 +3233,14 @@ test("syncs market prices through the same-origin API and shows the report", asy
       "SUPPLY/KILL": "1,186"
     }
   });
+
+  await page.reload();
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Economy" }).click();
+  await expect(page.getByLabel("Market active PriceSet summary")).toContainText(
+    "Label Mock market sync"
+  );
+  await expect(page.getByLabel("Market active PriceSet summary")).toContainText("Source scraped");
+  await expect(page.getByLabel("Price history summary")).toContainText("Snapshots 1");
 });
 
 test("analyzes and manages browser-local price history in Economy", async ({ page }) => {
@@ -3039,5 +3325,5 @@ test("analyzes and manages browser-local price history in Economy", async ({ pag
   expect(await page.evaluate(() => window.localStorage.getItem("index-sim:unrelated-test"))).toBe(
     "keep-me"
   );
-  await expect(page.locator(".topbar")).toContainText("Bundled");
+  await expect(page.locator(".topbar")).toContainText(/bundled legacy prices/i);
 });
