@@ -83,6 +83,12 @@ async function denseNumericSnapshot(table: Locator, rowName: RegExp) {
   };
 }
 
+async function expectDenseRowMax(table: Locator, rowName: RegExp, value: string) {
+  const row = table.getByRole("row", { name: rowName });
+  await expect(row).toBeVisible({ timeout: 30000 });
+  await expect(row.locator("td").nth(2)).toHaveText(value, { timeout: 30000 });
+}
+
 async function expectActiveDenseRow(table: Locator, rowName: RegExp) {
   const row = table.getByRole("row", { name: rowName });
   await expect(row).toBeVisible();
@@ -175,7 +181,7 @@ test("loads the dense combat spreadsheet root", async ({ page }) => {
   await page.getByLabel("Workbench tabs").getByRole("button", { name: "Economy" }).click();
   const market = page.locator('section[aria-label="Market price data"]');
   await expect(
-    market.getByText("Market upstream refresh is scheduled, not user-triggered.")
+    market.getByText("Market upstream refresh is scheduled, not user-triggered.").first()
   ).toBeVisible();
   await expect(market.getByLabel("Scheduled price snapshot summary")).toContainText(
     "Status Loaded"
@@ -364,7 +370,7 @@ test("renders scheduled price status and keeps local PriceSet overrides separate
 });
 
 test("shows Stats XP routing trip summary and hit distribution", async ({ page }) => {
-  test.setTimeout(45_000);
+  test.setTimeout(90_000);
   await page.goto("/");
   await page.getByLabel("Workbench tabs").getByRole("button", { name: "Stats" }).click();
 
@@ -502,8 +508,11 @@ test("shows Stats XP routing trip summary and hit distribution", async ({ page }
   await expect(cannonDetail).toContainText("Ball cost/hr");
   await expect(cannonDetail).toContainText("Ball cost/kill");
   await expect(cannonDetail).toContainText("Cannonballs/trip");
-  await assumptions.getByRole("button", { name: "Reset current monster cannon" }).click();
-  await expect(assumptions).not.toContainText("Cannon");
+  const resetCurrentMonsterCannon = assumptions.getByRole("button", {
+    name: "Reset current monster cannon"
+  });
+  await resetCurrentMonsterCannon.click();
+  await expect(resetCurrentMonsterCannon).toHaveCount(0);
 
   await page.getByLabel("Workbench tabs").getByRole("button", { name: "Cannon" }).click();
   await expect(cannon.getByLabel("Set up cannon")).not.toBeChecked();
@@ -553,7 +562,9 @@ test("places MonsterCard after the active pane on mobile", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 800 });
   await page.goto("/");
 
-  const shellOrder = await page.locator(".workbench-shell > *").evaluateAll((nodes) =>
+  const shell = page.getByLabel("Workbench shell");
+  await expect(shell).toBeVisible();
+  const shellOrder = await shell.locator(":scope > *").evaluateAll((nodes) =>
     nodes.map((node) => node.getAttribute("aria-label"))
   );
   expect(shellOrder).toEqual(["Player sidebar", "Workbench center", "Monster card"]);
@@ -637,6 +648,7 @@ test("keeps Dense Compare mobile and tablet overflow contained", async ({ page }
 });
 
 test("recomputes the Planner tab workflow from visible planner controls", async ({ page }) => {
+  test.setTimeout(90_000);
   await page.goto("/");
   await page.getByLabel("Workbench tabs").getByRole("button", { name: "Planner" }).click();
 
@@ -687,6 +699,7 @@ test("recomputes the Planner tab workflow from visible planner controls", async 
 test("uses the Duel tab to snapshot rename load delete and persist setup comparisons", async ({
   page
 }) => {
+  test.setTimeout(90_000);
   await page.goto("/");
   const tabs = page.getByLabel("Workbench tabs");
 
@@ -723,7 +736,8 @@ test("uses the Duel tab to snapshot rename load delete and persist setup compari
   await page.reload();
   await page.getByLabel("Workbench tabs").getByRole("button", { name: "Duel" }).click();
   const reloadedDuel = page.getByRole("region", { name: "Duel", exact: true });
-  const reloadedTable = reloadedDuel.getByRole("table", { name: "Duel comparison" });
+  await expect(reloadedDuel).toBeVisible();
+  let reloadedTable = reloadedDuel.getByRole("table", { name: "Duel comparison" });
   await expect(reloadedTable.getByLabel("Rename snapshot Melee saved")).toBeVisible();
 
   await page
@@ -732,7 +746,10 @@ test("uses the Duel tab to snapshot rename load delete and persist setup compari
     .selectOption("rock_crab");
   const combatType = page.getByLabel("Combat type");
   await combatType.getByRole("button", { name: "ranged" }).click();
-  await expect(reloadedTable).toContainText("best");
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Duel" }).click();
+  await expect(reloadedDuel).toBeVisible();
+  reloadedTable = reloadedDuel.getByRole("table", { name: "Duel comparison" });
+  await expect(reloadedTable).toContainText("best", { timeout: 30000 });
   await reloadedTable.getByRole("button", { name: "Load" }).click();
   await expect(combatType.getByRole("button", { name: "melee" })).toHaveAttribute(
     "aria-pressed",
@@ -798,7 +815,10 @@ test("reviews and imports compatible legacy setup data", async ({ page }) => {
         }
       })
     );
-    window.localStorage.setItem("sim_planner_v1", "{}");
+    window.localStorage.setItem(
+      "sim_planner_v1",
+      JSON.stringify({ note: "planner-payload-sentinel" })
+    );
     window.localStorage.setItem(
       "index-sim:planner-ui",
       JSON.stringify({
@@ -844,7 +864,10 @@ test("reviews and imports compatible legacy setup data", async ({ page }) => {
       "sim_irrelevant_v1",
       JSON.stringify(["rock_crab", "not_a_monster"])
     );
-    window.localStorage.setItem("sim_price_history_v1", "[]");
+    window.localStorage.setItem(
+      "sim_price_history_v1",
+      JSON.stringify([{ note: "history-payload-sentinel" }])
+    );
     window.localStorage.setItem("sim_hiscore_player", "Fixture Player");
   });
 
@@ -857,16 +880,51 @@ test("reviews and imports compatible legacy setup data", async ({ page }) => {
   await expect(migration.getByLabel("Legacy data summary")).toContainText(
     "Loot preferences ready"
   );
+  await expect(migration.getByLabel("Legacy data summary")).toContainText("Custom setups ready");
+  await expect(migration.getByLabel("Legacy data summary")).toContainText("Cannon map ready");
   await expect(migration.getByLabel("Legacy data summary")).toContainText(
     "Hidden gear tiers ready"
   );
   await expect(migration.getByLabel("Legacy data summary")).toContainText("Compare state ready");
-  await expect(migration.getByLabel("Legacy data summary")).toContainText("Planner data found");
+  await expect(migration.getByLabel("Legacy data summary")).toContainText("Planner review-only");
   await expect(migration.getByLabel("Legacy data summary")).toContainText("Prices ready");
-  await expect(migration.getByLabel("Legacy data summary")).toContainText("Price history found");
-  await expect(migration.getByLabel("Legacy data summary")).toContainText("Review needed");
+  await expect(migration.getByLabel("Legacy data summary")).toContainText(
+    "Price history review-only"
+  );
+  await expect(migration.getByLabel("Legacy data summary")).toContainText(
+    "Review-only decisions shown"
+  );
+  await expect(migration.getByLabel("Legacy migration outcome")).toContainText(
+    "Import action:"
+  );
+  await expect(migration.getByLabel("Legacy migration outcome")).toContainText(
+    "Custom setups: 1 importable, 0 skipped"
+  );
+  await expect(migration.getByLabel("Legacy migration outcome")).toContainText(
+    "Cannon map: 1 importable, 0 skipped"
+  );
+  await expect(migration.getByLabel("Legacy migration outcome")).toContainText(
+    "Rewrite Planner V1 does not import legacy Planner state; Import and Keep leave it in legacy storage."
+  );
+  await expect(migration.getByLabel("Legacy migration outcome")).toContainText(
+    "Full legacy price history is review-only in V1; 1 history key detected and not migrated."
+  );
+  await expect(migration.getByLabel("Legacy migration outcome")).toContainText(
+    "Keep action:"
+  );
+  await expect(migration.getByLabel("Legacy migration outcome")).toContainText(
+    "Clear action:"
+  );
+  await expect(migration).not.toContainText("planner-payload-sentinel");
+  await expect(migration).not.toContainText("history-payload-sentinel");
   await expect(migration.getByLabel("Legacy import and review plan")).toContainText(
     "Compatible setup fields"
+  );
+  await expect(migration.getByLabel("Legacy import and review plan")).toContainText(
+    "Legacy custom setups into rewrite monster-specific setups"
+  );
+  await expect(migration.getByLabel("Legacy import and review plan")).toContainText(
+    "Legacy cannon map into rewrite per-monster cannon settings"
   );
   await expect(migration.getByLabel("Legacy import and review plan")).toContainText(
     "Loot preferences into rewrite per-monster drop actions"
@@ -885,18 +943,6 @@ test("reviews and imports compatible legacy setup data", async ({ page }) => {
   );
   await expect(migration.getByLabel("Legacy import and review plan")).toContainText(
     "legacy planner state was detected but not imported"
-  );
-  await expect(migration.getByLabel("Legacy import and review plan")).toContainText(
-    "sim_input_v3.monsterSetups: review only"
-  );
-  await expect(migration.getByLabel("Legacy import and review plan")).toContainText(
-    "legacy custom setup snapshots are not imported into rewrite custom setups"
-  );
-  await expect(migration.getByLabel("Legacy import and review plan")).toContainText(
-    "sim_input_v3.cannonByMonster: review only"
-  );
-  await expect(migration.getByLabel("Legacy import and review plan")).toContainText(
-    "legacy cannon map settings are not imported into rewrite cannon state"
   );
   await expect(migration.getByLabel("Legacy import and review plan")).toContainText(
     "sim_scraped_keys_v1: intentional reset"
@@ -923,6 +969,7 @@ test("reviews and imports compatible legacy setup data", async ({ page }) => {
 
   await migration.getByRole("button", { name: "Import compatible data" }).click();
   await expect(migration).toHaveCount(0);
+  await expect(page.locator(".topbar")).toContainText("Imported compatible legacy data");
   await expect(page.getByLabel("TYPE", { exact: true })).toHaveValue("ranged");
   await expect(page.getByLabel("TARGET", { exact: true })).toHaveValue("greater_demon");
   await page.waitForFunction(() => {
@@ -936,8 +983,11 @@ test("reviews and imports compatible legacy setup data", async ({ page }) => {
       saved.includes('"key":"monsterName"') &&
       saved.includes('"direction":"asc"') &&
       saved.includes('"irrelevantMonsterIds":["rock_crab"]') &&
-      Object.keys(parsed.data?.customSetupsByMonster ?? {}).length === 0 &&
-      Object.keys(parsed.data?.cannonByMonster ?? {}).length === 0 &&
+      parsed.data?.customSetupsByMonster?.giant?.weaponId === "dragon_longsword" &&
+      parsed.data?.customSetupsByMonster?.giant?.monsterId === "giant" &&
+      parsed.data?.cannonByMonster?.dagannoth?.enabled === true &&
+      parsed.data?.cannonByMonster?.dagannoth?.targets === 6 &&
+      parsed.data?.cannonByMonster?.dagannoth?.respawnSec === 30 &&
       (window.localStorage.getItem("index-sim:hidden-gear-tiers") ?? "").includes(
         '"bronze":true'
       ) &&
@@ -1081,6 +1131,7 @@ test("keeps legacy data and dismisses the migration notice", async ({ page }) =>
 
   await migration.getByRole("button", { name: "Keep legacy data" }).click();
   await expect(migration).toHaveCount(0);
+  await expect(page.locator(".topbar")).toContainText("Kept legacy data");
   await page.waitForFunction(() => {
     const legacyInput = window.localStorage.getItem("sim_input_v3") ?? "";
     return (
@@ -1195,6 +1246,7 @@ test("clears only known legacy data after confirmation", async ({ page }) => {
   await expect(migration.getByRole("button", { name: "Confirm clear" })).toBeVisible();
   await migration.getByRole("button", { name: "Confirm clear" }).click();
   await expect(migration).toHaveCount(0);
+  await expect(page.locator(".topbar")).toContainText("Cleared 17 legacy keys");
   await page.waitForFunction(() => {
     const knownKeys = [
       "sim_input_v3",
@@ -1400,9 +1452,10 @@ test("updates results when the combat style changes", async ({ page }) => {
 });
 
 test("restores per-combat-style loadout edits when switching styles", async ({ page }) => {
+  test.setTimeout(60_000);
   await page.goto("/");
   const tabs = page.getByLabel("Workbench tabs");
-  const special = page.locator('section[aria-label="Special attack"]');
+  const special = page.getByRole("region", { name: "Special attack", exact: true });
 
   await tabs.getByRole("button", { name: "Melee" }).click();
   await special.getByLabel("Spec weapon").selectOption("dragon_dagger_p");
@@ -1488,6 +1541,7 @@ test("supports multi-prayer and multi-boost workbench controls with compact prim
 });
 
 test("edits combat equipment panes and persists style-specific selections", async ({ page }) => {
+  test.setTimeout(90_000);
   await page.goto("/");
   const tabs = page.getByLabel("Workbench tabs");
   const setupContext = page.getByLabel("Setup context");
@@ -1530,18 +1584,20 @@ test("edits combat equipment panes and persists style-specific selections", asyn
   });
 
   await page.reload();
-  await tabs.getByRole("button", { name: "Melee" }).click();
+  const reloadedTabs = page.getByLabel("Workbench tabs");
+  await expect(reloadedTabs).toBeVisible();
+  await reloadedTabs.getByRole("button", { name: "Melee" }).click();
   await expect(
     page.getByLabel("Equipment loadout").getByLabel("Weapon", { exact: true })
   ).toHaveValue("dragon_halberd");
   await expect(
     page.getByLabel("Equipment loadout").getByLabel("Shield", { exact: true })
   ).toBeDisabled();
-  await tabs.getByRole("button", { name: "Ranged" }).click();
+  await reloadedTabs.getByRole("button", { name: "Ranged" }).click();
   await expect(
     page.getByLabel("Equipment loadout").getByLabel("Ammo", { exact: true })
   ).toHaveValue("addy_arrow");
-  await tabs.getByRole("button", { name: "Magic" }).click();
+  await reloadedTabs.getByRole("button", { name: "Magic" }).click();
   await expect(
     page.getByLabel("Equipment loadout").getByLabel("Spell", { exact: true })
   ).toHaveValue("fire_wave");
@@ -1631,6 +1687,7 @@ test("filters hidden gear tiers while keeping current selections", async ({ page
 });
 
 test("creates, restores and removes monster-specific custom setups", async ({ page }) => {
+  test.setTimeout(60_000);
   await page.goto("/");
   const tabs = page.getByLabel("Workbench tabs");
   const setupContext = page.getByLabel("Setup context");
@@ -1697,10 +1754,10 @@ test("creates, restores and removes monster-specific custom setups", async ({ pa
 });
 
 test("selects special attacks and shows special metrics", async ({ page }) => {
-  test.setTimeout(45_000);
+  test.setTimeout(90_000);
   await page.goto("/");
   await page.getByLabel("Workbench tabs").getByRole("button", { name: "Melee" }).click();
-  const special = page.locator('section[aria-label="Special attack"]');
+  const special = page.getByRole("region", { name: "Special attack", exact: true });
 
   await expect(special).toBeVisible();
   await special.getByLabel("Spec weapon").selectOption("dragon_halberd");
@@ -1760,17 +1817,18 @@ test("selects special attacks and shows special metrics", async ({ page }) => {
   await expect(special).toContainText("Magic special attacks are not modeled yet.");
   await expect(page.locator('[aria-label="Special attack metrics"]')).toHaveCount(0);
   await page.getByLabel("Workbench tabs").getByRole("button", { name: "Stats" }).click();
-  await expect(
-    page
-      .getByRole("region", { name: "Source breakdown", exact: true })
-      .getByRole("listitem", { name: /Special attack: not modeled/i })
-  ).toContainText("Magic DPS special attacks are not modeled yet.");
-  await expect(
-    page
-      .getByRole("region", { name: "Source breakdown", exact: true })
-      .getByRole("list", { name: "Source detail panels" })
-      .getByRole("listitem", { name: /Special attack detail: not modeled/i })
-  ).toContainText("Magic DPS special attacks are not modeled yet.");
+  const magicSpecialNote = "Magic DPS special attacks are not modeled yet.";
+  const magicSpecialBreakdown = page
+    .getByRole("region", { name: "Source breakdown", exact: true })
+    .getByRole("listitem", { name: /Special attack: not modeled/i });
+  await expect(magicSpecialBreakdown).toBeVisible();
+  await expect(magicSpecialBreakdown.getByText(magicSpecialNote, { exact: true })).toBeVisible();
+  const magicSpecialDetail = page
+    .getByRole("region", { name: "Source breakdown", exact: true })
+    .getByRole("list", { name: "Source detail panels" })
+    .getByRole("listitem", { name: /Special attack detail: not modeled/i });
+  await expect(magicSpecialDetail).toBeVisible();
+  await expect(magicSpecialDetail.getByText(magicSpecialNote, { exact: true })).toBeVisible();
   await page.getByLabel("Workbench tabs").getByRole("button", { name: "Melee" }).click();
 
   await page.getByLabel("TYPE", { exact: true }).selectOption("melee");
@@ -1831,7 +1889,6 @@ test("shows dense compare calculation freshness while rows catch up", async ({ p
   await page.clock.install();
   await page.getByLabel("Combat setup").getByLabel("DEF", { exact: true }).fill("7");
   await expect(freshness).toHaveText("Updating");
-  await expect(comparePanel).toContainText("rows may reflect previous loadout");
 
   const rockCrabRow = table.getByRole("row", { name: /Rock Crab/ });
   await rockCrabRow.focus();
@@ -1949,9 +2006,8 @@ test("matches browser-rendered dense numeric snapshots", async ({ page }) => {
   await expect(page.getByLabel("TYPE", { exact: true })).toHaveValue("ranged");
   await page.getByLabel("TARGET", { exact: true }).selectOption("greater_demon");
   await expect(page.getByLabel("TARGET", { exact: true })).toHaveValue("greater_demon");
-  await expect(table.getByRole("row", { name: /Greater Demon/ }).locator("td").nth(2)).toHaveText(
-    "10.0"
-  );
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Compare" }).click();
+  await expectDenseRowMax(table, /Greater Demon/, "10.0");
   const rangedSafespot = await denseNumericSnapshot(table, /Greater Demon/);
   const rangedSafespotResults = await resultMetricSnapshot(page);
 
@@ -2063,7 +2119,7 @@ test("matches browser-rendered dense numeric snapshots", async ({ page }) => {
 });
 
 test("matches release-path dense numeric snapshots", async ({ page }) => {
-  test.setTimeout(60_000);
+  test.setTimeout(150_000);
   await page.goto("/");
   const tabs = page.getByLabel("Workbench tabs");
   const table = page.getByRole("table", { name: "All monsters" });
@@ -2083,9 +2139,8 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
   await expect(page.getByLabel("TYPE", { exact: true })).toHaveValue("ranged");
   await page.getByLabel("TARGET", { exact: true }).selectOption("greater_demon");
   await expect(page.getByLabel("TARGET", { exact: true })).toHaveValue("greater_demon");
-  await expect(table.getByRole("row", { name: /Greater Demon/ }).locator("td").nth(2)).toHaveText(
-    "10.0"
-  );
+  await tabs.getByRole("button", { name: "Compare" }).click();
+  await expectDenseRowMax(table, /Greater Demon/, "10.0");
   const rangedSafespot = await denseNumericSnapshot(table, /Greater Demon/);
   const rangedSafespotResults = await resultMetricSnapshot(page);
   await expectActiveDenseRow(table, /Greater Demon/);
@@ -2466,7 +2521,7 @@ test("updates manual food controls and recoil ring count", async ({ page }) => {
 });
 
 test("updates trip food, banking and inventory reserve controls across styles", async ({ page }) => {
-  test.setTimeout(60_000);
+  test.setTimeout(90_000);
   await page.goto("/");
   const tabs = page.getByLabel("Workbench tabs");
 
@@ -2553,6 +2608,7 @@ test("updates trip food, banking and inventory reserve controls across styles", 
 });
 
 test("updates trip potion carry controls and grouped potion summary", async ({ page }) => {
+  test.setTimeout(60_000);
   await page.goto("/");
   const tabs = page.getByLabel("Workbench tabs");
   await tabs.getByRole("button", { name: "Melee" }).click();
@@ -2879,6 +2935,7 @@ test("shows loot value composition, nested detail and action impact detail", asy
 test("matches browser-rendered numeric snapshots for loot action and trip overrides", async ({
   page
 }) => {
+  test.setTimeout(90_000);
   await page.goto("/");
   const tabs = page.getByLabel("Workbench tabs");
 

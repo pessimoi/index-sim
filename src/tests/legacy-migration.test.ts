@@ -12,7 +12,11 @@ import {
 import { HIDDEN_GEAR_TIERS_STORAGE_KEY } from "../app/state/hidden-gear-tiers";
 import { LOOT_PREFS_STORAGE_KEY } from "../app/state/loot-prefs";
 import { PLANNER_UI_STORAGE_KEY } from "../app/state/planner";
-import { DEFAULT_FORM_STATE, REWRITE_SETUP_STORAGE_KEY } from "../app/state/ui-state";
+import {
+  DEFAULT_FORM_STATE,
+  REWRITE_SETUP_STORAGE_KEY,
+  normalizeFormState
+} from "../app/state/ui-state";
 import type { GameDataSnapshot, PriceSet } from "../domain/shared";
 
 describe("legacy storage migration foundation", () => {
@@ -230,12 +234,21 @@ describe("legacy storage migration foundation", () => {
     expect(report.skippedFields).toEqual([]);
   });
 
-  it("detects legacy custom setup and cannon maps as review-only nested setup areas", () => {
+  it("imports valid legacy custom setup and cannon maps while skipping unknown monsters", () => {
     const storage = createMemoryStorage({
       [LEGACY_INPUT_STORAGE_KEY]: JSON.stringify({
         combatType: "melee",
         monsterSetups: {
-          giant: { combatType: "ranged", weapon: "magic_shortbow" },
+          giant: {
+            combatType: "ranged",
+            weapon: "magic_shortbow",
+            ammo: "rune_arrow",
+            style: "rapid",
+            gear: {
+              body: "black_dhide_body",
+              legs: "black_dhide_legs"
+            }
+          },
           not_a_current_monster: { combatType: "magic" }
         },
         cannonByMonster: {
@@ -248,46 +261,84 @@ describe("legacy storage migration foundation", () => {
     const report = inspectLegacySetupMigration({ storage, gameData });
 
     expect(report.setup?.combatStyle).toBe("melee");
-    expect(report.importedFields).not.toEqual(
+    expect(report.customSetupsByMonster?.giant).toMatchObject({
+      combatStyle: "ranged",
+      monsterId: "giant",
+      weaponId: "magic_shortbow",
+      ammoId: "rune_arrow",
+      styleId: "rapid",
+      gear: {
+        body: "black_dhide_body",
+        legs: "black_dhide_legs"
+      }
+    });
+    expect(report.cannonByMonster?.dagannoth).toEqual({
+      enabled: true,
+      targets: 6,
+      respawnSec: 30
+    });
+    expect(report.importedFields).toEqual(
       expect.arrayContaining([
-        expect.stringContaining("monsterSetups"),
-        expect.stringContaining("cannonByMonster")
+        "customSetupsByMonster",
+        "customSetupsByMonster.giant",
+        "sim_input_v3.monsterSetups.giant.combatStyle",
+        "sim_input_v3.monsterSetups.giant.weaponId",
+        "cannonByMonster",
+        "cannonByMonster.dagannoth"
       ])
     );
     expect(report.skippedFields).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          field: "sim_input_v3.monsterSetups",
-          disposition: "review-only",
-          handling:
-            "Detected only; legacy custom setup snapshots are not imported into rewrite custom setups.",
-          reason: expect.stringContaining("not imported because no safe import policy is accepted")
+          field: "sim_input_v3.monsterSetups.not_a_current_monster",
+          reason: "unknown monster id"
         }),
         expect.objectContaining({
-          field: "sim_input_v3.cannonByMonster",
-          disposition: "review-only",
-          handling:
-            "Detected only; legacy cannon map settings are not imported into rewrite cannon state.",
-          reason: expect.stringContaining("not imported because no safe import policy is accepted")
+          field: "sim_input_v3.cannonByMonster.not_a_current_monster",
+          reason: "unknown monster id"
         })
       ])
     );
+    expect(report.warnings).not.toEqual(
+      expect.arrayContaining([
+        "Legacy custom setup snapshots did not contain any safely importable entries.",
+        "Legacy cannon map did not contain any safely importable entries."
+      ])
+    );
+  });
+
+  it("keeps existing rewrite custom setup entries over conflicting legacy snapshots", () => {
+    const existingGiantSetup = normalizeFormState({
+      ...DEFAULT_FORM_STATE,
+      monsterId: "giant",
+      weaponId: "dragon_longsword"
+    });
+    const storage = createMemoryStorage({
+      [LEGACY_INPUT_STORAGE_KEY]: JSON.stringify({
+        monsterSetups: {
+          giant: { combatType: "ranged", weapon: "magic_shortbow" },
+          rock_crab: { combatType: "melee", weapon: "dragon_longsword" }
+        }
+      })
+    });
+
+    const report = inspectLegacySetupMigration({
+      storage,
+      gameData,
+      currentCustomSetupsByMonster: { giant: existingGiantSetup }
+    });
+
+    expect(report.customSetupsByMonster?.giant).toBeUndefined();
+    expect(report.customSetupsByMonster?.rock_crab).toMatchObject({
+      monsterId: "rock_crab",
+      weaponId: "dragon_longsword"
+    });
     expect(report.skippedFields).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          field: "sim_input_v3.monsterSetups",
-          reason: expect.stringContaining("unknown current monster ids")
-        }),
-        expect.objectContaining({
-          field: "sim_input_v3.cannonByMonster",
-          reason: expect.stringContaining("unknown current monster ids")
+          field: "sim_input_v3.monsterSetups.giant",
+          reason: "rewrite custom setup already exists; kept rewrite-owned setup"
         })
-      ])
-    );
-    expect(report.warnings).toEqual(
-      expect.arrayContaining([
-        "Legacy custom setup snapshots were detected but not imported.",
-        "Legacy cannon map was detected but not imported."
       ])
     );
   });
@@ -308,19 +359,50 @@ describe("legacy storage migration foundation", () => {
       expect.arrayContaining([
         expect.objectContaining({
           field: "sim_input_v3.monsterSetups",
-          disposition: "review-only",
-          reason:
-            "legacy custom setup snapshots were detected but not imported because the shape is not an object map"
+          reason: "legacy custom setup snapshots were skipped because the shape is not an object map"
         }),
         expect.objectContaining({
           field: "sim_input_v3.cannonByMonster",
-          disposition: "review-only",
-          reason:
-            "legacy cannon map was detected but not imported because the shape is not an object map"
+          reason: "legacy cannon map was skipped because the shape is not an object map"
         })
       ])
     );
     expect(report.warnings.join(" ")).not.toContain("not a map");
+  });
+
+  it("skips invalid legacy cannon settings and unsafe nested map keys", () => {
+    const storage = createMemoryStorage({
+      [LEGACY_INPUT_STORAGE_KEY]: JSON.stringify({
+        cannonByMonster: {
+          giant: { enabled: "yes", targets: 3 },
+          rock_crab: { enabled: true, targets: 9, respawnSec: 30 },
+          dagannoth: { enabled: true, targets: 6, respawnSec: null },
+          constructor: { enabled: true, targets: 3 }
+        }
+      })
+    });
+
+    const report = inspectLegacySetupMigration({ storage, gameData });
+
+    expect(report.cannonByMonster).toEqual({
+      dagannoth: { enabled: true, targets: 6, respawnSec: null }
+    });
+    expect(report.skippedFields).toEqual(
+      expect.arrayContaining([
+        {
+          field: "sim_input_v3.cannonByMonster.giant.enabled",
+          reason: "expected a boolean"
+        },
+        {
+          field: "sim_input_v3.cannonByMonster.rock_crab.targets",
+          reason: "expected an integer from 1 to 8"
+        },
+        {
+          field: "sim_input_v3.cannonByMonster.constructor",
+          reason: "unsafe legacy map key"
+        }
+      ])
+    );
   });
 
   it("reports malformed legacy JSON without returning a setup candidate", () => {

@@ -9,6 +9,7 @@ import {
 import {
   EQUIPMENT_SLOTS,
   type CombatStyle,
+  type CombatSimulationResult,
   type DataProvenance,
   type EntityId,
   type EquipmentSlot,
@@ -16,7 +17,6 @@ import {
   type PlayerLevels,
   type SimulationContext,
   type SimulationRequest,
-  type SimulationResult,
   type SimulationWarning
 } from "../shared";
 
@@ -74,7 +74,7 @@ const MANUAL_REQUIREMENT_POLICY_WARNING: SimulationWarning = {
 
 export interface PlannerEvaluation {
   request: SimulationRequest;
-  combat: SimulationResult;
+  combat: CombatSimulationResult;
   trip: TripLootSupplyResult;
   metricValue: number;
   dps: number;

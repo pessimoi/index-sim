@@ -376,7 +376,7 @@ export interface DbaInfo {
   totalBoost: number;
 }
 
-export interface SimulationResult {
+export interface CombatSimulationResult {
   combatStyle: CombatStyle;
   monsterId: EntityId;
   maxHit: number;

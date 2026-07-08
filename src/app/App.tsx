@@ -1298,6 +1298,12 @@ function legacyMigrationSummaryItems(report: LegacySetupMigrationReport): string
   const historyFound = report.keyReview.some(
     (item) => item.found && item.key.startsWith("sim_price_history")
   );
+  const customSetupsFound =
+    report.customSetupsByMonster != null ||
+    report.skippedFields.some((field) => field.field.startsWith("sim_input_v3.monsterSetups"));
+  const cannonMapFound =
+    report.cannonByMonster != null ||
+    report.skippedFields.some((field) => field.field.startsWith("sim_input_v3.cannonByMonster"));
   const reviewNeeded = report.keyReview.some(
     (item) => item.found && item.disposition !== "migrate"
   );
@@ -1317,6 +1323,16 @@ function legacyMigrationSummaryItems(report: LegacySetupMigrationReport): string
       : foundKeys.has("sim_loot_prefs_v1")
         ? "Loot preferences skipped"
         : "No loot preferences",
+    report.customSetupsByMonster != null
+      ? "Custom setups ready"
+      : customSetupsFound
+        ? "Custom setups skipped"
+        : "No custom setups",
+    report.cannonByMonster != null
+      ? "Cannon map ready"
+      : cannonMapFound
+        ? "Cannon map skipped"
+        : "No cannon map",
     report.hiddenGearTiers != null
       ? "Hidden gear tiers ready"
       : foundKeys.has("sim_hidden_tiers_v1")
@@ -1328,9 +1344,11 @@ function legacyMigrationSummaryItems(report: LegacySetupMigrationReport): string
         ? "Compare state skipped"
         : "No compare state",
     report.priceSet ? "Prices ready" : pricesFound ? "Prices skipped" : "No prices",
-    historyFound ? "Price history found" : "No price history",
-    foundKeys.has("sim_planner_v1") ? "Planner data found" : "No planner data",
-    reviewNeeded || report.skippedFields.length > 0 ? "Review needed" : "No review needed"
+    historyFound ? "Price history review-only" : "No price history",
+    foundKeys.has("sim_planner_v1") ? "Planner review-only" : "No planner data",
+    reviewNeeded || report.skippedFields.length > 0
+      ? "Review-only decisions shown"
+      : "No review-only data"
   ];
 }
 
@@ -1344,6 +1362,12 @@ function legacyDispositionLabel(disposition: LegacyStorageKeyMigrationDispositio
 function legacyMigrationImportPlan(report: LegacySetupMigrationReport): string[] {
   const items: string[] = [];
   if (report.setup) items.push("Compatible setup fields into rewrite setup");
+  if (report.customSetupsByMonster != null) {
+    items.push("Legacy custom setups into rewrite monster-specific setups");
+  }
+  if (report.cannonByMonster != null) {
+    items.push("Legacy cannon map into rewrite per-monster cannon settings");
+  }
   if (report.lootPrefs != null) {
     items.push("Loot preferences into rewrite per-monster drop actions");
   }
@@ -1369,6 +1393,87 @@ function legacyMigrationReviewPlan(report: LegacySetupMigrationReport): string[]
     return `${field.field}: ${disposition}${handling}${field.reason}`;
   });
   return [...reviewItems, ...skippedItems];
+}
+
+function countSkippedLegacyFields(report: LegacySetupMigrationReport, prefix: string): number {
+  return report.skippedFields.filter((field) => field.field.startsWith(prefix)).length;
+}
+
+function countFoundLegacyKeys(
+  report: LegacySetupMigrationReport,
+  predicate: (key: LegacyStorageKey) => boolean
+): number {
+  return report.foundKeys.filter(predicate).length;
+}
+
+function legacyMigrationOutcomeItems(report: LegacySetupMigrationReport): string[] {
+  const importPlan = legacyMigrationImportPlan(report);
+  const customSetupImportCount = Object.keys(report.customSetupsByMonster ?? {}).length;
+  const customSetupSkipCount = countSkippedLegacyFields(report, "sim_input_v3.monsterSetups");
+  const cannonImportCount = Object.keys(report.cannonByMonster ?? {}).length;
+  const cannonSkipCount = countSkippedLegacyFields(report, "sim_input_v3.cannonByMonster");
+  const reviewOnlyKeyCount = report.keyReview.filter(
+    (item) => item.found && item.disposition === "review-only"
+  ).length;
+  const clearKeyCount = report.keyReview.filter((item) => item.clearDeletes).length;
+  const priceHistoryKeyCount = countFoundLegacyKeys(report, (key) =>
+    key.startsWith("sim_price_history")
+  );
+  const skippedCount = report.skippedFields.length;
+  const items: string[] = [];
+
+  items.push(
+    `Import action: ${formatNumber(importPlan.length)} compatible area${
+      importPlan.length === 1 ? "" : "s"
+    } ready; legacy keys stay in storage.`
+  );
+  items.push(
+    `Skipped status: ${formatNumber(skippedCount)} sanitized skip reason${
+      skippedCount === 1 ? "" : "s"
+    } shown below.`
+  );
+  items.push(
+    `Review-only status: ${formatNumber(reviewOnlyKeyCount)} found key${
+      reviewOnlyKeyCount === 1 ? "" : "s"
+    } kept unless Clear is confirmed.`
+  );
+  if (customSetupImportCount > 0 || customSetupSkipCount > 0) {
+    items.push(
+      `Custom setups: ${formatNumber(customSetupImportCount)} importable, ${formatNumber(
+        customSetupSkipCount
+      )} skipped.`
+    );
+  }
+  if (cannonImportCount > 0 || cannonSkipCount > 0) {
+    items.push(
+      `Cannon map: ${formatNumber(cannonImportCount)} importable, ${formatNumber(
+        cannonSkipCount
+      )} skipped.`
+    );
+  }
+  if (report.foundKeys.includes("sim_planner_v1")) {
+    items.push(
+      "Rewrite Planner V1 does not import legacy Planner state; Import and Keep leave it in legacy storage."
+    );
+  }
+  if (priceHistoryKeyCount > 0) {
+    items.push(
+      `Full legacy price history is review-only in V1; ${formatNumber(
+        priceHistoryKeyCount
+      )} history key${priceHistoryKeyCount === 1 ? "" : "s"} detected and not migrated.`
+    );
+  }
+  items.push(
+    `Keep action: dismisses this review and keeps ${formatNumber(report.foundKeys.length)} found legacy key${
+      report.foundKeys.length === 1 ? "" : "s"
+    } untouched.`
+  );
+  items.push(
+    `Clear action: deletes ${formatNumber(clearKeyCount)} known legacy key${
+      clearKeyCount === 1 ? "" : "s"
+    } only after confirmation; unknown keys are not touched.`
+  );
+  return items;
 }
 
 function mergeLootPrefsState(current: LootPrefsState, imported: LootPrefsState): LootPrefsState {
@@ -2135,12 +2240,17 @@ export function App() {
   const legacyMigrationReport = useMemo<LegacySetupMigrationReport | null>(() => {
     if (!context || legacyMigrationDismissed) return null;
     try {
-      const report = inspectLegacySetupMigration({ storage, gameData: context.gameData });
+      const report = inspectLegacySetupMigration({
+        storage,
+        gameData: context.gameData,
+        currentCustomSetupsByMonster: customSetupsByMonster,
+        currentCannonByMonster: cannonByMonster
+      });
       return report.foundKeys.length > 0 ? report : null;
     } catch {
       return null;
     }
-  }, [context, legacyMigrationDismissed]);
+  }, [cannonByMonster, context, customSetupsByMonster, legacyMigrationDismissed]);
   const denseCompareForGameData = useMemo(
     () =>
       context
@@ -2788,6 +2898,8 @@ export function App() {
   const importLegacySetup = () => {
     if (
       !legacyMigrationReport?.setup &&
+      legacyMigrationReport?.customSetupsByMonster == null &&
+      legacyMigrationReport?.cannonByMonster == null &&
       legacyMigrationReport?.lootPrefs == null &&
       !legacyMigrationReport?.hiddenGearTiers &&
       !legacyMigrationReport?.denseCompareSort &&
@@ -2818,14 +2930,38 @@ export function App() {
         );
       }
     }
-    if (legacyMigrationReport.setup || hasDenseCompareImport) {
+    const hasRewriteSetupImport =
+      legacyMigrationReport.setup != null ||
+      hasDenseCompareImport ||
+      legacyMigrationReport.customSetupsByMonster != null ||
+      legacyMigrationReport.cannonByMonster != null;
+    if (hasRewriteSetupImport) {
+      const nextCustomSetupsByMonster =
+        legacyMigrationReport.customSetupsByMonster != null
+          ? {
+              ...legacyMigrationReport.customSetupsByMonster,
+              ...customSetupsByMonster
+            }
+          : customSetupsByMonster;
+      const nextCannonByMonster =
+        legacyMigrationReport.cannonByMonster != null
+          ? {
+              ...legacyMigrationReport.cannonByMonster,
+              ...cannonByMonster
+            }
+          : cannonByMonster;
       const setup = legacyMigrationReport.setup
-        ? savedSetupFromForm(legacyMigrationReport.setup, nextDenseCompare, cannonByMonster)
+        ? savedSetupFromForm(
+            legacyMigrationReport.setup,
+            nextDenseCompare,
+            nextCannonByMonster,
+            nextCustomSetupsByMonster
+          )
         : savedSetupFromForm(
             form,
             nextDenseCompare,
-            cannonByMonster,
-            customSetupsByMonster,
+            nextCannonByMonster,
+            nextCustomSetupsByMonster,
             defaultForm,
             setupMode
           );
@@ -3101,6 +3237,10 @@ export function App() {
 
   const setCombatStyle = (combatStyle: CombatStyle) =>
     setFormSafe((current) => switchCombatStyleLoadout(current, combatStyle));
+  const selectCombatStyle = (combatStyle: CombatStyle) => {
+    setActiveTab(combatStyle);
+    setCombatStyle(combatStyle);
+  };
 
   const reviewActiveAssumption = (tab: ActiveAssumptionReviewTarget) => {
     setActiveTab(tab);
@@ -3666,9 +3806,14 @@ export function App() {
   const legacyReviewPlan = legacyMigrationReport
     ? legacyMigrationReviewPlan(legacyMigrationReport)
     : [];
+  const legacyOutcomeItems = legacyMigrationReport
+    ? legacyMigrationOutcomeItems(legacyMigrationReport)
+    : [];
   const legacyClearKeys = legacyMigrationReport ? legacyClearKeyList(legacyMigrationReport) : "";
   const legacyImportReady =
     legacyMigrationReport?.setup != null ||
+    legacyMigrationReport?.customSetupsByMonster != null ||
+    legacyMigrationReport?.cannonByMonster != null ||
     legacyMigrationReport?.lootPrefs != null ||
     legacyMigrationReport?.hiddenGearTiers != null ||
     legacyMigrationReport?.denseCompareSort != null ||
@@ -3932,6 +4077,11 @@ export function App() {
               <span key={item}>{item}</span>
             ))}
           </div>
+          <div className="legacy-migration-outcomes" aria-label="Legacy migration outcome">
+            {legacyOutcomeItems.map((item) => (
+              <span key={item}>{item}</span>
+            ))}
+          </div>
           <div className="legacy-migration-plan" aria-label="Legacy import and review plan">
             <div>
               <h3>Will import</h3>
@@ -4043,7 +4193,7 @@ export function App() {
                   type="button"
                   className={form.combatStyle === option.id ? "active" : undefined}
                   aria-pressed={form.combatStyle === option.id}
-                  onClick={() => setCombatStyle(option.id as CombatStyle)}
+                  onClick={() => selectCombatStyle(option.id as CombatStyle)}
                 >
                   {option.label}
                 </button>
@@ -4270,7 +4420,7 @@ export function App() {
                   label="TYPE"
                   value={form.combatStyle}
                   options={COMBAT_STYLE_OPTIONS}
-                  onChange={(combatStyle) => setCombatStyle(combatStyle as CombatStyle)}
+                  onChange={(combatStyle) => selectCombatStyle(combatStyle as CombatStyle)}
                 />
                 <NumberField
                   label={primaryLevelLabel(form.combatStyle)}

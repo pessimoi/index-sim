@@ -34,6 +34,7 @@ import {
   type DenseCompareRowViewModel,
   weaponOptions
 } from "../app/view-models/simulation";
+import { simulateFullSimulation } from "../domain/simulation";
 import { HIGH_ALCH_MAGIC_XP_PER_CAST } from "../domain/trip";
 
 interface GoldenFixture {
@@ -1890,6 +1891,39 @@ describe("rewrite UI view models", () => {
     });
   }, 15_000);
 
+  it("adapts the composed full simulation result as the primary numeric source", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const request = formToSimulationRequest(DEFAULT_FORM_STATE, context.gameData);
+    const fullResult = simulateFullSimulation(
+      {
+        request,
+        trip: formToTripPolicy(DEFAULT_FORM_STATE),
+        ringOfWealth: DEFAULT_FORM_STATE.ringOfWealth,
+        legendsComplete: true
+      },
+      context
+    );
+    const result = createSimulationViewModel(DEFAULT_FORM_STATE, context);
+    const normalAttack = result.statsSourceBreakdown.rows.find(
+      (row) => row.id === "normal-attack"
+    );
+
+    expect(result.combat).toEqual(fullResult.combat);
+    expect(result.trip).toEqual(fullResult.trip);
+    expect(result.result).toEqual(fullResult);
+    expect(result.playerEffectiveXpPerHour).toBe(fullResult.xp.playerEffectiveXpPerHour);
+    expect(result.cannonEffectiveXpPerHour).toBe(fullResult.xp.cannonEffectiveXpPerHour);
+    expect(result.effectiveXpPerHour).toBe(fullResult.xp.effectiveXpPerHour);
+    expect(result.totalXpPerHour).toBe(fullResult.xp.totalXpPerHour);
+    expect(result.xpRouting.effectiveXpPerHour).toBe(fullResult.xp.effectiveXpPerHour);
+    expect(result.xpRouting.totalXpPerHour).toBe(fullResult.xp.totalXpPerHour);
+    expect(normalAttack).toMatchObject({
+      dps: fullResult.rates.dps,
+      xpPerHour: fullResult.xp.playerEffectiveXpPerHour
+    });
+    expect(result.warnings).toEqual(fullResult.warnings.map((warning) => warning.message));
+  }, 15_000);
+
   it("builds Stats source breakdown rows from current combat and trip outputs", async () => {
     const { context } = await loadBundledLegacyContext();
     const result = createSimulationViewModel(DEFAULT_FORM_STATE, context);
@@ -2208,6 +2242,14 @@ describe("rewrite UI view models", () => {
       context
     );
     const snapshotRow = duel.snapshotRows[0]!;
+    const liveVm = createSimulationViewModel(DEFAULT_FORM_STATE, context);
+    const snapshotVm = createSimulationViewModel(
+      normalizeFormState({
+        ...snapshot.form,
+        monsterId: DEFAULT_FORM_STATE.monsterId
+      }),
+      context
+    );
 
     expect(duel).toMatchObject({
       monsterId: DEFAULT_FORM_STATE.monsterId,
@@ -2235,6 +2277,16 @@ describe("rewrite UI view models", () => {
     expect(snapshotRow.dps).toBeGreaterThan(0);
     expect(Number.isFinite(snapshotRow.effectiveXpPerHour)).toBe(true);
     expect(Number.isFinite(snapshotRow.effectiveNetGpPerHour)).toBe(true);
+    expect(duel.liveRow.dps).toBe(liveVm.result.rates.effectiveDps);
+    expect(duel.liveRow.effectiveXpPerHour).toBe(liveVm.result.xp.effectiveXpPerHour);
+    expect(duel.liveRow.effectiveNetGpPerHour).toBe(
+      liveVm.result.rates.effectiveNetGpPerHour
+    );
+    expect(snapshotRow.dps).toBe(snapshotVm.result.rates.effectiveDps);
+    expect(snapshotRow.effectiveXpPerHour).toBe(snapshotVm.result.xp.effectiveXpPerHour);
+    expect(snapshotRow.effectiveNetGpPerHour).toBe(
+      snapshotVm.result.rates.effectiveNetGpPerHour
+    );
     expect(snapshotRow.deltas.dps).toBeCloseTo(snapshotRow.dps - duel.liveRow.dps);
     expect(
       duel.rows.some(
@@ -2625,6 +2677,7 @@ describe("rewrite UI view models", () => {
   it("builds dense compare rows for every monster with the active target marked", async () => {
     const { context } = await loadBundledLegacyContext();
     const rows = createDenseCompareRows(DEFAULT_FORM_STATE, context);
+    const activeVm = createSimulationViewModel(DEFAULT_FORM_STATE, context);
     const monsterCount = Object.keys(context.gameData.monsters).length;
 
     expect(rows).toHaveLength(monsterCount);
@@ -2647,6 +2700,9 @@ describe("rewrite UI view models", () => {
     expect(activeRow?.gpPerKill).toBeGreaterThanOrEqual(0);
     expect(Number.isFinite(activeRow?.gpPerHour)).toBe(true);
     expect(Number.isFinite(activeRow?.netGpPerHour)).toBe(true);
+    expect(activeRow?.dps).toBe(activeVm.result.rates.effectiveDps);
+    expect(activeRow?.xpPerHour).toBe(activeVm.result.xp.effectiveXpPerHour);
+    expect(activeRow?.netGpPerHour).toBe(activeVm.result.rates.effectiveNetGpPerHour);
   }, 15_000);
 
   it("uses monster-specific custom setup snapshots in dense compare rows", async () => {
@@ -2675,7 +2731,9 @@ describe("rewrite UI view models", () => {
       hasCustomSetup: true
     });
     expect(rockCrabRow?.markers.map((marker) => marker.id)).toContain("custom");
-    expect(rockCrabRow?.dps).toBe(customVm.combat.effectiveDps);
+    expect(rockCrabRow?.dps).toBe(customVm.result.rates.effectiveDps);
+    expect(rockCrabRow?.xpPerHour).toBe(customVm.result.xp.effectiveXpPerHour);
+    expect(rockCrabRow?.netGpPerHour).toBe(customVm.result.rates.effectiveNetGpPerHour);
     expect(rows.find((row) => row.monsterId === DEFAULT_FORM_STATE.monsterId)?.hasCustomSetup).toBe(
       false
     );

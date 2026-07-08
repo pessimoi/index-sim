@@ -1,6 +1,7 @@
 import { hitChance, potionBoostedLevel, TICK_SECONDS, type PotionStatKey } from "../combat";
 import { sumEquipmentBonuses } from "../equipment";
 import {
+  type CombatSimulationResult,
   type CombatStyle,
   type DropDefinition,
   type DropEntry,
@@ -10,7 +11,6 @@ import {
   type PriceSet,
   type SimulationContext,
   type SimulationRequest,
-  type SimulationResult,
   type SimulationWarning
 } from "../shared";
 
@@ -133,7 +133,7 @@ export interface TripScarceSpotResult {
 
 export interface TripLootSupplyInput {
   request: SimulationRequest;
-  combat: SimulationResult;
+  combat: CombatSimulationResult;
   trip?: TripPolicy;
   lootPrefs?: Record<string, LootAction | string | undefined>;
   ringOfWealth?: boolean;
@@ -1188,7 +1188,7 @@ interface CannonComputationInput {
   settings?: CannonSettings | null;
   monster: MonsterDefinition;
   priceSet: PriceSet;
-  combat: SimulationResult;
+  combat: CombatSimulationResult;
   playerDps: number;
   hpEffective: number;
   overheadSec: number;

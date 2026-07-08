@@ -1,9 +1,7 @@
 import {
-  computeCombatXpBreakdown,
   createHitDistribution,
   simulateCombat,
   weaponStances,
-  type CombatXpBreakdown,
   type CombatXpKey
 } from "@/domain/combat";
 import {
@@ -46,6 +44,11 @@ import {
   type TripLootSupplyResult
 } from "@/domain/trip";
 import {
+  simulateFullSimulation,
+  type FullSimulationInput,
+  type FullSimulationResult
+} from "@/domain/simulation";
+import {
   DEFAULT_DENSE_COMPARE_SORT_STATE,
   normalizeDenseCompareUiState,
   normalizeDenseCompareSortState,
@@ -81,6 +84,7 @@ import {
 
 export interface SimulationViewModel {
   request: SimulationRequest;
+  result: FullSimulationResult;
   combat: ReturnType<typeof simulateCombat>;
   hitDistribution: HitDistributionViewModel;
   combatRollDetail: StatsCombatRollDetailViewModel;
@@ -1776,11 +1780,22 @@ function tripInputFor(
   cannonByMonster: CannonByMonsterState,
   lootSettingsByMonster: LootSettingsByMonsterState = {}
 ): TripLootSupplyInput {
+  return {
+    ...fullSimulationInputFor(form, request, cannonByMonster, lootSettingsByMonster),
+    combat
+  };
+}
+
+function fullSimulationInputFor(
+  form: CombatSetupFormState,
+  request: SimulationRequest,
+  cannonByMonster: CannonByMonsterState,
+  lootSettingsByMonster: LootSettingsByMonsterState = {}
+): FullSimulationInput {
   const lootSettings = lootSettingsForMonster(lootSettingsByMonster, request.monsterId);
   const trip = formToTripPolicy(form);
   return {
     request,
-    combat,
     trip: {
       ...trip,
       alching: lootSettings.highAlch ?? trip.alching
@@ -2015,30 +2030,6 @@ const PROTECTION_LABELS: Record<NonNullable<CombatSetupFormState["trip"]["protec
   magic: "Protect from Magic"
 };
 
-function prayerEffectiveXpPerHour(trip: TripLootSupplyResult): number {
-  return trip.prayerXpPerKill * trip.effectiveKph;
-}
-
-function alchMagicXpPerHour(trip: TripLootSupplyResult): number {
-  return trip.alchCastsPerKill * HIGH_ALCH_MAGIC_XP_PER_CAST * trip.effectiveKph;
-}
-
-function modeledTotalXpPerHour(input: {
-  xp: CombatXpBreakdown;
-  trip: TripLootSupplyResult;
-  cannonEffectiveXpPerHour: number;
-}): number {
-  const combatSkillXpPerHour =
-    Object.values(input.xp.skillXpPerKill).reduce((sum, value) => sum + (value ?? 0), 0) *
-    input.trip.effectiveKph;
-  return (
-    combatSkillXpPerHour +
-    input.cannonEffectiveXpPerHour +
-    prayerEffectiveXpPerHour(input.trip) +
-    alchMagicXpPerHour(input.trip)
-  );
-}
-
 function xpRoutingRow(input: {
   id: string;
   label: string;
@@ -2059,31 +2050,26 @@ function xpRoutingRow(input: {
 }
 
 function createXpRoutingViewModel(input: {
-  xp: CombatXpBreakdown;
-  trip: TripLootSupplyResult;
-  playerEffectiveXpPerHour: number;
-  cannonEffectiveXpPerHour: number;
-  effectiveXpPerHour: number;
-  totalXpPerHour: number;
+  result: FullSimulationResult;
 }): XpRoutingViewModel {
-  const prayerXpPerHour = prayerEffectiveXpPerHour(input.trip);
-  const alchXpPerHour = alchMagicXpPerHour(input.trip);
+  const xp = input.result.xp;
+  const trip = input.result.trip;
   const rows: XpRoutingRowViewModel[] = [
     xpRoutingRow({
       id: "player-combat",
       label: "Player combat XP/hr",
-      xpPerHour: input.playerEffectiveXpPerHour,
+      xpPerHour: xp.playerEffectiveXpPerHour,
       status: "modeled",
       note: "Direct player combat XP contributing to effective XP/hr."
     })
   ];
 
-  if (input.cannonEffectiveXpPerHour > 0) {
+  if (xp.cannonEffectiveXpPerHour > 0) {
     rows.push(
       xpRoutingRow({
         id: "cannon-ranged",
         label: "Cannon ranged XP/hr",
-        xpPerHour: input.cannonEffectiveXpPerHour,
+        xpPerHour: xp.cannonEffectiveXpPerHour,
         status: "modeled",
         note: "Separate cannon ranged XP row after trip efficiency."
       })
@@ -2091,13 +2077,13 @@ function createXpRoutingViewModel(input: {
   }
 
   for (const key of XP_SKILL_ORDER) {
-    const xpPerKill = input.xp.skillXpPerKill[key] ?? 0;
+    const xpPerKill = xp.combat.skillXpPerKill[key] ?? 0;
     if (xpPerKill <= 0) continue;
     rows.push(
       xpRoutingRow({
         id: `skill-${key}`,
         label: XP_SKILL_LABELS[key],
-        xpPerHour: xpPerKill * input.trip.effectiveKph,
+        xpPerHour: xpPerKill * trip.effectiveKph,
         status: "modeled",
         note: "Skill row from the rewrite-owned combat XP breakdown."
       })
@@ -2108,30 +2094,30 @@ function createXpRoutingViewModel(input: {
     xpRoutingRow({
       id: "prayer",
       label: "Prayer XP/hr",
-      xpPerHour: prayerXpPerHour,
+      xpPerHour: xp.prayerXpPerHour,
       status: "modeled",
       note:
-        prayerXpPerHour > 0
+        xp.prayerXpPerHour > 0
           ? "Bury XP from current loot actions after trip efficiency."
           : "No buryable bone XP in the current loot actions."
     }),
     xpRoutingRow({
       id: "alch",
       label: "Magic (alch) XP/hr",
-      xpPerHour: alchXpPerHour,
+      xpPerHour: xp.magicAlchXpPerHour,
       status: "modeled",
       note:
-        input.trip.alchCastsPerKill > 0
-          ? `${formatNumber(input.trip.alchCastsPerKill, 2)} alch casts/kill at ${HIGH_ALCH_MAGIC_XP_PER_CAST} Magic XP/cast after trip efficiency.`
+        trip.alchCastsPerKill > 0
+          ? `${formatNumber(trip.alchCastsPerKill, 2)} alch casts/kill at ${HIGH_ALCH_MAGIC_XP_PER_CAST} Magic XP/cast after trip efficiency.`
           : "No in-trip high-alch casts in the current loot model."
     })
   );
 
   return {
-    effectiveXpPerHour: input.effectiveXpPerHour,
-    totalXpPerHour: input.totalXpPerHour,
-    effectiveXpPerHourLabel: formatNumber(input.effectiveXpPerHour),
-    totalXpPerHourLabel: formatNumber(input.totalXpPerHour),
+    effectiveXpPerHour: xp.effectiveXpPerHour,
+    totalXpPerHour: xp.totalXpPerHour,
+    effectiveXpPerHourLabel: formatNumber(xp.effectiveXpPerHour),
+    totalXpPerHourLabel: formatNumber(xp.totalXpPerHour),
     rows
   };
 }
@@ -2248,22 +2234,21 @@ function statsSourceDetail(input: {
 
 function createStatsSourceBreakdownViewModel(input: {
   form: CombatSetupFormState;
-  combat: ReturnType<typeof simulateCombat>;
-  trip: TripLootSupplyResult;
-  playerEffectiveXpPerHour: number;
-  cannonEffectiveXpPerHour: number;
+  result: FullSimulationResult;
   specialWarnings: readonly CalculationWarningViewModel[];
   moneyWarnings: readonly CalculationWarningViewModel[];
   hitDistribution: HitDistributionViewModel;
 }): StatsSourceBreakdownViewModel {
-  const cannon = input.trip.cannon;
+  const combat = input.result.combat;
+  const trip = input.result.trip;
+  const cannon = trip.cannon;
   const cannonSupplyCostPerKill = cannon?.ballCostPerKill ?? 0;
   const normalSupplyCostPerKill = Math.max(
     0,
-    input.trip.supply.supplyCostPerKill - cannonSupplyCostPerKill
+    trip.supply.supplyCostPerKill - cannonSupplyCostPerKill
   );
-  const normalSupplyCostPerHour = normalSupplyCostPerKill * input.trip.effectiveKph;
-  const special = input.combat.specialAttack;
+  const normalSupplyCostPerHour = normalSupplyCostPerKill * trip.effectiveKph;
+  const special = combat.specialAttack;
   const specialDps = special ? special.dpsWithSpec - special.dpsBase : null;
   const dbaBoostSpecialActive =
     input.form.combatStyle === "melee" && input.form.boosts.includes("dba_spec");
@@ -2298,12 +2283,12 @@ function createStatsSourceBreakdownViewModel(input: {
     id: "normal-attack",
     label: "Normal attack",
     status: "modeled",
-    dps: input.combat.dps,
+    dps: input.result.rates.dps,
     dpsDetail: special ? "Baseline before special attacks" : null,
     dpsGainPct: null,
-    xpPerHour: input.playerEffectiveXpPerHour,
-    hitChance: input.combat.hitChance,
-    maxHit: input.combat.maxHit,
+    xpPerHour: input.result.xp.playerEffectiveXpPerHour,
+    hitChance: combat.hitChance,
+    maxHit: combat.maxHit,
     supplyCostPerHour: normalSupplyCostPerHour,
     supplyCostPerKill: normalSupplyCostPerKill,
     notes: ["Base player attack after trip efficiency and current supply model."]
@@ -2329,10 +2314,10 @@ function createStatsSourceBreakdownViewModel(input: {
     dps: cannon?.cannonDps ?? null,
     dpsDetail: cannon ? `${formatNumber(cannon.activeFrac * 100, 1)}% active` : null,
     dpsGainPct: null,
-    xpPerHour: cannon ? input.cannonEffectiveXpPerHour : null,
-    hitChance: cannon ? input.combat.hitChance : null,
+    xpPerHour: cannon ? input.result.xp.cannonEffectiveXpPerHour : null,
+    hitChance: cannon ? combat.hitChance : null,
     maxHit: cannon?.maxBall ?? null,
-    supplyCostPerHour: cannon ? cannonSupplyCostPerKill * input.trip.effectiveKph : null,
+    supplyCostPerHour: cannon ? cannonSupplyCostPerKill * trip.effectiveKph : null,
     supplyCostPerKill: cannon ? cannonSupplyCostPerKill : null,
     notes: cannon
       ? [
@@ -2837,30 +2822,31 @@ export function createSimulationViewModel(
   options: SimulationViewModelOptions = {}
 ): SimulationViewModel {
   const request = formToSimulationRequest(form, context.gameData);
-  const combat = simulateCombat(request, context);
-  const tripInput = tripInputFor(form, request, combat, cannonByMonster, lootSettingsByMonster);
-  const trip = simulateWithLootPrefs(tripInput, context, lootPrefs);
-  const xp = computeCombatXpBreakdown(
+  const fullInput = fullSimulationInputFor(
+    form,
     request,
-    context,
-    combat,
-    trip.cannon ? { directDamageFraction: trip.combatXpDamageFraction } : undefined
+    cannonByMonster,
+    lootSettingsByMonster
   );
-  const playerEffectiveXpPerHour = xp.combatXpPerKill * trip.effectiveKph;
-  const cannonEffectiveXpPerHour = (trip.cannon?.rangedXpPerHour ?? 0) * trip.trip.efficiency;
-  const effectiveXpPerHour = playerEffectiveXpPerHour + cannonEffectiveXpPerHour;
-  const totalXpPerHour = modeledTotalXpPerHour({ xp, trip, cannonEffectiveXpPerHour });
+  const fullResult = simulateFullSimulation({ ...fullInput, lootPrefs }, context);
+  const combat = fullResult.combat;
+  const trip = fullResult.trip;
+  const tripInput: TripLootSupplyInput = { ...fullInput, combat };
+  const playerEffectiveXpPerHour = fullResult.xp.playerEffectiveXpPerHour;
+  const cannonEffectiveXpPerHour = fullResult.xp.cannonEffectiveXpPerHour;
+  const effectiveXpPerHour = fullResult.xp.effectiveXpPerHour;
+  const totalXpPerHour = fullResult.xp.totalXpPerHour;
 
   const lootRows =
     options.includeLootRows === false
       ? {
           rows: [],
-          defaultEffectiveNetGpPerHour: trip.effectiveNetGpPerHour,
+          defaultEffectiveNetGpPerHour: fullResult.rates.effectiveNetGpPerHour,
           currentDeltaNetGpPerHour: 0,
           overrideCount: 0
         }
       : createLootRows(tripInput, context, trip, lootPrefs, options.lootPriceHistoryByItem);
-  const calculationWarnings = calculationWarningViewModels([...combat.warnings, ...trip.warnings]);
+  const calculationWarnings = calculationWarningViewModels(fullResult.warnings);
   const specialWarnings = calculationWarnings.filter((warning) =>
     SPECIAL_WARNING_CODES.has(warning.code)
   );
@@ -2886,6 +2872,7 @@ export function createSimulationViewModel(
 
   return {
     request,
+    result: fullResult,
     combat,
     hitDistribution,
     combatRollDetail: createStatsCombatRollDetailViewModel({
@@ -2894,20 +2881,12 @@ export function createSimulationViewModel(
       hitDistribution
     }),
     xpRouting: createXpRoutingViewModel({
-      xp,
-      trip,
-      playerEffectiveXpPerHour,
-      cannonEffectiveXpPerHour,
-      effectiveXpPerHour,
-      totalXpPerHour
+      result: fullResult
     }),
     tripBankingSummary: createTripBankingSummaryViewModel(form, trip),
     statsSourceBreakdown: createStatsSourceBreakdownViewModel({
       form,
-      combat,
-      trip,
-      playerEffectiveXpPerHour,
-      cannonEffectiveXpPerHour,
+      result: fullResult,
       specialWarnings,
       moneyWarnings,
       hitDistribution
@@ -2973,26 +2952,27 @@ function duelBaseRowFromSimulation(
   name: string,
   vm: SimulationViewModel
 ): DuelComparisonBaseRowViewModel {
+  const result = vm.result;
   return {
     id,
     snapshotId,
     source,
     name,
-    monsterId: vm.request.monsterId,
+    monsterId: result.request.monsterId,
     monsterName: vm.monsterCard.monsterName,
-    combatStyle: vm.request.combatStyle,
+    combatStyle: result.request.combatStyle,
     loadoutLabel: duelLoadoutLabel(vm),
-    maxHit: vm.combat.maxHit,
-    dps: vm.combat.effectiveDps,
-    hitChance: vm.combat.hitChance,
-    ttkSec: vm.combat.ttkSec,
-    killsPerTrip: vm.trip.trip.killsPerTrip,
-    killsPerHour: vm.trip.killsPerHour,
-    effectiveXpPerHour: vm.effectiveXpPerHour,
-    effectiveNetGpPerHour: vm.trip.effectiveNetGpPerHour,
-    gpPerXp: gpPerXpValue(vm.trip.effectiveNetGpPerHour, vm.effectiveXpPerHour),
-    supplyCostPerHour: vm.trip.supply.supplyCostPerKill * vm.trip.effectiveKph,
-    bound: vm.trip.trip.bound,
+    maxHit: result.combat.maxHit,
+    dps: result.rates.effectiveDps,
+    hitChance: result.combat.hitChance,
+    ttkSec: result.rates.ttkSec,
+    killsPerTrip: result.trip.trip.killsPerTrip,
+    killsPerHour: result.rates.killsPerHour,
+    effectiveXpPerHour: result.xp.effectiveXpPerHour,
+    effectiveNetGpPerHour: result.rates.effectiveNetGpPerHour,
+    gpPerXp: gpPerXpValue(result.rates.effectiveNetGpPerHour, result.xp.effectiveXpPerHour),
+    supplyCostPerHour: result.rates.supplyCostPerKill * result.rates.effectiveKph,
+    bound: result.trip.trip.bound,
     warnings: vm.warnings
   };
 }
@@ -3155,16 +3135,16 @@ export function createDenseCompareRows(
         isIrrelevant: irrelevantMonsterIds.has(monster.id),
         isForcedVisible: false
       }),
-      hitChance: vm.combat.hitChance,
-      maxHit: vm.combat.maxHit,
-      dps: vm.combat.effectiveDps,
-      ttkSec: vm.combat.ttkSec,
-      killsPerHour: vm.trip.killsPerHour,
-      xpPerHour: vm.effectiveXpPerHour,
-      gpPerKill: vm.trip.gpPerKill,
-      gpPerHour: vm.trip.gpPerHour,
-      netGpPerHour: vm.trip.effectiveNetGpPerHour,
-      bound: vm.trip.trip.bound
+      hitChance: vm.result.combat.hitChance,
+      maxHit: vm.result.combat.maxHit,
+      dps: vm.result.rates.effectiveDps,
+      ttkSec: vm.result.rates.ttkSec,
+      killsPerHour: vm.result.rates.killsPerHour,
+      xpPerHour: vm.result.xp.effectiveXpPerHour,
+      gpPerKill: vm.result.rates.gpPerKill,
+      gpPerHour: vm.result.rates.gpPerHour,
+      netGpPerHour: vm.result.rates.effectiveNetGpPerHour,
+      bound: vm.result.trip.trip.bound
     };
   });
 

@@ -11,11 +11,16 @@ import {
 import { FOOD, lootPreferenceKey, lootPreferenceKeysForMonster } from "@/domain/trip";
 import { HiscoresPlayerNameSchema, createPriceSetFromLegacyRecords } from "@/data/schemas";
 import {
+  CannonByMonsterSchema,
   CombatSetupFormSchema,
+  CustomSetupsByMonsterSchema,
+  DEFAULT_CANNON_SETTINGS,
   DEFAULT_FORM_STATE,
   normalizeFormState,
   setCombatStyleDefaults,
-  type CombatSetupFormState
+  type CannonByMonsterState,
+  type CombatSetupFormState,
+  type CustomSetupsByMonsterState
 } from "@/app/state/ui-state";
 import {
   DenseCompareSortStateSchema,
@@ -95,11 +100,15 @@ export interface LegacySetupMigrationReport {
   hiddenGearTiers: HiddenGearTiersState | null;
   denseCompareSort: DenseCompareSortState | null;
   irrelevantMonsterIds: string[] | null;
+  customSetupsByMonster: CustomSetupsByMonsterState | null;
+  cannonByMonster: CannonByMonsterState | null;
 }
 
 export interface LegacySetupMigrationOptions {
   storage: KeyValueStorage;
   gameData: GameDataSnapshot;
+  currentCustomSetupsByMonster?: CustomSetupsByMonsterState;
+  currentCannonByMonster?: CannonByMonsterState;
   maxInputBytes?: number;
   maxPriceBytes?: number;
   maxHiscoresBytes?: number;
@@ -270,6 +279,9 @@ type MutableFormState = CombatSetupFormState;
 type LegacyRecord = Record<string, unknown>;
 type TripField = keyof CombatSetupFormState["trip"];
 type LegacyJsonField = LegacyStorageKey | string;
+interface LegacyInputMappingOptions {
+  mapMonster?: boolean;
+}
 interface LootPreferenceCandidate {
   monsterId: EntityId;
   rowId: string;
@@ -393,13 +405,13 @@ function inspectLegacySetupInput(
     return;
   }
 
-  inspectLegacySetupReviewOnlyAreas(parsed, options.gameData, report);
+  inspectLegacyNestedSetupAreas(parsed, options, report);
 
   const draft = cloneDefaultFormState();
   mapLegacyInput(parsed, draft, options.gameData, report);
 
   if (report.importedFields.length === 0) {
-    warn(report, "Legacy setup input did not contain any safely importable fields.");
+    warn(report, "Legacy active setup input did not contain any safely importable fields.");
     return;
   }
 
@@ -414,104 +426,213 @@ function inspectLegacySetupInput(
   report.setup = normalizeFormState(validated.data);
 }
 
-function inspectLegacySetupReviewOnlyAreas(
+function inspectLegacyNestedSetupAreas(
   legacy: LegacyRecord,
-  gameData: GameDataSnapshot,
+  options: LegacySetupMigrationOptions,
   report: LegacySetupMigrationReport
 ): void {
-  inspectNestedReviewOnlyMap({
-    value: legacy.monsterSetups,
-    field: "sim_input_v3.monsterSetups",
-    label: "Legacy custom setup snapshots",
-    singular: "custom setup snapshot",
-    plural: "custom setup snapshots",
-    handling:
-      "Detected only; legacy custom setup snapshots are not imported into rewrite custom setups.",
-    invalidShapeReason:
-      "legacy custom setup snapshots were detected but not imported because the shape is not an object map",
-    detectedReason:
-      "legacy custom setup snapshots were detected but not imported because no safe import policy is accepted",
-    warning: "Legacy custom setup snapshots were detected but not imported.",
-    gameData,
-    report
-  });
-  inspectNestedReviewOnlyMap({
-    value: legacy.cannonByMonster,
-    field: "sim_input_v3.cannonByMonster",
-    label: "Legacy cannon map",
-    singular: "cannon entry",
-    plural: "cannon entries",
-    handling:
-      "Detected only; legacy cannon map settings are not imported into rewrite cannon state.",
-    invalidShapeReason:
-      "legacy cannon map was detected but not imported because the shape is not an object map",
-    detectedReason:
-      "legacy cannon map was detected but not imported because no safe import policy is accepted",
-    warning: "Legacy cannon map was detected but not imported.",
-    gameData,
-    report
-  });
+  inspectLegacyCustomSetups(legacy.monsterSetups, options, report);
+  inspectLegacyCannonByMonster(legacy.cannonByMonster, options, report);
 }
 
-function inspectNestedReviewOnlyMap(options: {
-  value: unknown;
-  field: string;
-  label: string;
-  singular: string;
-  plural: string;
-  handling: string;
-  invalidShapeReason: string;
-  detectedReason: string;
-  warning: string;
-  gameData: GameDataSnapshot;
-  report: LegacySetupMigrationReport;
-}): void {
-  if (options.value === undefined) return;
-  if (!isRecord(options.value)) {
-    skip(options.report, options.field, options.invalidShapeReason, {
-      disposition: "review-only",
-      handling: options.handling
-    });
-    warn(options.report, `${options.label} was detected but its shape is not importable.`);
+function inspectLegacyCustomSetups(
+  value: unknown,
+  options: LegacySetupMigrationOptions,
+  report: LegacySetupMigrationReport
+): void {
+  const field = "sim_input_v3.monsterSetups";
+  if (value === undefined) return;
+  if (!isRecord(value)) {
+    skip(report, field, "legacy custom setup snapshots were skipped because the shape is not an object map");
+    warn(report, "Legacy custom setup snapshots were detected but their shape is not importable.");
     return;
   }
 
-  const monsterIds = Object.keys(options.value);
-  if (monsterIds.length === 0) return;
-  if (monsterIds.length > MAX_LEGACY_NESTED_REVIEW_KEYS) {
-    skip(
-      options.report,
-      options.field,
-      `${options.detectedReason}; map exceeds safe review key limit`,
-      { disposition: "review-only", handling: options.handling }
-    );
-    warn(options.report, `${options.label} was detected but exceeds the safe review key limit.`);
+  const entries = Object.entries(value);
+  if (entries.length === 0) return;
+  if (entries.length > MAX_LEGACY_NESTED_REVIEW_KEYS) {
+    skip(report, field, "legacy custom setup snapshot map exceeds safe key limit");
+    warn(report, "Legacy custom setup snapshots were detected but exceed the safe key limit.");
     return;
   }
 
   const knownMonsterIds = new Set(Object.keys(options.gameData.monsters));
-  const unknownMonsterCount = monsterIds.filter((monsterId) => !knownMonsterIds.has(monsterId))
-    .length;
-  const entryCountText = `${monsterIds.length} ${
-    monsterIds.length === 1 ? options.singular : options.plural
-  }`;
-  const unknownText =
-    unknownMonsterCount > 0
-      ? `; ${unknownMonsterCount} ${
-          unknownMonsterCount === 1 ? "entry has" : "entries have"
-        } unknown current monster ids`
-      : "";
+  const existing = options.currentCustomSetupsByMonster ?? {};
+  const imported: CustomSetupsByMonsterState = {};
 
-  skip(
-    options.report,
-    options.field,
-    `${options.detectedReason} (${entryCountText}${unknownText})`,
-    {
-      disposition: "review-only",
-      handling: options.handling
+  for (const [monsterId, setupValue] of entries) {
+    const entryField = `${field}.${monsterId}`;
+    if (!isSafeLegacyMapKey(monsterId)) {
+      skip(report, entryField, "unsafe legacy map key");
+      continue;
     }
-  );
-  warn(options.report, options.warning);
+    if (!knownMonsterIds.has(monsterId)) {
+      skip(report, entryField, "unknown monster id");
+      continue;
+    }
+    if (existing[monsterId]) {
+      skip(report, entryField, "rewrite custom setup already exists; kept rewrite-owned setup");
+      continue;
+    }
+    if (!isRecord(setupValue)) {
+      skip(report, entryField, "expected an object setup snapshot");
+      continue;
+    }
+
+    const childReport = createReport([]);
+    const draft = cloneDefaultFormState();
+    draft.monsterId = monsterId;
+    mapLegacyInput(setupValue, draft, options.gameData, childReport, { mapMonster: false });
+    copyNestedReportFindings(childReport, entryField, report);
+
+    if (childReport.importedFields.length === 0) {
+      skip(report, entryField, "no safely importable custom setup fields");
+      continue;
+    }
+
+    const validated = CombatSetupFormSchema.safeParse({ ...draft, monsterId });
+    if (!validated.success) {
+      skip(report, entryField, "mapped custom setup failed rewrite form validation");
+      continue;
+    }
+
+    imported[monsterId] = normalizeFormState({ ...validated.data, monsterId });
+    importField(report, `customSetupsByMonster.${monsterId}`);
+  }
+
+  if (Object.keys(imported).length === 0) {
+    warn(report, "Legacy custom setup snapshots did not contain any safely importable entries.");
+    return;
+  }
+
+  const validated = CustomSetupsByMonsterSchema.safeParse(imported);
+  if (!validated.success) {
+    skip(report, field, "legacy custom setup snapshots failed rewrite validation");
+    warn(report, "Legacy custom setup snapshots were ignored because they failed rewrite validation.");
+    return;
+  }
+
+  report.customSetupsByMonster = validated.data;
+  importField(report, "customSetupsByMonster");
+}
+
+function inspectLegacyCannonByMonster(
+  value: unknown,
+  options: LegacySetupMigrationOptions,
+  report: LegacySetupMigrationReport
+): void {
+  const field = "sim_input_v3.cannonByMonster";
+  if (value === undefined) return;
+  if (!isRecord(value)) {
+    skip(report, field, "legacy cannon map was skipped because the shape is not an object map");
+    warn(report, "Legacy cannon map was detected but its shape is not importable.");
+    return;
+  }
+
+  const entries = Object.entries(value);
+  if (entries.length === 0) return;
+  if (entries.length > MAX_LEGACY_NESTED_REVIEW_KEYS) {
+    skip(report, field, "legacy cannon map exceeds safe key limit");
+    warn(report, "Legacy cannon map was detected but exceeds the safe key limit.");
+    return;
+  }
+
+  const knownMonsterIds = new Set(Object.keys(options.gameData.monsters));
+  const existing = options.currentCannonByMonster ?? {};
+  const imported: CannonByMonsterState = {};
+
+  for (const [monsterId, settingsValue] of entries) {
+    const entryField = `${field}.${monsterId}`;
+    if (!isSafeLegacyMapKey(monsterId)) {
+      skip(report, entryField, "unsafe legacy map key");
+      continue;
+    }
+    if (!knownMonsterIds.has(monsterId)) {
+      skip(report, entryField, "unknown monster id");
+      continue;
+    }
+    if (existing[monsterId]) {
+      skip(report, entryField, "rewrite cannon settings already exist; kept rewrite-owned settings");
+      continue;
+    }
+
+    const settings = parseLegacyCannonSettings(settingsValue, entryField, report);
+    if (!settings) continue;
+    imported[monsterId] = settings;
+    importField(report, `cannonByMonster.${monsterId}`);
+  }
+
+  if (Object.keys(imported).length === 0) {
+    warn(report, "Legacy cannon map did not contain any safely importable entries.");
+    return;
+  }
+
+  const validated = CannonByMonsterSchema.safeParse(imported);
+  if (!validated.success) {
+    skip(report, field, "legacy cannon map failed rewrite validation");
+    warn(report, "Legacy cannon map was ignored because it failed rewrite validation.");
+    return;
+  }
+
+  report.cannonByMonster = validated.data;
+  importField(report, "cannonByMonster");
+}
+
+function parseLegacyCannonSettings(
+  value: unknown,
+  field: string,
+  report: LegacySetupMigrationReport
+): CannonByMonsterState[string] | null {
+  if (!isRecord(value)) {
+    skip(report, field, "expected an object cannon settings entry");
+    return null;
+  }
+
+  const enabled = value.enabled;
+  const targets = value.targets;
+  const respawnSec = value.respawnSec;
+  const next: CannonByMonsterState[string] = { ...DEFAULT_CANNON_SETTINGS };
+
+  if (enabled !== undefined) {
+    if (typeof enabled !== "boolean") {
+      skip(report, `${field}.enabled`, "expected a boolean");
+      return null;
+    }
+    next.enabled = enabled;
+  }
+
+  if (targets !== undefined) {
+    if (
+      typeof targets !== "number" ||
+      !Number.isFinite(targets) ||
+      !Number.isInteger(targets) ||
+      targets < 1 ||
+      targets > 8
+    ) {
+      skip(report, `${field}.targets`, "expected an integer from 1 to 8");
+      return null;
+    }
+    next.targets = targets;
+  }
+
+  if (respawnSec !== undefined) {
+    if (respawnSec === null) {
+      next.respawnSec = null;
+    } else if (
+      typeof respawnSec === "number" &&
+      Number.isFinite(respawnSec) &&
+      Number.isInteger(respawnSec) &&
+      respawnSec >= 1 &&
+      respawnSec <= 3600
+    ) {
+      next.respawnSec = respawnSec;
+    } else {
+      skip(report, `${field}.respawnSec`, "expected null or an integer from 1 to 3600");
+      return null;
+    }
+  }
+
+  return next;
 }
 
 function inspectLegacyHiscoresPlayer(
@@ -916,7 +1037,9 @@ function createReport(foundKeys: LegacyStorageKey[]): LegacySetupMigrationReport
     lootPrefs: null,
     hiddenGearTiers: null,
     denseCompareSort: null,
-    irrelevantMonsterIds: null
+    irrelevantMonsterIds: null,
+    customSetupsByMonster: null,
+    cannonByMonster: null
   };
 }
 
@@ -924,11 +1047,12 @@ function mapLegacyInput(
   legacy: LegacyRecord,
   draft: MutableFormState,
   gameData: GameDataSnapshot,
-  report: LegacySetupMigrationReport
+  report: LegacySetupMigrationReport,
+  options: LegacyInputMappingOptions = {}
 ): void {
   mapCombatStyle(legacy, draft, report);
   mapLevels(legacy, draft, report);
-  mapMonster(legacy, draft, gameData, report);
+  if (options.mapMonster !== false) mapMonster(legacy, draft, gameData, report);
   mapWeapon(legacy, draft, gameData, report);
   mapAmmo(legacy, draft, gameData, report);
   mapSpell(legacy, draft, gameData, report);
@@ -1299,6 +1423,26 @@ function readEntityObjectId(value: unknown): string | undefined {
 
 function isRecord(value: unknown): value is LegacyRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isSafeLegacyMapKey(key: string): boolean {
+  return key !== "__proto__" && key !== "prototype" && key !== "constructor";
+}
+
+function copyNestedReportFindings(
+  child: LegacySetupMigrationReport,
+  prefix: string,
+  report: LegacySetupMigrationReport
+): void {
+  for (const field of child.importedFields) {
+    importField(report, `${prefix}.${field}`);
+  }
+  for (const field of child.skippedFields) {
+    skip(report, `${prefix}.${field.field}`, field.reason, {
+      disposition: field.disposition,
+      handling: field.handling
+    });
+  }
 }
 
 function byteLength(text: string): number {

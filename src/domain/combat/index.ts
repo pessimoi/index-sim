@@ -1,6 +1,7 @@
 import { loadoutToCombatBonuses, sumEquipmentBonuses } from "../equipment";
 import {
   type AttackType,
+  type CombatSimulationResult,
   type CombatStyle,
   type DbaInfo,
   type EntityId,
@@ -8,7 +9,6 @@ import {
   type MonsterDefinition,
   type SimulationContext,
   type SimulationRequest,
-  type SimulationResult,
   type SimulationWarning,
   type SpecialAttackResult
 } from "../shared";
@@ -784,7 +784,7 @@ function specialAttackResult(
 export function simulateCombat(
   request: SimulationRequest,
   context: SimulationContext
-): SimulationResult {
+): CombatSimulationResult {
   const monster = context.gameData.monsters[request.monsterId];
   if (!monster) {
     throw new Error(`Unknown monster id: ${request.monsterId}`);
@@ -987,7 +987,7 @@ export function simulateCombat(
 export function computeCombatXpBreakdown(
   request: SimulationRequest,
   context: SimulationContext,
-  combat: SimulationResult,
+  combat: CombatSimulationResult,
   options: CombatXpBreakdownOptions = {}
 ): CombatXpBreakdown {
   const monster = context.gameData.monsters[request.monsterId];
