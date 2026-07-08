@@ -23,8 +23,9 @@ import {
 import {
   MarketAdapterError,
   fetchMarketStatus,
+  loadScheduledStaticPriceSnapshot,
   parsePriceSetFileText,
-  syncMarketPrices
+  type ScheduledStaticPriceSnapshotStatus
 } from "@/adapters/market";
 import { PRICE_SET_IMPORT_MAX_BYTES } from "@/data/schemas";
 import {
@@ -60,17 +61,16 @@ import type {
   HiscoresResponse,
   HiscoresStatusResponse,
   MarketStatusResponse,
-  MarketSyncReport,
-  MarketSyncScope,
   PriceSet,
   SimulationContext
 } from "@/domain/shared";
 import { FOOD, defaultOverhead, lootPreferenceKeysForMonster, type LootAction } from "@/domain/trip";
 import {
-  applyMarketSyncResponse,
-  formatMarketSyncReportDetails,
-  summarizeMarketSyncReport,
-  type MarketReportStatusFilter
+  activePriceSetOriginLabel,
+  createScheduledPriceSnapshotViewModel,
+  resolveActivePriceSetFallback,
+  scheduledPriceSetFromStatus,
+  type ActivePriceSetOrigin
 } from "./state/market-sync";
 import {
   LEGACY_MIGRATION_DISMISSED_STORAGE_KEY,
@@ -246,6 +246,7 @@ import {
   type PlannerPanelViewModel,
   type LootDropRowViewModel,
   type LootPriceHistoryItemContext,
+  type StatsCombatRollDetailViewModel,
   type StatsSourceDetailViewModel,
   formatNumber,
   monsterOptions,
@@ -430,13 +431,6 @@ type PriceImportSurface = "topbar" | "settings" | "market";
 type ScopedPriceImportNotice = PriceImportNotice & { surface: PriceImportSurface };
 
 const SETUP_IMPORT_MAX_BYTES = 250_000;
-
-const MARKET_REPORT_STATUS_FILTERS: Array<{ id: MarketReportStatusFilter; label: string }> = [
-  { id: "all", label: "All" },
-  { id: "updated", label: "Updated" },
-  { id: "skipped", label: "Skipped" },
-  { id: "failed", label: "Failed" }
-];
 
 const COMBAT_STYLE_OPTIONS: SelectOption[] = [
   { id: "melee", label: "melee" },
@@ -1051,6 +1045,41 @@ function StatsSourceDetailCard({ detail }: { detail: StatsSourceDetailViewModel 
   );
 }
 
+function StatsCombatRollDetail({ detail }: { detail: StatsCombatRollDetailViewModel }) {
+  return (
+    <section className="stats-panel combat-roll-panel" aria-label="Combat roll details">
+      <div className="section-title-row">
+        <div>
+          <h2>Combat roll details</h2>
+          <span className="section-subtitle">Normal attack and current result metrics</span>
+        </div>
+        <span className={`status-pill ${detail.status === "modeled" ? "ready" : ""}`}>
+          {detail.statusLabel}
+        </span>
+      </div>
+      <div className="combat-roll-grid" role="list" aria-label="Combat roll metrics">
+        {detail.metrics.map((metric) => (
+          <div
+            className={`combat-roll-metric ${metric.tone}`}
+            role="listitem"
+            aria-label={`${metric.label}: ${metric.value}; ${metric.note}`}
+            key={metric.id}
+          >
+            <span>{metric.label}</span>
+            <strong>{metric.value}</strong>
+            <small>{metric.note}</small>
+          </div>
+        ))}
+      </div>
+      <ul className="combat-roll-notes">
+        {detail.notes.map((note) => (
+          <li key={note}>{note}</li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function ActiveAssumptionsSummary({
   summary,
   onReview,
@@ -1334,7 +1363,11 @@ function legacyMigrationReviewPlan(report: LegacySetupMigrationReport): string[]
   const reviewItems = report.keyReview
     .filter((item) => item.found && item.disposition !== "migrate")
     .map((item) => `${item.key}: ${legacyDispositionLabel(item.disposition)} - ${item.reason}`);
-  const skippedItems = report.skippedFields.map((field) => `${field.field}: ${field.reason}`);
+  const skippedItems = report.skippedFields.map((field) => {
+    const disposition = field.disposition ? `${legacyDispositionLabel(field.disposition)} - ` : "";
+    const handling = field.handling ? `${field.handling} ` : "";
+    return `${field.field}: ${disposition}${handling}${field.reason}`;
+  });
   return [...reviewItems, ...skippedItems];
 }
 
@@ -1378,17 +1411,17 @@ function describeHiscoresError(error: unknown): string {
 
 function describeMarketError(error: unknown): string {
   if (error instanceof MarketAdapterError) {
-    if (error.code === "bad-request") return "Check the market sync request";
-    if (error.code === "not-found") return "Market sync target not found";
+    if (error.code === "bad-request") return "Check the market price request";
+    if (error.code === "not-found") return "Market price data not found";
     if (error.code === "rate-limited") {
       return error.retryAfterSeconds
         ? `Rate limited. Try again in ${error.retryAfterSeconds}s`
         : "Rate limited";
     }
     if (error.code === "upstream-unavailable") return marketUnavailableMessage(null);
-    if (error.code === "upstream-invalid") return "Market sync response invalid";
+    if (error.code === "upstream-invalid") return "Market price response invalid";
   }
-  return "Market sync failed. Bundled and imported PriceSets still work.";
+  return "Market price data check failed. Bundled, scheduled and imported PriceSets still work.";
 }
 
 function sanitizeImportDetail(value: string): string {
@@ -1460,8 +1493,8 @@ function hiscoresUnavailableMessage(status: HiscoresStatusResponse | null): stri
 
 function marketUnavailableMessage(status: MarketStatusResponse | null): string {
   return status?.source.id === "disabled"
-    ? "Live market sync is not configured in this run. Simulations continue to use the active bundled or imported PriceSet."
-    : "Market sync is unavailable right now. Bundled and imported PriceSets still work.";
+    ? "Market upstream refresh is scheduled, not user-triggered. Import a PriceSet file to override prices locally."
+    : "Market price service is unavailable right now. Scheduled, bundled and imported PriceSets still work.";
 }
 
 function SelectField({
@@ -1855,6 +1888,10 @@ export function App() {
   const [priceHistory, setPriceHistory] =
     useState<BrowserPriceHistoryState>(loadInitialPriceHistory);
   const [bundledPriceSet, setBundledPriceSet] = useState<PriceSet | null>(null);
+  const [scheduledSnapshotStatus, setScheduledSnapshotStatus] =
+    useState<ScheduledStaticPriceSnapshotStatus | null>(null);
+  const [activePriceSetOrigin, setActivePriceSetOrigin] =
+    useState<ActivePriceSetOrigin>("bundled");
   const [plannerState, setPlannerState] = useState<PlannerUiState>(loadInitialPlannerUiState);
   const [plannerComputedState, setPlannerComputedState] =
     useState<PlannerUiState>(loadInitialPlannerUiState);
@@ -1894,12 +1931,8 @@ export function App() {
   const hiscoresPlayerRef = useRef(hiscoresPlayer);
   const hiscoresLookupSequenceRef = useRef(0);
   const [marketStatus, setMarketStatus] = useState<MarketStatusResponse | null>(null);
-  const [marketBusy, setMarketBusy] = useState<MarketSyncScope | null>(null);
-  const [marketReport, setMarketReport] = useState<MarketSyncReport | null>(null);
-  const [marketReportFilter, setMarketReportFilter] =
-    useState<MarketReportStatusFilter>("all");
   const [marketNotice, setMarketNotice] = useState<{
-    tone: "neutral" | "success" | "error";
+    tone: "neutral" | "success" | "warning" | "error";
     message: string;
   } | null>(null);
   const [economyBaselineMode, setEconomyBaselineMode] =
@@ -2035,33 +2068,57 @@ export function App() {
   useEffect(() => {
     let cancelled = false;
     loadBundledLegacyContext()
-      .then((result) => {
+      .then(async (result) => {
         if (cancelled) return;
         const bundledContext = result.context;
         const selectedPriceSet = loadSelectedPriceSet(storage);
+        const restoredPriceSet =
+          selectedPriceSet.status === "loaded" ? selectedPriceSet.value.priceSet : null;
+        const scheduledStatus = await loadScheduledStaticPriceSnapshot({
+          fallbackPriceSet: restoredPriceSet ?? bundledContext.priceSet
+        });
+        if (cancelled) return;
+        const fallbackResolution = resolveActivePriceSetFallback({
+          bundledPriceSet: bundledContext.priceSet,
+          selectedPriceSet: restoredPriceSet,
+          scheduledSnapshotStatus: scheduledStatus
+        });
+        const scheduledLoaded = scheduledStatus.status === "loaded";
         setBundledPriceSet(bundledContext.priceSet);
-        if (selectedPriceSet.status === "loaded") {
-          const restoredPriceSet = selectedPriceSet.value.priceSet;
+        setScheduledSnapshotStatus(scheduledStatus);
+        setActivePriceSetOrigin(fallbackResolution.origin);
+        if (restoredPriceSet) {
           setStatus(
             initialSavedSetup.loaded
               ? "Loaded saved rewrite setup and selected PriceSet"
               : "Loaded selected PriceSet"
           );
-          setContext({ ...bundledContext, priceSet: restoredPriceSet });
-          setPriceLabel(restoredPriceSet.label);
+          setContext({ ...bundledContext, priceSet: fallbackResolution.priceSet });
+          setPriceLabel(fallbackResolution.priceSet.label);
           setMarketNotice({
             tone: "success",
             message: `Restored selected PriceSet: ${restoredPriceSet.label}`
           });
         } else {
           const selectedPriceSetIssue = describeSelectedPriceSetLoadIssue(selectedPriceSet);
+          const loadedStatus = scheduledLoaded
+            ? "Loaded scheduled prices"
+            : initialSavedSetup.loaded
+              ? "Loaded saved rewrite setup"
+              : "Loaded bundled data";
           setStatus(
-            selectedPriceSetIssue ??
-              (initialSavedSetup.loaded ? "Loaded saved rewrite setup" : "Loaded bundled data")
+            selectedPriceSetIssue && !scheduledLoaded ? selectedPriceSetIssue : loadedStatus
           );
-          setContext(bundledContext);
-          setPriceLabel(bundledContext.priceSet.label);
-          if (selectedPriceSetIssue) {
+          setContext({ ...bundledContext, priceSet: fallbackResolution.priceSet });
+          setPriceLabel(fallbackResolution.priceSet.label);
+          if (scheduledLoaded) {
+            setMarketNotice({
+              tone: selectedPriceSetIssue ? "neutral" : "success",
+              message: selectedPriceSetIssue
+                ? "Saved active PriceSet could not be restored. Scheduled prices were loaded."
+                : "Scheduled prices loaded."
+            });
+          } else if (selectedPriceSetIssue) {
             setMarketNotice({ tone: "error", message: selectedPriceSetIssue });
           }
         }
@@ -2371,8 +2428,6 @@ export function App() {
   const hiscoresAvailable = hiscoresStatus?.available === true;
   const hiscoresStatusText = statusText(hiscoresStatus, hiscoresAvailable);
   const canApplyHiscores = canApplyHiscoresPreview(hiscoresPlayer, hiscoresResponse);
-  const marketAvailable = marketStatus?.available === true;
-  const marketStatusText = statusText(marketStatus, marketAvailable);
 
   const monsters = useMemo(() => (context ? monsterOptions(context.gameData) : []), [context]);
   const styles = useMemo(
@@ -2652,6 +2707,7 @@ export function App() {
     setContext((current) => (current ? { ...current, priceSet } : current));
     setPriceHistory((current) => appendAcceptedPriceSetToHistory(current, priceSet, acceptedAt));
     setPriceLabel(priceSet.label);
+    setActivePriceSetOrigin("selected");
     setStatus(nextStatus);
     setMarketNotice({
       tone: selectedPersisted ? "success" : "neutral",
@@ -2970,47 +3026,6 @@ export function App() {
       tone: applied ? "success" : "neutral",
       message: applied ? `Applied ${applied} skills` : "No current setup skills to apply"
     });
-  };
-
-  const handleMarketSync = async (scope: Exclude<MarketSyncScope, "items">) => {
-    if (!context) return;
-    if (!marketAvailable) {
-      setMarketNotice({ tone: "error", message: marketUnavailableMessage(marketStatus) });
-      return;
-    }
-
-    setMarketBusy(scope);
-    setMarketReportFilter("all");
-    setMarketNotice({ tone: "neutral", message: "Syncing market prices" });
-    try {
-      const response = await syncMarketPrices({
-        scope,
-        monsterId: scope === "monster" ? form.monsterId : undefined,
-        includeAlch: true
-      });
-      const acceptedAt = new Date();
-      const selectedPersisted = persistSelectedActivePriceSet(response.priceSet, acceptedAt);
-      setContext((current) =>
-        current
-          ? applyMarketSyncResponse(current, response)
-          : applyMarketSyncResponse(context, response)
-      );
-      setPriceHistory((current) =>
-        appendAcceptedPriceSetToHistory(current, response.priceSet, acceptedAt)
-      );
-      setPriceLabel(response.priceSet.label);
-      setStatus("Synced market prices");
-      setMarketReport(response.report);
-      const marketSummary = summarizeMarketSyncReport(response.report);
-      setMarketNotice({
-        tone: response.report.failed || !selectedPersisted ? "neutral" : "success",
-        message: selectedPersisted ? marketSummary : `${marketSummary}. Local restore was not saved.`
-      });
-    } catch (caught: unknown) {
-      setMarketNotice({ tone: "error", message: describeMarketError(caught) });
-    } finally {
-      setMarketBusy(null);
-    }
   };
 
   const snapshotCurrentPriceSet = () => {
@@ -3701,9 +3716,30 @@ export function App() {
   const activePriceSetAlchCount = activePriceSet
     ? Object.keys(activePriceSet.alchValues).length
     : 0;
-  const activePriceSetIsBundled = activePriceSet?.source === "bundled";
+  const scheduledPriceSet = scheduledPriceSetFromStatus(scheduledSnapshotStatus);
+  const scheduledPriceSetCreatedAtMs = scheduledPriceSet
+    ? Date.parse(scheduledPriceSet.createdAt)
+    : NaN;
+  const scheduledPriceSetAgeSeconds =
+    scheduledPriceSet && Number.isFinite(scheduledPriceSetCreatedAtMs)
+      ? Math.max(0, Math.floor((Date.now() - scheduledPriceSetCreatedAtMs) / 1000))
+      : null;
+  const scheduledPriceSetItemCount = scheduledPriceSet
+    ? Object.keys(scheduledPriceSet.itemPrices).length
+    : 0;
+  const scheduledPriceSetAlchCount = scheduledPriceSet
+    ? Object.keys(scheduledPriceSet.alchValues).length
+    : 0;
+  const scheduledSnapshotViewModel = createScheduledPriceSnapshotViewModel(
+    scheduledSnapshotStatus,
+    activePriceSetOrigin
+  );
+  const resetFallbackPriceSet = scheduledPriceSet ?? bundledPriceSet;
+  const resetFallbackOrigin: ActivePriceSetOrigin = scheduledPriceSet ? "scheduled" : "bundled";
+  const resetFallbackLabel =
+    resetFallbackOrigin === "scheduled" ? "scheduled prices" : "bundled prices";
   const canResetActivePriceSet = Boolean(
-    activePriceSet && bundledPriceSet && !activePriceSetIsBundled
+    activePriceSet && resetFallbackPriceSet && activePriceSetOrigin === "selected"
   );
   const exportActivePriceSet = () => {
     if (!activePriceSet) return;
@@ -3720,11 +3756,11 @@ export function App() {
     setPriceSetResetPending(true);
     setMarketNotice({
       tone: "neutral",
-      message: "Confirm reset to bundled prices. Local price history will be kept."
+      message: `Confirm reset local price override to ${resetFallbackLabel}. Local price history will be kept.`
     });
   };
-  const resetActivePriceSetToBundled = () => {
-    if (!bundledPriceSet) return;
+  const resetActivePriceSetToFallback = () => {
+    if (!resetFallbackPriceSet) return;
     let persistedReset = true;
     try {
       clearSelectedPriceSet(storage);
@@ -3739,15 +3775,20 @@ export function App() {
       recordLocalStateStorageFailure("selected-price-set", "clear_failed");
     }
     refreshLocalStateHealthReport();
-    setContext((current) => (current ? { ...current, priceSet: bundledPriceSet } : current));
-    setPriceLabel(bundledPriceSet.label);
+    setContext((current) => (current ? { ...current, priceSet: resetFallbackPriceSet } : current));
+    setPriceLabel(resetFallbackPriceSet.label);
+    setActivePriceSetOrigin(resetFallbackOrigin);
     setPriceSetResetPending(false);
-    setStatus(persistedReset ? "Reset to bundled prices" : "Reset to bundled prices for this session");
+    setStatus(
+      persistedReset
+        ? `Reset to ${resetFallbackLabel}`
+        : `Reset to ${resetFallbackLabel} for this session`
+    );
     setMarketNotice({
       tone: persistedReset ? "success" : "neutral",
       message: persistedReset
-        ? "Reset to bundled prices. Local price history was kept."
-        : "Reset to bundled prices for this session. Local storage is unavailable, so reload may restore the previous PriceSet."
+        ? `Reset to ${resetFallbackLabel}. Local price history was kept.`
+        : `Reset to ${resetFallbackLabel} for this session. Local storage is unavailable, so reload may restore the previous PriceSet.`
     });
     setFatalError(null);
   };
@@ -3758,8 +3799,8 @@ export function App() {
       </button>
       {priceSetResetPending ? (
         <>
-          <button type="button" onClick={resetActivePriceSetToBundled}>
-            Confirm reset to bundled prices
+          <button type="button" onClick={resetActivePriceSetToFallback}>
+            Confirm reset to {resetFallbackLabel}
           </button>
           <button type="button" onClick={() => setPriceSetResetPending(false)}>
             Cancel
@@ -3771,18 +3812,42 @@ export function App() {
           disabled={!canResetActivePriceSet}
           onClick={requestResetActivePriceSet}
         >
-          Reset to bundled prices
+          Reset local price override
         </button>
       )}
     </>
   );
+  const renderScheduledSnapshotSummary = () => {
+    const scheduledMessage = scheduledSnapshotStatus?.warnings.length
+      ? `${scheduledSnapshotViewModel.message} ${scheduledSnapshotStatus.warnings[0]}`
+      : scheduledSnapshotViewModel.message;
+    return (
+      <>
+        <div className="price-history-summary" aria-label="Scheduled price snapshot summary">
+          <span>Status {scheduledSnapshotViewModel.statusLabel}</span>
+          <span>Label {scheduledPriceSet?.label ?? "-"}</span>
+          <span>Source scheduled static JSON</span>
+          <span>Created {scheduledPriceSet?.createdAt ?? "-"}</span>
+          <span>Age {formatAge(scheduledPriceSetAgeSeconds)}</span>
+          <span>Item prices {formatNumber(scheduledPriceSetItemCount)}</span>
+          <span>Alch values {formatNumber(scheduledPriceSetAlchCount)}</span>
+          <span>Fallback {scheduledSnapshotViewModel.fallbackLabel}</span>
+        </div>
+        <p
+          className={`inline-status ${scheduledSnapshotViewModel.tone}`}
+          role={
+            scheduledSnapshotViewModel.tone === "error" ||
+            scheduledSnapshotViewModel.tone === "warning"
+              ? "alert"
+              : "status"
+          }
+        >
+          {scheduledMessage}
+        </p>
+      </>
+    );
+  };
   const priceDataStatusMessage = marketNotice?.message ?? status;
-  const marketReportDetails = marketReport
-    ? formatMarketSyncReportDetails(marketReport, {
-        filter: marketReportFilter,
-        itemLabel: (itemId) => context?.gameData.items[itemId]?.name
-      })
-    : null;
 
   return (
     <main className="app-shell">
@@ -4420,6 +4485,8 @@ export function App() {
                       ))}
                   </div>
                 </section>
+
+                <StatsCombatRollDetail detail={viewModel.combatRollDetail} />
 
                 <div className="stats-analysis-grid">
                   <section className="stats-panel" aria-label="XP routing">
@@ -6681,10 +6748,14 @@ export function App() {
                     <div className="section-title-row">
                       <h2>Price data</h2>
                       <span className={`status-pill ${activePriceSet ? "ready" : ""}`}>
-                        {activePriceSet ? activePriceSet.source : "empty"}
+                        {activePriceSet
+                          ? activePriceSetOriginLabel(activePriceSetOrigin)
+                          : "empty"}
                       </span>
                     </div>
+                    {renderScheduledSnapshotSummary()}
                     <div className="price-history-summary" aria-label="Active PriceSet summary">
+                      <span>Active source {activePriceSetOriginLabel(activePriceSetOrigin)}</span>
                       <span>Label {activePriceSet?.label ?? priceLabel}</span>
                       <span>Source {activePriceSet?.source ?? "-"}</span>
                       <span>Created {activePriceSet?.createdAt ?? "-"}</span>
@@ -6769,28 +6840,23 @@ export function App() {
                     </div>
                   </section>
                 )}
-                <section className="service-group" aria-label="Market sync">
+                <section className="service-group" aria-label="Market price data">
                   <div className="section-title-row">
                     <h2>Market</h2>
-                    <span className={`status-pill ${marketAvailable ? "ready" : ""}`}>
-                      {marketStatusText}
+                    <span
+                      className={`status-pill ${
+                        scheduledSnapshotStatus?.status === "loaded" ? "ready" : ""
+                      }`}
+                    >
+                      {scheduledSnapshotViewModel.statusLabel}
                     </span>
                   </div>
+                  {renderScheduledSnapshotSummary()}
+                  <p className="inline-status neutral">
+                    Market upstream refresh is scheduled, not user-triggered. Import a PriceSet file
+                    to override prices locally.
+                  </p>
                   <div className="market-sync-bar">
-                    <button
-                      type="button"
-                      disabled={!marketAvailable || marketBusy !== null}
-                      onClick={() => void handleMarketSync("monster")}
-                    >
-                      {marketBusy === "monster" ? "Syncing" : "Sync monster"}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={!marketAvailable || marketBusy !== null}
-                      onClick={() => void handleMarketSync("all-supported")}
-                    >
-                      {marketBusy === "all-supported" ? "Syncing" : "Sync all"}
-                    </button>
                     <label className="file-button">
                       Import PriceSet
                       <input
@@ -6826,6 +6892,7 @@ export function App() {
                     className="price-history-summary"
                     aria-label="Market active PriceSet summary"
                   >
+                    <span>Active source {activePriceSetOriginLabel(activePriceSetOrigin)}</span>
                     <span>Label {activePriceSet?.label ?? priceLabel}</span>
                     <span>Source {activePriceSet?.source ?? "-"}</span>
                     <span>Created {activePriceSet?.createdAt ?? "-"}</span>
@@ -6864,104 +6931,6 @@ export function App() {
                       ariaLabel="Price import notice"
                       className="price-import-panel-notice"
                     />
-                  )}
-                  {marketReport && (
-                    <div className="market-report" aria-label="Market sync report">
-                      <span>Source {marketReport.source.label}</span>
-                      <span>Fetched {marketReport.finishedAt}</span>
-                      <span>Updated {marketReport.updated}</span>
-                      <span>Skipped {marketReport.skipped}</span>
-                      <span>Failed {marketReport.failed}</span>
-                      {marketReportDetails && marketReportDetails.warnings.length > 0 && (
-                        <div
-                          className="market-report-warnings"
-                          role="status"
-                          aria-label="Market sync warnings"
-                        >
-                          <strong>Warnings</strong>
-                          {marketReportDetails.warnings.slice(0, 4).map((warning) => (
-                            <span className={warning.severity} key={warning.id}>
-                              {warning.itemId ? `${warning.itemId}: ` : ""}
-                              {warning.message}
-                            </span>
-                          ))}
-                          {marketReportDetails.warnings.length > 4 && (
-                            <span>
-                              {formatNumber(marketReportDetails.warnings.length - 4)} more
-                            </span>
-                          )}
-                        </div>
-                      )}
-                      {marketReportDetails && (
-                        <div
-                          className="market-report-detail-panel"
-                          aria-label="Market sync item diagnostics"
-                        >
-                          <div
-                            className="segmented market-report-filters"
-                            aria-label="Market report status filter"
-                          >
-                            {MARKET_REPORT_STATUS_FILTERS.map((filter) => (
-                              <button
-                                type="button"
-                                className={marketReportFilter === filter.id ? "active" : ""}
-                                aria-pressed={marketReportFilter === filter.id}
-                                onClick={() => setMarketReportFilter(filter.id)}
-                                key={filter.id}
-                              >
-                                {filter.label}{" "}
-                                {formatNumber(marketReportDetails.counts[filter.id])}
-                              </button>
-                            ))}
-                          </div>
-                          <table>
-                            <thead>
-                              <tr>
-                                <th>Item</th>
-                                <th>Status</th>
-                                <th>Price</th>
-                                <th>Alch</th>
-                                <th>Source slug</th>
-                                <th>Reason</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {marketReportDetails.items.length > 0 ? (
-                                marketReportDetails.items.map((item) => (
-                                  <tr
-                                    className={`market-report-item-${item.status}`}
-                                    key={item.itemId}
-                                  >
-                                    <td>
-                                      <span>{item.itemLabel}</span>
-                                      {item.itemLabel !== item.itemId && (
-                                        <small>{item.itemId}</small>
-                                      )}
-                                    </td>
-                                    <td>{item.status}</td>
-                                    <td className="numeric">
-                                      <span>{item.priceLabel}</span>
-                                      {item.sampleSizeLabel !== "-" && (
-                                        <small>Samples {item.sampleSizeLabel}</small>
-                                      )}
-                                    </td>
-                                    <td className="numeric">{item.alchValueLabel}</td>
-                                    <td>{item.sourceSlug}</td>
-                                    <td>{item.reason}</td>
-                                  </tr>
-                                ))
-                              ) : (
-                                <tr>
-                                  <td colSpan={6}>
-                                    No {marketReportFilter} items in this report.
-                                  </td>
-                                </tr>
-                              )}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-                    </div>
                   )}
                 </section>
                 {activeTab === "economy" && (

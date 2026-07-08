@@ -1,6 +1,8 @@
 import { fileURLToPath, URL } from "node:url";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import react from "@vitejs/plugin-react";
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin, type PreviewServer, type ViteDevServer } from "vite";
 import { hiscoresApiPlugin } from "./src/server/vite-hiscores-middleware";
 import { marketApiPlugin } from "./src/server/vite-market-middleware";
 
@@ -8,12 +10,52 @@ const projectRoot = fileURLToPath(new URL(".", import.meta.url));
 const publicDir = fileURLToPath(new URL("./public", import.meta.url));
 const outDir = fileURLToPath(new URL("./dist", import.meta.url));
 const cacheDir = fileURLToPath(new URL("./node_modules/.vite", import.meta.url));
+const scheduledPriceAssetFiles = ["prices.json", "alch.json", "price-history.json"] as const;
+
+function scheduledPriceAssetsPlugin(): Plugin {
+  const assetFileSet = new Set<string>(scheduledPriceAssetFiles);
+
+  const attachStaticPriceAssetMiddleware = (
+    server: Pick<ViteDevServer | PreviewServer, "middlewares">
+  ) => {
+    server.middlewares.use((request, response, next) => {
+      const pathname = new URL(request.url ?? "/", "http://localhost").pathname.replace(/^\/+/, "");
+      if (!assetFileSet.has(pathname)) {
+        next();
+        return;
+      }
+
+      response.statusCode = 200;
+      response.setHeader("Content-Type", "application/json; charset=utf-8");
+      response.end(readFileSync(join(projectRoot, pathname)));
+    });
+  };
+
+  return {
+    name: "index-sim-scheduled-price-assets",
+    configureServer(server) {
+      attachStaticPriceAssetMiddleware(server);
+    },
+    configurePreviewServer(server) {
+      attachStaticPriceAssetMiddleware(server);
+    },
+    generateBundle() {
+      for (const fileName of scheduledPriceAssetFiles) {
+        this.emitFile({
+          type: "asset",
+          fileName,
+          source: readFileSync(join(projectRoot, fileName))
+        });
+      }
+    }
+  };
+}
 
 export default defineConfig({
   root: projectRoot,
   publicDir,
   cacheDir,
-  plugins: [hiscoresApiPlugin(), marketApiPlugin(), react()],
+  plugins: [scheduledPriceAssetsPlugin(), hiscoresApiPlugin(), marketApiPlugin(), react()],
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url))

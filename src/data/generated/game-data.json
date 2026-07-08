@@ -1,0 +1,89 @@
+{
+  "ammo": {},
+  "equipment": {
+    "amulet": {},
+    "body": {},
+    "boots": {},
+    "cape": {},
+    "gloves": {},
+    "helm": {},
+    "legs": {},
+    "ring": {},
+    "shield": {}
+  },
+  "id": "generated-foundation-fixture",
+  "items": {
+    "bones": {
+      "id": "bones",
+      "name": "Bones",
+      "provenance": {
+        "notes": "Foundation fixture item, not copied upstream file content.",
+        "source": "manual",
+        "sourceRef": "synthetic fixture"
+      },
+      "stackable": false
+    },
+    "bronze_sword": {
+      "id": "bronze_sword",
+      "name": "Bronze sword",
+      "provenance": {
+        "notes": "Foundation fixture weapon item, not copied upstream file content.",
+        "source": "manual",
+        "sourceRef": "synthetic fixture"
+      },
+      "stackable": false
+    }
+  },
+  "label": "Generated game data foundation fixture",
+  "monsters": {
+    "training_dummy": {
+      "attack": 1,
+      "defLevel": 1,
+      "hp": 3,
+      "id": "training_dummy",
+      "level": 1,
+      "loot": [
+        {
+          "chance": 1,
+          "key": "bones",
+          "name": "Bones",
+          "provenance": {
+            "notes": "Foundation fixture drop row, not copied upstream file content.",
+            "source": "manual",
+            "sourceRef": "synthetic fixture"
+          },
+          "qtyAvg": 1
+        }
+      ],
+      "name": "Training dummy",
+      "provenance": {
+        "notes": "Foundation fixture monster, not copied upstream file content.",
+        "source": "manual",
+        "sourceRef": "synthetic fixture"
+      },
+      "strength": 1
+    }
+  },
+  "provenance": {
+    "notes": "Foundation generated snapshot. This output is schema-valid and normalized, but LostCityRS/Content file parsing and authoritative field extraction are not implemented yet.",
+    "source": "manual",
+    "sourceRef": "LostCityRS/Content fixture fixture-revision-274",
+    "verifiedAt": "2026-07-08T00:00:00.000Z"
+  },
+  "spells": {},
+  "weapons": {
+    "bronze_sword": {
+      "acc": {
+        "crush": -2,
+        "slash": 3,
+        "stab": 4
+      },
+      "accBonus": 4,
+      "dmgBonus": 5,
+      "name": "Bronze sword",
+      "speed": 4,
+      "type": "melee",
+      "wclass": "sword"
+    }
+  }
+}

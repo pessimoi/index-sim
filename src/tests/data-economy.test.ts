@@ -3,6 +3,7 @@ import { join } from "node:path";
 import ts from "typescript";
 import { ZodError } from "zod";
 import { lookupItemPrice, collectMissingPriceWarnings } from "../domain/economy";
+import { createScheduledStaticPriceSnapshotStatus } from "../adapters/market";
 import {
   DataReliabilityError,
   createGameDataSnapshotFromLegacy,
@@ -16,6 +17,7 @@ import {
   PriceSetSchema,
   PriceSetValidationError,
   createPriceSetFromLegacyRecords,
+  GameDataSnapshotSchema,
   parsePriceSetJson
 } from "../data/schemas";
 import { createLegacyRuntime } from "./helpers/legacy-sim";
@@ -159,6 +161,17 @@ describe("validated game data snapshots", () => {
     expect(priceSet.alchValues).not.toHaveProperty("_randomherb_avg");
   });
 
+  it("validates the committed generated game-data foundation snapshot", () => {
+    const generatedSnapshot = GameDataSnapshotSchema.parse(
+      readJsonFile("src/data/generated/game-data.json")
+    );
+
+    expect(generatedSnapshot.id).toBe("generated-foundation-fixture");
+    expect(generatedSnapshot.provenance?.notes).toMatch(/foundation/i);
+    expect(generatedSnapshot).not.toHaveProperty("priceHistory");
+    expect(generatedSnapshot).not.toHaveProperty("historicalSnapshots");
+  });
+
   it("rejects duplicate legacy monster ids before object conversion can hide them", () => {
     const runtime = createLegacyRuntime();
     const duplicatedMonster = { ...runtime.GameData.MONSTERS[0], id: "chicken" };
@@ -234,6 +247,31 @@ describe("price file schemas", () => {
     expect(priceSet.itemPrices).not.toHaveProperty("_scraped_at");
     expect(priceHistory.length).toBeGreaterThan(0);
     expect(priceHistory[0]?.prices.rune_scimitar).toBeGreaterThan(0);
+  });
+
+  it("builds a read-only scheduled static PriceSet candidate from committed price files", () => {
+    const status = createScheduledStaticPriceSnapshotStatus({
+      pricesText: readTextFile("prices.json"),
+      alchText: readTextFile("alch.json"),
+      priceHistoryText: readTextFile("price-history.json")
+    });
+
+    expect(status.status).toBe("loaded");
+    expect(status.files).toEqual({
+      prices: "loaded",
+      alch: "loaded",
+      priceHistory: "loaded"
+    });
+    expect(status.scheduledPriceSet).not.toBeNull();
+    expect(PriceSetSchema.parse(status.scheduledPriceSet)).toMatchObject({
+      label: "Scheduled static prices",
+      source: "scraped"
+    });
+    expect(status.scheduledPriceSet?.itemPrices.rune_scimitar).toBeGreaterThan(0);
+    expect(status.scheduledPriceSet?.alchValues.rune_scimitar).toBeGreaterThan(0);
+    expect(status.scheduledPriceSet?.itemPrices).not.toHaveProperty("_scraped_at");
+    expect(status.itemCount).toBeGreaterThan(0);
+    expect(status.alchCount).toBeGreaterThan(0);
   });
 
   it("gates committed raw data files for duplicate keys before object parsing", () => {

@@ -1,0 +1,30 @@
+{
+  "generatedAt": "2026-07-08T00:00:00.000Z",
+  "generator": {
+    "command": "npm run data:generate -- --source-dir src/tests/fixtures/data-generator/lostcity-content --output-root . --generated-at 2026-07-08T00:00:00.000Z",
+    "name": "index-sim-data-generator",
+    "version": "foundation-1"
+  },
+  "outputs": {
+    "gameData": "src/data/generated/game-data.json",
+    "revisionImpact": "docs/project/revision-impact/current.md",
+    "sourcePin": "src/data/generated/source-pin.json"
+  },
+  "schemaVersion": 1,
+  "scope": {
+    "notes": [
+      "Generated output is committed as a foundation artifact only.",
+      "Runtime still loads the validated legacy adapter snapshot.",
+      "Upstream file bodies, market price history and historical game-data snapshots are intentionally excluded."
+    ],
+    "parser": "foundation-manifest",
+    "runtimeBootstrap": "legacy-adapter",
+    "status": "foundation"
+  },
+  "source": {
+    "commit": "0000000000000000000000000000000000000274",
+    "name": "LostCityRS/Content fixture",
+    "path": "src/tests/fixtures/data-generator/lostcity-content",
+    "revision": "fixture-revision-274"
+  }
+}

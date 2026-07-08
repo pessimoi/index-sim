@@ -83,6 +83,7 @@ export interface SimulationViewModel {
   request: SimulationRequest;
   combat: ReturnType<typeof simulateCombat>;
   hitDistribution: HitDistributionViewModel;
+  combatRollDetail: StatsCombatRollDetailViewModel;
   xpRouting: XpRoutingViewModel;
   tripBankingSummary: StatsTripBankingSummaryViewModel;
   statsSourceBreakdown: StatsSourceBreakdownViewModel;
@@ -135,6 +136,22 @@ export interface HitDistributionViewModel {
   averageHitLabel: string;
   maxHitLabel: string;
   buckets: HitDistributionBucketViewModel[];
+}
+
+export interface StatsCombatRollMetricViewModel {
+  id: string;
+  label: string;
+  value: string;
+  numericValue: number | null;
+  note: string;
+  tone: "default" | "teal" | "gold" | "muted";
+}
+
+export interface StatsCombatRollDetailViewModel {
+  status: "modeled" | "partial";
+  statusLabel: string;
+  metrics: StatsCombatRollMetricViewModel[];
+  notes: string[];
 }
 
 export type XpRoutingRowStatus = "modeled" | "partial" | "not-modeled";
@@ -2593,6 +2610,170 @@ function createHitDistributionViewModel(
   };
 }
 
+function finiteNumberOrNull(value: number): number | null {
+  return Number.isFinite(value) ? value : null;
+}
+
+function positiveFiniteNumberOrNull(value: number): number | null {
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function formatOptionalNumber(value: number | null, digits = 0): string {
+  return value == null ? "-" : formatNumber(value, digits);
+}
+
+function formatOptionalPercent(value: number | null): string {
+  return value == null ? "-" : `${formatNumber(value * 100, 1)}%`;
+}
+
+function formatOptionalDuration(value: number | null): string {
+  if (value == null) return "-";
+  if (value < 60) return `${formatNumber(value, 1)}s`;
+  const minutes = Math.floor(value / 60);
+  const remainingSeconds = Math.round(value % 60)
+    .toString()
+    .padStart(2, "0");
+  return `${minutes}:${remainingSeconds}`;
+}
+
+function statsCombatRollMetric(
+  input: StatsCombatRollMetricViewModel
+): StatsCombatRollMetricViewModel {
+  return input;
+}
+
+export function createStatsCombatRollDetailViewModel(input: {
+  combat: ReturnType<typeof simulateCombat>;
+  trip: TripLootSupplyResult;
+  hitDistribution: HitDistributionViewModel;
+}): StatsCombatRollDetailViewModel {
+  const effectiveAccuracy = finiteNumberOrNull(input.combat.debug.effectiveAccuracy);
+  const effectiveDamage = finiteNumberOrNull(input.combat.debug.effectiveDamage);
+  const attackRoll = finiteNumberOrNull(input.combat.attackRoll);
+  const defenceRoll = finiteNumberOrNull(input.combat.defenceRoll);
+  const hitChance = finiteNumberOrNull(input.combat.hitChance);
+  const maxHit = finiteNumberOrNull(input.combat.maxHit);
+  const averageHit = finiteNumberOrNull(input.hitDistribution.averageHit);
+  const attackSpeedSec = positiveFiniteNumberOrNull(input.combat.attackSpeedSec);
+  const attackTicks = positiveFiniteNumberOrNull(input.combat.attackTicks);
+  const ttkSec = positiveFiniteNumberOrNull(input.combat.ttkSec);
+  const killsPerHour = positiveFiniteNumberOrNull(input.trip.killsPerHour);
+  const gpPerKill = finiteNumberOrNull(input.trip.gpPerKill);
+
+  const metrics: StatsCombatRollMetricViewModel[] = [
+    statsCombatRollMetric({
+      id: "effective-accuracy",
+      label: "Effective accuracy",
+      value: formatOptionalNumber(effectiveAccuracy),
+      numericValue: effectiveAccuracy,
+      note: "Normal attack roll input after level, stance, prayer, boost and accuracy bonus.",
+      tone: "teal"
+    }),
+    statsCombatRollMetric({
+      id: "effective-damage",
+      label: "Effective damage",
+      value: formatOptionalNumber(effectiveDamage),
+      numericValue: effectiveDamage,
+      note: "Normal attack damage input after level, stance, prayer, boost and damage bonus.",
+      tone: "default"
+    }),
+    statsCombatRollMetric({
+      id: "attack-roll",
+      label: "Attack roll",
+      value: formatOptionalNumber(attackRoll),
+      numericValue: attackRoll,
+      note: "Normal attack roll before comparing against the active monster defence roll.",
+      tone: "default"
+    }),
+    statsCombatRollMetric({
+      id: "defence-roll",
+      label: "Defence roll",
+      value: formatOptionalNumber(defenceRoll),
+      numericValue: defenceRoll,
+      note: "Monster defence roll for the current active defence type.",
+      tone: "default"
+    }),
+    statsCombatRollMetric({
+      id: "hit-chance",
+      label: "Hit chance",
+      value: formatOptionalPercent(hitChance),
+      numericValue: hitChance,
+      note: "Normal attack hit probability from the current combat result.",
+      tone: "teal"
+    }),
+    statsCombatRollMetric({
+      id: "max-hit",
+      label: "Max hit",
+      value: formatOptionalNumber(maxHit, 1),
+      numericValue: maxHit,
+      note: "Normal attack max hit; special and cannon max hits are shown in source details.",
+      tone: "default"
+    }),
+    statsCombatRollMetric({
+      id: "average-hit",
+      label: "Average hit",
+      value: formatOptionalNumber(averageHit, 2),
+      numericValue: averageHit,
+      note: "Normal attack average hit from the current hit distribution model.",
+      tone: "default"
+    }),
+    statsCombatRollMetric({
+      id: "attack-speed",
+      label: "Attack speed",
+      value: attackSpeedSec == null ? "-" : `${formatNumber(attackSpeedSec, 1)}s`,
+      numericValue: attackSpeedSec,
+      note: "Normal attack seconds per swing.",
+      tone: "default"
+    }),
+    statsCombatRollMetric({
+      id: "attack-cycle",
+      label: "Attack cycle",
+      value: attackTicks == null ? "-" : `${formatNumber(attackTicks, 1)} ticks`,
+      numericValue: attackTicks,
+      note: "Normal attack cycle in game ticks.",
+      tone: "default"
+    }),
+    statsCombatRollMetric({
+      id: "ttk",
+      label: "TTK",
+      value: formatOptionalDuration(ttkSec),
+      numericValue: ttkSec,
+      note: "Current combat result time to kill before Trip banking and scarce-spot efficiency.",
+      tone: "gold"
+    }),
+    statsCombatRollMetric({
+      id: "kills-per-hour",
+      label: "Kills/hr",
+      value: formatOptionalNumber(killsPerHour),
+      numericValue: killsPerHour,
+      note: "Current whole-result kill rate after Trip and banking effects.",
+      tone: "gold"
+    }),
+    statsCombatRollMetric({
+      id: "gp-per-kill",
+      label: "GP/kill",
+      value: formatOptionalNumber(gpPerKill),
+      numericValue: gpPerKill,
+      note: "Current loot/economy result per kill before hourly trip efficiency.",
+      tone: "gold"
+    })
+  ];
+  const hasFallback = metrics.some((metric) => metric.numericValue == null);
+
+  return {
+    status: hasFallback ? "partial" : "modeled",
+    statusLabel: hasFallback ? "partial" : "modeled",
+    metrics,
+    notes: [
+      "Roll and hit metrics describe the normal player attack.",
+      "TTK, kills/hr and GP/kill mirror the current composed simulation result.",
+      ...(hasFallback
+        ? ["Some values are unavailable from the current result and are shown as fallbacks."]
+        : [])
+    ]
+  };
+}
+
 function finitePositiveMax(values: number[]): number {
   return Math.max(0, ...values.filter((value) => Number.isFinite(value) && value > 0));
 }
@@ -2707,6 +2888,11 @@ export function createSimulationViewModel(
     request,
     combat,
     hitDistribution,
+    combatRollDetail: createStatsCombatRollDetailViewModel({
+      combat,
+      trip,
+      hitDistribution
+    }),
     xpRouting: createXpRoutingViewModel({
       xp,
       trip,

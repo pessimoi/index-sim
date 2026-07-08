@@ -1,10 +1,26 @@
 import type {
+  PriceSet,
   IntegrationSeverity,
   MarketItemReport,
   MarketSyncReport,
   MarketSyncResponse,
   SimulationContext
 } from "@/domain/shared";
+import type { ScheduledStaticPriceSnapshotStatus } from "@/adapters/market";
+
+export type ActivePriceSetOrigin = "selected" | "scheduled" | "bundled";
+
+export interface ActivePriceSetFallbackResolution {
+  priceSet: PriceSet;
+  origin: ActivePriceSetOrigin;
+}
+
+export interface ScheduledPriceSnapshotViewModel {
+  statusLabel: string;
+  tone: "success" | "neutral" | "warning" | "error";
+  message: string;
+  fallbackLabel: string;
+}
 
 export function applyMarketSyncResponse(
   context: SimulationContext,
@@ -20,6 +36,89 @@ export function keepMarketSyncFailureContext(context: SimulationContext): Simula
   return context;
 }
 
+export function scheduledPriceSetFromStatus(
+  status: ScheduledStaticPriceSnapshotStatus | null
+): PriceSet | null {
+  return status?.status === "loaded" ? status.scheduledPriceSet : null;
+}
+
+export function resolveActivePriceSetFallback(input: {
+  bundledPriceSet: PriceSet;
+  selectedPriceSet: PriceSet | null;
+  scheduledSnapshotStatus: ScheduledStaticPriceSnapshotStatus | null;
+}): ActivePriceSetFallbackResolution {
+  if (input.selectedPriceSet) {
+    return {
+      priceSet: input.selectedPriceSet,
+      origin: "selected"
+    };
+  }
+
+  const scheduledPriceSet = scheduledPriceSetFromStatus(input.scheduledSnapshotStatus);
+  if (scheduledPriceSet) {
+    return {
+      priceSet: scheduledPriceSet,
+      origin: "scheduled"
+    };
+  }
+
+  return {
+    priceSet: input.bundledPriceSet,
+    origin: "bundled"
+  };
+}
+
+export function activePriceSetOriginLabel(origin: ActivePriceSetOrigin): string {
+  if (origin === "selected") return "Local override";
+  if (origin === "scheduled") return "Scheduled snapshot";
+  return "Bundled fallback";
+}
+
+function fallbackLabelForOrigin(origin: ActivePriceSetOrigin): string {
+  if (origin === "selected") return "Local override active";
+  if (origin === "scheduled") return "Scheduled snapshot active";
+  return "Bundled prices active";
+}
+
+export function createScheduledPriceSnapshotViewModel(
+  status: ScheduledStaticPriceSnapshotStatus | null,
+  activeOrigin: ActivePriceSetOrigin
+): ScheduledPriceSnapshotViewModel {
+  if (!status) {
+    return {
+      statusLabel: "Loading",
+      tone: "neutral",
+      message: "Checking scheduled price snapshot.",
+      fallbackLabel: fallbackLabelForOrigin(activeOrigin)
+    };
+  }
+
+  if (status.status === "loaded") {
+    return {
+      statusLabel: "Loaded",
+      tone: "success",
+      message: "Scheduled prices loaded.",
+      fallbackLabel: fallbackLabelForOrigin(activeOrigin)
+    };
+  }
+
+  if (status.status === "fallback") {
+    return {
+      statusLabel: "Fallback",
+      tone: "warning",
+      message: status.reason,
+      fallbackLabel: fallbackLabelForOrigin(activeOrigin)
+    };
+  }
+
+  return {
+    statusLabel: status.status === "missing" ? "Unavailable" : "Invalid",
+    tone: status.status === "missing" ? "neutral" : "warning",
+    message: status.reason,
+    fallbackLabel: fallbackLabelForOrigin(activeOrigin)
+  };
+}
+
 export function summarizeMarketSyncReport(report: MarketSyncReport): string {
   return `${report.updated} updated · ${report.skipped} skipped · ${report.failed} failed`;
 }
@@ -29,7 +128,6 @@ export type MarketReportStatusFilter = "all" | MarketItemReport["status"];
 export interface MarketReportItemDetail {
   itemId: string;
   itemLabel: string;
-  sourceSlug: string;
   status: MarketItemReport["status"];
   priceLabel: string;
   alchValueLabel: string;
@@ -91,7 +189,6 @@ export function formatMarketSyncReportDetails(
     .map(({ item }) => ({
       itemId: item.itemId,
       itemLabel: options.itemLabel?.(item.itemId) ?? item.itemId,
-      sourceSlug: item.sourceSlug ?? "-",
       status: item.status,
       priceLabel: formatMarketNumber(item.price),
       alchValueLabel: formatMarketNumber(item.alchValue),

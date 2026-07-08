@@ -78,6 +78,8 @@ export interface LegacyStorageKeyReviewItem extends LegacyStorageKeyPolicy {
 export interface LegacyMigrationSkippedField {
   field: string;
   reason: string;
+  disposition?: LegacyStorageKeyMigrationDisposition;
+  handling?: string;
 }
 
 export interface LegacySetupMigrationReport {
@@ -114,6 +116,7 @@ const DEFAULT_MAX_LEGACY_LOOT_PREFS_BYTES = 100_000;
 const DEFAULT_MAX_LEGACY_UI_STATE_BYTES = 50_000;
 const MAX_LEGACY_LOOT_PREF_KEYS = 500;
 const MAX_LEGACY_IRRELEVANT_MONSTER_IDS = 500;
+const MAX_LEGACY_NESTED_REVIEW_KEYS = 500;
 const COMBAT_STYLES = ["melee", "ranged", "magic"] as const satisfies readonly CombatStyle[];
 const PROTECT_PRAYERS = ["none", "melee", "missiles", "magic"] as const;
 const PRAYER_MODES = ["potions", "altar", "none"] as const;
@@ -390,6 +393,8 @@ function inspectLegacySetupInput(
     return;
   }
 
+  inspectLegacySetupReviewOnlyAreas(parsed, options.gameData, report);
+
   const draft = cloneDefaultFormState();
   mapLegacyInput(parsed, draft, options.gameData, report);
 
@@ -407,6 +412,106 @@ function inspectLegacySetupInput(
   }
 
   report.setup = normalizeFormState(validated.data);
+}
+
+function inspectLegacySetupReviewOnlyAreas(
+  legacy: LegacyRecord,
+  gameData: GameDataSnapshot,
+  report: LegacySetupMigrationReport
+): void {
+  inspectNestedReviewOnlyMap({
+    value: legacy.monsterSetups,
+    field: "sim_input_v3.monsterSetups",
+    label: "Legacy custom setup snapshots",
+    singular: "custom setup snapshot",
+    plural: "custom setup snapshots",
+    handling:
+      "Detected only; legacy custom setup snapshots are not imported into rewrite custom setups.",
+    invalidShapeReason:
+      "legacy custom setup snapshots were detected but not imported because the shape is not an object map",
+    detectedReason:
+      "legacy custom setup snapshots were detected but not imported because no safe import policy is accepted",
+    warning: "Legacy custom setup snapshots were detected but not imported.",
+    gameData,
+    report
+  });
+  inspectNestedReviewOnlyMap({
+    value: legacy.cannonByMonster,
+    field: "sim_input_v3.cannonByMonster",
+    label: "Legacy cannon map",
+    singular: "cannon entry",
+    plural: "cannon entries",
+    handling:
+      "Detected only; legacy cannon map settings are not imported into rewrite cannon state.",
+    invalidShapeReason:
+      "legacy cannon map was detected but not imported because the shape is not an object map",
+    detectedReason:
+      "legacy cannon map was detected but not imported because no safe import policy is accepted",
+    warning: "Legacy cannon map was detected but not imported.",
+    gameData,
+    report
+  });
+}
+
+function inspectNestedReviewOnlyMap(options: {
+  value: unknown;
+  field: string;
+  label: string;
+  singular: string;
+  plural: string;
+  handling: string;
+  invalidShapeReason: string;
+  detectedReason: string;
+  warning: string;
+  gameData: GameDataSnapshot;
+  report: LegacySetupMigrationReport;
+}): void {
+  if (options.value === undefined) return;
+  if (!isRecord(options.value)) {
+    skip(options.report, options.field, options.invalidShapeReason, {
+      disposition: "review-only",
+      handling: options.handling
+    });
+    warn(options.report, `${options.label} was detected but its shape is not importable.`);
+    return;
+  }
+
+  const monsterIds = Object.keys(options.value);
+  if (monsterIds.length === 0) return;
+  if (monsterIds.length > MAX_LEGACY_NESTED_REVIEW_KEYS) {
+    skip(
+      options.report,
+      options.field,
+      `${options.detectedReason}; map exceeds safe review key limit`,
+      { disposition: "review-only", handling: options.handling }
+    );
+    warn(options.report, `${options.label} was detected but exceeds the safe review key limit.`);
+    return;
+  }
+
+  const knownMonsterIds = new Set(Object.keys(options.gameData.monsters));
+  const unknownMonsterCount = monsterIds.filter((monsterId) => !knownMonsterIds.has(monsterId))
+    .length;
+  const entryCountText = `${monsterIds.length} ${
+    monsterIds.length === 1 ? options.singular : options.plural
+  }`;
+  const unknownText =
+    unknownMonsterCount > 0
+      ? `; ${unknownMonsterCount} ${
+          unknownMonsterCount === 1 ? "entry has" : "entries have"
+        } unknown current monster ids`
+      : "";
+
+  skip(
+    options.report,
+    options.field,
+    `${options.detectedReason} (${entryCountText}${unknownText})`,
+    {
+      disposition: "review-only",
+      handling: options.handling
+    }
+  );
+  warn(options.report, options.warning);
 }
 
 function inspectLegacyHiscoresPlayer(
@@ -1317,8 +1422,13 @@ function importField(report: LegacySetupMigrationReport, field: string): void {
   report.importedFields.push(field);
 }
 
-function skip(report: LegacySetupMigrationReport, field: string, reason: string): void {
-  report.skippedFields.push({ field, reason });
+function skip(
+  report: LegacySetupMigrationReport,
+  field: string,
+  reason: string,
+  metadata: Pick<LegacyMigrationSkippedField, "disposition" | "handling"> = {}
+): void {
+  report.skippedFields.push({ field, reason, ...metadata });
 }
 
 function warn(report: LegacySetupMigrationReport, message: string): void {

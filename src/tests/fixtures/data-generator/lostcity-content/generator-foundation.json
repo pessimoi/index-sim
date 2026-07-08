@@ -1,0 +1,95 @@
+{
+  "source": {
+    "name": "LostCityRS/Content fixture",
+    "revision": "fixture-revision-274",
+    "commit": "0000000000000000000000000000000000000274"
+  },
+  "snapshot": {
+    "id": "generated-foundation-fixture",
+    "label": "Generated game data foundation fixture",
+    "items": {
+      "bones": {
+        "id": "bones",
+        "name": "Bones",
+        "stackable": false,
+        "provenance": {
+          "source": "manual",
+          "sourceRef": "synthetic fixture",
+          "notes": "Foundation fixture item, not copied upstream file content."
+        }
+      },
+      "bronze_sword": {
+        "id": "bronze_sword",
+        "name": "Bronze sword",
+        "stackable": false,
+        "provenance": {
+          "source": "manual",
+          "sourceRef": "synthetic fixture",
+          "notes": "Foundation fixture weapon item, not copied upstream file content."
+        }
+      }
+    },
+    "monsters": {
+      "training_dummy": {
+        "id": "training_dummy",
+        "name": "Training dummy",
+        "level": 1,
+        "hp": 3,
+        "attack": 1,
+        "strength": 1,
+        "defLevel": 1,
+        "loot": [
+          {
+            "name": "Bones",
+            "key": "bones",
+            "chance": 1,
+            "qtyAvg": 1,
+            "provenance": {
+              "source": "manual",
+              "sourceRef": "synthetic fixture",
+              "notes": "Foundation fixture drop row, not copied upstream file content."
+            }
+          }
+        ],
+        "provenance": {
+          "source": "manual",
+          "sourceRef": "synthetic fixture",
+          "notes": "Foundation fixture monster, not copied upstream file content."
+        }
+      }
+    },
+    "weapons": {
+      "bronze_sword": {
+        "name": "Bronze sword",
+        "type": "melee",
+        "wclass": "sword",
+        "accBonus": 4,
+        "dmgBonus": 5,
+        "speed": 4,
+        "acc": {
+          "stab": 4,
+          "slash": 3,
+          "crush": -2
+        }
+      }
+    },
+    "ammo": {},
+    "spells": {},
+    "equipment": {
+      "helm": {},
+      "amulet": {},
+      "body": {},
+      "legs": {},
+      "shield": {},
+      "gloves": {},
+      "boots": {},
+      "cape": {},
+      "ring": {}
+    },
+    "provenance": {
+      "source": "manual",
+      "sourceRef": "synthetic fixture",
+      "notes": "Schema-valid generated-data foundation fixture. It is not a full authoritative LostCityRS/Content extraction."
+    }
+  }
+}

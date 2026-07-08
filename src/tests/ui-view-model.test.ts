@@ -24,6 +24,7 @@ import {
   createMonsterCardViewModel,
   createPlannerViewModel,
   createSimulationViewModel,
+  createStatsCombatRollDetailViewModel,
   equipmentSlotOptions,
   formatNumber,
   gearQuickActionForSlot,
@@ -151,6 +152,10 @@ function statsSourceDetail(
 
 function statsSourceMetrics(detail: StatsSourceDetailForTest | undefined) {
   return new Map((detail?.metrics ?? []).map((metric) => [metric.id, metric]));
+}
+
+function combatRollMetrics(result: ReturnType<typeof createSimulationViewModel>) {
+  return new Map(result.combatRollDetail.metrics.map((metric) => [metric.id, metric]));
 }
 
 describe("rewrite UI view models", () => {
@@ -1704,6 +1709,145 @@ describe("rewrite UI view models", () => {
     expect(missBucket.ariaLabel).toContain("miss or zero damage");
     expect(maxBucket).toBeDefined();
     expect(maxBucket?.ariaLabel).toContain("max hit bucket");
+  }, 15_000);
+
+  it("builds default melee Stats combat roll detail metrics from current result data", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const result = createSimulationViewModel(DEFAULT_FORM_STATE, context);
+    const metrics = combatRollMetrics(result);
+
+    expect(result.combatRollDetail).toMatchObject({
+      status: "modeled",
+      statusLabel: "modeled"
+    });
+    expect(metrics.get("effective-accuracy")).toMatchObject({
+      value: formatNumber(result.combat.debug.effectiveAccuracy),
+      numericValue: result.combat.debug.effectiveAccuracy
+    });
+    expect(metrics.get("effective-damage")).toMatchObject({
+      value: formatNumber(result.combat.debug.effectiveDamage),
+      numericValue: result.combat.debug.effectiveDamage
+    });
+    expect(metrics.get("attack-roll")).toMatchObject({
+      value: formatNumber(result.combat.attackRoll),
+      numericValue: result.combat.attackRoll
+    });
+    expect(metrics.get("defence-roll")).toMatchObject({
+      value: formatNumber(result.combat.defenceRoll),
+      numericValue: result.combat.defenceRoll
+    });
+    expect(metrics.get("hit-chance")).toMatchObject({
+      value: `${formatNumber(result.combat.hitChance * 100, 1)}%`,
+      numericValue: result.combat.hitChance
+    });
+    expect(metrics.get("max-hit")).toMatchObject({
+      value: formatNumber(result.combat.maxHit, 1),
+      numericValue: result.combat.maxHit
+    });
+    expect(metrics.get("average-hit")).toMatchObject({
+      value: formatNumber(result.hitDistribution.averageHit, 2),
+      numericValue: result.hitDistribution.averageHit
+    });
+    expect(metrics.get("attack-speed")).toMatchObject({
+      value: `${formatNumber(result.combat.attackSpeedSec, 1)}s`,
+      numericValue: result.combat.attackSpeedSec
+    });
+    expect(metrics.get("attack-cycle")).toMatchObject({
+      value: `${formatNumber(result.combat.attackTicks, 1)} ticks`,
+      numericValue: result.combat.attackTicks
+    });
+    expect(metrics.get("ttk")?.numericValue).toBe(result.combat.ttkSec);
+    expect(metrics.get("kills-per-hour")?.numericValue).toBe(result.trip.killsPerHour);
+    expect(metrics.get("gp-per-kill")?.numericValue).toBe(result.trip.gpPerKill);
+    expect(result.combatRollDetail.notes.join("\n")).toContain(
+      "Roll and hit metrics describe the normal player attack."
+    );
+  }, 15_000);
+
+  it("builds ranged Stats combat roll detail without melee-only assumptions", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const result = createSimulationViewModel(rangedRockCrabForm(), context);
+    const metrics = combatRollMetrics(result);
+    const notes = result.combatRollDetail.metrics.map((metric) => metric.note).join("\n");
+
+    expect(result.request.combatStyle).toBe("ranged");
+    expect(result.combatRollDetail.status).toBe("modeled");
+    expect(metrics.get("effective-accuracy")?.numericValue).toBe(
+      result.combat.debug.effectiveAccuracy
+    );
+    expect(metrics.get("effective-damage")?.numericValue).toBe(
+      result.combat.debug.effectiveDamage
+    );
+    expect(metrics.get("hit-chance")?.numericValue).toBe(result.combat.hitChance);
+    expect(metrics.get("attack-cycle")?.numericValue).toBe(result.combat.attackTicks);
+    expect(metrics.get("ttk")?.numericValue).toBe(result.combat.ttkSec);
+    expect(notes.toLowerCase()).not.toContain("melee");
+  }, 15_000);
+
+  it("builds magic Stats combat roll detail without special or cannon histogram claims", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const magicForm = normalizeFormState({
+      ...switchCombatStyleLoadout(DEFAULT_FORM_STATE, "magic"),
+      weaponId: "staff_of_fire",
+      spellId: "fire_wave",
+      styleId: "accurate"
+    });
+    const result = createSimulationViewModel(magicForm, context);
+    const metrics = combatRollMetrics(result);
+
+    expect(result.request.combatStyle).toBe("magic");
+    expect(result.combatRollDetail.status).toBe("modeled");
+    expect(metrics.get("effective-accuracy")?.numericValue).toBe(
+      result.combat.debug.effectiveAccuracy
+    );
+    expect(metrics.get("average-hit")?.numericValue).toBe(result.hitDistribution.averageHit);
+    expect(statsSourceDetail(result, "special-attack")?.histogram).toBeNull();
+    expect(statsSourceDetail(result, "cannon")?.histogram).toBeNull();
+  }, 15_000);
+
+  it("renders unavailable Stats combat roll values as fallbacks instead of zero", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const result = createSimulationViewModel(DEFAULT_FORM_STATE, context);
+    const detail = createStatsCombatRollDetailViewModel({
+      combat: {
+        ...result.combat,
+        attackRoll: Number.NaN,
+        hitChance: Number.NaN,
+        maxHit: Number.NaN,
+        attackTicks: Number.NaN,
+        attackSpeedSec: Number.NaN,
+        ttkSec: Number.POSITIVE_INFINITY,
+        debug: {
+          ...result.combat.debug,
+          effectiveAccuracy: Number.NaN
+        }
+      },
+      trip: {
+        ...result.trip,
+        killsPerHour: Number.NaN,
+        gpPerKill: Number.NaN
+      },
+      hitDistribution: {
+        ...result.hitDistribution,
+        averageHit: Number.NaN
+      }
+    });
+    const metrics = new Map(detail.metrics.map((metric) => [metric.id, metric]));
+
+    expect(detail.status).toBe("partial");
+    expect(metrics.get("effective-accuracy")).toMatchObject({
+      value: "-",
+      numericValue: null
+    });
+    expect(metrics.get("attack-roll")).toMatchObject({ value: "-", numericValue: null });
+    expect(metrics.get("hit-chance")).toMatchObject({ value: "-", numericValue: null });
+    expect(metrics.get("average-hit")).toMatchObject({ value: "-", numericValue: null });
+    expect(metrics.get("attack-speed")).toMatchObject({ value: "-", numericValue: null });
+    expect(metrics.get("attack-cycle")).toMatchObject({ value: "-", numericValue: null });
+    expect(metrics.get("ttk")).toMatchObject({ value: "-", numericValue: null });
+    expect(metrics.get("kills-per-hour")).toMatchObject({ value: "-", numericValue: null });
+    expect(metrics.get("gp-per-kill")).toMatchObject({ value: "-", numericValue: null });
+    expect(detail.notes.join("\n")).toContain("shown as fallbacks");
   }, 15_000);
 
   it("builds Stats XP routing rows with player, skill and modeled loot XP rows", async () => {

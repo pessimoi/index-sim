@@ -1,10 +1,16 @@
 import {
   applyMarketSyncResponse,
+  activePriceSetOriginLabel,
+  createScheduledPriceSnapshotViewModel,
   formatMarketSyncReportDetails,
   keepMarketSyncFailureContext,
+  resolveActivePriceSetFallback,
   summarizeMarketSyncReport
 } from "../app/state/market-sync";
-import { parsePriceSetFileText } from "../adapters/market";
+import {
+  createScheduledStaticPriceSnapshotStatus,
+  parsePriceSetFileText
+} from "../adapters/market";
 import { createMemoryStorage } from "../adapters/storage";
 import {
   analyzePriceHistoryMovers,
@@ -177,7 +183,6 @@ describe("market sync UI state helpers", () => {
     expect(details.items[0]).toMatchObject({
       itemId: "lobster",
       itemLabel: "Lobster",
-      sourceSlug: "lobster",
       priceLabel: "-",
       alchValueLabel: "-",
       reason: expect.stringContaining("[path]")
@@ -224,6 +229,87 @@ describe("market sync UI state helpers", () => {
     expect(details.items).toHaveLength(1);
     expect(details.items[0]).toMatchObject({ itemId: "lobster", status: "failed" });
     expect(details.counts).toEqual({ all: 2, updated: 1, skipped: 0, failed: 1 });
+  });
+
+  it("models a valid scheduled snapshot as the active fallback over bundled prices", () => {
+    const bundled = fixtureContext().priceSet;
+    const scheduled = createScheduledStaticPriceSnapshotStatus({
+      pricesText: JSON.stringify({ _scraped_at: 1783512900, lobster: 220 }),
+      alchText: JSON.stringify({ lobster: 0 })
+    });
+    const resolution = resolveActivePriceSetFallback({
+      bundledPriceSet: bundled,
+      selectedPriceSet: null,
+      scheduledSnapshotStatus: scheduled
+    });
+    const statusViewModel = createScheduledPriceSnapshotViewModel(scheduled, resolution.origin);
+
+    expect(resolution.origin).toBe("scheduled");
+    expect(activePriceSetOriginLabel(resolution.origin)).toBe("Scheduled snapshot");
+    expect(resolution.priceSet).toMatchObject({
+      label: "Scheduled static prices",
+      source: "scraped",
+      itemPrices: { lobster: 220 }
+    });
+    expect(statusViewModel).toMatchObject({
+      statusLabel: "Loaded",
+      tone: "success",
+      message: "Scheduled prices loaded.",
+      fallbackLabel: "Scheduled snapshot active"
+    });
+  });
+
+  it("keeps persisted selected PriceSet ahead of a valid scheduled snapshot", () => {
+    const bundled = fixtureContext().priceSet;
+    const selected = importedPriceSet("selected-over-scheduled");
+    const scheduled = createScheduledStaticPriceSnapshotStatus({
+      pricesText: JSON.stringify({ _scraped_at: 1783512900, lobster: 220 }),
+      alchText: JSON.stringify({ lobster: 0 })
+    });
+    const resolution = resolveActivePriceSetFallback({
+      bundledPriceSet: bundled,
+      selectedPriceSet: selected,
+      scheduledSnapshotStatus: scheduled
+    });
+    const statusViewModel = createScheduledPriceSnapshotViewModel(scheduled, resolution.origin);
+
+    expect(resolution.origin).toBe("selected");
+    expect(resolution.priceSet.id).toBe("selected-over-scheduled");
+    expect(statusViewModel.fallbackLabel).toBe("Local override active");
+  });
+
+  it.each([
+    [
+      "missing",
+      createScheduledStaticPriceSnapshotStatus(
+        { pricesText: JSON.stringify({ lobster: 220 }), alchText: null },
+        { fallbackPriceSet: fixtureContext().priceSet }
+      )
+    ],
+    [
+      "invalid",
+      createScheduledStaticPriceSnapshotStatus(
+        { pricesText: "{bad", alchText: JSON.stringify({ lobster: 0 }) },
+        { fallbackPriceSet: fixtureContext().priceSet }
+      )
+    ]
+  ] as const)("models %s scheduled snapshots as non-fatal fallback notices", (_caseName, status) => {
+    const bundled = fixtureContext().priceSet;
+    const resolution = resolveActivePriceSetFallback({
+      bundledPriceSet: bundled,
+      selectedPriceSet: null,
+      scheduledSnapshotStatus: status
+    });
+    const statusViewModel = createScheduledPriceSnapshotViewModel(status, resolution.origin);
+
+    expect(resolution.origin).toBe("bundled");
+    expect(resolution.priceSet.id).toBe("base");
+    expect(statusViewModel).toMatchObject({
+      statusLabel: "Fallback",
+      tone: "warning",
+      fallbackLabel: "Bundled prices active"
+    });
+    expect(statusViewModel.message).toContain("Using the current PriceSet fallback");
   });
 
   it("accepted imported PriceSet adds a browser-local history snapshot", () => {
@@ -435,6 +521,38 @@ describe("market sync UI state helpers", () => {
     if (afterFailedSync.status === "loaded") {
       expect(afterFailedSync.value.priceSet.id).toBe("synced");
     }
+  });
+
+  it("keeps selected PriceSet and browser-local history unchanged when reading scheduled static prices", () => {
+    const historyEnvelope = JSON.stringify({
+      version: 1,
+      savedAt: "2026-07-05T13:01:00.000Z",
+      data: DEFAULT_PRICE_HISTORY_STATE
+    });
+    const storage = createMemoryStorage({
+      [PRICE_HISTORY_STORAGE_KEY]: historyEnvelope
+    });
+    saveSelectedPriceSet(storage, importedPriceSet("selected-before-scheduled-load"), {
+      now: () => new Date("2026-07-05T13:01:00.000Z")
+    });
+    const selectedBefore = storage.getItem(SELECTED_PRICE_SET_STORAGE_KEY);
+
+    const loaded = createScheduledStaticPriceSnapshotStatus({
+      pricesText: JSON.stringify({ _scraped_at: 1783512900, lobster: 220 }),
+      alchText: JSON.stringify({ lobster: 0 })
+    });
+    const fallback = createScheduledStaticPriceSnapshotStatus(
+      {
+        pricesText: "{bad",
+        alchText: JSON.stringify({ lobster: 0 })
+      },
+      { fallbackPriceSet: fixtureContext().priceSet }
+    );
+
+    expect(loaded.status).toBe("loaded");
+    expect(fallback.status).toBe("fallback");
+    expect(storage.getItem(SELECTED_PRICE_SET_STORAGE_KEY)).toBe(selectedBefore);
+    expect(storage.getItem(PRICE_HISTORY_STORAGE_KEY)).toBe(historyEnvelope);
   });
 
   it("analyzes movers latest-vs-previous, latest-vs-first and explicit snapshot", () => {

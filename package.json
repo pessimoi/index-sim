@@ -11,6 +11,8 @@
     "test:golden": "$NODE node_modules/vitest/vitest.mjs run --config vitest.config.ts src/tests/legacy-golden.test.ts",
     "test:watch": "$NODE node_modules/vitest/vitest.mjs --config vitest.config.ts",
     "fixtures:capture": "$NODE node_modules/vite-node/vite-node.mjs --config vitest.config.ts scripts/capture-legacy-golden.ts",
+    "data:generate": "$NODE node_modules/vite-node/vite-node.mjs --config vitest.config.ts scripts/generate-game-data.ts",
+    "prices:write-scheduled": "$NODE node_modules/vite-node/vite-node.mjs --config vitest.config.ts scripts/write-scheduled-market-prices.ts",
     "test:e2e": "playwright test",
     "typecheck": "tsc -b",
     "lint": "$NODE node_modules/eslint/bin/eslint.js .",

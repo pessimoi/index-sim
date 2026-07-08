@@ -173,9 +173,13 @@ test("loads the dense combat spreadsheet root", async ({ page }) => {
     page.getByText("Live hiscores lookup is not configured in this run.")
   ).toBeVisible();
   await page.getByLabel("Workbench tabs").getByRole("button", { name: "Economy" }).click();
+  const market = page.locator('section[aria-label="Market price data"]');
   await expect(
-    page.getByText("Live market sync is not configured in this run.")
+    market.getByText("Market upstream refresh is scheduled, not user-triggered.")
   ).toBeVisible();
+  await expect(market.getByLabel("Scheduled price snapshot summary")).toContainText(
+    "Status Loaded"
+  );
   await expect(page.getByText("run_sim.py")).toHaveCount(0);
   await expect(page.getByText("/api/prices")).toHaveCount(0);
   await expect(page.getByText("/api/scrape")).toHaveCount(0);
@@ -206,7 +210,7 @@ test("keeps hiscores disabled fallback focused on manual Player levels", async (
   });
 
   await page.goto("/");
-  const hiscores = page.getByLabel("Hiscores");
+  const hiscores = page.getByRole("region", { name: "Hiscores" });
   const playerLevels = page.getByLabel("Player levels");
 
   await expect(hiscores.getByLabel("Player", { exact: true })).toBeVisible();
@@ -223,8 +227,8 @@ test("keeps hiscores disabled fallback focused on manual Player levels", async (
   expect(lookupRequested).toBe(false);
 });
 
-test("keeps market disabled fallback focused on imported PriceSets", async ({ page }) => {
-  let syncRequested = false;
+test("renders scheduled price status and keeps local PriceSet overrides separate", async ({ page }) => {
+  let refreshRequested = false;
   await page.route("**/api/market/status", async (route) => {
     await route.fulfill({
       status: 200,
@@ -238,7 +242,7 @@ test("keeps market disabled fallback focused on imported PriceSets", async ({ pa
     });
   });
   await page.route("**/api/market/sync", async (route) => {
-    syncRequested = true;
+    refreshRequested = true;
     await route.fulfill({
       status: 503,
       contentType: "application/json",
@@ -250,19 +254,21 @@ test("keeps market disabled fallback focused on imported PriceSets", async ({ pa
 
   await page.goto("/");
   await page.getByLabel("Workbench tabs").getByRole("button", { name: "Economy" }).click();
-  const market = page.locator('section[aria-label="Market sync"]');
+  const market = page.locator('section[aria-label="Market price data"]');
   const activePriceSetSummary = market.getByLabel("Market active PriceSet summary");
+  const scheduledSummary = market.getByLabel("Scheduled price snapshot summary");
 
-  await expect(market.getByRole("button", { name: "Sync monster" })).toBeDisabled();
-  await expect(market.getByRole("button", { name: "Sync all" })).toBeDisabled();
-  await expect(market).toContainText("Live market sync is not configured in this run.");
   await expect(market).toContainText(
-    "Simulations continue to use the active bundled or imported PriceSet."
+    "Market upstream refresh is scheduled, not user-triggered."
   );
-  await expect(activePriceSetSummary).toContainText(/Label .*bundled legacy prices/i);
-  await expect(activePriceSetSummary).toContainText("Source bundled");
+  await expect(scheduledSummary).toContainText("Status Loaded");
+  await expect(scheduledSummary).toContainText("Label Scheduled static prices");
+  await expect(activePriceSetSummary).toContainText("Active source Scheduled snapshot");
+  await expect(activePriceSetSummary).toContainText("Label Scheduled static prices");
+  await expect(activePriceSetSummary).toContainText("Source scraped");
   await expect(activePriceSetSummary).toContainText(/Item prices [0-9,]+/);
   await expect(activePriceSetSummary).toContainText(/Alch values [0-9,]+/);
+  await expect(market.getByRole("button", { name: /Sync/ })).toHaveCount(0);
 
   const importedPriceSet = {
     id: "manual-disabled-market",
@@ -284,12 +290,12 @@ test("keeps market disabled fallback focused on imported PriceSets", async ({ pa
 
   await expect(market.getByLabel("Price import notice")).toContainText("Imported price set");
   await expect(activePriceSetSummary).toContainText("Label Disabled market imported prices");
+  await expect(activePriceSetSummary).toContainText("Active source Local override");
   await expect(activePriceSetSummary).toContainText("Source manual");
   await expect(activePriceSetSummary).toContainText("Item prices 2");
   await expect(activePriceSetSummary).toContainText("Alch values 2");
   await expect(page.getByLabel("Price history summary")).toContainText("Snapshots 1");
-  await expect(market.getByRole("button", { name: "Sync monster" })).toBeDisabled();
-  await expect(market.getByRole("button", { name: "Sync all" })).toBeDisabled();
+  await expect(market.getByRole("button", { name: /Sync/ })).toHaveCount(0);
 
   const persistedHistory = await page.evaluate(() =>
     JSON.parse(window.localStorage.getItem("index-sim:price-history") ?? "null")
@@ -324,7 +330,7 @@ test("keeps market disabled fallback focused on imported PriceSets", async ({ pa
   });
   await page.reload();
   await page.getByLabel("Workbench tabs").getByRole("button", { name: "Economy" }).click();
-  const reloadedMarket = page.locator('section[aria-label="Market sync"]');
+  const reloadedMarket = page.locator('section[aria-label="Market price data"]');
   const reloadedActivePriceSetSummary = reloadedMarket.getByLabel(
     "Market active PriceSet summary"
   );
@@ -334,11 +340,12 @@ test("keeps market disabled fallback focused on imported PriceSets", async ({ pa
   await expect(reloadedActivePriceSetSummary).toContainText("Source manual");
   await expect(page.getByLabel("Price history summary")).toContainText("Snapshots 1");
 
-  await reloadedMarket.getByRole("button", { name: "Reset to bundled prices" }).click();
-  await expect(reloadedMarket).toContainText("Confirm reset to bundled prices");
-  await reloadedMarket.getByRole("button", { name: "Confirm reset to bundled prices" }).click();
-  await expect(reloadedActivePriceSetSummary).toContainText(/Label .*bundled legacy prices/i);
-  await expect(reloadedActivePriceSetSummary).toContainText("Source bundled");
+  await reloadedMarket.getByRole("button", { name: "Reset local price override" }).click();
+  await expect(reloadedMarket).toContainText("Confirm reset to scheduled prices");
+  await reloadedMarket.getByRole("button", { name: "Confirm reset to scheduled prices" }).click();
+  await expect(reloadedActivePriceSetSummary).toContainText("Active source Scheduled snapshot");
+  await expect(reloadedActivePriceSetSummary).toContainText("Label Scheduled static prices");
+  await expect(reloadedActivePriceSetSummary).toContainText("Source scraped");
   expect(
     await page.evaluate(() => window.localStorage.getItem("index-sim:price-set:selected"))
   ).toBeNull();
@@ -351,9 +358,9 @@ test("keeps market disabled fallback focused on imported PriceSets", async ({ pa
   await page.reload();
   await page.getByLabel("Workbench tabs").getByRole("button", { name: "Economy" }).click();
   await expect(page.getByLabel("Market active PriceSet summary")).toContainText(
-    /Label .*bundled legacy prices/i
+    "Label Scheduled static prices"
   );
-  expect(syncRequested).toBe(false);
+  expect(refreshRequested).toBe(false);
 });
 
 test("shows Stats XP routing trip summary and hit distribution", async ({ page }) => {
@@ -388,6 +395,21 @@ test("shows Stats XP routing trip summary and hit distribution", async ({ page }
   await expect(
     sourceDetails.getByRole("listitem", { name: /Cannon detail: inactive/i })
   ).toContainText("Cannon is off");
+
+  const combatRoll = analysis.getByRole("region", {
+    name: "Combat roll details",
+    exact: true
+  });
+  await expect(combatRoll).toBeVisible();
+  const combatRollMetrics = combatRoll.getByRole("list", { name: "Combat roll metrics" });
+  await expect(combatRollMetrics).toContainText("Effective accuracy");
+  await expect(combatRollMetrics).toContainText("Effective damage");
+  await expect(combatRollMetrics).toContainText("Hit chance");
+  await expect(combatRollMetrics).toContainText("Attack speed");
+  await expect(combatRollMetrics).toContainText("Attack cycle");
+  await expect(combatRollMetrics).toContainText("TTK");
+  await expect(combatRollMetrics).toContainText("Kills/hr");
+  await expect(combatRollMetrics).toContainText("GP/kill");
 
   const xpRouting = analysis.getByRole("region", { name: "XP routing", exact: true });
   await expect(xpRouting).toBeVisible();
@@ -427,6 +449,21 @@ test("shows Stats XP routing trip summary and hit distribution", async ({ page }
   await expect(histogram.getByRole("listitem", { name: /miss or zero damage/i })).toBeVisible();
   await expect(histogram.getByRole("listitem", { name: /max hit bucket/i })).toBeVisible();
   await expect(histogram).toContainText("max hit");
+
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Ranged" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Stats" }).click();
+  await expect(combatRoll).toContainText("Effective accuracy");
+  await expect(combatRoll).toContainText("Attack cycle");
+  await expect(combatRoll.getByRole("listitem", { name: /Hit chance:/ })).toBeVisible();
+
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Magic" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Stats" }).click();
+  await expect(combatRoll).toContainText("Effective damage");
+  await expect(
+    sourceDetails.getByRole("listitem", { name: /Special attack detail: not modeled/i })
+  ).toContainText("Magic DPS special attacks are not modeled yet");
+  await expect(sourceDetails).not.toContainText("Special attack histogram");
+  await expect(sourceDetails).not.toContainText("Cannon histogram");
 
   await page.getByLabel("Workbench tabs").getByRole("button", { name: "Compare" }).click();
   await page.getByLabel("TYPE", { exact: true }).selectOption("ranged");
@@ -752,7 +789,13 @@ test("reviews and imports compatible legacy setup data", async ({ page }) => {
         weapon: "magic_shortbow",
         ammo: "rune_arrow",
         style: "rapid",
-        trip: { safespot: false, protect: "missiles", antifire: true }
+        trip: { safespot: false, protect: "missiles", antifire: true },
+        monsterSetups: {
+          giant: { combatType: "melee", weapon: "dragon_longsword" }
+        },
+        cannonByMonster: {
+          dagannoth: { enabled: true, targets: 6, respawnSec: 30 }
+        }
       })
     );
     window.localStorage.setItem("sim_planner_v1", "{}");
@@ -844,6 +887,18 @@ test("reviews and imports compatible legacy setup data", async ({ page }) => {
     "legacy planner state was detected but not imported"
   );
   await expect(migration.getByLabel("Legacy import and review plan")).toContainText(
+    "sim_input_v3.monsterSetups: review only"
+  );
+  await expect(migration.getByLabel("Legacy import and review plan")).toContainText(
+    "legacy custom setup snapshots are not imported into rewrite custom setups"
+  );
+  await expect(migration.getByLabel("Legacy import and review plan")).toContainText(
+    "sim_input_v3.cannonByMonster: review only"
+  );
+  await expect(migration.getByLabel("Legacy import and review plan")).toContainText(
+    "legacy cannon map settings are not imported into rewrite cannon state"
+  );
+  await expect(migration.getByLabel("Legacy import and review plan")).toContainText(
     "sim_scraped_keys_v1: intentional reset"
   );
   const keyReview = migration.getByRole("table", { name: "Legacy storage key review" });
@@ -872,6 +927,8 @@ test("reviews and imports compatible legacy setup data", async ({ page }) => {
   await expect(page.getByLabel("TARGET", { exact: true })).toHaveValue("greater_demon");
   await page.waitForFunction(() => {
     const saved = window.localStorage.getItem("index-sim:rewrite-setup") ?? "";
+    if (!saved) return false;
+    const parsed = JSON.parse(saved);
     return (
       saved.includes('"combatStyle":"ranged"') &&
       saved.includes('"monsterId":"greater_demon"') &&
@@ -879,6 +936,8 @@ test("reviews and imports compatible legacy setup data", async ({ page }) => {
       saved.includes('"key":"monsterName"') &&
       saved.includes('"direction":"asc"') &&
       saved.includes('"irrelevantMonsterIds":["rock_crab"]') &&
+      Object.keys(parsed.data?.customSetupsByMonster ?? {}).length === 0 &&
+      Object.keys(parsed.data?.cannonByMonster ?? {}).length === 0 &&
       (window.localStorage.getItem("index-sim:hidden-gear-tiers") ?? "").includes(
         '"bronze":true'
       ) &&
@@ -1005,7 +1064,14 @@ test("surfaces setup requirement warnings and reviews the active loadout", async
 
 test("keeps legacy data and dismisses the migration notice", async ({ page }) => {
   await page.addInitScript(() => {
-    window.localStorage.setItem("sim_input_v3", JSON.stringify({ combatType: "melee" }));
+    window.localStorage.setItem(
+      "sim_input_v3",
+      JSON.stringify({
+        combatType: "melee",
+        monsterSetups: { giant: { weapon: "dragon_longsword" } },
+        cannonByMonster: { dagannoth: { enabled: true, targets: 6, respawnSec: 30 } }
+      })
+    );
     window.localStorage.setItem("sim_planner_v1", "{not json");
   });
 
@@ -1016,8 +1082,10 @@ test("keeps legacy data and dismisses the migration notice", async ({ page }) =>
   await migration.getByRole("button", { name: "Keep legacy data" }).click();
   await expect(migration).toHaveCount(0);
   await page.waitForFunction(() => {
+    const legacyInput = window.localStorage.getItem("sim_input_v3") ?? "";
     return (
-      window.localStorage.getItem("sim_input_v3") !== null &&
+      legacyInput.includes("monsterSetups") &&
+      legacyInput.includes("cannonByMonster") &&
       window.localStorage.getItem("sim_planner_v1") !== null &&
       window.localStorage.getItem("index-sim:legacy-migration-dismissed") !== null
     );
@@ -1089,7 +1157,14 @@ test("surfaces rewrite local storage save failures without losing current sessio
 
 test("clears only known legacy data after confirmation", async ({ page }) => {
   await page.addInitScript(() => {
-    window.localStorage.setItem("sim_input_v3", JSON.stringify({ combatType: "melee" }));
+    window.localStorage.setItem(
+      "sim_input_v3",
+      JSON.stringify({
+        combatType: "melee",
+        monsterSetups: { giant: { weapon: "dragon_longsword" } },
+        cannonByMonster: { dagannoth: { enabled: true, targets: 6, respawnSec: 30 } }
+      })
+    );
     window.localStorage.setItem("sim_planner_v1", "{}");
     window.localStorage.setItem("sim_loot_prefs_v1", "{}");
     window.localStorage.setItem("sim_hidden_tiers_v1", "{}");
@@ -1913,19 +1988,19 @@ test("matches browser-rendered dense numeric snapshots", async ({ page }) => {
       ttk: "12.8s",
       killsPerHour: "235",
       xpPerHour: "21,573",
-      gpPerKill: "479",
-      gpPerHour: "112,417",
-      netGpPerHour: "-109,053"
+      gpPerKill: "537",
+      gpPerHour: "126,132",
+      netGpPerHour: "-78,561"
     },
     defaultMeleeResults: {
       DPS: "3.05",
       "MAX HIT": "16.4",
       "HIT %": "88.9%",
       "XP/HR": "21,573",
-      "GP/HR NET": "-109,053",
+      "GP/HR NET": "-78,561",
       "KILLS/HR": "235",
-      "GP/KILL": "479",
-      "SUPPLY/KILL": "1,187"
+      "GP/KILL": "537",
+      "SUPPLY/KILL": "1,047"
     },
     rangedSafespot: {
       hit: "70.6%",
@@ -1934,19 +2009,19 @@ test("matches browser-rendered dense numeric snapshots", async ({ page }) => {
       ttk: "45.6s",
       killsPerHour: "73",
       xpPerHour: "14,525",
-      gpPerKill: "646",
-      gpPerHour: "47,327",
-      netGpPerHour: "-194,861"
+      gpPerKill: "620",
+      gpPerHour: "45,419",
+      netGpPerHour: "-183,914"
     },
     rangedSafespotResults: {
       DPS: "1.96",
       "MAX HIT": "10.0",
       "HIT %": "70.6%",
       "XP/HR": "14,525",
-      "GP/HR NET": "-194,861",
+      "GP/HR NET": "-183,914",
       "KILLS/HR": "73",
-      "GP/KILL": "646",
-      "SUPPLY/KILL": "5,315"
+      "GP/KILL": "620",
+      "SUPPLY/KILL": "5,026"
     },
     cannonRanged: {
       hit: "80.7%",
@@ -1955,19 +2030,19 @@ test("matches browser-rendered dense numeric snapshots", async ({ page }) => {
       ttk: "32.3s",
       killsPerHour: "326",
       xpPerHour: "37,421",
-      gpPerKill: "89",
-      gpPerHour: "28,904",
-      netGpPerHour: "-320,994"
+      gpPerKill: "87",
+      gpPerHour: "28,484",
+      netGpPerHour: "-478,051"
     },
     cannonRangedResults: {
       DPS: "2.24",
       "MAX HIT": "10.0",
       "HIT %": "80.7%",
       "XP/HR": "37,421",
-      "GP/HR NET": "-320,994",
+      "GP/HR NET": "-478,051",
       "KILLS/HR": "326",
-      "GP/KILL": "89",
-      "SUPPLY/KILL": "1,929"
+      "GP/KILL": "87",
+      "SUPPLY/KILL": "2,828"
     },
     cannonOutput: {
       "Effective targets": "2.5",
@@ -1976,12 +2051,12 @@ test("matches browser-rendered dense numeric snapshots", async ({ page }) => {
       "Balls/kill": "4.41",
       "Cannon Ranged XP/hr": "45,075",
       "Effective XP/hr": "37,421",
-      "Effective net GP/hr": "-320,994",
-      "Ball cost/hr": "335,006",
-      "Ball cost/kill": "793",
-      "Ball price": "180",
+      "Effective net GP/hr": "-478,051",
+      "Ball cost/hr": "744,459",
+      "Ball cost/kill": "1,763",
+      "Ball price": "400",
       "Cannonballs/trip": "69",
-      "Ball gp/trip": "12,380",
+      "Ball gp/trip": "27,512",
       "K/hr uplift": "215.9%"
     }
   });
@@ -2098,19 +2173,19 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
       ttk: "12.8s",
       killsPerHour: "235",
       xpPerHour: "21,573",
-      gpPerKill: "479",
-      gpPerHour: "112,417",
-      netGpPerHour: "-109,053"
+      gpPerKill: "537",
+      gpPerHour: "126,132",
+      netGpPerHour: "-78,561"
     },
     meleeBaselineResults: {
       DPS: "3.05",
       "MAX HIT": "16.4",
       "HIT %": "88.9%",
       "XP/HR": "21,573",
-      "GP/HR NET": "-109,053",
+      "GP/HR NET": "-78,561",
       "KILLS/HR": "235",
-      "GP/KILL": "479",
-      "SUPPLY/KILL": "1,187"
+      "GP/KILL": "537",
+      "SUPPLY/KILL": "1,047"
     },
     meleeAlchRelevant: {
       hit: "82.1%",
@@ -2119,19 +2194,19 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
       ttk: "23.2s",
       killsPerHour: "140",
       xpPerHour: "18,290",
-      gpPerKill: "463",
-      gpPerHour: "64,907",
-      netGpPerHour: "-117,343"
+      gpPerKill: "480",
+      gpPerHour: "67,415",
+      netGpPerHour: "-98,217"
     },
     meleeAlchRelevantResults: {
       DPS: "2.81",
       "MAX HIT": "16.4",
       "HIT %": "82.1%",
       "XP/HR": "18,290",
-      "GP/HR NET": "-117,343",
+      "GP/HR NET": "-98,217",
       "KILLS/HR": "140",
-      "GP/KILL": "463",
-      "SUPPLY/KILL": "2,028"
+      "GP/KILL": "480",
+      "SUPPLY/KILL": "1,791"
     },
     rangedSafespot: {
       hit: "70.6%",
@@ -2140,19 +2215,19 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
       ttk: "45.6s",
       killsPerHour: "73",
       xpPerHour: "14,525",
-      gpPerKill: "646",
-      gpPerHour: "47,327",
-      netGpPerHour: "-194,861"
+      gpPerKill: "620",
+      gpPerHour: "45,419",
+      netGpPerHour: "-183,914"
     },
     rangedSafespotResults: {
       DPS: "1.96",
       "MAX HIT": "10.0",
       "HIT %": "70.6%",
       "XP/HR": "14,525",
-      "GP/HR NET": "-194,861",
+      "GP/HR NET": "-183,914",
       "KILLS/HR": "73",
-      "GP/KILL": "646",
-      "SUPPLY/KILL": "5,315"
+      "GP/KILL": "620",
+      "SUPPLY/KILL": "5,026"
     },
     rangedCannon: {
       hit: "80.7%",
@@ -2161,19 +2236,19 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
       ttk: "32.3s",
       killsPerHour: "326",
       xpPerHour: "37,421",
-      gpPerKill: "89",
-      gpPerHour: "28,904",
-      netGpPerHour: "-320,994"
+      gpPerKill: "87",
+      gpPerHour: "28,484",
+      netGpPerHour: "-478,051"
     },
     rangedCannonResults: {
       DPS: "2.24",
       "MAX HIT": "10.0",
       "HIT %": "80.7%",
       "XP/HR": "37,421",
-      "GP/HR NET": "-320,994",
+      "GP/HR NET": "-478,051",
       "KILLS/HR": "326",
-      "GP/KILL": "89",
-      "SUPPLY/KILL": "1,929"
+      "GP/KILL": "87",
+      "SUPPLY/KILL": "2,828"
     },
     magicSafespot: {
       hit: "35.7%",
@@ -2182,19 +2257,19 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
       ttk: "1:33",
       killsPerHour: "37",
       xpPerHour: "21,210",
-      gpPerKill: "6,264",
-      gpPerHour: "233,556",
-      netGpPerHour: "-431,266"
+      gpPerKill: "6,598",
+      gpPerHour: "246,025",
+      netGpPerHour: "-420,425"
     },
     magicSafespotResults: {
       DPS: "1.19",
       "MAX HIT": "20.0",
       "HIT %": "35.7%",
       "XP/HR": "21,210",
-      "GP/HR NET": "-431,266",
+      "GP/HR NET": "-420,425",
       "KILLS/HR": "37",
-      "GP/KILL": "6,264",
-      "SUPPLY/KILL": "35,981"
+      "GP/KILL": "6,598",
+      "SUPPLY/KILL": "35,568"
     },
     customLootSettings: {
       hit: "72.4%",
@@ -2203,19 +2278,19 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
       ttk: "40.9s",
       killsPerHour: "67",
       xpPerHour: "8,443",
-      gpPerKill: "6,004",
-      gpPerHour: "404,685",
-      netGpPerHour: "53,064"
+      gpPerKill: "6,088",
+      gpPerHour: "410,373",
+      netGpPerHour: "69,068"
     },
     customLootSettingsResults: {
       DPS: "1.97",
       "MAX HIT": "22.9",
       "HIT %": "72.4%",
       "XP/HR": "8,443",
-      "GP/HR NET": "53,064",
+      "GP/HR NET": "69,068",
       "KILLS/HR": "67",
-      "GP/KILL": "6,004",
-      "SUPPLY/KILL": "4,118"
+      "GP/KILL": "6,088",
+      "SUPPLY/KILL": "3,634"
     }
   });
 });
@@ -2857,10 +2932,10 @@ test("matches browser-rendered numeric snapshots for loot action and trip overri
       "MAX HIT": "16.4",
       "HIT %": "88.9%",
       "XP/HR": "21,573",
-      "GP/HR NET": "-48,956",
+      "GP/HR NET": "-18,464",
       "KILLS/HR": "235",
-      "GP/KILL": "869",
-      "SUPPLY/KILL": "1,187"
+      "GP/KILL": "927",
+      "SUPPLY/KILL": "1,047"
     },
     tripSummary: {
       "Prayer/kill": "29.21",
@@ -2871,17 +2946,17 @@ test("matches browser-rendered numeric snapshots for loot action and trip overri
       "Kills/trip": "6.1",
       "Effective K/hr": "45",
       "Recoil/kill": "4.5 dmg",
-      "Recoil gp/kill": "168"
+      "Recoil gp/kill": "101"
     },
     tripManual: {
       DPS: "2.59",
       "MAX HIT": "16.4",
       "HIT %": "75.5%",
       "XP/HR": "20,093",
-      "GP/HR NET": "-88,872",
+      "GP/HR NET": "-59,306",
       "KILLS/HR": "80",
-      "GP/KILL": "1,624",
-      "SUPPLY/KILL": "3,587"
+      "GP/KILL": "1,768",
+      "SUPPLY/KILL": "3,079"
     }
   });
 });
@@ -2891,7 +2966,11 @@ test("matches browser-rendered numeric snapshots for imported price sets", async
   await page.getByLabel("Workbench tabs").getByRole("button", { name: "Settings" }).click();
   const settings = page.locator('[aria-label="Price data settings"]');
   const priceSetSummary = settings.locator('[aria-label="Active PriceSet summary"]');
+  const scheduledSummary = settings.locator('[aria-label="Scheduled price snapshot summary"]');
   await expect(settings).toContainText("Price data");
+  await expect(scheduledSummary).toContainText("Status Loaded");
+  await expect(scheduledSummary).toContainText("Label Scheduled static prices");
+  await expect(priceSetSummary).toContainText("Active source Scheduled snapshot");
   await expect(priceSetSummary).toContainText(/Item prices [0-9,]+/);
   await expect(priceSetSummary).toContainText(/Alch values [0-9,]+/);
 
@@ -3025,7 +3104,7 @@ test("looks up hiscores through the same-origin API and applies previewed levels
   });
 
   await page.goto("/");
-  const hiscores = page.getByLabel("Hiscores");
+  const hiscores = page.getByRole("region", { name: "Hiscores" });
   await expect(page.getByRole("button", { name: "Lookup" })).toBeEnabled();
   await hiscores.getByLabel("Player", { exact: true }).fill("Fixture Player");
   await hiscores.getByRole("button", { name: "Lookup" }).click();
@@ -3055,7 +3134,8 @@ test("looks up hiscores through the same-origin API and applies previewed levels
   await expect(setup.getByLabel("DEF", { exact: true })).toHaveValue("65");
 });
 
-test("syncs market prices through the same-origin API and shows the report", async ({ page }) => {
+test("keeps market UI scheduled-only when the compatibility sync API exists", async ({ page }) => {
+  let refreshRequested = false;
   await page.route("**/api/market/status", async (route) => {
     await route.fulfill({
       status: 200,
@@ -3073,174 +3153,38 @@ test("syncs market prices through the same-origin API and shows the report", asy
     });
   });
   await page.route("**/api/market/sync", async (route) => {
-    const body = JSON.parse(route.request().postData() ?? "{}");
-    expect(body).toEqual({
-      scope: "monster",
-      monsterId: "giant",
-      includeAlch: true
-    });
-    expect(JSON.stringify(body)).not.toContain("http");
-    expect(JSON.stringify(body)).not.toContain("sourceSlug");
+    refreshRequested = true;
     await route.fulfill({
-      status: 200,
+      status: 503,
       contentType: "application/json",
       body: JSON.stringify({
-        priceSet: {
-          id: "mock-market-sync",
-          label: "Mock market sync",
-          source: "scraped",
-          createdAt: "2026-07-05T12:00:05.000Z",
-          itemPrices: { big_bones: 430, lobster: 210 },
-          alchValues: { big_bones: 0, lobster: 0 },
-          provenance: {
-            source: "scraped",
-            sourceRef: "markets.lostcity.rs"
-          }
-        },
-        report: {
-          requested: 3,
-          updated: 1,
-          skipped: 1,
-          failed: 1,
-          startedAt: "2026-07-05T12:00:00.000Z",
-          finishedAt: "2026-07-05T12:00:05.000Z",
-          source: {
-            id: "markets.lostcity.rs",
-            label: "Mock LostCity market",
-            origin: "https://markets.lostcity.rs"
-          },
-          items: [
-            {
-              itemId: "big_bones",
-              sourceSlug: "big_bones",
-              status: "updated",
-              price: 430,
-              alchValue: 0,
-              sampleSize: 3
-            },
-            {
-              itemId: "lobster",
-              sourceSlug: "lobster",
-              status: "failed",
-              reason: "Mock upstream timeout"
-            },
-            {
-              itemId: "rune_scimitar",
-              sourceSlug: "rune_scimitar",
-              status: "skipped",
-              reason: "No recent market samples"
-            }
-          ],
-          warnings: [
-            {
-              code: "partial-market-sync",
-              severity: "warning",
-              message: "One mocked item failed; successful prices remain usable",
-              itemId: "lobster"
-            }
-          ]
-        }
+        error: { code: "upstream-unavailable", message: "Compatibility sync disabled" }
       })
     });
   });
 
   await page.goto("/");
   await page.getByLabel("Workbench tabs").getByRole("button", { name: "Economy" }).click();
-  await expect(page.getByRole("button", { name: "Sync monster" })).toBeEnabled();
-  await page.getByRole("button", { name: "Sync monster" }).click();
+  const market = page.locator('section[aria-label="Market price data"]');
 
-  await expect(page.getByLabel("Market sync report")).toContainText("Mock LostCity market");
-  await expect(page.getByLabel("Market sync report")).toContainText("Updated 1");
-  await expect(page.getByLabel("Market sync report")).toContainText("Skipped 1");
-  await expect(page.getByLabel("Market sync report")).toContainText("Failed 1");
-  await expect(page.getByLabel("Market sync warnings")).toContainText("lobster");
-  await expect(page.getByLabel("Market sync warnings")).toContainText(
-    "One mocked item failed; successful prices remain usable"
+  await expect(market.getByLabel("Scheduled price snapshot summary")).toContainText(
+    "Status Loaded"
   );
-  const marketDiagnostics = page.getByLabel("Market sync item diagnostics");
-  await expect(marketDiagnostics.locator("tbody tr").first()).toContainText("Lobster");
-  await expect(marketDiagnostics.locator("tbody tr").first()).toContainText("failed");
-  await expect(marketDiagnostics.locator("tbody tr").first()).toContainText(
-    "Mock upstream timeout"
+  await expect(market.getByLabel("Market active PriceSet summary")).toContainText(
+    "Active source Scheduled snapshot"
   );
-  await expect(marketDiagnostics).toContainText("rune_scimitar");
-  await expect(marketDiagnostics).toContainText("No recent market samples");
-  await expect(marketDiagnostics).toContainText("big_bones");
-  await marketDiagnostics.getByRole("button", { name: "Failed 1" }).click();
-  await expect(marketDiagnostics).toContainText("Lobster");
-  await expect(marketDiagnostics).not.toContainText("Big bones");
-  await marketDiagnostics.getByRole("button", { name: "Skipped 1" }).click();
-  await expect(marketDiagnostics).toContainText("rune_scimitar");
-  await expect(marketDiagnostics).not.toContainText("Lobster");
-  await marketDiagnostics.getByRole("button", { name: "All 3" }).click();
-  await expect(page.locator(".topbar").getByText("Mock market sync")).toBeVisible();
-  await expect(page.getByLabel("Price history summary")).toContainText("Snapshots 1");
-  await expect(page.getByLabel("Price history summary")).toContainText("Items 2");
-  await expect(page.getByLabel("Price history summary")).toContainText("Active Mock market sync");
-  await expect(page.getByLabel("Price history summary")).toContainText(
-    "Latest Mock market sync active"
+  await expect(market.getByRole("button", { name: /Sync|Refresh|Scrape/ })).toHaveCount(0);
+  await expect(market).toContainText(
+    "Market upstream refresh is scheduled, not user-triggered."
   );
-
-  const persistedHistory = await page.evaluate(() =>
-    JSON.parse(window.localStorage.getItem("index-sim:price-history") ?? "null")
-  );
-  expect(persistedHistory).toMatchObject({
-    version: 1,
-    data: {
-      snapshots: [
-        {
-          sourcePriceSetId: "mock-market-sync",
-          label: "Mock market sync",
-          itemPrices: { big_bones: 430, lobster: 210 }
-        }
-      ]
-    }
-  });
-  expect(JSON.stringify(persistedHistory)).not.toContain("sourceSlug");
-  expect(JSON.stringify(persistedHistory)).not.toContain("https://markets.lostcity.rs");
-  const persistedSelected = await page.evaluate(() =>
-    JSON.parse(window.localStorage.getItem("index-sim:price-set:selected") ?? "null")
-  );
-  expect(persistedSelected).toMatchObject({
-    version: 1,
-    data: {
-      selectedAt: expect.any(String),
-      priceSet: {
-        id: "mock-market-sync",
-        label: "Mock market sync",
-        source: "scraped",
-        itemPrices: { big_bones: 430, lobster: 210 },
-        alchValues: { big_bones: 0, lobster: 0 }
-      }
-    }
-  });
-  expect(JSON.stringify(persistedSelected)).not.toContain("sourceSlug");
-  expect(JSON.stringify(persistedSelected)).not.toContain("https://markets.lostcity.rs");
-
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Compare" }).click();
-  const mockedMarketSync = await resultMetricSnapshot(page);
-  expect({
-    mockedMarketSync
-  }).toEqual({
-    mockedMarketSync: {
-      DPS: "3.05",
-      "MAX HIT": "16.4",
-      "HIT %": "88.9%",
-      "XP/HR": "21,573",
-      "GP/HR NET": "-122,212",
-      "KILLS/HR": "235",
-      "GP/KILL": "393",
-      "SUPPLY/KILL": "1,186"
-    }
-  });
-
-  await page.reload();
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Economy" }).click();
-  await expect(page.getByLabel("Market active PriceSet summary")).toContainText(
-    "Label Mock market sync"
-  );
-  await expect(page.getByLabel("Market active PriceSet summary")).toContainText("Source scraped");
-  await expect(page.getByLabel("Price history summary")).toContainText("Snapshots 1");
+  const bodyText = await page.locator("body").innerText();
+  expect(bodyText).not.toContain("/api/prices");
+  expect(bodyText).not.toContain("/api/scrape");
+  expect(bodyText).not.toContain("run_sim.py");
+  expect(refreshRequested).toBe(false);
+  expect(
+    await page.evaluate(() => window.localStorage.getItem("index-sim:price-set:selected"))
+  ).toBeNull();
 });
 
 test("analyzes and manages browser-local price history in Economy", async ({ page }) => {
@@ -3325,5 +3269,5 @@ test("analyzes and manages browser-local price history in Economy", async ({ pag
   expect(await page.evaluate(() => window.localStorage.getItem("index-sim:unrelated-test"))).toBe(
     "keep-me"
   );
-  await expect(page.locator(".topbar")).toContainText(/bundled legacy prices/i);
+  await expect(page.locator(".topbar")).toContainText(/scheduled static prices/i);
 });
