@@ -134,6 +134,7 @@ src/
     equipment/
     trip/
     economy/
+    simulation/
     planner/
     shared/
   data/
@@ -175,7 +176,8 @@ Inputs:
 
 Outputs:
 
-- `SimulationResult`
+- `CombatSimulationResult` from the combat-only slice
+- `FullSimulationResult` from the composed simulation foundation
 - debug/intermediate values needed by UI
 - structured warnings
 
@@ -354,21 +356,43 @@ type SimulationContext = {
   priceSet: PriceSet;
 };
 
-type SimulationResult = {
-  dps: number;
-  killsPerHour: number;
-  xpPerHour: XpBreakdown;
-  grossGpPerHour: number;
-  netGpPerHour: number;
-  supplyCostPerHour: number;
-  trip: TripResult;
-  loot: LootResult;
-  warnings: SimulationWarning[];
-  debug?: SimulationDebug;
+type FullSimulationResult = {
+  request: SimulationRequest;
+  combat: CombatSimulationResult;
+  trip: TripLootSupplyResult;
+  xp: {
+    combat: CombatXpBreakdown;
+    playerEffectiveXpPerHour: number;
+    cannonEffectiveXpPerHour: number;
+    effectiveXpPerHour: number;
+    combatSkillXpPerHour: number;
+    prayerXpPerHour: number;
+    magicAlchXpPerHour: number;
+    totalXpPerHour: number;
+  };
+  rates: {
+    dps: number;
+    effectiveDps: number;
+    ttkSec: number;
+    cycleSec: number;
+    killsPerHour: number;
+    effectiveKph: number;
+    gpPerKill: number;
+    gpPerHour: number;
+    netGpPerHour: number;
+    effectiveGpPerHour: number;
+    effectiveNetGpPerHour: number;
+    supplyCostPerKill: number;
+  };
+  warnings: FullSimulationWarning[];
+  debug: {
+    combat: CombatSimulationResult["debug"];
+    combatXpDamageFraction: number;
+  };
 };
 ```
 
-Current implementation note: `src/domain/shared/index.ts` now defines the first typed contracts. The implemented `SimulationResult` is a combat/equipment slice result. `src/domain/trip` now produces a separate typed `TripLootSupplyResult` for trip, loot, supply and effective GP outputs. `src/domain/planner` now produces a typed `PlannerPlan` using those domain slices. `src/app/view-models` composes these slices for the first React UI parity path. A single final domain-level full simulator result remains open.
+Current implementation note: `src/domain/shared/index.ts` now defines the shared typed contracts and names the combat-only result `CombatSimulationResult`. `src/domain/trip` produces `TripLootSupplyResult` for trip, loot, supply and effective GP outputs. `src/domain/simulation` defines the composed `FullSimulationResult`, scoped warning contract and pure assembly functions over the current combat, trip/loot/supply and XP slices. The primary `src/app/view-models` `createSimulationViewModel()` path exposes and consumes `FullSimulationResult` for combat, trip, XP/rate and warning sources, then remains responsible for UI labels, hit distribution, Stats cards, active assumptions, reset/review actions and loot-row presentation. Dense Compare/Compare and Duel row generation now reuse that composed result path for their numeric row fields instead of maintaining separate combat+trip+XP assembly. `src/domain/planner` produces a typed `PlannerPlan` using the domain slices and keeps its combat-only evaluation field typed as `CombatSimulationResult`; it is not forced onto the UI-facing composed result. The final public name of the composed contract, including whether it should eventually become `SimulationResult`, remains an open decision.
 
 Acceptance rule: for a fixed `SimulationRequest`, `GameDataSnapshot` and `PriceSet`, the result must be deterministic.
 

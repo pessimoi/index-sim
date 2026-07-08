@@ -1,7 +1,7 @@
 # UI Parity Specification
 
 - Status: implementation target specification
-- Date: 2026-07-07
+- Date: 2026-07-08
 - Owner: technical docs
 - Product inventory: [../product/feature-inventory.md](../product/feature-inventory.md)
 - Legacy UI source: `views.jsx` and `planner.jsx`
@@ -10,6 +10,8 @@
 ## Goal
 
 The refactored Vite/React implementation should feel like the same combat workbench as the legacy UI, with cleaner internals. Calculation parity alone is not enough. The default layout, tab order, workflow grouping and feature discoverability must match the old tool closely enough that an existing user can move from legacy to rewrite without hunting for controls.
+
+Current cross-slice bucket ownership: [rewrite-parity-report.md](rewrite-parity-report.md#core-uiworkbench-gap-buckets) summarizes the remaining core UI/workbench parity gaps for the accepted V1 slices. This specification keeps the detailed slice contracts below.
 
 ## Non-goals
 
@@ -109,6 +111,19 @@ per-monster loot settings, loot action overrides, active non-bundled PriceSet,
 scarce spot, explicit safespot override, protection prayer, manual food/bank/prayer controls,
 changed supply settings and hidden gear tiers. Stats and Compare render the same
 summary below the metric strip. `Review` only changes the active tab. `Reset` is shown only on the scoped resettable rows above; for example, resetting current-monster loot settings does not remove loot action overrides, resetting loot action overrides does not remove per-monster loot settings, resetting current-monster cannon does not change Trip scarce state, resetting explicit safespot returns to Auto and resetting Trip scarce spot leaves the target-count and respawn values in place.
+
+### Combat, Stats, Special And Result V1 Slice
+
+Status date: 2026-07-08. The accepted V1 replacement line for this slice is
+visible workflow parity in the root Vite rewrite, not a clone of legacy
+script-order internals.
+
+| Classification | Items | Release impact |
+| --- | --- | --- |
+| `release-required` | Combat type controls in PlayerSidebar and compact setup strip route through the active combat-style tab; melee/ranged/magic loadouts stash and restore style-owned weapon, ammo, spell, gear, prayers, boosts, manual overrides and special-attack state; `SimulationRequest` receives normalized combat request data without UI-only or saved-setup state; Result summary keeps the existing metric strip and Active assumptions review/reset boundaries; Stats shows combat roll detail, XP routing, source breakdown/detail for normal attack, special attack and cannon, Trip/banking summary and normal-player hit distribution; supported melee/ranged special attack controls show current domain metrics; magic unsupported and DBA boost states suppress `specialAttack` request data. | Complete for this slice. |
+| `later` | Full price-aware, quest-aware, generated-requirement-aware or whole-loadout gear optimization; broader browser-display expansion; all-fixture browser-rendered numeric coverage; full visual regression; special/cannon hit distribution breakdowns beyond current normal-player hit distribution. | Not required unless a later release makes one of these evidence areas a blocker. |
+| `legacy-only` | Runtime Babel, CDN React, production `window.*` ownership, archived legacy layout internals and script-order coupling. | Not ported by design. |
+| `decision-needed` | New special attack formulas, magic DPS specials, final dragon-halberd/NPC-size behavior and ranged/magic/halberd auto-safespot default UX. | Keep as explicit future decisions, not blockers for the accepted V1 slice. |
 
 ### Dense Monster Table
 
@@ -268,14 +283,14 @@ monster/drop filter paths.
 
 ### Dense/Compare Release Classification
 
-Status date: 2026-07-07. This classification applies to the current Vite
-rewrite Dense/Compare release slice, not to deleting archived legacy files or
-claiming full visual parity.
+Status date: 2026-07-08. This classification applies to the current Vite
+rewrite Dense/Compare V1 replacement slice, not to deleting archived legacy
+files or claiming full visual parity.
 
 Current Dense/Compare release blocker list: none. The release-required items
 below are implemented and have unit/view-model or Playwright evidence. The
-feature inventory rows stay `Osittainen` because later and decision-needed
-items remain open for broader parity or full replacement.
+feature inventory rows are `Valmis` for the visible V1 replacement workflow
+because later and decision-needed items below are not blockers for this slice.
 
 Decision: D-032 accepts the current release-path browser numeric coverage for
 this slice. The existing browser evidence covers representative default melee,
@@ -294,7 +309,7 @@ unless a future user decision makes them required.
 | Mobile/tablet containment for the dense table | `release-required` | Implemented with contained horizontal table scroll and browser-smoked at mobile and tablet widths. |
 | Browser-rendered numeric snapshots for representative release paths | `release-required` | Accepted by D-032 as sufficient for this release slice. |
 | All-fixture browser-display expansion | `later` | Add only if a future release asks for every legacy fixture rendered in the browser. Domain/trip/XP fixture parity remains the current numeric baseline. |
-| Full visual regression suite | `later` | Not required by the current release classification; add only if visual tolerance becomes a release requirement. |
+| Full visual regression suite | `later` | Not required by the current V1 replacement classification; add only if visual tolerance becomes a release requirement. |
 | Exact legacy CSS/layout pixel matching and script-order `window.*` internals | `legacy-only` | The rewrite preserves user workflow shape, not archived implementation internals. |
 | Deeper legacy compare-state migration beyond compatible `sim_compare_sort_v1` and `sim_irrelevant_v1` import | `decision-needed` | Do not implicitly read or migrate additional legacy compare maps without a separate migration/no-migration decision. |
 | Final default relationship between Dense Compare and the broader tabbed workbench | `decision-needed` | Current release can ship with Compare as the active dense pane; final product default remains a UX decision. |
@@ -581,13 +596,14 @@ Source and status:
 
 - Source: backlog item for remaining Loot/economy parity plus this UI parity
   spec's Loot and Economy requirements.
-- Feature inventory status: `Loot/economy summary` is `Osittainen`.
+- Feature inventory status: `Loot/economy summary` is `Valmis` for the accepted
+  visible V1 replacement workflow.
 - Current state: the drop table, action selection, per-action net GP/hr impact,
   full nested drop detail, loot value composition, trip-state row labels,
   browser-local history context in Loot row detail and Economy price-history tab
-  exist. Remaining work in this area is outside this slice unless a later goal
-  accepts live provider, shared history or full legacy price-history migration
-  decisions.
+  exist. This visible slice is closed; remaining work in this area is outside
+  the slice unless a later goal accepts live provider, shared history or full
+  legacy price-history migration decisions.
 
 In scope:
 
@@ -712,6 +728,8 @@ Required content:
 
 Current implementation note: the rewrite state/schema now models `bankSeconds` as a nullable auto/manual value plus `potionSets`, `potionDoses`, `singleDose`, `dbaRestore`, `runeSlots`, `safespot`, `protect`, `recoilRings`, `foodCount`, `foodPerKillOverride`, `prayerPotionSets`, `prayerPotionDoses`, `altarSeconds`, `scarceSpot`, `targetsAtSpot` and `respawnSeconds`, and maps active Trip assumptions into `TripPolicy` without adding Trip fields to `SimulationRequest`. Version 3 rewrite setup envelopes remain backward compatible because newly modeled fields default through the Zod schema, and legacy auto bank time imports as `bankSeconds: null`. The root UI exposes food selector, bank time Auto/Manual seconds, single-dose toggle, general potion vials/doses, a general potion recommendation panel with recommended carry, repot interval, active-trip estimate, inactive/no-boost/manual-carry/below/above/matched status and Apply recommendation action, teleport item, ranged ammo recovery, DBA restore only when the melee DBA special boost is active, magic rune slots, safespot Auto/On/Off, protect prayer, antifire, antipoison, prayer restore auto/manual vials/manual doses, altar timing, scarce/AFK target count and respawn seconds, food-count auto/manual, food-per-kill override and recoil ring count when ring of recoil is equipped. Non-applicable reserve controls stay visible in disabled/read-only form for the current combat style or setup except DBA restore, which is hidden until the DBA boost makes it relevant. The domain applies enabled scarce/respawn limits to effective trip rates before prayer-per-kill is calculated. The general potion recommendation is derived in `src/domain/trip` from selected general combat boosts, `sustained`, `repotThreshold`, finite `cycleSec * killsPerTrip` active fighting time and the current vial/single-dose mode; sustained-off setups show an inactive repeat-dose state, no general combat boost shows a no-boost state, non-finite trip estimates guide the user to manual `vials/type` or `doses/type` carry, and active finite estimates enable Apply only when the recommended carry differs from the current general potion carry. It is not persisted and Apply only writes `potionSets` or `potionDoses`. The Cannon pane can link its target count and respawn seconds into the same Trip sparse state, so cannon-at-spot sparse assumptions are visible in the Cannon workflow instead of hidden in generic Trip state. The Trip summary is grouped by survival, prayer, food, inventory reserve, potions, scarce cap, recoil and outcome/effective rates, and uses user-facing labels for `Bank time` (`Auto 90s`/`Manual 60s` style), `Food count` (`Auto 12`/`Manual 8` style), `Prayer restore` (`Auto 3 vials`, `Manual 8 doses` or `Manual 3 vials`), `Protection prayer`, `Potion carry`, `Potion slots`, `Loot capacity` and `Effective K/hr`. It keeps the same selected food, teleport reserve, ammo recovery, rune slots, active survival, prayer carried, max kills from prayer, prayer points per dose, recoil assumptions, respawn-bound status, inventory reserve slots/parts, potion parts/costs, free-at-start details, supply/kill and ammo/kill details, plus DBA restore only when the DBA boost is active. Open question: should exact archived legacy UI `potRec` numerical parity be accepted as a requirement?
 
+Release classification: the visible Trip controls and grouped Trip result workflow are accepted for V1 replacement in the rewrite architecture. Exact archived legacy `potRec` numerical parity, prayer potion modeling changes, live/provider data and canonical data choices remain decision-needed follow-ups, not blockers for this accepted Trip slice.
+
 ### Cannon
 
 Required content:
@@ -757,10 +775,12 @@ cross-monster Duel matrix remain out of scope.
 Required content:
 
 - Use `src/domain/planner` as the calculation owner.
-- Preserve the legacy planner UI flow: optimize-for display, future weapons toggle, avg-over-session toggle, only-current-gear toggle, live/pause/recompute controls, skill locks, current XP fields, target fields, notes, summary metrics, order of training, gear timeline, DPS vs cumulative XP chart and gear pool editor.
+- Preserve the accepted rewrite Planner UI flow: optimize-for display, avg-over-session toggle, only-current-gear toggle, recompute control, skill locks, current XP fields, target fields, notes/warnings, summary metrics, order of training, gear timeline, DPS vs cumulative XP chart and gear pool editor. Legacy future/hypothetical weapons remain decision-needed and are not part of the accepted V1 Planner slice.
 - Planner UI state must be versioned and persisted separately from pure domain input.
 
 Current implementation note: `src/app/state/planner.ts` now owns version 1 of the rewrite Planner UI state contract under `index-sim:planner-ui`. The state covers metric, target levels, current XP values, skill locks, avg-over-session, only-current-gear and gear-pool restrictions. `src/app/view-models/simulation.ts` adapts that state into `src/domain/planner` input/options and validates gear-pool ids against the active `GameDataSnapshot`/default planner pool. The workbench Planner tab now exposes the visible workflow for optimize metric, current XP, target levels, skill locks, active avg-over-session, only-current-gear, explicit Recompute, summary metrics, training order, unlock summary, gear pool editor, gear timeline, DPS-vs-cumulative-XP chart and empty/error states. Recompute snapshots the Planner UI state into a calculation state and does not mutate combat setup, target monster, loadout or price state; changing avg-over-session marks the Planner pending until Recompute. Avg-over-session maps to the domain Planner `sustained` option independently of the combat setup sustained control. Planner output also surfaces an info warning that item requirements use the current manual policy until generated requirements are accepted. The V1 Planner acceptance line is the rewrite replacement line, backed by deterministic domain golden fixtures for melee unlock, ranged unlock, magic spell unlock and boosted sustained training plus the visible Planner smoke. The gear pool editor only narrows the current non-hypothetical default planner pool; it does not enable future/hypothetical gear or choose a generated requirement source. Legacy `sim_planner_v1` is detect/review-only until a separate migration decision exists: the migration UX reports that Planner data was found, warns that it is not imported, keeps it on Import/Keep, preserves existing `index-sim:planner-ui` state and removes it only through confirmed Clear with the other known legacy keys. Full legacy Planner migration, generated requirement source/future-hypothetical gear policy and legacy planner numeric parity remain open.
+
+Release classification: the visible Planner tab and rewrite-domain Planner workflow are accepted for V1 replacement. Exact legacy planner numeric parity, full `sim_planner_v1` migration/import, generated requirement extraction and future/hypothetical gear exposure remain decision-needed or blocked follow-ups, not blockers for this accepted Planner slice.
 
 ### Economy
 
@@ -774,7 +794,34 @@ Required content if price history remains a product feature:
 - Item filter.
 - Movers table with item, trend sparkline, price, baseline, GP delta and percent delta.
 
-Current implementation note: the Economy tab shows the scheduled static price snapshot status, active `PriceSet` source/label/created age/counts and browser-local history summary. It records capped browser-local history snapshots only after validated imported/compatible legacy `PriceSet` values are accepted active or when `Snapshot now` captures the current active `PriceSet`; scheduled restore itself does not append history. The tab uses valid selected local override, valid scheduled static snapshot, then bundled prices as its fallback order. It shows active/latest price-set labels, latest snapshot age, tracked item count, snapshot count, moved item count, Previous/First/Snapshot baseline selection, item filter, top gainers/fallers and a movers table with latest price, baseline price, GP delta and percent delta. Missing or zero baseline prices render without `Infinity`/`NaN`. `Clear history` requires confirmation and removes only the rewrite-owned `index-sim:price-history` key. Trend sparklines and fuller economy workflows remain open.
+Current implementation note: the Economy tab is complete for the accepted V1
+browser-local Loot/Economy slice. It shows the scheduled static price snapshot
+status, active `PriceSet` source/label/created age/counts and browser-local
+history summary. It records capped browser-local history snapshots only after
+validated imported/compatible legacy `PriceSet` values are accepted active or
+when `Snapshot now` captures the current active `PriceSet`; scheduled restore
+itself does not append history. The tab uses valid selected local override,
+valid scheduled static snapshot, then bundled prices as its fallback order. It
+shows active/latest price-set labels, latest snapshot age, tracked item count,
+snapshot count, moved item count, Previous/First/Snapshot baseline selection,
+item filter, top gainers/fallers and a movers table with latest price, baseline
+price, GP delta and percent delta. Missing or zero baseline prices render
+without `Infinity`/`NaN`. `Clear history` requires confirmation and removes
+only the rewrite-owned `index-sim:price-history` key. Trend sparklines and
+fuller economy workflows are later enhancements, not blockers for this slice.
+
+### Loot/Economy Release Classification
+
+Status date: 2026-07-08. This classification applies to the visible
+Loot/Economy V1 replacement workflow in the root Vite rewrite, not to
+production market automation or full legacy storage migration.
+
+| Classification | Items | Release impact |
+| --- | --- | --- |
+| `release-required` | Current-monster loot action table; per-drop action selection for loot, skip, bury, alch, unid and value where applicable; per-monster high-alch, kill-overhead and talisman settings; current-monster reset and optimize actions with one-step Undo; loot value composition with top contributors and tail grouping; nested `_expand` drop detail; readable per-action net GP/hr impact detail; local price-history context in Loot row detail; structured missing, alias and fallback price warnings near Loot/Economy money values; active/latest price context; local PriceSet import override; reset-to-scheduled fallback; Snapshot now; confirmed Clear history for only `index-sim:price-history`; browser-local Economy movers analysis. | Complete for this slice. |
+| `later` | Trend sparklines, fuller economy analysis beyond the current movers table, all-fixture browser-display expansion and full visual regression. | Not required unless a later release makes one of these evidence areas a blocker. |
+| `legacy-only` | Archived `market.js` current-monster nested sync behavior, legacy script-order globals, legacy `/api/prices` or `/api/scrape` production copy and legacy runtime internals. | Not ported by design for the rewrite V1 path. |
+| `decision-needed` | Full legacy price-history migration, server-managed/shared price history, live provider evidence, raw live `markets.lostcity.rs` response adapter and GitHub Actions cron/commit wiring. | Keep as explicit future decisions or blocked production work, not blockers for the accepted visible V1 slice. |
 
 ### Settings
 
@@ -803,12 +850,12 @@ Current implementation note: Settings now has a Price data panel that shows sche
 - Keep existing rewrite view-model calculations where possible.
 - Add Playwright smoke coverage for shell geometry, tab order and independent scroll containers.
 
-Current implementation note: partially complete. The root rewrite now has the
-workbench shell foundation with PlayerSidebar, setup context bar, legacy-order
-TabBar, active pane routing for existing Stats, combat-style setup, Compare,
-Loot, Trip, Cannon and Economy/Settings surfaces, and a visible right-side
-MonsterCard rail. Duel and Planner are visible as planned tab destinations
-only. Full visual regression remains open.
+Current implementation note: complete for the accepted V1 workbench shell slice.
+The root rewrite now has the workbench shell foundation with PlayerSidebar,
+setup context bar, legacy-order TabBar, active pane routing for Stats,
+combat-style setup, Compare, Loot, Trip, Cannon, Duel, Planner and
+Economy/Settings surfaces, and a visible right-side MonsterCard rail. Full
+visual regression remains open.
 
 ### Phase C: setup and equipment parity
 
@@ -817,14 +864,15 @@ only. Full visual regression remains open.
 - Add per-combat-type loadout stash/restore.
 - Add MonsterCard target search, drop filter and equipment overview.
 
-Current implementation note: partially complete. Combat type, levels, stance
-and key trip-rate summary are in PlayerSidebar, and per-combat-type loadout
-stash/restore is implemented in versioned setup state. Dedicated Melee, Ranged
-and Magic equipment panes now cover searchable weapon, ammo, spell and gear
-selectors, per-slot active-style gear quick actions, bonus summaries and two-handed shield locking. SetupBar now
+Current implementation note: complete for the accepted V1 setup and equipment
+slice. Combat type, levels, stance and key trip-rate summary are in
+PlayerSidebar, and per-combat-type loadout stash/restore is implemented in
+versioned setup state. Dedicated Melee, Ranged and Magic equipment panes now
+cover searchable weapon, ammo, spell and gear selectors, per-slot active-style
+gear quick actions, bonus summaries and two-handed shield locking. SetupBar now
 covers rewrite-owned monster-specific custom setup create/edit/remove, manual
-accuracy/damage/speed overrides and target switch restore. MonsterCard now
-adds target search, shared drop filter, active defence highlight and compact
+accuracy/damage/speed overrides and target switch restore. MonsterCard now adds
+target search, shared drop filter, active defence highlight and compact
 equipment overview in the right rail. Full best-in-slot semantics and legacy
 custom setup migration remain open.
 
@@ -832,6 +880,11 @@ custom setup migration remain open.
 
 - Restore full Stats, Compare, Loot and Trip tab workflows.
 - Add UI-level tests for changing a target, editing a loadout, sorting/filtering Compare, changing loot actions and changing trip assumptions.
+
+Current implementation note: Stats, Result summary, Loot/Economy and Trip are
+complete for the accepted V1 replacement slices, and Compare has the accepted
+D-032 release classification. Remaining exact legacy numeric questions are later
+or decision-needed scope.
 
 ### Phase E: missing tab parity
 

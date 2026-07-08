@@ -78,7 +78,7 @@ Use this log for choices that future agents must not re-litigate accidentally.
 - Legacy Migration V1 implementation: D-042 accepts compatible import for the audited nested `sim_input_v3.monsterSetups` and `sim_input_v3.cannonByMonster` fields. Exact compatible field mapping, unknown-id handling and validation details belong to the implementation/test pass. `sim_planner_v1` and full legacy price-history payloads remain review-only/not migrated in V1; future import for either still requires an explicit decision.
 - Cannon occupancy/overlay, cannonball cost and cannon ranged XP are ported into pure `src/domain/trip`; the dense rewrite dashboard exposes per-monster cannon controls, while final full-workbench placement remains open.
 - Legacy source files are retained for fixtures/data bootstrap; deleting them requires a separate full-replacement decision.
-- Final full-domain `SimulationResult` shape remains open until combat/equipment, trip/loot/supply and economy slices are composed for the UI.
+- The current composed UI-facing result contract is `FullSimulationResult`; whether a later public contract should be renamed back to `SimulationResult` remains open.
 - Dense spreadsheet can become the default root view during parity work; its final coexistence with the full tabbed workbench remains open.
 - Planner item requirements are still a manual policy copied from the existing planner notes; they belong in the generated snapshot scope, but authoritative extraction and exact schema are not present.
 - Future weapons are not added to canonical planner pools until a human accepts a product/data provenance decision.
