@@ -119,22 +119,144 @@ The current command writes only `src/data/generated/source-pin.json`, `src/data/
 
 ## V1 release evidence snapshot
 
-The latest consolidated release-evidence check was run on 2026-07-08 for the current Vite/React rewrite path. This records executed checks only; it does not choose production hosting, CSP implementation, live upstream providers, scheduled job wiring, generated data runtime switch, full visual regression or deeper legacy migration.
+The latest consolidated release-evidence check was refreshed on 2026-07-08 for the current Vite/React rewrite path. This records executed checks only; it does not choose production hosting, CSP implementation, live upstream providers, scheduled job wiring, generated data runtime switch, full visual regression or deeper legacy migration.
 
 | Check | Latest result | Notes and follow-up |
 | --- | --- | --- |
-| `npm run typecheck` | `pass` | Core TypeScript gate passed. Re-run after TypeScript or source changes. |
-| `npm run test` | `pass` | Full Vitest run passed across 25 files and 406 tests. Includes unit, schema, UI/view-model, persistence, live-integration mock, migration, generated-data, scheduled-market-writer and performance smoke coverage. |
-| `npm run test:golden` | `pass` | Golden fixture run passed 19 tests. Fixture changes still require an accepted baseline decision before updating snapshots. |
-| `npm run build` | `pass` | Vite build passed with only the known chunk-size warning. |
-| `npm run test:e2e` | `fail after sandbox escalation` | The first sandboxed run failed to bind the local Vite server with `listen EPERM 127.0.0.1:5173`; the same command then ran with explicit sandbox escalation and failed the default Playwright gate: 29 passed and 22 failed out of 51 tests in about 5.1 minutes. The failures span Stats/Cannon state, mobile shell order, Planner, Duel, loadout persistence, gear quick actions, custom setup, special attacks, Dense numeric/marker paths, Trip controls, Loot settings and loot/trip override numeric snapshots. Tests stayed mocked/same-origin and did not call live upstream services. |
-| `npm audit` | `pass` | Reported 0 vulnerabilities. |
+| `npm run typecheck` | `pass` | Goal 7 rerun passed. Re-run after TypeScript or source changes. |
+| `npm run test` | `pass` | Goal 7 full Vitest run passed across 25 files and 408 tests. Includes unit, schema, UI/view-model, persistence, live-integration mock, migration, generated-data, scheduled-market-writer and performance smoke coverage, including D-042 legacy custom setup/cannon import tests. |
+| `npm run test:golden` | `pass` | Goal 7 golden fixture run passed 19 tests. Fixture changes still require an accepted baseline decision before updating snapshots. |
+| `npm run build` | `pass` | Goal 7 Vite build passed with only the known chunk-size warning. |
+| `npm run test:e2e` | `current sandbox rerun environment-only; earlier browser gate remains historical evidence` | Goal 7 current sandbox rerun failed before browser execution because the local Vite server could not bind `127.0.0.1:5173`: `listen EPERM: operation not permitted`. No Playwright assertion failed and no app/browser failure was observed. The latest browser-executed default gate remains the earlier localhost-capable run: 51 passed out of 51 tests in about 6.0 minutes, mocked/same-origin and without live upstream services. This Goal 7 run is not a fresh browser pass for the current checkout; rerun `npm run test:e2e` in a localhost-capable environment before a public release package, or record the freshness gap in trusted-tester handoff notes. |
+| Goal 1/2 focused Playwright reruns | `pass, superseded by full gate` | Focused escalated localhost runs were used to isolate Combat/Stats/Special, Duel, Planner, Dense/Compare, Cannon, Trip, Loot and numeric-snapshot smoke paths during stabilization. The later full `npm run test:e2e` pass remains the latest browser-executed default gate; the older failure matrix below is retained only as historical triage evidence. Goal 7 still needs a localhost-capable fresh browser rerun before a public release cut or when trusted-tester notes need fresh browser evidence. |
+| Loot/Economy focused checks | `pass with sandbox-limited browser smoke` | On 2026-07-08, the Loot/Economy pass ran `npm run typecheck` and `npm run test -- src/tests/trip-loot-supply.test.ts src/tests/data-economy.test.ts src/tests/market-adapter.test.ts src/tests/market-ui-state.test.ts src/tests/ui-adapters.test.ts src/tests/price-import-notice.test.ts src/tests/market-server.test.ts src/tests/market-sync-items.test.ts src/tests/market-writer.test.ts src/tests/legacy-migration.test.ts src/tests/ui-view-model.test.ts`, passing 267 focused tests. The focused Loot/Economy Playwright smoke failed before browser execution with `listen EPERM: operation not permitted 127.0.0.1:5173`, matching the managed-sandbox localhost limitation and not superseding the earlier escalated 51/51 browser gate. No source formulas, fixture outputs or Playwright numeric expectations changed, so `npm run test:golden` was not rerun for that documentation/status closure. |
+| Goal 3 numeric snapshot audit | `pass with sandbox-limited browser rerun` | On 2026-07-08, focused numeric domain/view-model evidence passed: `npm run test -- src/tests/domain-core.test.ts src/tests/trip-loot-supply.test.ts src/tests/xp-parity.test.ts src/tests/ui-view-model.test.ts src/tests/data-economy.test.ts` passed 173 tests, and `npm run test:golden` passed 19 tests. Focused numeric Playwright and full `npm run test:e2e` rerun attempts in the current managed sandbox both failed before browser execution with `listen EPERM 127.0.0.1:5173`; this is environment-only and does not supersede the earlier escalated 51/51 browser gate. No Playwright numeric expectations, source formulas or golden fixtures were changed. |
+| Goal 4 release-gate refresh | `pass with environment-only browser rerun limitation` | Goal 4 reran `npm run typecheck`, the focused Trip set `npm run test -- src/tests/trip-loot-supply.test.ts src/tests/ui-adapters.test.ts src/tests/ui-view-model.test.ts src/tests/scaffold.test.ts src/tests/xp-parity.test.ts` with 178 passing tests, full `npm run test`, `npm run test:golden`, `npm run build`, `npm audit`, the static DOM/code-execution search, the static secrets search, the broader URL/API-copy search and the live-integration release-copy audit. All non-browser gates passed or had documented residual classifications. The only non-pass command was the focused Trip/Cannon Playwright smoke, which failed before browser execution with the managed-sandbox localhost `EPERM` limitation above. No source formulas, fixture outputs or Playwright numeric expectations changed. |
+| Goal 5 Planner focused checks | `pass with environment-only browser rerun limitation` | Goal 5 reran `npm run typecheck`, `npm run test -- src/tests/planner-domain.test.ts src/tests/planner-ui-state.test.ts src/tests/planner-ui-adapter.test.ts src/tests/ui-view-model.test.ts src/tests/legacy-migration.test.ts` with 131 passing tests, `npm run test:golden` with 19 passing tests, `npm audit`, the static DOM/code-execution search, the static secrets search and a Planner/localStorage migration boundary search. Non-browser checks passed or had documented residual classifications. The focused Planner Playwright smoke `npm run test:e2e -- --workers=1 --grep "Planner"` failed before browser execution with `listen EPERM: operation not permitted 127.0.0.1:5173`, matching the managed-sandbox localhost limitation and not superseding the earlier escalated 51/51 browser gate. No Planner source formulas, fixtures, persisted schema versions or Playwright numeric expectations changed. |
+| Goal 6 legacy migration focused checks | `pass with environment-only browser rerun limitation` | Goal 6 reran `npm run typecheck` and `npm run test -- src/tests/legacy-migration.test.ts src/tests/local-state-health.test.ts src/tests/ui-adapters.test.ts src/tests/market-ui-state.test.ts src/tests/price-import-notice.test.ts src/tests/planner-ui-state.test.ts` with 126 passing tests. The focused Import/Keep/Clear/local-state Playwright smoke `npm run test:e2e -- --workers=1 -g "legacy|local state"` failed before browser execution with `listen EPERM: operation not permitted 127.0.0.1:5173`, matching the managed-sandbox localhost limitation and not superseding the earlier escalated 51/51 browser gate. Goal 6 changed documentation/status only: no source formulas, fixture outputs, persisted schema versions, localStorage key lists or Playwright numeric expectations changed, so `npm run test:golden` was not rerun. |
+| D-042 Legacy Migration V1 custom/cannon import | `unit/typecheck pass; browser rerun environment-only` | D-042 compatible nested `sim_input_v3.monsterSetups` and `sim_input_v3.cannonByMonster` import is implemented. `npm run test -- src/tests/legacy-migration.test.ts src/tests/ui-adapters.test.ts` passed 85 tests and `npm run typecheck` passed. The focused Playwright command `npm run test:e2e -- --grep "legacy migration"` failed before browser execution because Vite could not bind `127.0.0.1:5173` with `listen EPERM: operation not permitted`; no browser assertion ran. |
+| Legacy Migration V1 UX/status closure | `unit/typecheck pass; browser rerun environment-only` | Goal 3 closed the user-facing review copy for the accepted V1 boundary. The Settings notice now shows a metadata-only outcome summary for importable, skipped and review-only areas, makes `sim_planner_v1` and full legacy price history explicit review-only/not-migrated decisions, and keeps Import/Keep/Clear status copy separate. `npm run test -- src/tests/legacy-migration.test.ts` passed 37 tests and `npm run typecheck` passed. The Playwright scaffold source was updated to check the outcome copy, Import/Keep/Clear status messages and absence of raw planner/history payload sentinels. The focused browser command `npm run test:e2e -- --grep "legacy migration"` failed before browser execution with the same managed-sandbox `listen EPERM: operation not permitted 127.0.0.1:5173` limitation; no browser assertion ran. |
+| Goal 7 release-gate and status check | `core pass; browser refresh pending` | Goal 7 reran the core release commands above plus `npm audit`, static DOM/code-execution search, static secrets search, broader URL/API-copy search and live-integration release-copy audit. Non-browser checks passed or had documented residual classifications. A localhost-capable browser smoke refresh is still needed for fresh browser evidence. |
+| `npm audit` | `pass` | Goal 7 reported 0 vulnerabilities. |
 | `git diff --check` | `pass` | Passed after this documentation refresh. |
 | Static DOM/code execution search | `pass with classified residual` | Found only `src/adapters/browser/index.ts` `new Function`, classified as trusted bundled legacy data bootstrap in the adapter-owned sandbox. |
 | Static secrets search | `pass with false positives` | Found item/package/doc/test text such as `token`, `js-tokens`, `css-tokenizer`, local-state-health fixture text and no real API key, secret, bearer token, password or private key. |
 | Release-copy audit | `pass with classified residuals` | Legacy `run_sim.py`, `/api/prices`, `/api/scrape` and legacy `/api/hiscores` hits remain archived evidence or documentation/history. Production rewrite paths use typed same-origin status/sync/lookup contracts and service-aware copy. The broader URL/API-copy audit also classifies CDN/Babel, `markets.lostcity.rs`, localhost and test URLs as archived legacy evidence, adapter/test contracts or documentation/history rather than production rewrite UI copy. |
-| Full visual regression | `not run` | Out of scope for this release-evidence check; the default Playwright smoke currently fails and must be resolved or explicitly reclassified before it can stand in as browser release evidence. |
+| Full visual regression | `not run` | Out of scope for this release-evidence check. The earlier passing default Playwright smoke remains historical browser evidence for the documented smoke scope, but Goal 7 could not produce a fresh browser pass in the current sandbox. |
 | Live upstream integration calls | `not run` | Automated tests must stay mocked until authoritative upstream and runtime/provider decisions are accepted. |
+
+## Goal 3 numeric snapshot audit
+
+Status date: 2026-07-08. This audit separates browser-rendered numeric
+snapshot evidence from the broader UI-flow smoke failures. Current result: no
+active Playwright numeric snapshot failure remains in the latest successful
+browser gate. The current Codex sandbox cannot bind the Vite localhost server
+without escalation, so the Goal 3 focused Playwright rerun attempt is recorded
+as environment-only; the latest browser-executed evidence remains the earlier
+escalated `npm run test:e2e` pass with 51 passed out of 51 tests. Goal 7 did
+not produce fresh browser evidence in the managed sandbox.
+
+Current numeric failure classification summary:
+
+| Class | Current count | Notes |
+| --- | ---: | --- |
+| `regression` | 0 | No current numeric mismatch or calculation regression is evidenced. |
+| `stale-test` | 0 | No numeric expectation was found to be stale in the current passing gate. |
+| `timing/flaky` | 0 active / 2 historical | The superseded dense release-path and loot/trip numeric rows timed out before numeric assertions and are historical only after the 51/51 pass. |
+| `environment-only` | 1 current rerun limitation | Focused numeric Playwright and full e2e rerun attempts failed to start Vite with `listen EPERM 127.0.0.1:5173` in the managed sandbox. |
+| `out-of-scope` | 0 | No numeric failure is removed from the gate as out of scope. |
+
+Numeric-path matrix:
+
+| Test or path | Feature area | Current symptom | Evidence | Class | Recommended decision |
+| --- | --- | --- | --- | --- | --- |
+| `matches browser-rendered dense numeric snapshots` | Dense / metric strip / Cannon output | No current failure in the latest successful gate. | Covered by the escalated 51/51 Playwright pass. Domain/view-model support stayed green in the Goal 3 focused Vitest run. | none active | Keep the current expectation values. Do not expand to all-fixture browser-display parity unless a future decision changes D-032. |
+| `matches release-path dense numeric snapshots` | Dense release path / metric strip | No current failure in the latest successful gate. Historical failure was a timeout before numeric assertions while setting up the large multi-scenario path. | Escalated 51/51 Playwright pass plus Goal 3 focused domain/view-model and golden pass. | historical `timing/flaky` | Keep the current expectation values. Do not treat the historical timeout as a numeric delta. |
+| `matches browser-rendered numeric snapshots for loot action and trip overrides` | Loot action override / Trip manual controls / metric strip | No current failure in the latest successful gate. Historical failure timed out while editing `Recoil rings`; no numeric mismatch was reported. | Escalated 51/51 Playwright pass plus Goal 3 focused trip/loot, XP, UI view-model and golden pass. | historical `timing/flaky` | Keep the current expectation values. Do not update snapshots from the historical actionability failure. |
+| `matches browser-rendered numeric snapshots for imported price sets` | PriceSet import / money metrics | No current failure in the latest successful gate. | Covered by the escalated 51/51 Playwright pass and `src/tests/data-economy.test.ts` in the Goal 3 focused run. | none active | Keep the current expectation values. Live market upstream parity remains outside automated browser tests. |
+| `enables cannon for the selected monster and shows cannon rates` and Cannon numeric output inside dense snapshots | Cannon / Trip sparse link / metric strip | No current failure in the latest successful gate. Historical Cannon row was a tab actionability timeout after reload, not a numeric mismatch. | Escalated 51/51 Playwright pass plus Goal 3 focused trip/loot, XP and UI view-model pass. | none active; related historical row `timing/flaky` | Keep current Cannon output expectations. Further all-fixture Cannon browser-display parity stays conditional on a later release requirement. |
+
+Expectation and baseline policy for this audit:
+
+- No Playwright numeric expectation was updated.
+- No source calculation formula was changed.
+- No legacy golden fixture was regenerated or edited.
+- The accepted ring-of-recoil XP attribution delta remains the existing D-031
+  line; Goal 3 did not add a new intentional numeric delta.
+- The accepted Dense/Compare browser numeric scope remains D-032. Full
+  all-fixture browser-display parity and full visual regression are not release
+  requirements without a future decision.
+
+## Superseded Playwright smoke failure matrix
+
+Status date: 2026-07-08. This matrix records the pre-stabilization default
+`npm run test:e2e` failure triage for the Vite/React rewrite. It is retained as
+release-evidence history only. The latest browser-executed default gate is the
+later full `npm run test:e2e` pass above: 51 passed out of 51 tests after
+localhost sandbox escalation. Goal 7 could not refresh that browser gate in the
+managed sandbox.
+
+Classification meanings:
+
+- `regression`: the failing assertion points at a user-visible workflow or
+  persisted-state contract that appears wrong or incomplete.
+- `stale-test`: the tested behavior appears present, but the assertion is
+  targeting it in a way that no longer matches the current DOM/accessibility
+  shape.
+- `timing/flaky`: the failure is dominated by actionability, locator stability,
+  clock/debounce timing or a mismatch between the assertion log and the final
+  error-context DOM.
+- `environment-only`: caused by the managed sandbox or local browser/runtime
+  environment rather than the app. The pre-escalation `listen EPERM` failure is
+  environment-only; none of the 19 escalated browser failures are classified
+  this way.
+- `out-of-scope`: the test asserts behavior outside the accepted current
+  release gate. No current failure is classified this way without a future
+  explicit decision.
+
+The recommendations in the rows below are the original triage decisions from
+the superseded failing run. They are not the current release-gate state after
+the later 51/51 default Playwright pass.
+
+| Test | Feature area | Symptom | Likely cause | Class | Recommended release-gate decision |
+| --- | --- | --- | --- | --- | --- |
+| `loads the dense combat spreadsheet root` | Economy / market copy | Strict-mode failure: the scheduled market refresh copy resolves to two elements inside `Market price data`. | The production copy is present twice, once as neutral paragraph copy and once as a status message. The locator is too broad for current UI. | `stale-test` | Do not treat as a product blocker after narrowing the assertion; keep the overall e2e gate failed until the test is updated or explicitly reclassified. |
+| `places MonsterCard after the active pane on mobile` | Mobile shell / MonsterCard | `.workbench-shell > *` returned an empty array even though the error context shows `Workbench shell`, `Player sidebar`, `Workbench center` and `Monster card`. | The test evaluates a CSS selector immediately after navigation without first waiting for the shell, while the accessible layout is present in the failure context. | `timing/flaky` | Keep as a browser-smoke blocker until a focused rerun or test hardening proves mobile ordering reliably passes. |
+| `recomputes the Planner tab workflow from visible planner controls` | Planner | Timeout while checking `Lock Attack`; the checkbox resolves but the action never completes. | Planner UI is present, but the control is not actionably stable during the test window, likely due render/workload timing or locator actionability. | `timing/flaky` | Keep as a release gate failure for the visible Planner workflow until focused Planner smoke is stable. |
+| `uses the Duel tab to snapshot rename load delete and persist setup comparisons` | Duel snapshots | After Undo, the undo status says the snapshot was restored, but the rename control for `Melee saved` is not visible. | Likely Duel undo/table refresh regression, or a stale table reference after restore. The current context shows only the live setup row. | `regression` | Release-blocking for the Duel workflow unless a focused rerun proves it is flaky and not a state bug. |
+| `restores per-combat-style loadout edits when switching styles` | Basic combat setup / per-style state | Ranged `POT` is expected to restore to `ranging`, but the compact selector is empty in the last full default run. | Likely per-style boost restore or compact boost synchronization regression in that run; the focused Goal 1 rerun passed after the combat-style tab routing fix. | `regression` in last full run; focused rerun `pass` | Remove from the remaining likely-regression list after the next full default gate confirms the focused result. |
+| `edits combat equipment panes and persists style-specific selections` | Equipment loadout persistence | Timeout clicking the `Melee` tab after reload; the tab resolves but does not become actionably stable. | Reload/tab actionability timing issue is more evident than a numeric or persisted-value mismatch. | `timing/flaky` | Keep as a smoke-gate failure; confirm with focused rerun before classifying as product regression. |
+| `creates, restores and removes monster-specific custom setups` | Custom setup snapshots | After Undo for removed custom setup, `Setup context` does not contain `Custom setup`. | Likely custom setup undo or setup-context refresh regression. | `regression` | Release-blocking for monster-specific setup workflow until fixed or reclassified with evidence. |
+| `selects special attacks and shows special metrics` | Special attacks | Assertion times out on DBA boost explanatory copy, while the error context shows the same copy inside `Special attack` in the last full default run. | The expected UI exists in the final context; the focused Goal 1 rerun passed after tab-route and locator hardening, so this is not treated as missing visible special-attack behavior. | `timing/flaky` in last full run; focused rerun `pass` | Keep the full smoke gate failed until rerun, but do not treat this row as a remaining Special attacks product blocker. |
+| `shows dense compare calculation freshness while rows catch up` | Dense compare freshness | Status changes to `Updating`, but the panel text still reads `current loadout` and not `rows may reflect previous loadout` in the last full default run. | The focused Goal 2 rerun passed after narrowing the smoke expectation to the status pill and live-row interaction, so this is not treated as a remaining Dense Compare product blocker. | `regression` in last full run; focused rerun `pass` | Remove from the remaining likely-regression list after the next full default gate confirms the focused result. |
+| `matches release-path dense numeric snapshots` | Dense numeric release path | Test hits its 60s timeout and the page closes while selecting Loot high-alch settings; no numeric mismatch is reported. | Large multi-scenario test is timing out before the assertion payload, likely due actionability/performance rather than a proven numeric delta. | `timing/flaky` | Keep the smoke gate failed, but do not update numeric snapshots from this result. Split or harden before treating it as a calculation regression. |
+| `enables cannon for the selected monster and shows cannon rates` | Cannon | After reload, clicking the `Cannon` tab times out while waiting for the tab to be stable. | The Cannon state appears active in the error context, but the tab click after reload is not actionably stable. | `timing/flaky` | Keep as a smoke-gate failure; focused Cannon smoke should determine whether there is a reload/state regression. |
+| `updates trip survival controls and keeps the trip summary visible` | Trip survival summary | Assertion times out looking for `Antifire`, while the error context shows `Antifire` and `Antipoison` in the Trip summary. | Locator/timing mismatch; the expected summary state is present in the final browser context. | `timing/flaky` | Keep as a smoke-gate failure until the Trip summary locator or timing is hardened. |
+| `updates manual food controls and recoil ring count` | Trip food / recoil persistence | After reload, `Food mode` is expected as `manual`; the error context shows Manual food and `Recoil rings` value `6`. | Final DOM contains the expected controls and values, pointing to locator/timing mismatch rather than proven app failure. | `timing/flaky` | Keep as a smoke-gate failure; focused rerun should decide if the persistence path is actually stable. |
+| `updates trip food, banking and inventory reserve controls across styles` | Trip controls across styles | Test hits its 60s timeout and page closes while switching back to Trip after Magic. | Long cross-style scenario exceeded the test window; no specific value mismatch was captured. | `timing/flaky` | Keep as a smoke-gate failure; split or focus before treating as product regression. |
+| `updates trip potion carry controls and grouped potion summary` | Trip potion carry | Visible summary reaches `6 doses/type`, but `waitForFunction` never observes the expected persisted setup substrings. | Likely persistence regression or stale persistence-shape expectation for single-dose potion state. | `regression` | Release-blocking until the persisted contract is verified and either code or test expectation is corrected with evidence. |
+| `updates prayer restore detail controls and keeps the trip summary visible` | Trip prayer restore | After reload, clicking `Trip` times out while the tab resolves but does not stabilize. | Reload/tab actionability timing dominates; no persisted-value mismatch is reached. | `timing/flaky` | Keep as a smoke-gate failure; focused Trip prayer smoke should decide whether persistence is actually broken. |
+| `updates per-monster loot settings and keeps them after reload` | Loot/economy settings persistence | After reload and target selection, clicking `Loot` times out; context shows Green Dragon markers in Compare. | The test does not reach value assertions; tab actionability after reload is the immediate failure. | `timing/flaky` | Keep as a smoke-gate failure; focused Loot settings smoke should confirm whether state reload works. |
+| `resets one Active modifiers loot row while preserving neighboring loot state` | Active assumptions / Loot reset | After resetting loot settings, assertion says `Active assumptions` is empty, but the error context shows `Loot action overrides` and no `Loot settings`. | Final UI matches the intended post-reset state, so the failure looks like locator/timing mismatch. | `timing/flaky` | Recommended reclassification to test-hardening work after focused confirmation; keep the full e2e gate failed meanwhile. |
+| `matches browser-rendered numeric snapshots for loot action and trip overrides` | Loot / Trip numeric snapshots | Timeout filling `Recoil rings`, while the error context shows the input at value `6`. | Actionability/timing issue before numeric assertions; no snapshot value mismatch is reported. | `timing/flaky` | Keep as a smoke-gate failure; do not update snapshots from this result. |
+
+Summary for the superseded full default run: 5 likely `regression` failures, 1 `stale-test`, 13
+`timing/flaky`, 0 escalated-browser `environment-only` failures and 0
+`out-of-scope` failures. The pre-escalation `listen EPERM` failure remains an
+environment-only managed-sandbox limitation and is not counted in the 19 browser
+failures. These rows have been superseded by the later 51/51 default Playwright
+pass and are no longer active release blockers.
+
+Focused Goal 1 and Goal 2 follow-ups on 2026-07-08 isolated the failing browser
+paths before the final full-suite pass. The final default `npm run test:e2e`
+rerun replaces the matrix as current release evidence.
+
+Security and privacy notes for this run: tests used localhost Vite plus mocked
+or same-origin API paths. The market source URL appears only as test fixture
+metadata. No live hiscores lookup, live market upstream call, raw browser
+storage payload, user player name, secret, token or machine-specific path is
+recorded in this matrix. Tenant risk is not applicable because this checkout has
+no tenant model.
 
 ## Golden legacy fixtures
 
@@ -306,11 +428,11 @@ The legacy storage migration unit tests live in:
 npm run test -- src/tests/legacy-migration.test.ts src/tests/ui-adapters.test.ts
 ```
 
-They cover known legacy key detection, the policy table that classifies every known legacy key as `migrate`, `review-only`, `intentional-reset` or `legacy-only`, defensive `sim_input_v3` JSON parsing, invalid non-object legacy setup state, safe mapping into the current rewrite form schema, unknown entity-id skips, numeric range/default handling, oversized payload rejection, nested `sim_input_v3` `monsterSetups` and `cannonByMonster` detection as sanitized review-only rows with invalid-shape, unknown-id and oversized fail-closed coverage, compatible `sim_hiscore_player` import, malformed hiscores skips with sanitized warnings, compatible legacy price/alch map conversion into an explicit `PriceSet`, malformed/oversized/unknown price skips, failed price import preserving the current `PriceSet`, compatible `sim_loot_prefs_v1` import for unambiguous current loot row ids with unknown row, invalid action, ambiguous name and oversized payload skips, compatible `sim_hidden_tiers_v1` import with unknown tier skips, compatible `sim_compare_sort_v1` import with invalid sort skips, compatible `sim_irrelevant_v1` import with unknown monster-id skips, oversized legacy UI-state rejection, legacy price-history detection without unsafe mutation across known history keys, invalid rewrite setup envelopes/data, rewrite setup version mismatch, the guarantee that inspection does not write or delete legacy or rewrite storage keys, explicit known-key clearing behavior and the review-only boundary for `sim_planner_v1`: detected, not parsed/imported into rewrite-owned Planner state, safe for invalid/oversized payloads and kept unless the user confirms Clear.
+They cover known legacy key detection, the policy table that classifies every known legacy key as `migrate`, `review-only`, `intentional-reset` or `legacy-only`, defensive `sim_input_v3` JSON parsing, invalid non-object legacy setup state, safe mapping into the current rewrite form schema, unknown entity-id skips, numeric range/default handling, oversized payload rejection, nested `sim_input_v3.monsterSetups` import into rewrite-owned monster-specific custom setup state, nested `sim_input_v3.cannonByMonster` import into rewrite-owned per-monster cannon state, existing rewrite custom setup conflict handling, invalid-shape, unsafe-map-key, unknown-id and invalid cannon setting skips with sanitized reasons, compatible `sim_hiscore_player` import, malformed hiscores skips with sanitized warnings, compatible legacy price/alch map conversion into an explicit `PriceSet`, malformed/oversized/unknown price skips, failed price import preserving the current `PriceSet`, compatible `sim_loot_prefs_v1` import for unambiguous current loot row ids with unknown row, invalid action, ambiguous name and oversized payload skips, compatible `sim_hidden_tiers_v1` import with unknown tier skips, compatible `sim_compare_sort_v1` import with invalid sort skips, compatible `sim_irrelevant_v1` import with unknown monster-id skips, oversized legacy UI-state rejection, legacy price-history detection without unsafe mutation across known history keys, invalid rewrite setup envelopes/data, rewrite setup version mismatch, the guarantee that inspection does not write or delete legacy or rewrite storage keys, explicit known-key clearing behavior and the review-only boundary for `sim_planner_v1`: detected, not parsed/imported into rewrite-owned Planner state, safe for invalid/oversized payloads and kept unless the user confirms Clear.
 
-The Playwright scaffold covers the user-facing notice/review flow: legacy keys show a migration notice, the review UX lists the import plan, review/reset plan, per-key policy and exact clear list, nested legacy custom setup/cannon map rows say review-only and not imported, Import writes compatible setup, loot prefs, hidden gear tiers, dense compare sort/relevance, hiscores last-player and accepted-price-history state while keeping legacy keys and without writing nested custom setup/cannon map entries into rewrite setup state, `sim_planner_v1` stays review-only and does not overwrite existing `index-sim:planner-ui`, Keep dismisses without deletion, Clear removes only known legacy keys after confirmation and an existing rewrite setup is not overwritten until the user chooses Import.
+The Playwright scaffold covers the user-facing notice/review flow: legacy keys show a migration notice, the review UX lists the import plan, review/reset plan, per-key policy and exact clear list, nested legacy custom setup/cannon map rows appear in the import plan when compatible, Import writes compatible setup, nested custom setup entries, nested cannon settings, loot prefs, hidden gear tiers, dense compare sort/relevance, hiscores last-player and accepted-price-history state while keeping legacy keys, `sim_planner_v1` stays review-only and does not overwrite existing `index-sim:planner-ui`, Keep dismisses without deletion, Clear removes only known legacy keys after confirmation and an existing rewrite setup is not overwritten until the user chooses Import.
 
-Release evidence for legacy migration/reset should include the focused unit command above, `npm run test:e2e` for the user-facing notice/review flow, the release-copy audit `rg -n "run_sim.py|/api/prices|/api/scrape|/api/hiscores" index.html legacy/index.html src views.jsx planner.jsx market.js docs`, the static security searches from this document and a feature-inventory check confirming the feature remains `Osittainen` until planner/custom setup/cannon and full price-history migration have an accepted policy.
+Release evidence for legacy migration/reset should include the focused unit command above, `npm run test:e2e` for the user-facing notice/review flow, the release-copy audit `rg -n "run_sim.py|/api/prices|/api/scrape|/api/hiscores" index.html legacy/index.html src views.jsx planner.jsx market.js docs`, the static security searches from this document and a feature-inventory check confirming `Legacy saved setup migration` is `Valmis` for the accepted V1 boundary. `sim_planner_v1` and full legacy price-history payloads remain review-only/not migrated for V1.
 
 ## Market API, adapter and UI state tests
 
@@ -482,6 +604,15 @@ Run the focused browser smoke for the visible Stats workflow with:
 npm run test:e2e -- --grep "Stats"
 ```
 
+Run the focused browser smoke for the accepted Goal 1 Combat/Stats/Special slice
+with:
+
+```sh
+npm run test:e2e -- --workers=1 -g "restores per-combat-style"
+npm run test:e2e -- --workers=1 -g "shows Stats XP routing"
+npm run test:e2e -- --workers=1 -g "selects special attacks"
+```
+
 Run the focused browser smoke for the Dense Compare scale indicators with:
 
 ```sh
@@ -498,6 +629,40 @@ Run the focused browser smoke for Dense Compare release-path numeric snapshots w
 
 ```sh
 npm run test:e2e -- --grep "release-path dense"
+```
+
+Run the focused browser smoke for the accepted Goal 2 Dense/Compare slice with:
+
+```sh
+npm run test:e2e -- --workers=1 -g "keeps Dense Compare mobile and tablet overflow contained"
+npm run test:e2e -- --workers=1 -g "shows dense compare calculation freshness"
+npm run test:e2e -- --workers=1 -g "filters dense compare rows and persists hidden monsters"
+npm run test:e2e -- --workers=1 -g "shows dense row markers"
+npm run test:e2e -- --workers=1 -g "matches browser-rendered dense numeric snapshots"
+npm run test:e2e -- --workers=1 -g "sorts the full monster table and selects a target row"
+```
+
+Run the focused browser smoke for the accepted Loot/Economy slice with:
+
+```sh
+npm run test:e2e -- --workers=1 -g "updates per-monster loot settings"
+npm run test:e2e -- --workers=1 -g "updates current monster loot actions"
+npm run test:e2e -- --workers=1 -g "shows loot value composition"
+npm run test:e2e -- --workers=1 -g "renders scheduled price status"
+npm run test:e2e -- --workers=1 -g "keeps market UI scheduled-only"
+npm run test:e2e -- --workers=1 -g "analyzes and manages browser-local price history"
+```
+
+Run the focused browser smoke for the accepted Trip slice with:
+
+```sh
+npm run test:e2e -- --workers=1 -g "updates trip survival controls"
+npm run test:e2e -- --workers=1 -g "updates manual food controls"
+npm run test:e2e -- --workers=1 -g "updates trip food, banking"
+npm run test:e2e -- --workers=1 -g "updates trip potion carry"
+npm run test:e2e -- --workers=1 -g "shows inactive trip potion recommendation"
+npm run test:e2e -- --workers=1 -g "updates prayer restore detail"
+npm run test:e2e -- --workers=1 -g "enables cannon"
 ```
 
 Run the focused browser smoke for local destructive-action Undo coverage with:

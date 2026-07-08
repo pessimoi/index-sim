@@ -12,6 +12,8 @@ The current app is a valuable static prototype of a 2004scape combat simulator. 
 - documented intentional deltas when LostCityRS/Content or accepted decisions supersede legacy behavior
 - reviewed game revision bumps through a manual `npm run data:generate` workflow that update only the current accepted normalized snapshot after validation and calculation-impact evidence, without committing raw upstream dumps or historical snapshot archives
 
+Immediate delivery target: trusted-tester handoff to one known friend for functional feedback. This is not a public release track and does not require full CI/CD, final hosting or a complete deploy pipeline yet.
+
 Implementation requirements for the rewrite live in [../technical/rewrite-spec.md](../technical/rewrite-spec.md).
 
 ## Rewrite phases
@@ -47,4 +49,4 @@ Implementation requirements for the rewrite live in [../technical/rewrite-spec.m
 - Database-backed persistence.
 - Public API contract.
 - Server-side market jobs.
-- Full deployment pipeline.
+- Full CI/CD or public deployment pipeline.

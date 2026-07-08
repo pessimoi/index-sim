@@ -86,14 +86,16 @@ Current state:
 - Rewrite preview: `npm run preview`.
 - No deploy script.
 - No CI.
+- Current external sharing target: trusted-tester handoff to one known friend, not a public release.
 
 Rewrite recommendation:
 
 - Keep `package.json` run/build/test scripts in sync with [../technical/testing.md](../technical/testing.md).
+- For the trusted-tester handoff, prioritize functional readiness, local build/preview sanity, a clear known-limitations note and fast feedback from the tester over formal release automation.
 - Keep simulation/domain deployment static-first. Add hiscores production provider wiring only through [../technical/live-integrations-spec.md](../technical/live-integrations-spec.md) after runtime, hosting and upstream sources are chosen.
 - Add market price freshness through scheduled repo automation and static JSON artifacts, not through user-triggered production sync.
 - Do not describe hiscores as live-available in release notes unless the production runtime and approved upstream provider are configured. Do not describe market prices as scheduled-current unless the writer is configured and its latest run is validated.
-- Do not lock the project to GitHub Pages, Netlify or another host until the accepted live integration requirements can be satisfied there.
+- Do not build a full CI/CD pipeline or lock the project to GitHub Pages, Netlify or another host just for the trusted-tester handoff. Choose hosting later when public-release and live-integration requirements are accepted.
 
 ## Static hosting hardening
 
@@ -152,27 +154,29 @@ The generator includes a repo-local output hygiene assertion before writing. It 
 
 ## Current release evidence snapshot
 
-The latest V1 release-evidence check was consolidated on 2026-07-08 for the current Vite/React rewrite path. Core checks pass, but the default browser smoke currently fails and is release-blocking until resolved or explicitly reclassified.
+The latest V1 release-evidence check was refreshed on 2026-07-08 for the current Vite/React rewrite path. Core checks pass. The latest browser-executed default smoke remains the earlier localhost-capable 51/51 pass; the current managed-sandbox rerun is environment-limited before browser execution and is not fresh browser evidence for this checkout.
 
 | Area | Status | Evidence | Operational follow-up |
 | --- | --- | --- | --- |
-| Core commands | `pass` | `npm run typecheck`, `npm run test` (25 files, 406 tests), `npm run test:golden` (19 tests), `npm run build` and `git diff --check` passed. | Re-run before release and after any source changes. |
-| Browser smoke | `fail after sandbox escalation` | The sandboxed `npm run test:e2e` hit the documented Codex localhost `EPERM` limitation. The escalated default Playwright run completed with 29 passed and 22 failed out of 51 tests in about 5.1 minutes. | Keep the smoke mocked/same-origin; investigate or explicitly reclassify the failures before release. Do not treat it as live provider evidence. |
-| Dependency audit | `pass` | `npm audit` reported 0 vulnerabilities. | Re-run after dependency changes. |
+| Core commands | `pass` | Goal 7 reran `npm run typecheck`, `npm run test` (25 files, 408 tests), `npm run test:golden` (19 tests), `npm run build` and `git diff --check`; all passed. | Re-run before release and after any source changes. |
+| Browser smoke | `current sandbox rerun environment-only` | Goal 7 `npm run test:e2e` stopped before browser execution because Vite could not bind `127.0.0.1:5173` with `listen EPERM: operation not permitted`. No Playwright assertion failed. The latest browser-executed default Playwright gate remains the earlier localhost-capable run with 51 passed out of 51 tests in about 6.0 minutes. | Keep the smoke mocked/same-origin; do not treat it as live provider evidence. Rerun in a localhost-capable environment before a public release; for the trusted-tester handoff, record the browser-smoke freshness in the handoff notes. |
+| Dependency audit | `pass` | Goal 7 `npm audit` reported 0 vulnerabilities. | Re-run after dependency changes. |
 | Security/static copy audit | `pass with classified residuals` | Static searches found only the trusted bundled legacy-data sandbox bootstrap, false-positive secret strings, typed same-origin contract/test paths, archived legacy evidence and documentation/history. | Continue classifying hits before release. Do not remove legacy evidence or add legacy `/api/*` shims without a separate decision. |
-| Production live integrations | `partial decision` | Hiscores and market sync have same-origin dev/preview boundaries and mocked tests. Market price refresh now has an accepted scheduled static JSON model and local writer foundation, but GitHub Actions wiring and the exact raw upstream adapter are not implemented. Hiscores still lacks production runtime/provider wiring. | Do not describe live hiscores or scheduled-current market prices as production-available until the relevant provider/writer is configured and validated. |
-| Deploy/security headers | `not selected yet` | Static-host headers are recommended below, but no deploy target is accepted. | Confirm the target host can set the required headers before a real deployment. |
+| Production live integrations | `partial decision` | Hiscores and market sync have same-origin dev/preview boundaries and mocked tests. Market price refresh now has an accepted scheduled static JSON model and local writer foundation, but GitHub Actions wiring and the exact raw upstream adapter are not implemented. Hiscores still lacks production runtime/provider wiring. The live-integration bucket matrix in [../technical/live-integrations-spec.md](../technical/live-integrations-spec.md#live-integration-gap-buckets) owns the current release-required, blocked and decision-needed split. | Do not describe live hiscores or scheduled-current market prices as production-available until the relevant provider/writer is configured and validated. Keep user-triggered upstream market refresh out of production copy. |
+| Deploy/security headers | `trusted-tester only` | Static-host headers are recommended below, but no deploy target is accepted. The current handoff is not a public deployment. | Confirm the target host can set the required headers before a real deployment. Do not block the trusted-tester handoff on final hosting or full CI/CD. |
 | Generated data workflow | `partly accepted` | Current UI still bootstraps from trusted bundled legacy data through a sandbox adapter. Revision bumps are accepted only as reviewed development PRs through `npm run data:generate`, and the output policy is a single normalized current snapshot plus source pin and current impact report. The command currently writes schema-valid foundation source-pin/game-data/report outputs; authoritative parser, full hybrid calculation-impact suite and runtime consumption are not implemented. | Replace with an authoritative generated `GameDataSnapshot` after the source/generator workflow is implemented. |
 
-## Release checklist, current app
+## Trusted-tester handoff checklist, current app
 
-Until a real release process exists:
+For the current trusted-tester model, the app is shared only with a known friend for functional feedback. This checklist is intentionally lighter than a public release or full CI/CD pipeline:
 
 1. Confirm intended price snapshot date.
 2. Run checks from [../technical/testing.md](../technical/testing.md).
 3. Smoke test the main UI in a browser if possible.
 4. Confirm no stale generated or local-only files are included accidentally.
 5. Run the live integration release copy audit and classify any remaining `run_sim.py` or legacy `/api/*` hits.
-6. Verify legacy migration/reset evidence: focused `src/tests/legacy-migration.test.ts` + `src/tests/ui-adapters.test.ts`, Playwright import/keep/clear smoke, and a feature-inventory check that the migration feature is not marked complete while planner/custom setup/loot prefs/compare/cannon/hidden tiers or full price-history migration remain open.
-7. Confirm static-host security headers or document why the target cannot set them.
+6. Verify legacy migration/reset evidence: focused `src/tests/legacy-migration.test.ts` + `src/tests/ui-adapters.test.ts`, Playwright import/keep/clear smoke, and a feature-inventory check that the accepted V1 migration boundary is clear: compatible setup/cannon import can be complete while `sim_planner_v1` and full legacy price-history payloads remain review-only.
+7. Write down known limitations for the tester, especially live hiscores/provider status, scheduled-price freshness and any browser-smoke evidence that could not be refreshed locally.
 8. Update documentation if run, data or deployment steps changed.
+
+A later public release can add final hosting, deploy-target CSP/security headers, CI/CD automation and stricter release notes as separate accepted work.
