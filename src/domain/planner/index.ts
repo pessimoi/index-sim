@@ -14,6 +14,7 @@ import {
   type EntityId,
   type EquipmentSlot,
   type GearSelection,
+  type GameDataSnapshot,
   type PlayerLevels,
   type SimulationContext,
   type SimulationRequest,
@@ -64,13 +65,6 @@ export interface PlannerOptions {
   sustained?: boolean;
   maxLevels?: number;
 }
-
-const MANUAL_REQUIREMENT_POLICY_WARNING: SimulationWarning = {
-  code: "manual-planner-requirement-policy",
-  severity: "info",
-  message:
-    "Planner item requirements use the current manual requirement policy until generated requirements are accepted."
-};
 
 export interface PlannerEvaluation {
   request: SimulationRequest;
@@ -170,7 +164,7 @@ const REQUIREMENT_PROVENANCE = {
   sourceRef: "planner-core.js requirement table in this checkout",
   verifiedAt: "2026-07-05",
   notes:
-    "Requirement levels are the existing rewrite planner policy until an authoritative generated item requirement source is accepted."
+    "Requirement levels are the manual fallback policy used only when generated item requirement data is missing."
 } satisfies DataProvenance;
 
 for (let level = 1, total = 0; level < 99; level += 1) {
@@ -275,6 +269,16 @@ export const ITEM_REQUIREMENTS: Record<EntityId, SkillRequirements> = {
 };
 
 export const PLANNER_REQUIREMENT_PROVENANCE = REQUIREMENT_PROVENANCE;
+
+export type PlannerRequirementSource = "generated" | "manual-fallback" | "none";
+
+export interface PlannerRequirementLookup {
+  itemId: EntityId;
+  requirements: SkillRequirements;
+  source: PlannerRequirementSource;
+  provenance?: DataProvenance;
+  warnings: SimulationWarning[];
+}
 
 export const CANDIDATE_POOLS: Record<CombatStyle, Required<PlannerPool>> = {
   melee: {
@@ -421,18 +425,72 @@ export function xpBetween(_skill: PlannerSkill, from: number, to: number): numbe
   return Math.max(0, xpAt(to) - xpAt(from));
 }
 
-export function reqOf(itemId: EntityId): SkillRequirements {
-  return ITEM_REQUIREMENTS[itemId] ?? {};
+function fallbackRequirementWarning(itemId: EntityId): SimulationWarning {
+  return {
+    code: "manual-planner-requirement-fallback",
+    severity: "info",
+    message: `Planner used manual requirement fallback because generated requirement data is missing for ${itemId}.`
+  };
 }
 
-export function reqLevel(itemId: EntityId, skill: PlannerSkill): number {
+export function requirementForItem(
+  gameData: GameDataSnapshot | undefined,
+  itemId: EntityId
+): PlannerRequirementLookup {
+  if (itemId === "none") {
+    return { itemId, requirements: {}, source: "none", warnings: [] };
+  }
+
+  const generated = gameData?.requirements?.[itemId];
+  if (generated) {
+    return {
+      itemId,
+      requirements: {
+        ...(generated.skills.attack !== undefined ? { attack: generated.skills.attack } : {}),
+        ...(generated.skills.defence !== undefined ? { defence: generated.skills.defence } : {}),
+        ...(generated.skills.ranged !== undefined ? { ranged: generated.skills.ranged } : {}),
+        ...(generated.skills.magic !== undefined ? { magic: generated.skills.magic } : {})
+      },
+      source: "generated",
+      provenance: generated.provenance,
+      warnings: []
+    };
+  }
+
+  const fallback = ITEM_REQUIREMENTS[itemId];
+  if (fallback) {
+    return {
+      itemId,
+      requirements: fallback,
+      source: "manual-fallback",
+      provenance: REQUIREMENT_PROVENANCE,
+      warnings: [fallbackRequirementWarning(itemId)]
+    };
+  }
+
+  return { itemId, requirements: {}, source: "none", warnings: [] };
+}
+
+export function reqOf(itemId: EntityId, gameData?: GameDataSnapshot): SkillRequirements {
+  return requirementForItem(gameData, itemId).requirements;
+}
+
+export function reqLevel(
+  itemId: EntityId,
+  skill: PlannerSkill,
+  gameData?: GameDataSnapshot
+): number {
   if (skill === "strength") return 0;
-  return reqOf(itemId)[skill] ?? 0;
+  return reqOf(itemId, gameData)[skill] ?? 0;
 }
 
-export function equippable(itemId: EntityId, state: PlannerLevels): boolean {
+export function equippable(
+  itemId: EntityId,
+  state: PlannerLevels,
+  gameData?: GameDataSnapshot
+): boolean {
   if (itemId === "none") return true;
-  const requirement = reqOf(itemId);
+  const requirement = reqOf(itemId, gameData);
   return (
     (requirement.attack == null || state.attack >= requirement.attack) &&
     (requirement.defence == null || state.defence >= requirement.defence) &&
@@ -567,7 +625,10 @@ export function buildPlan(
     (skill) => targets[skill] != null && targets[skill]! > baseRequest.levels[skill]
   );
   const startXp = startingXp(baseRequest.levels, allSkills, options.startXp);
-  const warnings = [MANUAL_REQUIREMENT_POLICY_WARNING, ...plannerPoolWarnings(pool, context)];
+  const warnings = [
+    ...requirementFallbackWarningsForPlanner(baseRequest, pool, context),
+    ...plannerPoolWarnings(pool, context)
+  ];
   const refs =
     metric === "balanced"
       ? balancedRefs(input, context, baseRequest, metric, pool, options.lockGear)
@@ -898,10 +959,10 @@ function candidateWeapons(
   }
   const candidates = (pool.weapon ?? [])
     .filter((weaponId) => !!context.gameData.weapons[weaponId])
-    .filter((weaponId) => equippable(weaponId, state));
+    .filter((weaponId) => equippable(weaponId, state, context.gameData));
   if (
     !candidates.includes(baseRequest.loadout.weaponId) &&
-    equippable(baseRequest.loadout.weaponId, state)
+    equippable(baseRequest.loadout.weaponId, state, context.gameData)
   ) {
     candidates.push(baseRequest.loadout.weaponId);
   }
@@ -933,7 +994,7 @@ function slotCandidates(
     .filter(
       (itemId) => itemId === "none" || !!context.gameData.equipment[slot as EquipmentSlot]?.[itemId]
     )
-    .filter((itemId) => equippable(itemId, state));
+    .filter((itemId) => equippable(itemId, state, context.gameData));
 }
 
 function requestForState(
@@ -1035,7 +1096,7 @@ function buildThresholds(
     for (const skill of skills) {
       const set = new Set<number>();
       for (const itemId of items) {
-        const level = reqLevel(itemId, skill);
+        const level = reqLevel(itemId, skill, context.gameData);
         if (level > 1) set.add(level);
       }
       if (combatStyle === "magic" && skill === "magic") {
@@ -1161,12 +1222,12 @@ function bindingRequirement(
     const spell = context.gameData.spells[itemId];
     return spell?.lvl && spell.lvl > 1 ? { skill: "magic", level: spell.lvl } : null;
   }
-  if (reqLevel(itemId, preferredSkill) > 1) {
-    return { skill: preferredSkill, level: reqLevel(itemId, preferredSkill) };
+  if (reqLevel(itemId, preferredSkill, context.gameData) > 1) {
+    return { skill: preferredSkill, level: reqLevel(itemId, preferredSkill, context.gameData) };
   }
   let best: { skill: PlannerSkill; level: number } | null = null;
   for (const skill of LEVEL_SKILLS) {
-    const level = reqLevel(itemId, skill);
+    const level = reqLevel(itemId, skill, context.gameData);
     if (level > 1 && (!best || level > best.level)) best = { skill, level };
   }
   return best;
@@ -1191,6 +1252,41 @@ function mergePool(base: PlannerPool, override: PlannerPool | undefined): Planne
     legs: withNone(override.legs ?? base.legs ?? ["none"]),
     shield: withNone(override.shield ?? base.shield ?? ["none"])
   };
+}
+
+function requirementFallbackWarningsForPlanner(
+  baseRequest: SimulationRequest,
+  pool: PlannerPool,
+  context: SimulationContext
+): SimulationWarning[] {
+  const itemIds = new Set<EntityId>([
+    baseRequest.loadout.weaponId,
+    ...Object.values(baseRequest.loadout.gear).filter((itemId): itemId is EntityId =>
+      typeof itemId === "string"
+    ),
+    ...(pool.weapon ?? []),
+    ...(pool.helm ?? []),
+    ...(pool.body ?? []),
+    ...(pool.legs ?? []),
+    ...(pool.shield ?? [])
+  ]);
+  itemIds.delete("none");
+
+  const fallbackItemIds = [...itemIds]
+    .filter((itemId) => requirementForItem(context.gameData, itemId).source === "manual-fallback")
+    .sort();
+  if (fallbackItemIds.length === 0) return [];
+
+  const shownItems = fallbackItemIds.slice(0, 5).join(", ");
+  const hiddenCount = fallbackItemIds.length - 5;
+  const suffix = hiddenCount > 0 ? `, and ${hiddenCount} more` : "";
+  return [
+    {
+      code: "manual-planner-requirement-fallback",
+      severity: "info",
+      message: `Planner used manual requirement fallback because generated requirement data is missing for ${shownItems}${suffix}.`
+    }
+  ];
 }
 
 function plannerPoolWarnings(pool: PlannerPool, context: SimulationContext): SimulationWarning[] {

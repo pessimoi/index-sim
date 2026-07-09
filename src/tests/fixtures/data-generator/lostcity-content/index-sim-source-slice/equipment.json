@@ -1,0 +1,1173 @@
+{
+  "equipment": [
+    {
+      "slot": "amulet",
+      "id": "amu_glory",
+      "name": "Amulet of glory",
+      "alch": 10575,
+      "bonuses": {
+        "stabAtt": 10,
+        "slashAtt": 10,
+        "crushAtt": 10,
+        "magAtt": 10,
+        "rngAtt": 10,
+        "stabDef": 3,
+        "slashDef": 3,
+        "crushDef": 3,
+        "magDef": 3,
+        "rngDef": 3,
+        "str": 6,
+        "prayer": 3
+      }
+    },
+    {
+      "slot": "amulet",
+      "id": "amu_power",
+      "name": "Amulet of power",
+      "alch": 2115,
+      "bonuses": {
+        "stabAtt": 6,
+        "slashAtt": 6,
+        "crushAtt": 6,
+        "magAtt": 6,
+        "rngAtt": 6,
+        "stabDef": 6,
+        "slashDef": 6,
+        "crushDef": 6,
+        "magDef": 6,
+        "rngDef": 6,
+        "str": 6,
+        "prayer": 1
+      }
+    },
+    {
+      "slot": "amulet",
+      "id": "amu_strength",
+      "name": "Amulet of strength",
+      "alch": 1215,
+      "bonuses": {
+        "str": 10
+      }
+    },
+    {
+      "slot": "amulet",
+      "id": "none",
+      "name": "None"
+    },
+    {
+      "slot": "amulet",
+      "id": "unholy_symbol",
+      "name": "Unholy symbol",
+      "alch": 0,
+      "bonuses": {
+        "prayer": 8
+      }
+    },
+    {
+      "slot": "body",
+      "id": "adamant_platebody",
+      "name": "Adamant platebody",
+      "alch": 7680,
+      "bonuses": {
+        "magAtt": -30,
+        "rngAtt": -10,
+        "stabDef": 65,
+        "slashDef": 63,
+        "crushDef": 55,
+        "magDef": -6,
+        "rngDef": 63
+      }
+    },
+    {
+      "slot": "body",
+      "id": "black_dhide_body",
+      "name": "Black d-hide body",
+      "alch": 8088,
+      "bonuses": {
+        "magAtt": -15,
+        "rngAtt": 30,
+        "stabDef": 55,
+        "slashDef": 47,
+        "crushDef": 60,
+        "magDef": 50,
+        "rngDef": 55
+      }
+    },
+    {
+      "slot": "body",
+      "id": "black_platebody",
+      "name": "Black platebody",
+      "alch": 2304,
+      "bonuses": {
+        "magAtt": -30,
+        "rngAtt": -10,
+        "stabDef": 41,
+        "slashDef": 40,
+        "crushDef": 30,
+        "magDef": -6,
+        "rngDef": 40
+      }
+    },
+    {
+      "slot": "body",
+      "id": "blue_dhide_body",
+      "name": "Blue d-hide body",
+      "alch": 5616,
+      "bonuses": {
+        "magAtt": -15,
+        "rngAtt": 20,
+        "stabDef": 45,
+        "slashDef": 37,
+        "crushDef": 50,
+        "magDef": 30,
+        "rngDef": 45
+      }
+    },
+    {
+      "slot": "body",
+      "id": "dragon_chainbody",
+      "name": "Dragon chainbody",
+      "alch": 150000,
+      "bonuses": {
+        "magAtt": -15,
+        "stabDef": 81,
+        "slashDef": 93,
+        "crushDef": 98,
+        "magDef": -3,
+        "rngDef": 82
+      }
+    },
+    {
+      "slot": "body",
+      "id": "green_dhide_body",
+      "name": "Green d-hide body",
+      "alch": 4680,
+      "bonuses": {
+        "magAtt": -15,
+        "rngAtt": 15,
+        "stabDef": 40,
+        "slashDef": 32,
+        "crushDef": 45,
+        "magDef": 20,
+        "rngDef": 40
+      }
+    },
+    {
+      "slot": "body",
+      "id": "hardleather_body",
+      "name": "Hardleather body",
+      "alch": 102,
+      "bonuses": {
+        "magAtt": -4,
+        "rngAtt": 8,
+        "stabDef": 12,
+        "slashDef": 15,
+        "crushDef": 18,
+        "magDef": 6,
+        "rngDef": 15
+      }
+    },
+    {
+      "slot": "body",
+      "id": "iron_platebody",
+      "name": "Iron platebody",
+      "alch": 336,
+      "bonuses": {
+        "magAtt": -30,
+        "rngAtt": -10,
+        "stabDef": 21,
+        "slashDef": 20,
+        "crushDef": 12,
+        "magDef": -6,
+        "rngDef": 20
+      }
+    },
+    {
+      "slot": "body",
+      "id": "leather_body",
+      "name": "Leather body",
+      "alch": 12,
+      "bonuses": {
+        "magAtt": -2,
+        "rngAtt": 2,
+        "stabDef": 8,
+        "slashDef": 9,
+        "crushDef": 10,
+        "magDef": 4,
+        "rngDef": 9
+      }
+    },
+    {
+      "slot": "body",
+      "id": "mithril_platebody",
+      "name": "Mithril platebody",
+      "alch": 3120,
+      "bonuses": {
+        "magAtt": -30,
+        "rngAtt": -10,
+        "stabDef": 46,
+        "slashDef": 44,
+        "crushDef": 38,
+        "magDef": -6,
+        "rngDef": 44
+      }
+    },
+    {
+      "slot": "body",
+      "id": "monk_robe_top",
+      "name": "Monk's robe (top)",
+      "alch": 0,
+      "bonuses": {
+        "prayer": 6
+      }
+    },
+    {
+      "slot": "body",
+      "id": "none",
+      "name": "None"
+    },
+    {
+      "slot": "body",
+      "id": "red_dhide_body",
+      "name": "Red d-hide body",
+      "alch": 6738,
+      "bonuses": {
+        "magAtt": -15,
+        "rngAtt": 25,
+        "stabDef": 50,
+        "slashDef": 42,
+        "crushDef": 55,
+        "magDef": 40,
+        "rngDef": 50
+      }
+    },
+    {
+      "slot": "body",
+      "id": "rune_chainbody",
+      "name": "Rune chainbody",
+      "alch": 30000,
+      "bonuses": {
+        "magAtt": -15,
+        "stabDef": 63,
+        "slashDef": 72,
+        "crushDef": 78,
+        "magDef": -3,
+        "rngDef": 65
+      }
+    },
+    {
+      "slot": "body",
+      "id": "rune_platebody",
+      "name": "Rune platebody",
+      "alch": 39000,
+      "bonuses": {
+        "magAtt": -30,
+        "rngAtt": -10,
+        "stabDef": 82,
+        "slashDef": 80,
+        "crushDef": 72,
+        "magDef": -6,
+        "rngDef": 80
+      }
+    },
+    {
+      "slot": "body",
+      "id": "splitbark_body",
+      "name": "Splitbark body",
+      "alch": 27000,
+      "bonuses": {
+        "magAtt": 8,
+        "rngAtt": -10,
+        "stabDef": 36,
+        "slashDef": 26,
+        "crushDef": 42,
+        "magDef": 15
+      }
+    },
+    {
+      "slot": "body",
+      "id": "steel_platebody",
+      "name": "Steel platebody",
+      "alch": 1200,
+      "bonuses": {
+        "magAtt": -30,
+        "rngAtt": -10,
+        "stabDef": 32,
+        "slashDef": 31,
+        "crushDef": 24,
+        "magDef": -6,
+        "rngDef": 31
+      }
+    },
+    {
+      "slot": "body",
+      "id": "studded_body",
+      "name": "Studded body",
+      "alch": 510,
+      "bonuses": {
+        "magAtt": -4,
+        "rngAtt": 8,
+        "stabDef": 18,
+        "slashDef": 25,
+        "crushDef": 22,
+        "magDef": 8,
+        "rngDef": 25
+      }
+    },
+    {
+      "slot": "body",
+      "id": "wizard_robe_top",
+      "name": "Wizard robe (top)",
+      "alch": 9,
+      "bonuses": {
+        "magAtt": 3,
+        "magDef": 3
+      }
+    },
+    {
+      "slot": "boots",
+      "id": "climbing_boots",
+      "name": "Climbing boots",
+      "alch": 7,
+      "bonuses": {
+        "slashDef": 2,
+        "crushDef": 2,
+        "str": 2
+      }
+    },
+    {
+      "slot": "boots",
+      "id": "none",
+      "name": "None"
+    },
+    {
+      "slot": "boots",
+      "id": "ranger_boots",
+      "name": "Ranger boots",
+      "alch": 120,
+      "bonuses": {
+        "magAtt": -10,
+        "rngAtt": 8,
+        "stabDef": 2,
+        "slashDef": 3,
+        "crushDef": 4,
+        "magDef": 2
+      }
+    },
+    {
+      "slot": "boots",
+      "id": "splitbark_boots",
+      "name": "Splitbark boots",
+      "alch": 3000,
+      "bonuses": {
+        "magAtt": 1,
+        "rngAtt": -1,
+        "stabDef": 3,
+        "slashDef": 2,
+        "crushDef": 4,
+        "magDef": 2
+      }
+    },
+    {
+      "slot": "boots",
+      "id": "wizard_boots",
+      "name": "Wizard boots",
+      "alch": 120,
+      "bonuses": {
+        "magAtt": 4,
+        "magDef": 4
+      }
+    },
+    {
+      "slot": "cape",
+      "id": "cape_legends",
+      "name": "Cape of legends",
+      "alch": 270,
+      "bonuses": {
+        "stabDef": 7,
+        "slashDef": 7,
+        "crushDef": 7,
+        "magDef": 7,
+        "rngDef": 7
+      }
+    },
+    {
+      "slot": "cape",
+      "id": "god_cape",
+      "name": "God cape",
+      "alch": 60,
+      "bonuses": {
+        "magAtt": 10,
+        "stabDef": 1,
+        "slashDef": 1,
+        "crushDef": 2,
+        "magDef": 10
+      }
+    },
+    {
+      "slot": "cape",
+      "id": "none",
+      "name": "None"
+    },
+    {
+      "slot": "gloves",
+      "id": "black_vambraces",
+      "name": "Black d-hide vambs",
+      "alch": 2592,
+      "bonuses": {
+        "magAtt": -10,
+        "rngAtt": 11,
+        "stabDef": 6,
+        "slashDef": 5,
+        "crushDef": 7,
+        "magDef": 8
+      }
+    },
+    {
+      "slot": "gloves",
+      "id": "blue_vambraces",
+      "name": "Blue d-hide vambs",
+      "alch": 1800,
+      "bonuses": {
+        "magAtt": -10,
+        "rngAtt": 9,
+        "stabDef": 4,
+        "slashDef": 3,
+        "crushDef": 5,
+        "magDef": 4
+      }
+    },
+    {
+      "slot": "gloves",
+      "id": "chaos_gauntlets",
+      "name": "Chaos gauntlets",
+      "alch": 0,
+      "note": "+3 bolt dmg",
+      "bonuses": {
+        "stabAtt": 2,
+        "slashAtt": 2,
+        "crushAtt": 2,
+        "stabDef": 8,
+        "slashDef": 9,
+        "crushDef": 7,
+        "str": 2
+      }
+    },
+    {
+      "slot": "gloves",
+      "id": "green_vambraces",
+      "name": "Green d-hide vambs",
+      "alch": 1500,
+      "bonuses": {
+        "magAtt": -10,
+        "rngAtt": 8,
+        "stabDef": 3,
+        "slashDef": 2,
+        "crushDef": 4,
+        "magDef": 2
+      }
+    },
+    {
+      "slot": "gloves",
+      "id": "leather_vambraces",
+      "name": "Leather vambraces",
+      "alch": 10,
+      "bonuses": {
+        "rngAtt": 4,
+        "stabDef": 2,
+        "slashDef": 2,
+        "crushDef": 1
+      }
+    },
+    {
+      "slot": "gloves",
+      "id": "none",
+      "name": "None"
+    },
+    {
+      "slot": "gloves",
+      "id": "red_vambraces",
+      "name": "Red d-hide vambs",
+      "alch": 2160,
+      "bonuses": {
+        "magAtt": -10,
+        "rngAtt": 10,
+        "stabDef": 5,
+        "slashDef": 4,
+        "crushDef": 6,
+        "magDef": 6
+      }
+    },
+    {
+      "slot": "gloves",
+      "id": "splitbark_gauntlets",
+      "name": "Splitbark gauntlets",
+      "alch": 3000,
+      "bonuses": {
+        "magAtt": 1,
+        "rngAtt": -1,
+        "stabDef": 3,
+        "slashDef": 2,
+        "crushDef": 4,
+        "magDef": 2
+      }
+    },
+    {
+      "slot": "helm",
+      "id": "adamant_full_helm",
+      "name": "Adamant full helm",
+      "alch": 2112,
+      "bonuses": {
+        "magAtt": -6,
+        "rngAtt": -2,
+        "stabDef": 19,
+        "slashDef": 21,
+        "crushDef": 16,
+        "magDef": -1,
+        "rngDef": 19
+      }
+    },
+    {
+      "slot": "helm",
+      "id": "archer_helm",
+      "name": "Archer helm",
+      "alch": 36000,
+      "bonuses": {
+        "stabAtt": -5,
+        "slashAtt": -5,
+        "crushAtt": -5,
+        "magAtt": -5,
+        "rngAtt": 6,
+        "stabDef": 6,
+        "slashDef": 8,
+        "crushDef": 10,
+        "magDef": 6,
+        "rngDef": 6
+      }
+    },
+    {
+      "slot": "helm",
+      "id": "berserker_helm",
+      "name": "Berserker helm",
+      "alch": 36000,
+      "bonuses": {
+        "magAtt": -5,
+        "rngAtt": -5,
+        "stabDef": 31,
+        "slashDef": 29,
+        "crushDef": 33,
+        "rngDef": 30,
+        "str": 3
+      }
+    },
+    {
+      "slot": "helm",
+      "id": "black_full_helm",
+      "name": "Black full helm",
+      "alch": 633,
+      "bonuses": {
+        "magAtt": -6,
+        "rngAtt": -2,
+        "stabDef": 12,
+        "slashDef": 13,
+        "crushDef": 10,
+        "magDef": -1,
+        "rngDef": 12
+      }
+    },
+    {
+      "slot": "helm",
+      "id": "bronze_med_helm",
+      "name": "Bronze med helm",
+      "alch": 14,
+      "bonuses": {
+        "stabDef": 3,
+        "slashDef": 4,
+        "crushDef": 2,
+        "magDef": -6,
+        "rngDef": 3
+      },
+      "requirements": {
+        "skills": {
+          "defence": 1
+        }
+      }
+    },
+    {
+      "slot": "helm",
+      "id": "coif",
+      "name": "Coif",
+      "alch": 120,
+      "bonuses": {
+        "magAtt": -1,
+        "rngAtt": 2,
+        "stabDef": 4,
+        "slashDef": 6,
+        "crushDef": 8,
+        "magDef": 4,
+        "rngDef": 4
+      }
+    },
+    {
+      "slot": "helm",
+      "id": "dragon_med_helm",
+      "name": "Dragon med helm",
+      "alch": 60000,
+      "bonuses": {
+        "magAtt": -3,
+        "rngAtt": -1,
+        "stabDef": 33,
+        "slashDef": 35,
+        "crushDef": 32,
+        "magDef": -1,
+        "rngDef": 34
+      }
+    },
+    {
+      "slot": "helm",
+      "id": "farseer_helm",
+      "name": "Farseer helm",
+      "alch": 36000,
+      "bonuses": {
+        "stabAtt": -5,
+        "slashAtt": -5,
+        "crushAtt": -5,
+        "magAtt": 6,
+        "rngAtt": -5,
+        "stabDef": 8,
+        "slashDef": 10,
+        "crushDef": 12,
+        "magDef": 6
+      }
+    },
+    {
+      "slot": "helm",
+      "id": "green_hat",
+      "name": "Green hat",
+      "alch": 96,
+      "bonuses": {
+        "magAtt": 3,
+        "magDef": 3
+      }
+    },
+    {
+      "slot": "helm",
+      "id": "iron_full_helm",
+      "name": "Iron full helm",
+      "alch": 92,
+      "bonuses": {
+        "magAtt": -6,
+        "rngAtt": -2,
+        "stabDef": 6,
+        "slashDef": 7,
+        "crushDef": 5,
+        "magDef": -1,
+        "rngDef": 6
+      }
+    },
+    {
+      "slot": "helm",
+      "id": "mithril_full_helm",
+      "name": "Mithril full helm",
+      "alch": 858,
+      "bonuses": {
+        "magAtt": -6,
+        "rngAtt": -2,
+        "stabDef": 13,
+        "slashDef": 14,
+        "crushDef": 11,
+        "magDef": -1,
+        "rngDef": 13
+      }
+    },
+    {
+      "slot": "helm",
+      "id": "none",
+      "name": "None"
+    },
+    {
+      "slot": "helm",
+      "id": "robin_hood_hat",
+      "name": "Robin hood hat",
+      "alch": 270,
+      "bonuses": {
+        "magAtt": -10,
+        "rngAtt": 8,
+        "stabDef": 4,
+        "slashDef": 6,
+        "crushDef": 8,
+        "magDef": 4,
+        "rngDef": 4
+      }
+    },
+    {
+      "slot": "helm",
+      "id": "rune_full_helm",
+      "name": "Rune full helm",
+      "alch": 21120,
+      "bonuses": {
+        "magAtt": -6,
+        "rngAtt": -2,
+        "stabDef": 30,
+        "slashDef": 32,
+        "crushDef": 27,
+        "magDef": -1,
+        "rngDef": 30
+      }
+    },
+    {
+      "slot": "helm",
+      "id": "splitbark_helm",
+      "name": "Splitbark helm",
+      "alch": 6000,
+      "bonuses": {
+        "magAtt": 2,
+        "rngAtt": -2,
+        "stabDef": 10,
+        "slashDef": 9,
+        "crushDef": 11,
+        "magDef": 3
+      }
+    },
+    {
+      "slot": "helm",
+      "id": "steel_full_helm",
+      "name": "Steel full helm",
+      "alch": 330,
+      "bonuses": {
+        "magAtt": -6,
+        "rngAtt": -2,
+        "stabDef": 9,
+        "slashDef": 10,
+        "crushDef": 7,
+        "magDef": -1,
+        "rngDef": 9
+      }
+    },
+    {
+      "slot": "helm",
+      "id": "warrior_helm",
+      "name": "Warrior helm",
+      "alch": 36000,
+      "bonuses": {
+        "slashAtt": 5,
+        "magAtt": -5,
+        "rngAtt": -5,
+        "stabDef": 31,
+        "slashDef": 33,
+        "crushDef": 29,
+        "rngDef": 30
+      }
+    },
+    {
+      "slot": "legs",
+      "id": "adamant_platelegs",
+      "name": "Adamant platelegs",
+      "alch": 3840,
+      "bonuses": {
+        "magAtt": -21,
+        "rngAtt": -7,
+        "stabDef": 33,
+        "slashDef": 31,
+        "crushDef": 29,
+        "magDef": -4,
+        "rngDef": 31
+      }
+    },
+    {
+      "slot": "legs",
+      "id": "black_dhide_legs",
+      "name": "Black d-hide chaps",
+      "alch": 3732,
+      "bonuses": {
+        "magAtt": -10,
+        "rngAtt": 17,
+        "stabDef": 31,
+        "slashDef": 25,
+        "crushDef": 33,
+        "magDef": 28,
+        "rngDef": 31
+      }
+    },
+    {
+      "slot": "legs",
+      "id": "black_platelegs",
+      "name": "Black platelegs",
+      "alch": 1152,
+      "bonuses": {
+        "magAtt": -21,
+        "rngAtt": -7,
+        "stabDef": 21,
+        "slashDef": 20,
+        "crushDef": 19,
+        "magDef": -4,
+        "rngDef": 20
+      }
+    },
+    {
+      "slot": "legs",
+      "id": "blue_dhide_legs",
+      "name": "Blue d-hide chaps",
+      "alch": 2592,
+      "bonuses": {
+        "magAtt": -10,
+        "rngAtt": 11,
+        "stabDef": 25,
+        "slashDef": 19,
+        "crushDef": 27,
+        "magDef": 14,
+        "rngDef": 25
+      }
+    },
+    {
+      "slot": "legs",
+      "id": "green_dhide_legs",
+      "name": "Green d-hide chaps",
+      "alch": 2340,
+      "bonuses": {
+        "magAtt": -10,
+        "rngAtt": 8,
+        "stabDef": 22,
+        "slashDef": 16,
+        "crushDef": 24,
+        "magDef": 8,
+        "rngDef": 22
+      }
+    },
+    {
+      "slot": "legs",
+      "id": "iron_platelegs",
+      "name": "Iron platelegs",
+      "alch": 168,
+      "bonuses": {
+        "magAtt": -21,
+        "rngAtt": -7,
+        "stabDef": 11,
+        "slashDef": 10,
+        "crushDef": 10,
+        "magDef": -4,
+        "rngDef": 10
+      }
+    },
+    {
+      "slot": "legs",
+      "id": "leather_chaps",
+      "name": "Leather chaps",
+      "alch": 12,
+      "bonuses": {
+        "rngAtt": 4,
+        "stabDef": 2,
+        "slashDef": 2,
+        "crushDef": 1
+      }
+    },
+    {
+      "slot": "legs",
+      "id": "mithril_platelegs",
+      "name": "Mithril platelegs",
+      "alch": 1560,
+      "bonuses": {
+        "magAtt": -21,
+        "rngAtt": -7,
+        "stabDef": 24,
+        "slashDef": 22,
+        "crushDef": 20,
+        "magDef": -4,
+        "rngDef": 22
+      }
+    },
+    {
+      "slot": "legs",
+      "id": "monk_robe_bottom",
+      "name": "Monk's robe (bottom)",
+      "alch": 0,
+      "bonuses": {
+        "prayer": 6
+      }
+    },
+    {
+      "slot": "legs",
+      "id": "none",
+      "name": "None"
+    },
+    {
+      "slot": "legs",
+      "id": "red_dhide_legs",
+      "name": "Red d-hide chaps",
+      "alch": 3108,
+      "bonuses": {
+        "magAtt": -10,
+        "rngAtt": 14,
+        "stabDef": 28,
+        "slashDef": 22,
+        "crushDef": 30,
+        "magDef": 20,
+        "rngDef": 28
+      }
+    },
+    {
+      "slot": "legs",
+      "id": "rune_platelegs",
+      "name": "Rune platelegs",
+      "alch": 38400,
+      "bonuses": {
+        "magAtt": -21,
+        "rngAtt": -7,
+        "stabDef": 51,
+        "slashDef": 49,
+        "crushDef": 47,
+        "magDef": -4,
+        "rngDef": 49
+      }
+    },
+    {
+      "slot": "legs",
+      "id": "splitbark_legs",
+      "name": "Splitbark legs",
+      "alch": 24000,
+      "bonuses": {
+        "magAtt": 7,
+        "rngAtt": -6,
+        "stabDef": 22,
+        "slashDef": 20,
+        "crushDef": 25,
+        "magDef": 10
+      }
+    },
+    {
+      "slot": "legs",
+      "id": "steel_platelegs",
+      "name": "Steel platelegs",
+      "alch": 600,
+      "bonuses": {
+        "magAtt": -21,
+        "rngAtt": -7,
+        "stabDef": 17,
+        "slashDef": 16,
+        "crushDef": 15,
+        "magDef": -4,
+        "rngDef": 16
+      }
+    },
+    {
+      "slot": "legs",
+      "id": "studded_chaps",
+      "name": "Studded chaps",
+      "alch": 450,
+      "bonuses": {
+        "magAtt": -5,
+        "rngAtt": 6,
+        "stabDef": 15,
+        "slashDef": 16,
+        "crushDef": 17,
+        "magDef": 6,
+        "rngDef": 16
+      }
+    },
+    {
+      "slot": "legs",
+      "id": "zamorak_robe_bottom",
+      "name": "Zamorak robe (bottom)",
+      "alch": 18,
+      "bonuses": {
+        "magAtt": 2,
+        "magDef": 3,
+        "prayer": 3
+      }
+    },
+    {
+      "slot": "ring",
+      "id": "none",
+      "name": "None"
+    },
+    {
+      "slot": "ring",
+      "id": "ring_of_recoil",
+      "name": "Ring of recoil",
+      "alch": 1500,
+      "note": "situational · reflects dmg",
+      "approx": true,
+      "recoil": true
+    },
+    {
+      "slot": "ring",
+      "id": "ring_of_wealth",
+      "name": "Ring of wealth",
+      "alch": 10575,
+      "note": "best in slot · gem table"
+    },
+    {
+      "slot": "shield",
+      "id": "adamant_kite",
+      "name": "Adamant kiteshield",
+      "alch": 3264,
+      "bonuses": {
+        "magAtt": -8,
+        "rngAtt": -2,
+        "stabDef": 27,
+        "slashDef": 31,
+        "crushDef": 29,
+        "magDef": -1,
+        "rngDef": 29
+      }
+    },
+    {
+      "slot": "shield",
+      "id": "anti_dragon",
+      "name": "Anti-dragon shield",
+      "alch": 12,
+      "bonuses": {
+        "stabDef": 7,
+        "slashDef": 9,
+        "crushDef": 8,
+        "magDef": 2,
+        "rngDef": 8
+      }
+    },
+    {
+      "slot": "shield",
+      "id": "balance_book",
+      "name": "Book of balance (Guthix)",
+      "alch": 120,
+      "bonuses": {
+        "stabAtt": 4,
+        "slashAtt": 4,
+        "crushAtt": 4,
+        "magAtt": 4,
+        "rngAtt": 4,
+        "stabDef": 4,
+        "slashDef": 4,
+        "crushDef": 4,
+        "magDef": 4,
+        "rngDef": 4,
+        "prayer": 5
+      }
+    },
+    {
+      "slot": "shield",
+      "id": "black_kite",
+      "name": "Black kiteshield",
+      "alch": 979,
+      "bonuses": {
+        "magAtt": -8,
+        "rngAtt": -2,
+        "stabDef": 17,
+        "slashDef": 19,
+        "crushDef": 18,
+        "magDef": -1,
+        "rngDef": 18
+      }
+    },
+    {
+      "slot": "shield",
+      "id": "bronze_sq_shield",
+      "name": "Bronze sq shield",
+      "alch": 24,
+      "bonuses": {
+        "stabDef": 6,
+        "slashDef": 8,
+        "crushDef": 5,
+        "magDef": -1,
+        "rngDef": 6
+      },
+      "requirements": {
+        "skills": {
+          "defence": 1
+        }
+      }
+    },
+    {
+      "slot": "shield",
+      "id": "dragon_sq",
+      "name": "Dragon sq shield",
+      "alch": 300000,
+      "bonuses": {
+        "magAtt": -6,
+        "rngAtt": -2,
+        "stabDef": 50,
+        "slashDef": 52,
+        "crushDef": 48,
+        "rngDef": 50
+      }
+    },
+    {
+      "slot": "shield",
+      "id": "iron_kite",
+      "name": "Iron kiteshield",
+      "alch": 142,
+      "bonuses": {
+        "magAtt": -8,
+        "rngAtt": -2,
+        "stabDef": 8,
+        "slashDef": 10,
+        "crushDef": 9,
+        "magDef": -1,
+        "rngDef": 9
+      }
+    },
+    {
+      "slot": "shield",
+      "id": "mithril_kite",
+      "name": "Mithril kiteshield",
+      "alch": 1326,
+      "bonuses": {
+        "magAtt": -8,
+        "rngAtt": -2,
+        "stabDef": 18,
+        "slashDef": 22,
+        "crushDef": 20,
+        "magDef": -1,
+        "rngDef": 20
+      }
+    },
+    {
+      "slot": "shield",
+      "id": "none",
+      "name": "None"
+    },
+    {
+      "slot": "shield",
+      "id": "rune_kite",
+      "name": "Rune kiteshield",
+      "alch": 32640,
+      "bonuses": {
+        "magAtt": -8,
+        "rngAtt": -2,
+        "stabDef": 44,
+        "slashDef": 48,
+        "crushDef": 46,
+        "magDef": -1,
+        "rngDef": 46
+      }
+    },
+    {
+      "slot": "shield",
+      "id": "steel_kite",
+      "name": "Steel kiteshield",
+      "alch": 510,
+      "bonuses": {
+        "magAtt": -8,
+        "rngAtt": -2,
+        "stabDef": 13,
+        "slashDef": 15,
+        "crushDef": 14,
+        "magDef": -1,
+        "rngDef": 14
+      }
+    },
+    {
+      "slot": "shield",
+      "id": "unholy_book",
+      "name": "Unholy book (Zamorak)",
+      "alch": 120,
+      "bonuses": {
+        "stabAtt": 8,
+        "slashAtt": 8,
+        "crushAtt": 8,
+        "magAtt": 8,
+        "rngAtt": 8,
+        "prayer": 5
+      }
+    }
+  ]
+}

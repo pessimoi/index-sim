@@ -1,17 +1,23 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { MARKET_SOURCE_MAPPINGS } from "../src/data/market-source-mapping";
 import { parseJsonWithDuplicateKeyCheck } from "../src/data/reliability";
 import { MARKET_SOURCE_ID } from "../src/data/schemas";
+import type { MarketSourceMapping } from "../src/domain/shared";
+import { parseMarketsLostcityRawResponseJson } from "./markets-lostcity-raw-adapter";
 import {
   ScheduledMarketWriterError,
   createScheduledMarketSnapshotOutputs,
-  parseScheduledMarketUpstreamResponseJson
+  parseScheduledMarketUpstreamResponseJson,
+  type ScheduledMarketSnapshotOutputs,
+  type ScheduledMarketWriterReport,
+  type ScheduledMarketUpstreamResponse
 } from "./scheduled-market-writer-core";
 
 const PRICE_FILE_NAMES = ["prices.json", "alch.json", "price-history.json"] as const;
 
-interface CliOptions {
+export interface CliOptions {
   input?: string;
   upstreamUrl?: string;
   outputDir: string;
@@ -20,13 +26,33 @@ interface CliOptions {
   dryRun: boolean;
 }
 
-function usage(): string {
+interface FetchResponseLike {
+  ok: boolean;
+  text(): Promise<string>;
+}
+
+type FetchLike = (
+  url: string,
+  init: { method: "GET"; headers: { Accept: "application/json" } }
+) => Promise<FetchResponseLike>;
+
+export interface RunScheduledMarketWriterDependencies {
+  fetchImpl?: FetchLike;
+}
+
+export interface RunScheduledMarketWriterResult {
+  changedFiles: string[];
+  outputs: ScheduledMarketSnapshotOutputs;
+  report: ScheduledMarketWriterReport;
+}
+
+export function usage(): string {
   return [
     "Usage: npm run prices:write-scheduled -- --input <normalized-upstream.json>",
     "",
     "Options:",
     "  --input <path>          Read a repository-local normalized upstream fixture/response.",
-    "  --upstream-url <url>    Fetch an explicit markets.lostcity.rs normalized response.",
+    "  --upstream-url <url>    Fetch a raw markets.lostcity.rs response and normalize it.",
     "  --output-dir <path>     Directory containing prices.json, alch.json and price-history.json.",
     "  --item-ids <ids>        Optional comma-separated allowlisted item ids for fixture/dev checks.",
     "  --now <iso>             Override capture time for repeatable local checks.",
@@ -43,7 +69,7 @@ function readOptionValue(argv: string[], index: number, flag: string): string {
   return value;
 }
 
-function parseArgs(argv: string[]): CliOptions {
+export function parseArgs(argv: string[]): CliOptions {
   const options: CliOptions = {
     outputDir: process.cwd(),
     dryRun: false
@@ -105,20 +131,13 @@ function parseArgs(argv: string[]): CliOptions {
   return options;
 }
 
-async function readUpstreamText(options: CliOptions): Promise<string> {
+async function readUpstreamText(options: CliOptions, fetchImpl: FetchLike): Promise<string> {
   if (options.input) {
     return readFileSync(resolve(options.input), "utf8");
   }
 
-  const target = new URL(options.upstreamUrl ?? "");
-  if (target.origin !== `https://${MARKET_SOURCE_ID}`) {
-    throw new ScheduledMarketWriterError(
-      "invalid_upstream",
-      "Upstream URL must use the approved markets.lostcity.rs origin"
-    );
-  }
-
-  const response = await fetch(target.href, {
+  const target = parseApprovedUpstreamUrl(options.upstreamUrl);
+  const response = await fetchImpl(target.href, {
     method: "GET",
     headers: { Accept: "application/json" }
   });
@@ -129,6 +148,41 @@ async function readUpstreamText(options: CliOptions): Promise<string> {
     );
   }
   return response.text();
+}
+
+function parseApprovedUpstreamUrl(upstreamUrl: string | undefined): URL {
+  let target: URL;
+  try {
+    if (!upstreamUrl) throw new TypeError("missing URL");
+    target = new URL(upstreamUrl);
+  } catch {
+    throw new ScheduledMarketWriterError(
+      "invalid_upstream",
+      "Upstream URL must use the approved markets.lostcity.rs origin"
+    );
+  }
+
+  if (
+    target.origin !== `https://${MARKET_SOURCE_ID}` ||
+    target.username !== "" ||
+    target.password !== ""
+  ) {
+    throw new ScheduledMarketWriterError(
+      "invalid_upstream",
+      "Upstream URL must use the approved markets.lostcity.rs origin"
+    );
+  }
+  return target;
+}
+
+async function readUpstream(
+  options: CliOptions,
+  mappings: readonly MarketSourceMapping[],
+  fetchImpl: FetchLike
+): Promise<ScheduledMarketUpstreamResponse> {
+  const upstreamText = await readUpstreamText(options, fetchImpl);
+  if (options.input) return parseScheduledMarketUpstreamResponseJson(upstreamText);
+  return parseMarketsLostcityRawResponseJson(upstreamText, { mappings });
 }
 
 function readJsonFile(outputDir: string, fileName: (typeof PRICE_FILE_NAMES)[number]): unknown {
@@ -162,16 +216,20 @@ function writeIfChanged(filePath: string, nextText: string, dryRun: boolean): bo
   return true;
 }
 
-async function main(): Promise<void> {
-  const options = parseArgs(process.argv.slice(2));
+export async function runScheduledMarketWriter(
+  argv: string[],
+  dependencies: RunScheduledMarketWriterDependencies = {}
+): Promise<RunScheduledMarketWriterResult> {
+  const options = parseArgs(argv);
   const outputDir = resolve(options.outputDir);
-  const upstream = parseScheduledMarketUpstreamResponseJson(await readUpstreamText(options));
+  const mappings = selectMappings(options.itemIds);
+  const upstream = await readUpstream(options, mappings, dependencies.fetchImpl ?? fetch);
   const outputs = createScheduledMarketSnapshotOutputs({
     upstream,
     previousPrices: readJsonFile(outputDir, "prices.json"),
     previousAlchValues: readJsonFile(outputDir, "alch.json"),
     previousPriceHistory: readJsonFile(outputDir, "price-history.json"),
-    mappings: selectMappings(options.itemIds),
+    mappings,
     capturedAt: options.now
   });
 
@@ -191,18 +249,36 @@ async function main(): Promise<void> {
       : null
   ].filter((fileName): fileName is string => fileName !== null);
 
+  return { changedFiles, outputs, report: outputs.report };
+}
+
+export async function main(): Promise<void> {
+  const options = parseArgs(process.argv.slice(2));
+  const { changedFiles, report } = await runScheduledMarketWriter(process.argv.slice(2));
+
   const mode = options.dryRun ? "Dry run" : "Writer";
   const changedLabel = changedFiles.length ? changedFiles.join(", ") : "no changes";
   console.log(
-    `${mode}: ${changedLabel}. Updated ${outputs.report.updated}; skipped ${outputs.report.skipped}.`
+    `${mode}: ${changedLabel}. Updated ${report.updated}; skipped ${report.skipped}.`
   );
 }
 
-main().catch((error: unknown) => {
-  if (error instanceof ScheduledMarketWriterError) {
-    console.error(`Scheduled market writer failed: ${error.code}`);
-  } else {
-    console.error("Scheduled market writer failed: internal-error");
-  }
-  process.exitCode = 1;
-});
+function isDirectCliRun(): boolean {
+  const currentFile = fileURLToPath(import.meta.url);
+  const argvHasCurrentFile = process.argv.some((arg) => resolve(arg) === currentFile);
+  const viteNodeScriptRun =
+    process.env.VITEST !== "true" &&
+    currentFile.replace(/\\/g, "/").endsWith("/scripts/write-scheduled-market-prices.ts");
+  return argvHasCurrentFile || viteNodeScriptRun;
+}
+
+if (isDirectCliRun()) {
+  main().catch((error: unknown) => {
+    if (error instanceof ScheduledMarketWriterError) {
+      console.error(`Scheduled market writer failed: ${error.code}`);
+    } else {
+      console.error("Scheduled market writer failed: internal-error");
+    }
+    process.exitCode = 1;
+  });
+}

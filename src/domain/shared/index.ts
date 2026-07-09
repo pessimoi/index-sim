@@ -35,6 +35,9 @@ export type EquipmentSlot = (typeof EQUIPMENT_SLOTS)[number];
 export type EquipmentBonuses = Record<BonusKey, number>;
 export type PriceSource = "bundled" | "imported" | "scraped" | "manual";
 
+export const ITEM_REQUIREMENT_SKILLS = ["attack", "defence", "ranged", "magic"] as const;
+export type ItemRequirementSkill = (typeof ITEM_REQUIREMENT_SKILLS)[number];
+
 export interface DataProvenance {
   source: "generated" | "manual" | "scraped" | "approximation" | "hypothetical";
   sourceRef?: string;
@@ -79,6 +82,9 @@ export interface AmmoDefinition {
   name: string;
   rangeBonus: number;
   kind?: string;
+  fam?: string;
+  tier?: number;
+  barKey?: EntityId;
   priceKey?: EntityId;
   alch?: number;
   price?: number;
@@ -111,6 +117,13 @@ export interface ItemDefinition {
   price?: number;
   alch?: number;
   stackable?: boolean;
+  provenance?: DataProvenance;
+  notes?: string;
+}
+
+export interface ItemRequirementDefinition {
+  itemId: EntityId;
+  skills: Partial<Record<ItemRequirementSkill, number>>;
   provenance?: DataProvenance;
   notes?: string;
 }
@@ -163,6 +176,7 @@ export interface GameDataSnapshot {
   ammo: Record<EntityId, AmmoDefinition>;
   spells: Record<EntityId, SpellDefinition>;
   equipment: EquipmentRegistry;
+  requirements?: Record<EntityId, ItemRequirementDefinition>;
   provenance?: DataProvenance;
 }
 

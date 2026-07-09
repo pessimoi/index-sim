@@ -1,0 +1,13 @@
+[ai_queue3,giant]
+gosub(npc_death);
+if (npc_findhero = ^false) {
+    return;
+}
+obj_add(npc_coord, npc_param(death_drop), 1, ^lootdrop_duration);
+
+def_int $random = random(128);
+if ($random < 4) {
+    obj_add(npc_coord, rune_scimitar, 1, ^lootdrop_duration);
+} else if ($random < 8) {
+    obj_add(npc_coord, bronze_arrow, 10, ^lootdrop_duration);
+}

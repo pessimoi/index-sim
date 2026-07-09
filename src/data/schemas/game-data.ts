@@ -1,7 +1,10 @@
 import { z } from "zod";
 import {
   type GameDataSnapshot,
+  ITEM_REQUIREMENT_SKILLS,
   type ItemDefinition,
+  type ItemRequirementDefinition,
+  type ItemRequirementSkill,
   type PriceSource,
   BONUS_KEYS,
   EQUIPMENT_SLOTS
@@ -49,6 +52,32 @@ export const ItemDefinitionSchema: z.ZodType<ItemDefinition> = z.object({
   provenance: DataProvenanceSchema.optional(),
   notes: z.string().min(1).optional()
 });
+
+const ItemRequirementLevelSchema = z.number().int().min(1).max(99);
+
+export const ItemRequirementSkillsSchema = z
+  .object(
+    Object.fromEntries(
+      ITEM_REQUIREMENT_SKILLS.map((skill) => [skill, ItemRequirementLevelSchema.optional()])
+    ) as Record<ItemRequirementSkill, z.ZodOptional<typeof ItemRequirementLevelSchema>>
+  )
+  .strict()
+  .superRefine((skills, ctx) => {
+    if (ITEM_REQUIREMENT_SKILLS.some((skill) => skills[skill] !== undefined)) return;
+    ctx.addIssue({
+      code: "custom",
+      message: "item requirement must include at least one supported skill"
+    });
+  });
+
+export const ItemRequirementDefinitionSchema: z.ZodType<ItemRequirementDefinition> = z
+  .object({
+    itemId: EntityIdSchema,
+    skills: ItemRequirementSkillsSchema,
+    provenance: DataProvenanceSchema.optional(),
+    notes: z.string().min(1).optional()
+  })
+  .strict();
 
 export const DropExpansionEntrySchema = z
   .object({
@@ -152,6 +181,9 @@ export const AmmoDefinitionSchema = z
     name: z.string().min(1),
     rangeBonus: NumericSchema,
     kind: z.string().min(1).optional(),
+    fam: z.string().min(1).optional(),
+    tier: NonNegativeNumberSchema.optional(),
+    barKey: EntityIdSchema.optional(),
     priceKey: EntityIdSchema.optional(),
     alch: NonNegativeNumberSchema.optional(),
     price: NonNegativeNumberSchema.optional()
@@ -200,7 +232,27 @@ export const GameDataSnapshotSchema = z.object({
   ammo: z.record(EntityIdSchema, AmmoDefinitionSchema),
   spells: z.record(EntityIdSchema, SpellDefinitionSchema),
   equipment: EquipmentRegistrySchema,
+  requirements: z.record(EntityIdSchema, ItemRequirementDefinitionSchema).optional(),
   provenance: DataProvenanceSchema.optional()
+}).superRefine((snapshot, ctx) => {
+  const requirements = snapshot.requirements;
+  if (!requirements) return;
+  for (const [itemId, requirement] of Object.entries(requirements)) {
+    if (requirement.itemId !== itemId) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["requirements", itemId, "itemId"],
+        message: "requirement itemId must match record key"
+      });
+    }
+    if (!snapshot.items[itemId]) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["requirements", itemId],
+        message: "requirement item must exist in items"
+      });
+    }
+  }
 });
 
 export type ValidatedGameDataSnapshot = z.infer<typeof GameDataSnapshotSchema>;

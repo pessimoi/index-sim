@@ -10,10 +10,12 @@ import {
   defaultPool,
   equippable,
   evaluatePlannerCandidate,
+  requirementForItem,
   reqLevel,
   trainingStanceId
 } from "../domain/planner";
 import { sumEquipmentBonuses } from "../domain/equipment";
+import type { SimulationContext } from "../domain/shared";
 
 interface PlannerGoldenFixture {
   cases: Array<{
@@ -31,15 +33,74 @@ const V1_PLANNER_ACCEPTANCE_CASE_IDS = [
   "boosted_sustained_strength_path"
 ] as const;
 
+function withGeneratedRequirement(
+  context: SimulationContext,
+  itemId: string,
+  skills: NonNullable<SimulationContext["gameData"]["requirements"]>[string]["skills"]
+): SimulationContext {
+  return {
+    ...context,
+    gameData: {
+      ...context.gameData,
+      requirements: {
+        ...(context.gameData.requirements ?? {}),
+        [itemId]: {
+          itemId,
+          skills,
+          provenance: {
+            source: "generated",
+            sourceRef: `test#${itemId}.requirements`
+          }
+        }
+      }
+    }
+  };
+}
+
 describe("planner requirements and candidate pools", () => {
   it("keeps gear eligibility as explicit planner policy", () => {
-    expect(reqLevel("rune_scimitar", "attack")).toBe(40);
-    expect(reqLevel("rune_scimitar", "strength")).toBe(0);
+    const { context } = createPlannerRuntime();
+    expect(reqLevel("rune_scimitar", "attack", context.gameData)).toBe(40);
+    expect(reqLevel("rune_scimitar", "strength", context.gameData)).toBe(0);
     expect(
-      equippable("rune_scimitar", { attack: 39, strength: 50, defence: 40, ranged: 1, magic: 1 })
+      equippable(
+        "rune_scimitar",
+        { attack: 39, strength: 50, defence: 40, ranged: 1, magic: 1 },
+        context.gameData
+      )
     ).toBe(false);
     expect(
-      equippable("rune_scimitar", { attack: 40, strength: 50, defence: 40, ranged: 1, magic: 1 })
+      equippable(
+        "rune_scimitar",
+        { attack: 40, strength: 50, defence: 40, ranged: 1, magic: 1 },
+        context.gameData
+      )
+    ).toBe(true);
+  });
+
+  it("uses generated item requirements before the manual fallback", () => {
+    const { context } = createPlannerRuntime();
+    const generatedContext = withGeneratedRequirement(context, "rune_scimitar", { attack: 45 });
+
+    expect(requirementForItem(generatedContext.gameData, "rune_scimitar")).toMatchObject({
+      source: "generated",
+      requirements: { attack: 45 },
+      warnings: []
+    });
+    expect(reqLevel("rune_scimitar", "attack", generatedContext.gameData)).toBe(45);
+    expect(
+      equippable(
+        "rune_scimitar",
+        { attack: 44, strength: 50, defence: 40, ranged: 1, magic: 1 },
+        generatedContext.gameData
+      )
+    ).toBe(false);
+    expect(
+      equippable(
+        "rune_scimitar",
+        { attack: 45, strength: 50, defence: 40, ranged: 1, magic: 1 },
+        generatedContext.gameData
+      )
     ).toBe(true);
   });
 
@@ -129,11 +190,11 @@ describe("planner domain scoring", () => {
     expect(plan.warnings.map((warning) => warning.code)).toContain("missing-planner-weapon");
   });
 
-  it("surfaces the manual item requirement policy until generated requirements are accepted", () => {
+  it("surfaces manual requirement fallback when generated data is missing", () => {
     const { runtime, context } = createPlannerRuntime();
     const input = plannerInputFromDefinition(runtime, {
       id: "planner_manual_requirement_policy",
-      description: "Planner manual requirement policy warning",
+      description: "Planner manual requirement fallback warning",
       combatType: "melee",
       monsterId: "giant",
       weapon: "rune_scimitar",
@@ -148,10 +209,67 @@ describe("planner domain scoring", () => {
 
     expect(plan.warnings).toContainEqual(
       expect.objectContaining({
-        code: "manual-planner-requirement-policy",
+        code: "manual-planner-requirement-fallback",
         severity: "info",
-        message: expect.stringContaining("manual requirement policy")
+        message: expect.stringContaining("manual requirement fallback")
       })
+    );
+  });
+
+  it("uses generated requirements for Planner unlock binding without fallback warning", () => {
+    const { runtime, context } = createPlannerRuntime();
+    const generatedContext = withGeneratedRequirement(
+      withGeneratedRequirement(context, "iron_scimitar", { attack: 1 }),
+      "rune_scimitar",
+      { attack: 45 }
+    );
+    const input = plannerInputFromDefinition(runtime, {
+      id: "planner_generated_requirement_unlock",
+      description: "Planner generated requirement unlock",
+      combatType: "melee",
+      monsterId: "giant",
+      weapon: "iron_scimitar",
+      style: "aggressive",
+      levels: { attack: 44, strength: 50, defence: 40, ranged: 1, magic: 1, prayer: 1 },
+      gear: {
+        helm: "none",
+        amulet: "none",
+        body: "none",
+        legs: "none",
+        shield: "none",
+        gloves: "none",
+        boots: "none",
+        cape: "none",
+        ring: "none"
+      },
+      prayers: ["none"],
+      boosts: ["none"],
+      trip: { foodKey: "none", teleport: false, bankSeconds: 0, prayerMode: "none" }
+    });
+
+    const plan = buildPlan(input, generatedContext, {
+      targets: { attack: 45 },
+      pool: {
+        weapon: ["iron_scimitar", "rune_scimitar"],
+        helm: ["none"],
+        body: ["none"],
+        legs: ["none"],
+        shield: ["none"]
+      },
+      maxLevels: 1
+    });
+
+    expect(plan.warnings.map((warning) => warning.code)).not.toContain(
+      "manual-planner-requirement-fallback"
+    );
+    expect(plan.unlocks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          itemId: "rune_scimitar",
+          reqSkill: "attack",
+          reqLevel: 45
+        })
+      ])
     );
   });
 });

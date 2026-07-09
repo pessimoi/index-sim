@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-07-08T00:00:00.000Z",
+  "generatedAt": "2026-07-09T00:00:00.000Z",
   "generator": {
-    "command": "npm run data:generate -- --source-dir src/tests/fixtures/data-generator/lostcity-content --output-root . --generated-at 2026-07-08T00:00:00.000Z",
+    "command": "npm run data:generate -- --source-dir .sources/lostcity-content --output-root . --generated-at 2026-07-09T00:00:00.000Z --impact-outlier-limit 25",
     "name": "index-sim-data-generator",
-    "version": "foundation-1"
+    "version": "raw-lostcity-runtime-catalog-2"
   },
   "outputs": {
     "gameData": "src/data/generated/game-data.json",
@@ -13,18 +13,20 @@
   "schemaVersion": 1,
   "scope": {
     "notes": [
-      "Generated output is committed as a foundation artifact only.",
-      "Runtime still loads the validated legacy adapter snapshot.",
-      "Upstream file bodies, market price history and historical game-data snapshots are intentionally excluded."
+      "Generated output is the committed root runtime game-data artifact.",
+      "Runtime loads this committed source-backed generated snapshot with scheduled static prices and generated item fallbacks.",
+      "Runtime monster combat/core-loot, item, weapon, ammo, spell and equipment fields are parsed directly from pinned LostCity config and RuneScript sources.",
+      "Simulator-only synthetic identities remain app-owned, and requirement skill classification remains outside the raw candidate.",
+      "Expected runtime identities are checked against src/data/generated/legacy-derived-runtime-game-data.json as a regression/reference baseline.",
+      "Raw upstream file bodies, market price history and historical game-data snapshots are intentionally excluded."
     ],
-    "parser": "foundation-manifest",
-    "runtimeBootstrap": "legacy-adapter",
-    "status": "foundation"
+    "parser": "raw-lostcity",
+    "runtimeBootstrap": "source-backed-generated-snapshot",
+    "status": "source-backed-raw"
   },
   "source": {
-    "commit": "0000000000000000000000000000000000000274",
-    "name": "LostCityRS/Content fixture",
-    "path": "src/tests/fixtures/data-generator/lostcity-content",
-    "revision": "fixture-revision-274"
+    "commit": "376072662e78a314bf35bb18815be39521491a6b",
+    "name": "LostCityRS/Content",
+    "path": ".sources/lostcity-content"
   }
 }

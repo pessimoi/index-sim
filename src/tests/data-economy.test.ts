@@ -2,7 +2,14 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import ts from "typescript";
 import { ZodError } from "zod";
-import { lookupItemPrice, collectMissingPriceWarnings } from "../domain/economy";
+import {
+  CanonicalItemIdMappingError,
+  aliasesForCanonicalItemId,
+  collectMissingPriceWarnings,
+  createCanonicalItemIdResolver,
+  lookupItemPrice,
+  resolveCanonicalItemId
+} from "../domain/economy";
 import { createScheduledStaticPriceSnapshotStatus } from "../adapters/market";
 import {
   DataReliabilityError,
@@ -161,13 +168,29 @@ describe("validated game data snapshots", () => {
     expect(priceSet.alchValues).not.toHaveProperty("_randomherb_avg");
   });
 
-  it("validates the committed generated game-data foundation snapshot", () => {
+  it("validates the committed raw LostCity generated game-data snapshot", () => {
     const generatedSnapshot = GameDataSnapshotSchema.parse(
       readJsonFile("src/data/generated/game-data.json")
     );
 
-    expect(generatedSnapshot.id).toBe("generated-foundation-fixture");
-    expect(generatedSnapshot.provenance?.notes).toMatch(/foundation/i);
+    expect(generatedSnapshot.id).toBe("lostcity-376072662e78-runtime");
+    expect(generatedSnapshot.provenance?.source).toBe("generated");
+    expect(generatedSnapshot.provenance?.notes).toMatch(/raw config/i);
+    expect(generatedSnapshot.monsters.giant?.hp).toBe(35);
+    expect(generatedSnapshot.monsters.giant?.loot?.[0]).toMatchObject({
+      name: "Big bones",
+      key: "big_bones",
+      chance: 1,
+      qtyAvg: 1
+    });
+    expect(generatedSnapshot.monsters.giant?.loot).toEqual(
+      expect.arrayContaining([expect.objectContaining({ tag: "gem" })])
+    );
+    expect(generatedSnapshot.weapons.shortbow).toMatchObject({ sub: "bow", speed: 4 });
+    expect(generatedSnapshot.ammo.bronze_arrow?.rangeBonus).toBe(7);
+    expect(generatedSnapshot.spells.wind_strike?.base).toBe(2);
+    expect(generatedSnapshot.equipment.helm.rune_full_helm?.stabDef).toBe(30);
+    expect(generatedSnapshot.requirements).toBeUndefined();
     expect(generatedSnapshot).not.toHaveProperty("priceHistory");
     expect(generatedSnapshot).not.toHaveProperty("historicalSnapshots");
   });
@@ -355,6 +378,122 @@ describe("price file schemas", () => {
 });
 
 describe("economy price lookup warnings", () => {
+  it("resolves known legacy gem aliases to explicit canonical item ids", () => {
+    expect(resolveCanonicalItemId("sapphire")).toMatchObject({
+      requestedItemId: "sapphire",
+      canonicalItemId: "uncut_sapphire",
+      source: "alias",
+      alias: "sapphire",
+      provenance: {
+        source: "manual"
+      }
+    });
+    expect(resolveCanonicalItemId("uncut_sapphire")).toEqual({
+      requestedItemId: "uncut_sapphire",
+      canonicalItemId: "uncut_sapphire",
+      source: "identity"
+    });
+    expect(aliasesForCanonicalItemId("uncut_sapphire")).toEqual(["sapphire"]);
+  });
+
+  it("uses an exact source item price before legacy fallback aliases", () => {
+    const priceSet = PriceSetSchema.parse({
+      id: "test-prices",
+      label: "Test prices",
+      source: "manual",
+      createdAt: "2026-07-05",
+      itemPrices: { uncut_sapphire: 1250, sapphire: 451 },
+      alchValues: {}
+    });
+    const originalPrices = { ...priceSet.itemPrices };
+
+    expect(lookupItemPrice(priceSet, "sapphire")).toMatchObject({
+      itemId: "sapphire",
+      requestedItemId: "sapphire",
+      canonicalItemId: "uncut_sapphire",
+      lookupSource: "identity",
+      value: 451
+    });
+    expect(lookupItemPrice(priceSet, "uncut_sapphire")).toMatchObject({
+      itemId: "uncut_sapphire",
+      requestedItemId: "uncut_sapphire",
+      canonicalItemId: "uncut_sapphire",
+      lookupSource: "identity",
+      value: 1250
+    });
+    expect(priceSet.itemPrices).toEqual(originalPrices);
+  });
+
+  it("falls back to alias prices when canonical prices are missing", () => {
+    const priceSet = PriceSetSchema.parse({
+      id: "test-prices",
+      label: "Test prices",
+      source: "manual",
+      createdAt: "2026-07-05",
+      itemPrices: { sapphire: 451 },
+      alchValues: {}
+    });
+
+    expect(lookupItemPrice(priceSet, "uncut_sapphire")).toMatchObject({
+      itemId: "sapphire",
+      requestedItemId: "uncut_sapphire",
+      canonicalItemId: "uncut_sapphire",
+      lookupSource: "alias",
+      aliasItemId: "sapphire",
+      value: 451
+    });
+  });
+
+  it("rejects duplicate canonical alias collisions", () => {
+    let error: unknown;
+    try {
+      createCanonicalItemIdResolver([
+        { alias: "sapphire", canonicalItemId: "uncut_sapphire" },
+        { alias: "sapphire", canonicalItemId: "uncut_emerald" }
+      ]);
+    } catch (caught) {
+      error = caught;
+    }
+
+    expect(error).toBeInstanceOf(CanonicalItemIdMappingError);
+    expect((error as CanonicalItemIdMappingError).issues.join("\n")).toContain(
+      "alias 'sapphire' maps to both 'uncut_sapphire' and 'uncut_emerald'"
+    );
+  });
+
+  it("preserves missing-price warnings when canonical aliases have no price", () => {
+    const priceSet = PriceSetSchema.parse({
+      id: "test-prices",
+      label: "Test prices",
+      source: "manual",
+      createdAt: "2026-07-05",
+      itemPrices: { lobster: 200 },
+      alchValues: {}
+    });
+    const originalPrices = { ...priceSet.itemPrices };
+    const resolution = resolveCanonicalItemId("sapphire");
+    const candidateIds = [
+      resolution.canonicalItemId,
+      ...aliasesForCanonicalItemId(resolution.canonicalItemId)
+    ];
+
+    expect(candidateIds).toEqual(["uncut_sapphire", "sapphire"]);
+    expect(lookupItemPrice(priceSet, resolution.canonicalItemId)).toMatchObject({
+      itemId: "uncut_sapphire",
+      value: null,
+      warning: {
+        code: "missing-price",
+        severity: "warning",
+        itemId: "uncut_sapphire",
+        priceSetId: "test-prices"
+      }
+    });
+    expect(
+      collectMissingPriceWarnings(priceSet, candidateIds).map((warning) => warning.itemId)
+    ).toEqual(["uncut_sapphire"]);
+    expect(priceSet.itemPrices).toEqual(originalPrices);
+  });
+
   it("reports missing prices without mutating the PriceSet", () => {
     const priceSet = PriceSetSchema.parse({
       id: "test-prices",
@@ -366,7 +505,10 @@ describe("economy price lookup warnings", () => {
     });
     const originalPrices = { ...priceSet.itemPrices };
 
-    expect(lookupItemPrice(priceSet, "lobster")).toEqual({ itemId: "lobster", value: 200 });
+    expect(lookupItemPrice(priceSet, "lobster")).toMatchObject({
+      itemId: "lobster",
+      value: 200
+    });
     expect(lookupItemPrice(priceSet, "missing_item")).toMatchObject({
       itemId: "missing_item",
       value: null,

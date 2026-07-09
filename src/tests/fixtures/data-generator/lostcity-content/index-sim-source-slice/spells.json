@@ -1,0 +1,253 @@
+{
+  "spells": [
+    {
+      "id": "claws_of_guthix",
+      "name": "Claws of Guthix",
+      "base": 20,
+      "lvl": 60,
+      "baseXp": 35,
+      "god": true,
+      "staff": "Staff of Guthix",
+      "label": "Claws of Guthix (max 20)",
+      "runes": {
+        "airrune": 4,
+        "bloodrune": 2,
+        "firerune": 1
+      }
+    },
+    {
+      "id": "earth_blast",
+      "name": "Earth Blast",
+      "base": 15,
+      "lvl": 53,
+      "baseXp": 31.5,
+      "label": "Earth Blast (max 15)",
+      "runes": {
+        "airrune": 3,
+        "deathrune": 1,
+        "earthrune": 4
+      }
+    },
+    {
+      "id": "earth_bolt",
+      "name": "Earth Bolt",
+      "base": 11,
+      "lvl": 29,
+      "baseXp": 19.5,
+      "label": "Earth Bolt (max 11)",
+      "runes": {
+        "airrune": 2,
+        "chaosrune": 1,
+        "earthrune": 3
+      }
+    },
+    {
+      "id": "earth_strike",
+      "name": "Earth Strike",
+      "base": 6,
+      "lvl": 9,
+      "baseXp": 9.5,
+      "label": "Earth Strike (max 6)",
+      "runes": {
+        "airrune": 1,
+        "earthrune": 2,
+        "mindrune": 1
+      }
+    },
+    {
+      "id": "earth_wave",
+      "name": "Earth Wave",
+      "base": 19,
+      "lvl": 70,
+      "baseXp": 40,
+      "label": "Earth Wave (max 19)",
+      "runes": {
+        "airrune": 5,
+        "bloodrune": 1,
+        "earthrune": 7
+      }
+    },
+    {
+      "id": "fire_blast",
+      "name": "Fire Blast",
+      "base": 16,
+      "lvl": 59,
+      "baseXp": 34.5,
+      "label": "Fire Blast (max 16)",
+      "runes": {
+        "airrune": 4,
+        "deathrune": 1,
+        "firerune": 5
+      }
+    },
+    {
+      "id": "fire_bolt",
+      "name": "Fire Bolt",
+      "base": 12,
+      "lvl": 35,
+      "baseXp": 22.5,
+      "label": "Fire Bolt (max 12)",
+      "runes": {
+        "airrune": 3,
+        "chaosrune": 1,
+        "firerune": 4
+      }
+    },
+    {
+      "id": "fire_strike",
+      "name": "Fire Strike",
+      "base": 8,
+      "lvl": 13,
+      "baseXp": 11.5,
+      "label": "Fire Strike (max 8)",
+      "runes": {
+        "airrune": 2,
+        "firerune": 3,
+        "mindrune": 1
+      }
+    },
+    {
+      "id": "fire_wave",
+      "name": "Fire Wave",
+      "base": 20,
+      "lvl": 75,
+      "baseXp": 42.5,
+      "label": "Fire Wave (max 20)",
+      "runes": {
+        "airrune": 5,
+        "bloodrune": 1,
+        "firerune": 7
+      }
+    },
+    {
+      "id": "flames_of_zamorak",
+      "name": "Flames of Zamorak",
+      "base": 20,
+      "lvl": 60,
+      "baseXp": 35,
+      "god": true,
+      "staff": "Staff of Zamorak",
+      "label": "Flames of Zamorak (max 20)",
+      "runes": {
+        "airrune": 1,
+        "bloodrune": 2,
+        "firerune": 4
+      }
+    },
+    {
+      "id": "saradomin_strike",
+      "name": "Saradomin Strike",
+      "base": 20,
+      "lvl": 60,
+      "baseXp": 35,
+      "god": true,
+      "staff": "Staff of Saradomin",
+      "label": "Saradomin Strike (max 20)",
+      "runes": {
+        "airrune": 4,
+        "bloodrune": 2,
+        "firerune": 2
+      }
+    },
+    {
+      "id": "water_blast",
+      "name": "Water Blast",
+      "base": 14,
+      "lvl": 47,
+      "baseXp": 28.5,
+      "label": "Water Blast (max 14)",
+      "runes": {
+        "airrune": 3,
+        "deathrune": 1,
+        "waterrune": 3
+      }
+    },
+    {
+      "id": "water_bolt",
+      "name": "Water Bolt",
+      "base": 10,
+      "lvl": 23,
+      "baseXp": 16.5,
+      "label": "Water Bolt (max 10)",
+      "runes": {
+        "airrune": 2,
+        "chaosrune": 1,
+        "waterrune": 2
+      }
+    },
+    {
+      "id": "water_strike",
+      "name": "Water Strike",
+      "base": 4,
+      "lvl": 5,
+      "baseXp": 7.5,
+      "label": "Water Strike (max 4)",
+      "runes": {
+        "airrune": 1,
+        "mindrune": 1,
+        "waterrune": 1
+      }
+    },
+    {
+      "id": "water_wave",
+      "name": "Water Wave",
+      "base": 18,
+      "lvl": 65,
+      "baseXp": 37.5,
+      "label": "Water Wave (max 18)",
+      "runes": {
+        "airrune": 5,
+        "bloodrune": 1,
+        "waterrune": 7
+      }
+    },
+    {
+      "id": "wind_blast",
+      "name": "Wind Blast",
+      "base": 13,
+      "lvl": 41,
+      "baseXp": 25.5,
+      "label": "Wind Blast (max 13)",
+      "runes": {
+        "airrune": 3,
+        "deathrune": 1
+      }
+    },
+    {
+      "id": "wind_bolt",
+      "name": "Wind Bolt",
+      "base": 9,
+      "lvl": 17,
+      "baseXp": 13.5,
+      "label": "Wind Bolt (max 9)",
+      "runes": {
+        "airrune": 2,
+        "chaosrune": 1
+      }
+    },
+    {
+      "id": "wind_strike",
+      "name": "Wind Strike",
+      "base": 2,
+      "lvl": 1,
+      "baseXp": 5.5,
+      "label": "Wind Strike (max 2)",
+      "runes": {
+        "airrune": 1,
+        "mindrune": 1
+      }
+    },
+    {
+      "id": "wind_wave",
+      "name": "Wind Wave",
+      "base": 17,
+      "lvl": 62,
+      "baseXp": 36,
+      "label": "Wind Wave (max 17)",
+      "runes": {
+        "airrune": 5,
+        "bloodrune": 1
+      }
+    }
+  ]
+}

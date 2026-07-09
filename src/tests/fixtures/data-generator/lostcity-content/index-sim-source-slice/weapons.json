@@ -1,0 +1,469 @@
+{
+  "weapons": [
+    {
+      "id": "adamant_scimitar",
+      "name": "Adamant scimitar",
+      "type": "melee",
+      "wclass": "scimitar",
+      "accBonus": 29,
+      "dmgBonus": 28,
+      "speed": 4,
+      "acc": {
+        "crush": -2,
+        "slash": 29,
+        "stab": 6
+      },
+      "alch": 1536
+    },
+    {
+      "id": "addy_dart_w",
+      "name": "Adamant darts (thrown)",
+      "type": "ranged",
+      "sub": "thrown",
+      "ammoKey": "addy_dart",
+      "accBonus": 0,
+      "dmgBonus": 0,
+      "speed": 3,
+      "alch": 0
+    },
+    {
+      "id": "addy_knife_w",
+      "name": "Adamant knives (thrown)",
+      "type": "ranged",
+      "sub": "thrown",
+      "ammoKey": "addy_knife",
+      "accBonus": 0,
+      "dmgBonus": 0,
+      "speed": 3,
+      "alch": 0
+    },
+    {
+      "id": "black_scimitar",
+      "name": "Black scimitar",
+      "type": "melee",
+      "wclass": "scimitar",
+      "accBonus": 19,
+      "dmgBonus": 14,
+      "speed": 4,
+      "acc": {
+        "crush": -2,
+        "slash": 19,
+        "stab": 4
+      },
+      "alch": 460
+    },
+    {
+      "id": "bronze_dart_w",
+      "name": "Bronze darts (thrown)",
+      "type": "ranged",
+      "sub": "thrown",
+      "ammoKey": "bronze_dart",
+      "accBonus": 0,
+      "dmgBonus": 0,
+      "speed": 3,
+      "alch": 0
+    },
+    {
+      "id": "bronze_knife_w",
+      "name": "Bronze knives (thrown)",
+      "type": "ranged",
+      "sub": "thrown",
+      "ammoKey": "bronze_knife",
+      "accBonus": 0,
+      "dmgBonus": 0,
+      "speed": 3,
+      "alch": 0
+    },
+    {
+      "id": "bronze_sword",
+      "name": "Bronze sword",
+      "type": "melee",
+      "wclass": "sword",
+      "accBonus": 5,
+      "dmgBonus": 5,
+      "speed": 4,
+      "acc": {
+        "crush": -2,
+        "slash": 3,
+        "stab": 4
+      },
+      "alch": 15,
+      "requirements": {
+        "skills": {
+          "attack": 1
+        }
+      }
+    },
+    {
+      "id": "dragon_dagger",
+      "name": "Dragon dagger",
+      "type": "melee",
+      "wclass": "dagger",
+      "accBonus": 25,
+      "dmgBonus": 40,
+      "speed": 4,
+      "acc": {
+        "crush": -4,
+        "slash": 25,
+        "stab": 40
+      },
+      "alch": 18000
+    },
+    {
+      "id": "dragon_dagger_p",
+      "name": "Dragon dagger(p)",
+      "type": "melee",
+      "wclass": "dagger",
+      "accBonus": 25,
+      "dmgBonus": 40,
+      "speed": 4,
+      "acc": {
+        "crush": -4,
+        "slash": 25,
+        "stab": 40
+      },
+      "poisonSeverity": 20,
+      "alch": 14400
+    },
+    {
+      "id": "dragon_halberd",
+      "name": "Dragon halberd",
+      "type": "melee",
+      "wclass": "halberd",
+      "accBonus": 95,
+      "dmgBonus": 89,
+      "speed": 7,
+      "acc": {
+        "crush": 0,
+        "slash": 95,
+        "stab": 70
+      },
+      "twoHand": true,
+      "alch": 150000
+    },
+    {
+      "id": "dragon_longsword",
+      "name": "Dragon longsword",
+      "type": "melee",
+      "wclass": "longsword",
+      "accBonus": 69,
+      "dmgBonus": 71,
+      "speed": 5,
+      "acc": {
+        "crush": -2,
+        "slash": 69,
+        "stab": 58
+      },
+      "alch": 60000
+    },
+    {
+      "id": "dragon_mace",
+      "name": "Dragon mace",
+      "type": "melee",
+      "wclass": "mace",
+      "accBonus": 60,
+      "dmgBonus": 55,
+      "speed": 5,
+      "acc": {
+        "crush": 60,
+        "slash": -2,
+        "stab": 40
+      },
+      "alch": 30000
+    },
+    {
+      "id": "iron_dart_w",
+      "name": "Iron darts (thrown)",
+      "type": "ranged",
+      "sub": "thrown",
+      "ammoKey": "iron_dart",
+      "accBonus": 0,
+      "dmgBonus": 0,
+      "speed": 3,
+      "alch": 0
+    },
+    {
+      "id": "iron_knife_w",
+      "name": "Iron knives (thrown)",
+      "type": "ranged",
+      "sub": "thrown",
+      "ammoKey": "iron_knife",
+      "accBonus": 0,
+      "dmgBonus": 0,
+      "speed": 3,
+      "alch": 0
+    },
+    {
+      "id": "iron_scimitar",
+      "name": "Iron scimitar",
+      "type": "melee",
+      "wclass": "scimitar",
+      "accBonus": 10,
+      "dmgBonus": 9,
+      "speed": 4,
+      "acc": {
+        "crush": -2,
+        "slash": 10,
+        "stab": 2
+      },
+      "alch": 67
+    },
+    {
+      "id": "magic_longbow",
+      "name": "Magic longbow",
+      "type": "ranged",
+      "sub": "bow",
+      "accBonus": 69,
+      "dmgBonus": 0,
+      "speed": 6,
+      "twoHand": true,
+      "alch": 1536
+    },
+    {
+      "id": "magic_shortbow",
+      "name": "Magic shortbow",
+      "type": "ranged",
+      "sub": "bow",
+      "accBonus": 69,
+      "dmgBonus": 0,
+      "speed": 4,
+      "twoHand": true,
+      "alch": 960
+    },
+    {
+      "id": "maple_shortbow",
+      "name": "Maple shortbow",
+      "type": "ranged",
+      "sub": "bow",
+      "accBonus": 29,
+      "dmgBonus": 0,
+      "speed": 4,
+      "twoHand": true,
+      "alch": 240
+    },
+    {
+      "id": "mith_dart_w",
+      "name": "Mithril darts (thrown)",
+      "type": "ranged",
+      "sub": "thrown",
+      "ammoKey": "mith_dart",
+      "accBonus": 0,
+      "dmgBonus": 0,
+      "speed": 3,
+      "alch": 0
+    },
+    {
+      "id": "mith_knife_w",
+      "name": "Mithril knives (thrown)",
+      "type": "ranged",
+      "sub": "thrown",
+      "ammoKey": "mith_knife",
+      "accBonus": 0,
+      "dmgBonus": 0,
+      "speed": 3,
+      "alch": 0
+    },
+    {
+      "id": "mithril_scimitar",
+      "name": "Mithril scimitar",
+      "type": "melee",
+      "wclass": "scimitar",
+      "accBonus": 21,
+      "dmgBonus": 20,
+      "speed": 4,
+      "acc": {
+        "crush": -2,
+        "slash": 21,
+        "stab": 5
+      },
+      "alch": 624
+    },
+    {
+      "id": "oak_shortbow",
+      "name": "Oak shortbow",
+      "type": "ranged",
+      "sub": "bow",
+      "accBonus": 14,
+      "dmgBonus": 0,
+      "speed": 4,
+      "twoHand": true,
+      "alch": 60
+    },
+    {
+      "id": "rune_dart_w",
+      "name": "Rune darts (thrown)",
+      "type": "ranged",
+      "sub": "thrown",
+      "ammoKey": "rune_dart",
+      "accBonus": 0,
+      "dmgBonus": 0,
+      "speed": 3,
+      "alch": 0
+    },
+    {
+      "id": "rune_knife_w",
+      "name": "Rune knives (thrown)",
+      "type": "ranged",
+      "sub": "thrown",
+      "ammoKey": "rune_knife",
+      "accBonus": 0,
+      "dmgBonus": 0,
+      "speed": 3,
+      "alch": 0
+    },
+    {
+      "id": "rune_scimitar",
+      "name": "Rune scimitar",
+      "type": "melee",
+      "wclass": "scimitar",
+      "accBonus": 45,
+      "dmgBonus": 44,
+      "speed": 4,
+      "acc": {
+        "crush": -2,
+        "slash": 45,
+        "stab": 7
+      },
+      "alch": 15360
+    },
+    {
+      "id": "shortbow",
+      "name": "Shortbow",
+      "type": "ranged",
+      "sub": "bow",
+      "accBonus": 8,
+      "dmgBonus": 0,
+      "speed": 4,
+      "twoHand": true,
+      "alch": 30
+    },
+    {
+      "id": "staff_of_air",
+      "name": "Staff of air",
+      "type": "magic",
+      "accBonus": 10,
+      "dmgBonus": 0,
+      "speed": 5,
+      "provides": "airrune",
+      "alch": 540
+    },
+    {
+      "id": "staff_of_earth",
+      "name": "Staff of earth",
+      "type": "magic",
+      "accBonus": 10,
+      "dmgBonus": 0,
+      "speed": 5,
+      "provides": "earthrune",
+      "alch": 540
+    },
+    {
+      "id": "staff_of_fire",
+      "name": "Staff of fire",
+      "type": "magic",
+      "accBonus": 10,
+      "dmgBonus": 0,
+      "speed": 5,
+      "provides": "firerune",
+      "alch": 900
+    },
+    {
+      "id": "staff_of_water",
+      "name": "Staff of water",
+      "type": "magic",
+      "accBonus": 10,
+      "dmgBonus": 0,
+      "speed": 5,
+      "provides": "waterrune",
+      "alch": 540
+    },
+    {
+      "id": "steel_dart_w",
+      "name": "Steel darts (thrown)",
+      "type": "ranged",
+      "sub": "thrown",
+      "ammoKey": "steel_dart",
+      "accBonus": 0,
+      "dmgBonus": 0,
+      "speed": 3,
+      "alch": 0
+    },
+    {
+      "id": "steel_knife_w",
+      "name": "Steel knives (thrown)",
+      "type": "ranged",
+      "sub": "thrown",
+      "ammoKey": "steel_knife",
+      "accBonus": 0,
+      "dmgBonus": 0,
+      "speed": 3,
+      "alch": 0
+    },
+    {
+      "id": "steel_scimitar",
+      "name": "Steel scimitar",
+      "type": "melee",
+      "wclass": "scimitar",
+      "accBonus": 15,
+      "dmgBonus": 14,
+      "speed": 4,
+      "acc": {
+        "crush": -2,
+        "slash": 15,
+        "stab": 3
+      },
+      "alch": 240
+    },
+    {
+      "id": "training_shortbow",
+      "name": "Training shortbow",
+      "type": "ranged",
+      "wclass": "bow",
+      "sub": "bow",
+      "ammoKey": "bronze_arrow",
+      "accBonus": 8,
+      "dmgBonus": 0,
+      "speed": 4,
+      "twoHand": true,
+      "requirements": {
+        "skills": {
+          "ranged": 5
+        },
+        "notes": "Fixture ranged requirement for source-backed parser tests."
+      }
+    },
+    {
+      "id": "willow_shortbow",
+      "name": "Willow shortbow",
+      "type": "ranged",
+      "sub": "bow",
+      "accBonus": 20,
+      "dmgBonus": 0,
+      "speed": 4,
+      "twoHand": true,
+      "alch": 120
+    },
+    {
+      "id": "yew_longbow",
+      "name": "Yew longbow",
+      "type": "ranged",
+      "sub": "bow",
+      "accBonus": 47,
+      "dmgBonus": 0,
+      "speed": 6,
+      "twoHand": true,
+      "alch": 768
+    },
+    {
+      "id": "yew_shortbow",
+      "name": "Yew shortbow",
+      "type": "ranged",
+      "sub": "bow",
+      "accBonus": 47,
+      "dmgBonus": 0,
+      "speed": 4,
+      "twoHand": true,
+      "alch": 480
+    }
+  ]
+}

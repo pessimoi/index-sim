@@ -7,6 +7,7 @@ import {
 import {
   buildPlan,
   defaultPool,
+  requirementForItem,
   SKILL_LABEL,
   SLOT_LABEL,
   PLANNER_REQUIREMENT_PROVENANCE,
@@ -17,6 +18,7 @@ import {
   type PlannerGearSlot,
   type PlannerPlan,
   type PlannerPool,
+  type PlannerRequirementSource,
   type SkillRequirements,
   type PlannerSkill,
   type PlannerTransition
@@ -25,6 +27,7 @@ import type {
   AttackType,
   BonusKey,
   CombatStyle,
+  DataProvenance,
   EquipmentItemDefinition,
   EquipmentSlot,
   EntityId,
@@ -311,7 +314,8 @@ export interface SetupRequirementSummaryViewModel {
   warningCount: number;
   hasWarnings: boolean;
   policyLabel: string;
-  provenance: typeof PLANNER_REQUIREMENT_PROVENANCE;
+  source: PlannerRequirementSource;
+  provenance: DataProvenance;
 }
 
 export type MonsterCardStatKey =
@@ -771,6 +775,7 @@ function gearQuickActionRequirementReason(
       itemId: item.id,
       itemName: item.label
     },
+    input.gameData,
     input.levels
   )[0];
   if (!warning) return null;
@@ -1413,10 +1418,11 @@ function createSetupRequirementWarnings(
     itemId: EntityId;
     itemName: string;
   },
+  gameData: GameDataSnapshot,
   levels: PlayerLevels
 ): SetupRequirementWarningViewModel[] {
   if (item.itemId === "none") return [];
-  const requirement = reqOf(item.itemId);
+  const requirement = requirementForItem(gameData, item.itemId).requirements;
   return SETUP_REQUIREMENT_SKILLS.flatMap((skill) => {
     const requiredLevel = requirement[skill] ?? 0;
     if (requiredLevel <= 0) return [];
@@ -1441,6 +1447,32 @@ function createSetupRequirementWarnings(
   });
 }
 
+function requirementPolicyForLookups(
+  lookups: ReturnType<typeof requirementForItem>[],
+  context: SimulationContext
+): { policyLabel: string; source: PlannerRequirementSource; provenance: DataProvenance } {
+  if (lookups.some((lookup) => lookup.source === "manual-fallback")) {
+    return {
+      policyLabel: "Manual requirement fallback",
+      source: "manual-fallback",
+      provenance: PLANNER_REQUIREMENT_PROVENANCE
+    };
+  }
+  const generated = lookups.find((lookup) => lookup.source === "generated");
+  if (!generated) {
+    return {
+      policyLabel: "No item requirements",
+      source: "none",
+      provenance: context.gameData.provenance ?? PLANNER_REQUIREMENT_PROVENANCE
+    };
+  }
+  return {
+    policyLabel: "Generated requirement data",
+    source: "generated",
+    provenance: generated.provenance ?? context.gameData.provenance ?? PLANNER_REQUIREMENT_PROVENANCE
+  };
+}
+
 function createSetupRequirementSummaryViewModel(
   request: SimulationRequest,
   context: SimulationContext
@@ -1460,13 +1492,20 @@ function createSetupRequirementSummaryViewModel(
       };
     })
   ];
-  const warnings = items.flatMap((item) => createSetupRequirementWarnings(item, request.levels));
+  const lookups = items
+    .filter((item) => item.itemId !== "none")
+    .map((item) => requirementForItem(context.gameData, item.itemId));
+  const policy = requirementPolicyForLookups(lookups, context);
+  const warnings = items.flatMap((item) =>
+    createSetupRequirementWarnings(item, context.gameData, request.levels)
+  );
   return {
     warnings,
     warningCount: warnings.length,
     hasWarnings: warnings.length > 0,
-    policyLabel: "Manual requirement policy",
-    provenance: PLANNER_REQUIREMENT_PROVENANCE
+    policyLabel: policy.policyLabel,
+    source: policy.source,
+    provenance: policy.provenance
   };
 }
 
@@ -1523,7 +1562,7 @@ function createActiveAssumptionsSummaryViewModel(input: {
       value: activeAssumptionCountLabel(input.setupRequirements.warningCount, "warning"),
       detail:
         input.setupRequirements.warnings[0]?.message ??
-        "Manual requirement checks flag this loadout.",
+        "Requirement checks flag this loadout.",
       reviewTab: combatReviewTab,
       tone: "warning",
       priority: 12
@@ -3345,7 +3384,7 @@ function plannerPoolItemHint(
   slot: PlannerGearSlot,
   itemId: EntityId
 ): string {
-  const req = reqOf(itemId);
+  const req = reqOf(itemId, context.gameData);
   const reqs = Object.entries(req)
     .map(([skill, level]) => `${SKILL_LABEL[skill as PlannerSkill]} ${level}`)
     .join(", ");

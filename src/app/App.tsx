@@ -8,11 +8,7 @@ import {
   type FormEvent
 } from "react";
 import { ZodError } from "zod";
-import {
-  downloadJsonFile,
-  loadBundledLegacyContext,
-  readBrowserFileText
-} from "@/adapters/browser";
+import { downloadJsonFile, readBrowserFileText } from "@/adapters/browser";
 import {
   HiscoresAdapterError,
   fetchHiscoresStatus,
@@ -44,6 +40,7 @@ import {
   type LegacySetupMigrationReport,
   type LegacyStorageKey
 } from "@/adapters/storage/legacy-migration";
+import { loadGeneratedRuntimeContext } from "@/adapters/generated";
 import { supportedSpecialAttacksForCombatStyle } from "@/domain/combat";
 import { loadoutToCombatBonuses } from "@/domain/equipment";
 import {
@@ -2020,11 +2017,13 @@ export function App() {
   );
   const skipNextLocalStatePersistRef = useRef<Set<LocalStateHealthItemId>>(new Set());
   const [readyToPersist, setReadyToPersist] = useState(false);
-  const [status, setStatus] = useState("Loading bundled data");
+  const [status, setStatus] = useState("Loading source-backed runtime data");
   const [fatalError, setFatalError] = useState<string | null>(null);
   const [setupImportNotice, setSetupImportNotice] = useState<SetupImportNotice | null>(null);
   const [priceImportNotice, setPriceImportNotice] = useState<ScopedPriceImportNotice | null>(null);
-  const [priceLabel, setPriceLabel] = useState("Bundled legacy prices");
+  const [priceLabel, setPriceLabel] = useState(
+    "Scheduled static prices + generated item fallbacks"
+  );
   const [hiscoresStatus, setHiscoresStatus] = useState<HiscoresStatusResponse | null>(null);
   const [hiscoresPlayer, setHiscoresPlayer] = useState(() => loadLastHiscoresPlayer(storage));
   const [hiscoresResponse, setHiscoresResponse] = useState<HiscoresResponse | null>(null);
@@ -2172,7 +2171,7 @@ export function App() {
 
   useEffect(() => {
     let cancelled = false;
-    loadBundledLegacyContext()
+    loadGeneratedRuntimeContext()
       .then(async (result) => {
         if (cancelled) return;
         const bundledContext = result.context;
@@ -2210,7 +2209,7 @@ export function App() {
             ? "Loaded scheduled prices"
             : initialSavedSetup.loaded
               ? "Loaded saved rewrite setup"
-              : "Loaded bundled data";
+              : "Loaded source-backed runtime data";
           setStatus(
             selectedPriceSetIssue && !scheduledLoaded ? selectedPriceSetIssue : loadedStatus
           );
@@ -4967,8 +4966,7 @@ export function App() {
                       title="Requirement warnings"
                     />
                     <p className="inline-status neutral">
-                      Manual requirement policy; generated authoritative requirements are not
-                      accepted yet.
+                      {viewModel.setupRequirements.policyLabel}
                     </p>
                   </div>
                 )}

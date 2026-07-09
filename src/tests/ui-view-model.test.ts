@@ -36,6 +36,7 @@ import {
 } from "../app/view-models/simulation";
 import { simulateFullSimulation } from "../domain/simulation";
 import { HIGH_ALCH_MAGIC_XP_PER_CAST } from "../domain/trip";
+import type { SimulationContext } from "../domain/shared";
 
 interface GoldenFixture {
   tolerances: {
@@ -50,6 +51,30 @@ interface GoldenFixture {
 const fixtures = fixtureSet as GoldenFixture;
 const fixturesById = new Map(fixtures.cases.map((testCase) => [testCase.id, testCase]));
 const numericRoundingGuard = 0.000000001;
+
+function withGeneratedRequirement(
+  context: SimulationContext,
+  itemId: string,
+  skills: NonNullable<SimulationContext["gameData"]["requirements"]>[string]["skills"]
+): SimulationContext {
+  return {
+    ...context,
+    gameData: {
+      ...context.gameData,
+      requirements: {
+        ...(context.gameData.requirements ?? {}),
+        [itemId]: {
+          itemId,
+          skills,
+          provenance: {
+            source: "generated",
+            sourceRef: `test#${itemId}.requirements`
+          }
+        }
+      }
+    }
+  };
+}
 
 function stableNumber(value: number): number {
   return Number(value.toFixed(6));
@@ -371,6 +396,27 @@ describe("rewrite UI view models", () => {
       itemId: "berserker_helm",
       disabled: false,
       reason: "Apply Berserker helm - requires Defence 45, current 1"
+    });
+  });
+
+  it("uses generated requirements in gear quick action reasons before manual fallback", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const generatedContext = withGeneratedRequirement(context, "berserker_helm", { defence: 50 });
+    const action = gearQuickActionForSlot({
+      gameData: generatedContext.gameData,
+      slot: "helm",
+      combatStyle: "melee",
+      weaponId: "rune_scimitar",
+      styleId: "aggressive",
+      currentItemId: "rune_full_helm",
+      levels: { ...DEFAULT_FORM_STATE.levels, defence: 49 },
+      options: equipmentSlotOptions(generatedContext.gameData, "helm")
+    });
+
+    expect(action).toMatchObject({
+      itemId: "berserker_helm",
+      disabled: false,
+      reason: "Apply Berserker helm - requires Defence 50, current 49"
     });
   });
 
@@ -798,6 +844,8 @@ describe("rewrite UI view models", () => {
       severity: "warning"
     });
     expect(runeBodyWarning?.message).toContain("Rune platebody requires Defence 40");
+    expect(result.setupRequirements.source).toBe("manual-fallback");
+    expect(result.setupRequirements.policyLabel).toBe("Manual requirement fallback");
     expect(activeAssumptionRow(result, "setup-requirements")).toMatchObject({
       label: "Setup requirements",
       reviewTab: "melee",
@@ -835,6 +883,42 @@ describe("rewrite UI view models", () => {
     expect(activeAssumptionRow(result, "setup-requirements")).toMatchObject({
       reviewTab: "melee"
     });
+  });
+
+  it("uses generated setup requirements without the manual fallback label", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const generatedContext = withGeneratedRequirement(context, "iron_scimitar", { attack: 5 });
+    const form = applyWeaponSelection(
+      {
+        ...DEFAULT_FORM_STATE,
+        levels: { ...DEFAULT_FORM_STATE.levels, attack: 1 },
+        gear: {
+          helm: "none",
+          amulet: "none",
+          body: "none",
+          legs: "none",
+          shield: "none",
+          gloves: "none",
+          boots: "none",
+          cape: "none",
+          ring: "none"
+        }
+      },
+      "iron_scimitar",
+      generatedContext.gameData
+    );
+    const result = createSimulationViewModel(form, generatedContext);
+
+    expect(result.setupRequirements.policyLabel).toBe("Generated requirement data");
+    expect(result.setupRequirements.source).toBe("generated");
+    expect(result.setupRequirements.warnings).toEqual([
+      expect.objectContaining({
+        itemId: "iron_scimitar",
+        skill: "attack",
+        requiredLevel: 5,
+        currentLevel: 1
+      })
+    ]);
   });
 
   it("keeps matching setup levels free of requirement warnings", async () => {

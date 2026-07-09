@@ -1,0 +1,22 @@
+{
+  "source": "markets.lostcity.rs",
+  "fetchedAt": "2026-07-08T00:15:00.000Z",
+  "items": {
+    "lobster": {
+      "price": 215,
+      "highAlch": 90
+    },
+    "not_an_allowed_slug": {
+      "price": 123,
+      "highAlch": 0
+    },
+    "rune_scimitar": {
+      "price": 23000,
+      "highAlch": 15360
+    },
+    "dragon_bones": {
+      "status": "skipped",
+      "reason": "No recent trade sample in fixture"
+    }
+  }
+}

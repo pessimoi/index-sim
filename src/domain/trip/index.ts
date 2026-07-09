@@ -1,4 +1,5 @@
 import { hitChance, potionBoostedLevel, TICK_SECONDS, type PotionStatKey } from "../combat";
+import { aliasesForCanonicalItemId, lookupItemPrice, resolveCanonicalItemId } from "../economy";
 import { sumEquipmentBonuses } from "../equipment";
 import {
   type CombatSimulationResult,
@@ -636,6 +637,8 @@ const SKIP_DEFAULTS = new Set([
   "seaweed"
 ]);
 
+const SKIP_DEFAULT_ITEM_IDS = new Set(["druidrobetop", "druidrobebottom", "opal_bolttips"]);
+
 const BURY_DEFAULTS = new Set([
   "big bones",
   "jogre bones",
@@ -778,11 +781,22 @@ function priceFromKeys(
   warnings?: SimulationWarning[],
   label?: string
 ): number {
-  const canonicalKey = keys[0];
-  for (const [index, key] of keys.entries()) {
+  const requestedKey = keys[0];
+  const canonicalKey = requestedKey
+    ? resolveCanonicalItemId(requestedKey).canonicalItemId
+    : undefined;
+  const lookupKeys = canonicalKey
+    ? [
+        canonicalKey,
+        ...aliasesForCanonicalItemId(canonicalKey),
+        ...keys.filter((key) => key !== canonicalKey)
+      ]
+    : keys;
+
+  for (const key of new Set(lookupKeys)) {
     const price = priceSet.itemPrices[key];
     if (asNumeric(price) !== undefined) {
-      if (warnings && index > 0 && canonicalKey) {
+      if (warnings && key !== canonicalKey && canonicalKey) {
         addWarningOnce(warnings, {
           code: "price-alias-used",
           severity: "info",
@@ -800,6 +814,30 @@ function priceFromKeys(
     });
   }
   return fallback * qty;
+}
+
+function addPriceAliasWarning(
+  warnings: SimulationWarning[] | undefined,
+  lookup: ReturnType<typeof lookupItemPrice>,
+  label: string
+): void {
+  if (
+    !warnings ||
+    lookup.lookupSource !== "alias" ||
+    !lookup.aliasItemId ||
+    !lookup.canonicalItemId
+  ) {
+    return;
+  }
+  addWarningOnce(warnings, {
+    code: "price-alias-used",
+    severity: "info",
+    message: `Using alias price '${lookup.aliasItemId}' for ${label}; canonical price '${lookup.canonicalItemId}' is missing.`
+  });
+}
+
+function itemPrice(priceSet: PriceSet, itemId: EntityId): number | undefined {
+  return lookupItemPrice(priceSet, itemId).value ?? undefined;
 }
 
 function addWarningOnce(warnings: SimulationWarning[], warning: SimulationWarning): void {
@@ -821,12 +859,15 @@ function priceOrFallback(
   label: string
 ): number {
   if (!itemId) return fallback;
-  const price = priceSet.itemPrices[itemId];
-  if (asNumeric(price) !== undefined) return price;
+  const lookup = lookupItemPrice(priceSet, itemId);
+  if (lookup.value !== null) {
+    addPriceAliasWarning(warnings, lookup, label);
+    return lookup.value;
+  }
   addWarningOnce(warnings, {
     code: "price-fallback-used",
     severity: "warning",
-    message: `Missing price '${itemId}' for ${label}; using fallback ${fallback}.`
+    message: `Missing price '${lookup.canonicalItemId ?? itemId}' for ${label}; using fallback ${fallback}.`
   });
   return fallback;
 }
@@ -856,6 +897,7 @@ export function normalizeLootName(name: string): string {
     .toLowerCase()
     .replace(/\s*[x×]\s*\d+/g, "")
     .replace(/['']/g, "")
+    .replace(/\s*\((\d+)\)/g, " ($1)")
     .replace(/\(noted\)/g, "")
     .replace(/\s+/g, " ")
     .trim();
@@ -919,6 +961,7 @@ export function alchForName(name: string, priceSet: PriceSet): number {
 export function defaultLootAction(drop: DropDefinition, priceSet: PriceSet): LootAction | null {
   const normalizedName = normalizeLootName(drop.name);
   if (BURY_DEFAULTS.has(normalizedName)) return "bury";
+  if (drop.key && SKIP_DEFAULT_ITEM_IDS.has(drop.key)) return "skip";
   if (SKIP_DEFAULTS.has(normalizedName)) return "skip";
   if (FOOD_DEFAULTS.has(normalizedName)) return "skip";
   if (ALCH_DEFAULTS.has(normalizedName)) return "alch";
@@ -1374,8 +1417,8 @@ export function evaluateLoot(
   const priceSet = context.priceSet;
   const lootPrefs = options.lootPrefs ?? {};
   const alchAllowed = !!options.alching;
-  const natCost = priceSet.itemPrices.naturerune ?? NATURE_RUNE_FALLBACK;
-  const herbUnidGp = priceSet.itemPrices.unidentified_guam ?? 15;
+  const natCost = itemPrice(priceSet, "naturerune") ?? NATURE_RUNE_FALLBACK;
+  const herbUnidGp = itemPrice(priceSet, "unidentified_guam") ?? 15;
   let cachedHerbs: ReturnType<typeof herbStats> | undefined;
   let cachedJewels: ReturnType<typeof jewelStats> | undefined;
   const getHerbs = () => {
@@ -1402,15 +1445,19 @@ export function evaluateLoot(
     const isBone = bonePrayerXp(drop.name) > 0;
     const isHerb = drop.tag === "herb";
     itemApproximationWarning(context.gameData, drop.key, warnings);
-    const livePrice =
-      drop.key && priceSet.itemPrices[drop.key] != null
-        ? priceSet.itemPrices[drop.key]
-        : (drop.price ?? 0);
-    if (drop.key && priceSet.itemPrices[drop.key] == null && drop.price == null) {
+    const livePriceLookup = drop.key ? lookupItemPrice(priceSet, drop.key) : null;
+    const livePrice = livePriceLookup?.value ?? drop.price ?? 0;
+    if (livePriceLookup && livePriceLookup.value !== null) {
+      addPriceAliasWarning(warnings, livePriceLookup, drop.name);
+    } else if (drop.key && drop.price == null) {
+      const missingItemId = livePriceLookup?.warning?.itemId ?? drop.key;
       addWarningOnce(warnings, {
         code: "missing-price",
         severity: "warning",
-        message: `Missing price for loot item '${drop.key}'.`
+        message:
+          missingItemId === drop.key
+            ? `Missing price for loot item '${drop.key}'.`
+            : `Missing price for loot item '${drop.key}' via canonical '${missingItemId}'.`
       });
     }
     const bulkDead = isBulkUnsellable(drop.name);
@@ -2084,13 +2131,15 @@ function ammoPrice(ammoId: EntityId, context: SimulationContext): number {
   if (!ammo) return 0;
   const record = ammo as unknown as Record<string, unknown>;
   const priceKey = typeof record.priceKey === "string" ? record.priceKey : ammoId;
-  const live = context.priceSet.itemPrices[priceKey];
-  if (asNumeric(live) !== undefined && live > 0) return live;
+  const live = itemPrice(context.priceSet, priceKey);
+  const numericLive = asNumeric(live);
+  if (numericLive !== undefined && numericLive > 0) return numericLive;
   const family = typeof record.fam === "string" ? record.fam : null;
   const tier = asNumeric(record.tier);
   if (family === "knife" && typeof record.barKey === "string") {
-    const bar = context.priceSet.itemPrices[record.barKey];
-    if (asNumeric(bar) !== undefined && bar > 0) return Math.round(bar / 5);
+    const bar = itemPrice(context.priceSet, record.barKey);
+    const numericBar = asNumeric(bar);
+    if (numericBar !== undefined && numericBar > 0) return Math.round(numericBar / 5);
   }
   if (family && tier !== undefined) {
     const anchors: Array<{ tier: number; price: number }> = [];
@@ -2101,7 +2150,7 @@ function ammoPrice(ammoId: EntityId, context: SimulationContext): number {
       const candidatePriceKey =
         typeof candidateRecord.priceKey === "string" ? candidateRecord.priceKey : undefined;
       const candidatePrice = candidatePriceKey
-        ? context.priceSet.itemPrices[candidatePriceKey]
+        ? itemPrice(context.priceSet, candidatePriceKey)
         : undefined;
       const numericCandidatePrice = asNumeric(candidatePrice);
       if (
@@ -2149,16 +2198,16 @@ function spellRuneCost(spellId: EntityId, weaponId: EntityId, context: Simulatio
   let cost = 0;
   for (const [rune, qty] of Object.entries(spell.runes)) {
     if (rune === provided) continue;
-    cost += (context.priceSet.itemPrices[rune] || 0) * qty;
+    cost += (itemPrice(context.priceSet, rune) || 0) * qty;
   }
   return cost;
 }
 
 function chargeCostPerCast(castIntervalSec: number, context: SimulationContext): number {
   const fullCost =
-    (context.priceSet.itemPrices.airrune || 0) * 3 +
-    (context.priceSet.itemPrices.firerune || 0) * 3 +
-    (context.priceSet.itemPrices.bloodrune || 0) * 3;
+    (itemPrice(context.priceSet, "airrune") || 0) * 3 +
+    (itemPrice(context.priceSet, "firerune") || 0) * 3 +
+    (itemPrice(context.priceSet, "bloodrune") || 0) * 3;
   const castsPerCharge = Math.max(1, CHARGE_DURATION_SEC / (castIntervalSec || 3));
   return fullCost / castsPerCharge;
 }

@@ -1,0 +1,86 @@
+name: Update market prices
+
+on:
+  schedule:
+    - cron: "15 0 * * *"
+    - cron: "15 12 * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-market-prices-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  update-market-prices:
+    name: Update scheduled market prices
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      MARKET_PRICES_UPSTREAM_URL: ${{ vars.MARKET_PRICES_UPSTREAM_URL }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Require approved upstream URL
+        run: |
+          if [ -z "${MARKET_PRICES_UPSTREAM_URL}" ]; then
+            echo "::error::Set repository variable MARKET_PRICES_UPSTREAM_URL to the verified https://markets.lostcity.rs raw market endpoint before enabling scheduled price updates."
+            exit 1
+          fi
+
+          case "${MARKET_PRICES_UPSTREAM_URL}" in
+            https://markets.lostcity.rs/*) ;;
+            *)
+              echo "::error::MARKET_PRICES_UPSTREAM_URL must start with https://markets.lostcity.rs/"
+              exit 1
+              ;;
+          esac
+
+      - name: Run scheduled market writer
+        run: npm run prices:write-scheduled -- --upstream-url "${MARKET_PRICES_UPSTREAM_URL}"
+
+      - name: Validate market outputs
+        run: |
+          node -e "for (const f of ['prices.json','alch.json','price-history.json']) JSON.parse(require('fs').readFileSync(f,'utf8'))"
+          npm run test -- src/tests/market-writer.test.ts
+          npm run test -- src/tests/data-economy.test.ts
+          git diff --check
+
+      - name: Ensure workflow changed only market snapshot files
+        run: |
+          changed_files="$(git diff --name-only)"
+          if [ -z "${changed_files}" ]; then
+            echo "No files changed."
+            exit 0
+          fi
+
+          disallowed_files="$(printf '%s\n' "${changed_files}" | grep -Ev '^(prices\.json|alch\.json|price-history\.json)$' || true)"
+          if [ -n "${disallowed_files}" ]; then
+            echo "::error::Scheduled market writer changed files outside the approved snapshot set:"
+            printf '%s\n' "${disallowed_files}"
+            exit 1
+          fi
+
+      - name: Commit market snapshot diff
+        run: |
+          if git diff --quiet -- prices.json alch.json price-history.json; then
+            echo "No market price changes to commit."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add prices.json alch.json price-history.json
+          git commit -m "Update scheduled market prices"
+          git push

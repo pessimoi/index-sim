@@ -1,0 +1,196 @@
+{
+  "ammo": [
+    {
+      "id": "addy_arrow",
+      "name": "Adamant arrow",
+      "rangeBonus": 31,
+      "kind": "arrow",
+      "priceKey": "adamant_arrow",
+      "alch": 48,
+      "price": 80
+    },
+    {
+      "id": "addy_dart",
+      "name": "Adamant dart",
+      "rangeBonus": 10,
+      "kind": "thrown",
+      "fam": "dart",
+      "tier": 4,
+      "priceKey": "adamant_dart",
+      "alch": 39,
+      "price": 26
+    },
+    {
+      "id": "addy_knife",
+      "name": "Adamant knife",
+      "rangeBonus": 14,
+      "kind": "thrown",
+      "fam": "knife",
+      "tier": 4,
+      "barKey": "adamantite_bar",
+      "priceKey": "adamant_knife",
+      "alch": 39,
+      "price": 42
+    },
+    {
+      "id": "bronze_arrow",
+      "name": "Bronze arrow",
+      "rangeBonus": 7,
+      "kind": "arrow",
+      "priceKey": "bronze_arrow",
+      "alch": 1,
+      "price": 1
+    },
+    {
+      "id": "bronze_dart",
+      "name": "Bronze dart",
+      "rangeBonus": 1,
+      "kind": "thrown",
+      "fam": "dart",
+      "tier": 0,
+      "priceKey": "bronze_dart",
+      "alch": 1,
+      "price": 1
+    },
+    {
+      "id": "bronze_knife",
+      "name": "Bronze knife",
+      "rangeBonus": 3,
+      "kind": "thrown",
+      "fam": "knife",
+      "tier": 0,
+      "barKey": "bronze_bar",
+      "priceKey": "bronze_knife",
+      "alch": 1,
+      "price": 2
+    },
+    {
+      "id": "iron_arrow",
+      "name": "Iron arrow",
+      "rangeBonus": 10,
+      "kind": "arrow",
+      "priceKey": "iron_arrow",
+      "alch": 1,
+      "price": 3
+    },
+    {
+      "id": "iron_dart",
+      "name": "Iron dart",
+      "rangeBonus": 3,
+      "kind": "thrown",
+      "fam": "dart",
+      "tier": 1,
+      "priceKey": "iron_dart",
+      "alch": 1,
+      "price": 2
+    },
+    {
+      "id": "iron_knife",
+      "name": "Iron knife",
+      "rangeBonus": 4,
+      "kind": "thrown",
+      "fam": "knife",
+      "tier": 1,
+      "barKey": "iron_bar",
+      "priceKey": "iron_knife",
+      "alch": 1,
+      "price": 4
+    },
+    {
+      "id": "mith_arrow",
+      "name": "Mithril arrow",
+      "rangeBonus": 22,
+      "kind": "arrow",
+      "priceKey": "mithril_arrow",
+      "alch": 19,
+      "price": 32
+    },
+    {
+      "id": "mith_dart",
+      "name": "Mithril dart",
+      "rangeBonus": 7,
+      "kind": "thrown",
+      "fam": "dart",
+      "tier": 3,
+      "priceKey": "mithril_dart",
+      "alch": 15,
+      "price": 11
+    },
+    {
+      "id": "mith_knife",
+      "name": "Mithril knife",
+      "rangeBonus": 10,
+      "kind": "thrown",
+      "fam": "knife",
+      "tier": 3,
+      "barKey": "mithril_bar",
+      "priceKey": "mithril_knife",
+      "alch": 16,
+      "price": 18
+    },
+    {
+      "id": "rune_arrow",
+      "name": "Rune arrow",
+      "rangeBonus": 49,
+      "kind": "arrow",
+      "priceKey": "rune_arrow",
+      "alch": 240,
+      "price": 400
+    },
+    {
+      "id": "rune_dart",
+      "name": "Rune dart",
+      "rangeBonus": 14,
+      "kind": "thrown",
+      "fam": "dart",
+      "tier": 5,
+      "priceKey": "rune_dart",
+      "alch": 210,
+      "price": 130
+    },
+    {
+      "id": "rune_knife",
+      "name": "Rune knife",
+      "rangeBonus": 24,
+      "kind": "thrown",
+      "fam": "knife",
+      "tier": 5,
+      "barKey": "runite_bar",
+      "priceKey": "rune_knife",
+      "alch": 100,
+      "price": 230
+    },
+    {
+      "id": "steel_arrow",
+      "name": "Steel arrow",
+      "rangeBonus": 16,
+      "kind": "arrow",
+      "priceKey": "steel_arrow",
+      "alch": 7,
+      "price": 12
+    },
+    {
+      "id": "steel_dart",
+      "name": "Steel dart",
+      "rangeBonus": 4,
+      "kind": "thrown",
+      "fam": "dart",
+      "tier": 2,
+      "priceKey": "steel_dart",
+      "alch": 6,
+      "price": 5
+    },
+    {
+      "id": "steel_knife",
+      "name": "Steel knife",
+      "rangeBonus": 7,
+      "kind": "thrown",
+      "fam": "knife",
+      "tier": 2,
+      "barKey": "steel_bar",
+      "priceKey": "steel_knife",
+      "alch": 6,
+      "price": 9
+    }
+  ]
+}

@@ -13,6 +13,7 @@ import {
   defaultLootAction,
   evaluateLoot,
   isStackable,
+  normalizeLootName,
   recommendPotionCarry,
   simulateTripLootSupply,
   type CannonSettings,
@@ -134,6 +135,12 @@ function buildTripInput(
 }
 
 describe("trip/loot/supply unit rules", () => {
+  it("normalizes source potion dose names without changing quantity semantics", () => {
+    expect(normalizeLootName("Antipoison(3)")).toBe("antipoison (3)");
+    expect(normalizeLootName("Antipoison (3)")).toBe("antipoison (3)");
+    expect(normalizeLootName("Air rune x18")).toBe("air rune");
+  });
+
   it("owns stackability separately from legacy TripModel", () => {
     expect(isStackable("naturerune", "Nature rune x6")).toBe(true);
     expect(isStackable("coins", "Coins")).toBe(true);
@@ -162,6 +169,18 @@ describe("trip/loot/supply unit rules", () => {
         priceSet
       )
     ).toBe("alch");
+    expect(
+      defaultLootAction(
+        { name: "Druid's robe", key: "druidrobetop", chance: 1, qtyAvg: 1, price: 420 },
+        priceSet
+      )
+    ).toBe("skip");
+    expect(
+      defaultLootAction(
+        { name: "Opal bolttips", key: "opal_bolttips", chance: 1, qtyAvg: 5, price: 30 },
+        priceSet
+      )
+    ).toBe("skip");
     expect(bonePrayerXp("Dragon bones")).toBe(72);
   });
 
@@ -223,6 +242,70 @@ describe("trip/loot/supply unit rules", () => {
     const fallbackResult = evaluateLoot(context.gameData.monsters.giant, fallbackContext);
 
     expect(fallbackResult.warnings.map((warning) => warning.code)).toContain("price-fallback-used");
+  });
+
+  it("values direct loot keys through canonical prices without alias warnings", () => {
+    const runtime = createLegacyRuntime();
+    const context = domainContextFromLegacy(runtime);
+    const { sapphire: _sapphire, ...withoutAliasSapphire } = context.priceSet.itemPrices;
+    const aliasKeyContext: SimulationContext = {
+      ...context,
+      priceSet: {
+        ...context.priceSet,
+        itemPrices: {
+          ...withoutAliasSapphire,
+          uncut_sapphire: 1250
+        }
+      }
+    };
+    const result = evaluateLoot(
+      {
+        id: "alias_key_giant",
+        name: "Alias key giant",
+        hp: 1,
+        loot: [{ name: "Uncut sapphire", key: "sapphire", chance: 1, qtyAvg: 1 }]
+      },
+      aliasKeyContext
+    );
+
+    expect(result.lootBreakdown[0]?.price).toBe(1250);
+    expect(result.lootBreakdown[0]?.saleValue).toBe(1250);
+    expect(result.warnings.map((warning) => warning.code)).not.toContain("price-alias-used");
+    expect(result.warnings.map((warning) => warning.code)).not.toContain("missing-price");
+  });
+
+  it("keeps alias fallback warnings when direct loot canonical prices are missing", () => {
+    const runtime = createLegacyRuntime();
+    const context = domainContextFromLegacy(runtime);
+    const { uncut_sapphire: _uncutSapphire, ...withoutCanonicalSapphire } =
+      context.priceSet.itemPrices;
+    const aliasFallbackContext: SimulationContext = {
+      ...context,
+      priceSet: {
+        ...context.priceSet,
+        itemPrices: {
+          ...withoutCanonicalSapphire,
+          sapphire: 451
+        }
+      }
+    };
+    const result = evaluateLoot(
+      {
+        id: "canonical_key_giant",
+        name: "Canonical key giant",
+        hp: 1,
+        loot: [{ name: "Uncut sapphire", key: "uncut_sapphire", chance: 1, qtyAvg: 1 }]
+      },
+      aliasFallbackContext
+    );
+
+    expect(result.lootBreakdown[0]?.price).toBe(451);
+    expect(result.lootBreakdown[0]?.saleValue).toBe(451);
+    expect(result.warnings.map((warning) => warning.code)).toContain("price-alias-used");
+    expect(result.warnings.map((warning) => warning.code)).not.toContain("missing-price");
+    expect(result.warnings.map((warning) => warning.message).join("\n")).toContain(
+      "uncut_sapphire"
+    );
   });
 
   it("bounds cannon target and respawn settings inside the domain", () => {

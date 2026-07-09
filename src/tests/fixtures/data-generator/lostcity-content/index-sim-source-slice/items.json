@@ -1,0 +1,1776 @@
+{
+  "items": [
+    {
+      "id": "1dose2defense",
+      "name": "Defence potion (1)",
+      "price": 180
+    },
+    {
+      "id": "2dose1strength",
+      "name": "Strength potion (2)",
+      "price": 280
+    },
+    {
+      "id": "3dose1defense",
+      "name": "Defence potion (3)",
+      "price": 350
+    },
+    {
+      "id": "3doseantipoison",
+      "name": "Antipoison (3)",
+      "price": 380
+    },
+    {
+      "id": "adamant_arrow",
+      "name": "Adamant arrow",
+      "price": 80
+    },
+    {
+      "id": "adamant_axe",
+      "name": "Adamant axe",
+      "alch": 480
+    },
+    {
+      "id": "adamant_dart",
+      "name": "Adamant dart"
+    },
+    {
+      "id": "adamant_dart_p",
+      "name": "adamant_dart_p",
+      "price": 65
+    },
+    {
+      "id": "adamant_full_helm",
+      "name": "Adamant full helm",
+      "price": 5000,
+      "alch": 2112
+    },
+    {
+      "id": "adamant_kite",
+      "name": "Adamant kiteshield"
+    },
+    {
+      "id": "adamant_kiteshield",
+      "name": "adamant_kiteshield",
+      "price": 8400,
+      "alch": 2688
+    },
+    {
+      "id": "adamant_knife",
+      "name": "Adamant knife"
+    },
+    {
+      "id": "adamant_med_helm",
+      "name": "Adamant med helm",
+      "alch": 1248
+    },
+    {
+      "id": "adamant_platebody",
+      "name": "Adamant platebody",
+      "price": 76000,
+      "alch": 16128
+    },
+    {
+      "id": "adamant_platelegs",
+      "name": "Adamant platelegs",
+      "price": 26000,
+      "alch": 9600
+    },
+    {
+      "id": "adamant_scimitar",
+      "name": "Adamant scimitar"
+    },
+    {
+      "id": "adamant_spear",
+      "name": "Adamant spear",
+      "price": 3100,
+      "alch": 3120
+    },
+    {
+      "id": "adamant_sq_shield",
+      "name": "Adamant sq shield",
+      "alch": 1152
+    },
+    {
+      "id": "adamant_warhammer",
+      "name": "Adamant warhammer",
+      "alch": 3120
+    },
+    {
+      "id": "adamantite_bar",
+      "name": "Adamantite bar",
+      "price": 4750
+    },
+    {
+      "id": "adamantite_ore",
+      "name": "Adamantite ore",
+      "price": 851
+    },
+    {
+      "id": "addy_arrow",
+      "name": "Adamant arrow"
+    },
+    {
+      "id": "addy_dart",
+      "name": "Adamant dart"
+    },
+    {
+      "id": "addy_dart_w",
+      "name": "Adamant darts (thrown)"
+    },
+    {
+      "id": "addy_knife",
+      "name": "Adamant knife"
+    },
+    {
+      "id": "addy_knife_w",
+      "name": "Adamant knives (thrown)"
+    },
+    {
+      "id": "air_rune",
+      "name": "Air rune",
+      "stackable": true
+    },
+    {
+      "id": "air_talisman",
+      "name": "Air talisman",
+      "price": 500
+    },
+    {
+      "id": "airrune",
+      "name": "Air rune ×10",
+      "price": 30
+    },
+    {
+      "id": "amu_glory",
+      "name": "Amulet of glory"
+    },
+    {
+      "id": "amu_power",
+      "name": "Amulet of power"
+    },
+    {
+      "id": "amu_strength",
+      "name": "Amulet of strength"
+    },
+    {
+      "id": "anti_dragon",
+      "name": "Anti-dragon shield"
+    },
+    {
+      "id": "antifire_potion",
+      "name": "antifire_potion",
+      "price": 4200
+    },
+    {
+      "id": "antipoison2",
+      "name": "Antipoison (2)"
+    },
+    {
+      "id": "antipoison3",
+      "name": "Antipoison (3)"
+    },
+    {
+      "id": "archer_helm",
+      "name": "Archer helm"
+    },
+    {
+      "id": "ashes",
+      "name": "Ashes",
+      "price": 206
+    },
+    {
+      "id": "babydragon_bones",
+      "name": "Babydragon bones",
+      "price": 0
+    },
+    {
+      "id": "balance_book",
+      "name": "Book of balance (Guthix)"
+    },
+    {
+      "id": "banana",
+      "name": "Banana"
+    },
+    {
+      "id": "bass",
+      "name": "Bass",
+      "price": 520
+    },
+    {
+      "id": "beer",
+      "name": "Beer",
+      "price": 2
+    },
+    {
+      "id": "berserker_helm",
+      "name": "Berserker helm"
+    },
+    {
+      "id": "big_bones",
+      "name": "Big bones",
+      "price": 390,
+      "stackable": false
+    },
+    {
+      "id": "bigoysterpearls",
+      "name": "Oyster pearls"
+    },
+    {
+      "id": "black_axe",
+      "name": "Black axe",
+      "price": 600,
+      "alch": 576
+    },
+    {
+      "id": "black_cape",
+      "name": "Black cape",
+      "price": 25
+    },
+    {
+      "id": "black_dagger",
+      "name": "Black dagger",
+      "price": 320,
+      "alch": 384
+    },
+    {
+      "id": "black_dhide_body",
+      "name": "Black d-hide body"
+    },
+    {
+      "id": "black_dhide_legs",
+      "name": "Black d-hide chaps"
+    },
+    {
+      "id": "black_full_helm",
+      "name": "Black full helm"
+    },
+    {
+      "id": "black_kite",
+      "name": "Black kiteshield"
+    },
+    {
+      "id": "black_kiteshield",
+      "name": "Black sq shield",
+      "price": 680,
+      "alch": 576
+    },
+    {
+      "id": "black_knife",
+      "name": "Black knife"
+    },
+    {
+      "id": "black_longsword",
+      "name": "Black longsword",
+      "alch": 768
+    },
+    {
+      "id": "black_platebody",
+      "name": "Black platebody"
+    },
+    {
+      "id": "black_platelegs",
+      "name": "Black platelegs"
+    },
+    {
+      "id": "black_scimitar",
+      "name": "Black scimitar"
+    },
+    {
+      "id": "black_sq_shield",
+      "name": "black_sq_shield",
+      "alch": 576
+    },
+    {
+      "id": "black_sword",
+      "name": "Black sword",
+      "price": 500,
+      "alch": 576
+    },
+    {
+      "id": "black_vambraces",
+      "name": "Black d-hide vambs"
+    },
+    {
+      "id": "black_warhammer",
+      "name": "Black warhammer",
+      "alch": 576
+    },
+    {
+      "id": "bloodrune",
+      "name": "Blood rune ×2",
+      "price": 775
+    },
+    {
+      "id": "blue_dhide_body",
+      "name": "Blue d-hide body"
+    },
+    {
+      "id": "blue_dhide_legs",
+      "name": "Blue d-hide chaps"
+    },
+    {
+      "id": "blue_vambraces",
+      "name": "Blue d-hide vambs"
+    },
+    {
+      "id": "body_talisman",
+      "name": "Body talisman",
+      "price": 500
+    },
+    {
+      "id": "bodyrune",
+      "name": "Body rune ×7",
+      "price": 14
+    },
+    {
+      "id": "bolt",
+      "name": "Bolts ×8",
+      "price": 4
+    },
+    {
+      "id": "bones",
+      "name": "Bones",
+      "price": 35,
+      "stackable": false
+    },
+    {
+      "id": "brass_necklace",
+      "name": "Brass necklace",
+      "price": 45
+    },
+    {
+      "id": "bread",
+      "name": "Bread"
+    },
+    {
+      "id": "bronze_arrow",
+      "name": "Bronze arrow",
+      "price": 15,
+      "stackable": true
+    },
+    {
+      "id": "bronze_axe",
+      "name": "Bronze axe",
+      "price": 5
+    },
+    {
+      "id": "bronze_bar",
+      "name": "Bronze bar",
+      "price": 60
+    },
+    {
+      "id": "bronze_dart",
+      "name": "Bronze dart"
+    },
+    {
+      "id": "bronze_dart_w",
+      "name": "Bronze darts (thrown)"
+    },
+    {
+      "id": "bronze_javelin",
+      "name": "bronze_javelin",
+      "price": 5
+    },
+    {
+      "id": "bronze_kiteshield",
+      "name": "Bronze kiteshield"
+    },
+    {
+      "id": "bronze_knife",
+      "name": "Bronze knife"
+    },
+    {
+      "id": "bronze_knife_w",
+      "name": "Bronze knives (thrown)"
+    },
+    {
+      "id": "bronze_longsword",
+      "name": "Bronze longsword",
+      "price": 5
+    },
+    {
+      "id": "bronze_med_helm",
+      "name": "Bronze med helm",
+      "stackable": false
+    },
+    {
+      "id": "bronze_pickaxe",
+      "name": "Bronze pickaxe",
+      "price": 1
+    },
+    {
+      "id": "bronze_scimitar",
+      "name": "Bronze scimitar",
+      "price": 18
+    },
+    {
+      "id": "bronze_spear",
+      "name": "Bronze spear"
+    },
+    {
+      "id": "bronze_sq_shield",
+      "name": "Bronze sq shield",
+      "price": 12,
+      "stackable": false
+    },
+    {
+      "id": "bronze_sword",
+      "name": "Bronze sword",
+      "alch": 15,
+      "stackable": false
+    },
+    {
+      "id": "cabbage",
+      "name": "Cabbage",
+      "price": 5
+    },
+    {
+      "id": "cape_legends",
+      "name": "Cape of legends"
+    },
+    {
+      "id": "casket",
+      "name": "Casket (opened)",
+      "price": 2891
+    },
+    {
+      "id": "cert_swordfish",
+      "name": "cert_swordfish",
+      "price": 220
+    },
+    {
+      "id": "chaos_gauntlets",
+      "name": "Chaos gauntlets"
+    },
+    {
+      "id": "chaosrune",
+      "name": "Chaos rune ×2",
+      "price": 133
+    },
+    {
+      "id": "cheese",
+      "name": "Cheese"
+    },
+    {
+      "id": "chefs_hat",
+      "name": "Chef's hat",
+      "price": 50
+    },
+    {
+      "id": "chocolate_cake",
+      "name": "Chocolate cake ×3",
+      "price": 350
+    },
+    {
+      "id": "climbing_boots",
+      "name": "Climbing boots"
+    },
+    {
+      "id": "coal",
+      "name": "Coal",
+      "price": 530
+    },
+    {
+      "id": "coif",
+      "name": "Coif"
+    },
+    {
+      "id": "coins",
+      "name": "Coins",
+      "stackable": true
+    },
+    {
+      "id": "cooked_meat",
+      "name": "Cooked meat"
+    },
+    {
+      "id": "copper_ore",
+      "name": "Copper ore",
+      "price": 4
+    },
+    {
+      "id": "cosmic_talisman",
+      "name": "cosmic_talisman",
+      "price": 500
+    },
+    {
+      "id": "cosmicrune",
+      "name": "Cosmic rune ×2",
+      "price": 245
+    },
+    {
+      "id": "cow_hide",
+      "name": "Cowhide",
+      "price": 510
+    },
+    {
+      "id": "deathrune",
+      "name": "Death rune ×2",
+      "price": 218
+    },
+    {
+      "id": "dragon_bones",
+      "name": "Dragon bones",
+      "price": 2504
+    },
+    {
+      "id": "dragon_chainbody",
+      "name": "Dragon chainbody"
+    },
+    {
+      "id": "dragon_dagger",
+      "name": "Dragon dagger"
+    },
+    {
+      "id": "dragon_dagger_p",
+      "name": "Dragon dagger(p)"
+    },
+    {
+      "id": "dragon_halberd",
+      "name": "Dragon halberd"
+    },
+    {
+      "id": "dragon_longsword",
+      "name": "Dragon longsword",
+      "price": 126000
+    },
+    {
+      "id": "dragon_mace",
+      "name": "Dragon mace"
+    },
+    {
+      "id": "dragon_med_helm",
+      "name": "Dragon med helm"
+    },
+    {
+      "id": "dragon_spear",
+      "name": "dragon_spear",
+      "price": 402000
+    },
+    {
+      "id": "dragon_sq",
+      "name": "Dragon sq shield"
+    },
+    {
+      "id": "dragonhide_black",
+      "name": "Black dragonhide",
+      "price": 3640
+    },
+    {
+      "id": "dragonhide_blue",
+      "name": "Blue dragonhide",
+      "price": 2960
+    },
+    {
+      "id": "dragonhide_body",
+      "name": "Green d'hide body",
+      "price": 4680,
+      "alch": 4680
+    },
+    {
+      "id": "dragonhide_chaps",
+      "name": "Green d'hide chaps",
+      "price": 2340,
+      "alch": 2340
+    },
+    {
+      "id": "dragonhide_green",
+      "name": "Green dragonhide",
+      "price": 2700
+    },
+    {
+      "id": "dragonhide_red",
+      "name": "Red dragonhide",
+      "price": 3200
+    },
+    {
+      "id": "dragonstone",
+      "name": "dragonstone",
+      "price": 181400
+    },
+    {
+      "id": "druidrobebottom",
+      "name": "Druid robe bottom",
+      "price": 420,
+      "alch": 240
+    },
+    {
+      "id": "druidrobetop",
+      "name": "Druid robe top",
+      "price": 420,
+      "alch": 240
+    },
+    {
+      "id": "earth_talisman",
+      "name": "Earth talisman",
+      "price": 500
+    },
+    {
+      "id": "earthrune",
+      "name": "Earth rune ×4",
+      "price": 11
+    },
+    {
+      "id": "eye_of_newt",
+      "name": "Eye of newt",
+      "price": 245
+    },
+    {
+      "id": "eye_patch",
+      "name": "Eye patch"
+    },
+    {
+      "id": "farseer_helm",
+      "name": "Farseer helm"
+    },
+    {
+      "id": "feather",
+      "name": "Feathers ×15",
+      "price": 18
+    },
+    {
+      "id": "fire_battlestaff",
+      "name": "Fire battlestaff",
+      "price": 13800,
+      "alch": 9000
+    },
+    {
+      "id": "fire_talisman",
+      "name": "Fire talisman",
+      "price": 500
+    },
+    {
+      "id": "firerune",
+      "name": "Fire rune ×6",
+      "price": 14
+    },
+    {
+      "id": "fishing_bait",
+      "name": "Fishing bait",
+      "price": 3
+    },
+    {
+      "id": "flier",
+      "name": "Flier"
+    },
+    {
+      "id": "fur",
+      "name": "Fur",
+      "price": 30
+    },
+    {
+      "id": "goblin_armour",
+      "name": "Goblin armour",
+      "price": 5
+    },
+    {
+      "id": "god_cape",
+      "name": "God cape"
+    },
+    {
+      "id": "gold_bar",
+      "name": "Gold bar",
+      "price": 390
+    },
+    {
+      "id": "gold_ore",
+      "name": "Gold ore",
+      "price": 1100
+    },
+    {
+      "id": "grain",
+      "name": "Grain"
+    },
+    {
+      "id": "granite_shield",
+      "name": "Granite shield",
+      "price": 35000
+    },
+    {
+      "id": "grapes",
+      "name": "grapes",
+      "price": 10
+    },
+    {
+      "id": "green_dhide_body",
+      "name": "Green d-hide body"
+    },
+    {
+      "id": "green_dhide_legs",
+      "name": "Green d-hide chaps"
+    },
+    {
+      "id": "green_hat",
+      "name": "Green hat"
+    },
+    {
+      "id": "green_vambraces",
+      "name": "Green d-hide vambs"
+    },
+    {
+      "id": "guam_leaf",
+      "name": "guam_leaf",
+      "price": 350
+    },
+    {
+      "id": "half_an_apple_pie",
+      "name": "Half apple pie"
+    },
+    {
+      "id": "hardleather_body",
+      "name": "Hardleather body"
+    },
+    {
+      "id": "harpoon",
+      "name": "Harpoon"
+    },
+    {
+      "id": "herb_avantoe",
+      "name": "herb_avantoe",
+      "price": 5180
+    },
+    {
+      "id": "herb_cadantine",
+      "name": "herb_cadantine",
+      "price": 3440
+    },
+    {
+      "id": "herb_dwarf_weed",
+      "name": "herb_dwarf_weed",
+      "price": 9300
+    },
+    {
+      "id": "herb_guam",
+      "name": "herb_guam",
+      "price": 350
+    },
+    {
+      "id": "herb_harralander",
+      "name": "herb_harralander",
+      "price": 2080
+    },
+    {
+      "id": "herb_irit",
+      "name": "herb_irit",
+      "price": 3760
+    },
+    {
+      "id": "herb_kwuarm",
+      "name": "herb_kwuarm",
+      "price": 4400
+    },
+    {
+      "id": "herb_lantadyme",
+      "name": "herb_lantadyme",
+      "price": 3940
+    },
+    {
+      "id": "herb_marrentill",
+      "name": "herb_marrentill",
+      "price": 69
+    },
+    {
+      "id": "herb_ranarr",
+      "name": "herb_ranarr",
+      "price": 5460
+    },
+    {
+      "id": "herb_tarromin",
+      "name": "herb_tarromin",
+      "price": 918
+    },
+    {
+      "id": "iron_2h_sword",
+      "name": "Iron 2h sword",
+      "alch": 126
+    },
+    {
+      "id": "iron_arrow",
+      "name": "Iron arrow",
+      "price": 17
+    },
+    {
+      "id": "iron_axe",
+      "name": "Iron axe"
+    },
+    {
+      "id": "iron_bar",
+      "name": "Iron bar",
+      "price": 474
+    },
+    {
+      "id": "iron_battleaxe",
+      "name": "Iron battleaxe",
+      "price": 45,
+      "alch": 96
+    },
+    {
+      "id": "iron_dagger",
+      "name": "Iron dagger",
+      "price": 18,
+      "alch": 30
+    },
+    {
+      "id": "iron_dart",
+      "name": "Iron dart"
+    },
+    {
+      "id": "iron_dart_w",
+      "name": "Iron darts (thrown)"
+    },
+    {
+      "id": "iron_full_helm",
+      "name": "Iron full helm",
+      "price": 45,
+      "alch": 84
+    },
+    {
+      "id": "iron_javelin",
+      "name": "Iron javelin ×5",
+      "price": 8
+    },
+    {
+      "id": "iron_kite",
+      "name": "Iron kiteshield"
+    },
+    {
+      "id": "iron_kiteshield",
+      "name": "Iron kiteshield",
+      "price": 50,
+      "alch": 60
+    },
+    {
+      "id": "iron_knife",
+      "name": "Iron knife"
+    },
+    {
+      "id": "iron_knife_w",
+      "name": "Iron knives (thrown)"
+    },
+    {
+      "id": "iron_longsword",
+      "name": "iron_longsword",
+      "price": 22,
+      "alch": 60
+    },
+    {
+      "id": "iron_mace",
+      "name": "Iron mace",
+      "price": 20
+    },
+    {
+      "id": "iron_med_helm",
+      "name": "Iron med helm",
+      "alch": 72
+    },
+    {
+      "id": "iron_ore",
+      "name": "Iron ore",
+      "price": 298
+    },
+    {
+      "id": "iron_pickaxe",
+      "name": "Iron pickaxe",
+      "price": 140
+    },
+    {
+      "id": "iron_platebody",
+      "name": "Iron platebody"
+    },
+    {
+      "id": "iron_platelegs",
+      "name": "Iron platelegs",
+      "price": 220,
+      "alch": 168
+    },
+    {
+      "id": "iron_scimitar",
+      "name": "Iron scimitar",
+      "price": 55,
+      "alch": 60
+    },
+    {
+      "id": "iron_spear",
+      "name": "Iron spear"
+    },
+    {
+      "id": "iron_sword",
+      "name": "Iron sword",
+      "price": 20,
+      "alch": 42
+    },
+    {
+      "id": "jug_wine",
+      "name": "Jug of wine",
+      "price": 1
+    },
+    {
+      "id": "knife",
+      "name": "Knife"
+    },
+    {
+      "id": "lawrune",
+      "name": "Law rune ×2",
+      "price": 309
+    },
+    {
+      "id": "leather_body",
+      "name": "Leather body"
+    },
+    {
+      "id": "leather_chaps",
+      "name": "Leather chaps"
+    },
+    {
+      "id": "leather_vambraces",
+      "name": "Leather vambraces"
+    },
+    {
+      "id": "limpwurt_root",
+      "name": "Limpwurt root",
+      "price": 2500
+    },
+    {
+      "id": "lobster",
+      "name": "Lobster",
+      "price": 224
+    },
+    {
+      "id": "lobster_pot",
+      "name": "Lobster pot"
+    },
+    {
+      "id": "loop_half_key",
+      "name": "loop_half_key",
+      "price": 81200
+    },
+    {
+      "id": "mackerel",
+      "name": "Mackerel",
+      "price": 60
+    },
+    {
+      "id": "magic_longbow",
+      "name": "Magic longbow"
+    },
+    {
+      "id": "magic_potion",
+      "name": "magic_potion",
+      "price": 4500
+    },
+    {
+      "id": "magic_shortbow",
+      "name": "Magic shortbow"
+    },
+    {
+      "id": "magic_staff",
+      "name": "Magic staff",
+      "price": 553,
+      "alch": 192
+    },
+    {
+      "id": "maple_shortbow",
+      "name": "Maple shortbow"
+    },
+    {
+      "id": "mcannonball",
+      "name": "mcannonball",
+      "price": 180
+    },
+    {
+      "id": "mind_rune",
+      "name": "Mind rune",
+      "stackable": true
+    },
+    {
+      "id": "mind_talisman",
+      "name": "Mind talisman",
+      "price": 500
+    },
+    {
+      "id": "mindrune",
+      "name": "Mind rune ×9",
+      "price": 19
+    },
+    {
+      "id": "mith_arrow",
+      "name": "Mithril arrow"
+    },
+    {
+      "id": "mith_dart",
+      "name": "Mithril dart"
+    },
+    {
+      "id": "mith_dart_w",
+      "name": "Mithril darts (thrown)"
+    },
+    {
+      "id": "mith_knife",
+      "name": "Mithril knife"
+    },
+    {
+      "id": "mith_knife_w",
+      "name": "Mithril knives (thrown)"
+    },
+    {
+      "id": "mithril_2h_sword",
+      "name": "Mithril 2h sword",
+      "price": 1950,
+      "alch": 1560
+    },
+    {
+      "id": "mithril_arrow",
+      "name": "Mithril arrow",
+      "price": 69
+    },
+    {
+      "id": "mithril_axe",
+      "name": "Mithril axe",
+      "price": 680,
+      "alch": 312
+    },
+    {
+      "id": "mithril_bar",
+      "name": "Mithril bar",
+      "price": 2180,
+      "alch": 720
+    },
+    {
+      "id": "mithril_battleaxe",
+      "name": "Mithril battleaxe",
+      "price": 1600,
+      "alch": 1248
+    },
+    {
+      "id": "mithril_chainbody",
+      "name": "Mithril chainbody",
+      "price": 828,
+      "alch": 2400
+    },
+    {
+      "id": "mithril_dart",
+      "name": "Mithril dart"
+    },
+    {
+      "id": "mithril_full_helm",
+      "name": "Mithril full helm"
+    },
+    {
+      "id": "mithril_javelin",
+      "name": "Mithril javelin ×10"
+    },
+    {
+      "id": "mithril_kite",
+      "name": "Mithril kiteshield"
+    },
+    {
+      "id": "mithril_kiteshield",
+      "name": "Mithril kiteshield",
+      "price": 4333,
+      "alch": 1560
+    },
+    {
+      "id": "mithril_knife",
+      "name": "Mithril knife"
+    },
+    {
+      "id": "mithril_longsword",
+      "name": "Mithril longsword",
+      "alch": 780
+    },
+    {
+      "id": "mithril_mace",
+      "name": "Mithril mace",
+      "price": 760,
+      "alch": 630
+    },
+    {
+      "id": "mithril_ore",
+      "name": "Mithril ore",
+      "price": 505
+    },
+    {
+      "id": "mithril_platebody",
+      "name": "Mithril platebody",
+      "alch": 2340
+    },
+    {
+      "id": "mithril_platelegs",
+      "name": "Mithril platelegs"
+    },
+    {
+      "id": "mithril_scimitar",
+      "name": "Mithril scimitar"
+    },
+    {
+      "id": "mithril_spear",
+      "name": "Mithril spear",
+      "alch": 1200
+    },
+    {
+      "id": "mithril_sq_shield",
+      "name": "Steel sq shield",
+      "price": 594,
+      "alch": 1170
+    },
+    {
+      "id": "mithril_sword",
+      "name": "Mithril sword",
+      "price": 620,
+      "alch": 780
+    },
+    {
+      "id": "monk_robe_bottom",
+      "name": "Monk's robe (bottom)"
+    },
+    {
+      "id": "monk_robe_top",
+      "name": "Monk's robe (top)"
+    },
+    {
+      "id": "muddy_key",
+      "name": "Muddy key",
+      "price": 800
+    },
+    {
+      "id": "naturerune",
+      "name": "Nature rune ×4",
+      "price": 351
+    },
+    {
+      "id": "oak_shortbow",
+      "name": "Oak shortbow"
+    },
+    {
+      "id": "opal_bolttips",
+      "name": "Opal bolt tips ×12",
+      "price": 30
+    },
+    {
+      "id": "oysterempty",
+      "name": "Empty oyster",
+      "price": 2
+    },
+    {
+      "id": "oystershell",
+      "name": "Oyster shell ×2",
+      "price": 2
+    },
+    {
+      "id": "pineapple",
+      "name": "Pineapple ×2"
+    },
+    {
+      "id": "plainstaff",
+      "name": "Staff",
+      "price": 140,
+      "alch": 48
+    },
+    {
+      "id": "pot_flour",
+      "name": "Pot of flour"
+    },
+    {
+      "id": "prayer_potion",
+      "name": "prayer_potion",
+      "price": 7000
+    },
+    {
+      "id": "ranger_boots",
+      "name": "Ranger boots"
+    },
+    {
+      "id": "ranging_potion",
+      "name": "ranging_potion",
+      "price": 5300
+    },
+    {
+      "id": "raw_bear_meat",
+      "name": "Raw bear meat",
+      "price": 10
+    },
+    {
+      "id": "raw_beef",
+      "name": "Raw beef",
+      "price": 5
+    },
+    {
+      "id": "raw_chicken",
+      "name": "Raw chicken",
+      "price": 5
+    },
+    {
+      "id": "raw_herring",
+      "name": "Raw herring ×3"
+    },
+    {
+      "id": "raw_lobster",
+      "name": "Raw lobster"
+    },
+    {
+      "id": "raw_mackerel",
+      "name": "Raw mackerel ×3"
+    },
+    {
+      "id": "raw_rat_meat",
+      "name": "raw_rat_meat",
+      "price": 5
+    },
+    {
+      "id": "raw_sardine",
+      "name": "Raw sardine ×5"
+    },
+    {
+      "id": "raw_tuna",
+      "name": "Raw tuna ×4"
+    },
+    {
+      "id": "red_cape",
+      "name": "red_cape",
+      "price": 12
+    },
+    {
+      "id": "red_dhide_body",
+      "name": "Red d-hide body"
+    },
+    {
+      "id": "red_dhide_legs",
+      "name": "Red d-hide chaps"
+    },
+    {
+      "id": "red_vambraces",
+      "name": "Red d-hide vambs"
+    },
+    {
+      "id": "restore_potion",
+      "name": "restore_potion",
+      "price": 200
+    },
+    {
+      "id": "ring_mould",
+      "name": "Ring mould"
+    },
+    {
+      "id": "ring_of_recoil",
+      "name": "Ring of recoil"
+    },
+    {
+      "id": "ring_of_wealth",
+      "name": "Ring of wealth"
+    },
+    {
+      "id": "robin_hood_hat",
+      "name": "Robin hood hat"
+    },
+    {
+      "id": "ruby_ring",
+      "name": "Ruby ring",
+      "price": 1000
+    },
+    {
+      "id": "rune_2h",
+      "name": "rune_2h",
+      "price": 48800
+    },
+    {
+      "id": "rune_2h_sword",
+      "name": "rune_2h_sword",
+      "alch": 38400
+    },
+    {
+      "id": "rune_arrow",
+      "name": "Rune arrow",
+      "price": 301
+    },
+    {
+      "id": "rune_battleaxe",
+      "name": "rune_battleaxe",
+      "price": 24618
+    },
+    {
+      "id": "rune_chainbody",
+      "name": "Rune chainbody",
+      "price": 38520,
+      "alch": 29952
+    },
+    {
+      "id": "rune_dagger",
+      "name": "Rune dagger",
+      "price": 4458,
+      "alch": 4608
+    },
+    {
+      "id": "rune_dart",
+      "name": "Rune dart"
+    },
+    {
+      "id": "rune_dart_w",
+      "name": "Rune darts (thrown)"
+    },
+    {
+      "id": "rune_full_helm",
+      "name": "Rune full helm",
+      "price": 30400,
+      "alch": 20160
+    },
+    {
+      "id": "rune_javelin",
+      "name": "rune_javelin",
+      "price": 100
+    },
+    {
+      "id": "rune_kite",
+      "name": "Rune kiteshield"
+    },
+    {
+      "id": "rune_kiteshield",
+      "name": "rune_kiteshield",
+      "price": 40000
+    },
+    {
+      "id": "rune_knife",
+      "name": "Rune knife",
+      "price": 2000
+    },
+    {
+      "id": "rune_knife_w",
+      "name": "Rune knives (thrown)"
+    },
+    {
+      "id": "rune_longsword",
+      "name": "Rune longsword",
+      "price": 18858,
+      "alch": 19200
+    },
+    {
+      "id": "rune_med_helm",
+      "name": "Rune med helm",
+      "price": 12250,
+      "alch": 11520
+    },
+    {
+      "id": "rune_platebody",
+      "name": "Rune platebody",
+      "price": 44600
+    },
+    {
+      "id": "rune_platelegs",
+      "name": "Rune platelegs",
+      "price": 40400
+    },
+    {
+      "id": "rune_scimitar",
+      "name": "Rune scimitar",
+      "price": 17900,
+      "alch": 15360
+    },
+    {
+      "id": "rune_sq_shield",
+      "name": "rune_sq_shield",
+      "price": 35880
+    },
+    {
+      "id": "rune_warhammer",
+      "name": "Rune warhammer",
+      "alch": 23040
+    },
+    {
+      "id": "salmon",
+      "name": "salmon",
+      "price": 80
+    },
+    {
+      "id": "sardine",
+      "name": "Sardine"
+    },
+    {
+      "id": "seaweed",
+      "name": "Seaweed ×10",
+      "price": 5
+    },
+    {
+      "id": "shark",
+      "name": "Shark",
+      "price": 785
+    },
+    {
+      "id": "shortbow",
+      "name": "Shortbow"
+    },
+    {
+      "id": "silver_ore",
+      "name": "silver_ore",
+      "price": 308
+    },
+    {
+      "id": "smalloysterpearls",
+      "name": "Oyster pearl",
+      "price": 120
+    },
+    {
+      "id": "snape_grass",
+      "name": "Snape grass",
+      "price": 1141
+    },
+    {
+      "id": "soulrune",
+      "name": "soulrune",
+      "price": 400
+    },
+    {
+      "id": "spinach_roll",
+      "name": "Spinach roll",
+      "price": 2
+    },
+    {
+      "id": "splitbark_body",
+      "name": "Splitbark body"
+    },
+    {
+      "id": "splitbark_boots",
+      "name": "Splitbark boots"
+    },
+    {
+      "id": "splitbark_gauntlets",
+      "name": "Splitbark gauntlets"
+    },
+    {
+      "id": "splitbark_helm",
+      "name": "Splitbark helm"
+    },
+    {
+      "id": "splitbark_legs",
+      "name": "Splitbark legs"
+    },
+    {
+      "id": "staff_of_air",
+      "name": "Staff of air"
+    },
+    {
+      "id": "staff_of_earth",
+      "name": "Staff of earth",
+      "price": 600,
+      "alch": 900
+    },
+    {
+      "id": "staff_of_fire",
+      "name": "Staff of fire"
+    },
+    {
+      "id": "staff_of_water",
+      "name": "Staff of water",
+      "price": 400
+    },
+    {
+      "id": "steel_2h_sword",
+      "name": "Steel 2h sword",
+      "price": 320,
+      "alch": 240
+    },
+    {
+      "id": "steel_arrow",
+      "name": "Steel arrow",
+      "price": 29
+    },
+    {
+      "id": "steel_axe",
+      "name": "Steel axe",
+      "price": 95,
+      "alch": 96
+    },
+    {
+      "id": "steel_bar",
+      "name": "Steel bar",
+      "price": 1470
+    },
+    {
+      "id": "steel_battleaxe",
+      "name": "Steel battleaxe",
+      "price": 250,
+      "alch": 240
+    },
+    {
+      "id": "steel_dagger",
+      "name": "Steel dagger"
+    },
+    {
+      "id": "steel_dart",
+      "name": "Steel dart"
+    },
+    {
+      "id": "steel_dart_w",
+      "name": "Steel darts (thrown)"
+    },
+    {
+      "id": "steel_full_helm",
+      "name": "Steel full helm",
+      "price": 190,
+      "alch": 240
+    },
+    {
+      "id": "steel_javelin",
+      "name": "Steel javelin ×10",
+      "price": 30
+    },
+    {
+      "id": "steel_kite",
+      "name": "Steel kiteshield"
+    },
+    {
+      "id": "steel_kiteshield",
+      "name": "Steel kiteshield",
+      "price": 175,
+      "alch": 168
+    },
+    {
+      "id": "steel_knife",
+      "name": "Steel knife"
+    },
+    {
+      "id": "steel_knife_w",
+      "name": "Steel knives (thrown)"
+    },
+    {
+      "id": "steel_longsword",
+      "name": "Steel longsword",
+      "price": 140,
+      "alch": 192
+    },
+    {
+      "id": "steel_mace",
+      "name": "Steel mace",
+      "price": 80
+    },
+    {
+      "id": "steel_med_helm",
+      "name": "Steel med helm",
+      "price": 85,
+      "alch": 120
+    },
+    {
+      "id": "steel_platebody",
+      "name": "Steel platebody",
+      "alch": 720
+    },
+    {
+      "id": "steel_platelegs",
+      "name": "Steel platelegs",
+      "price": 220,
+      "alch": 480
+    },
+    {
+      "id": "steel_scimitar",
+      "name": "Steel scimitar",
+      "price": 100,
+      "alch": 120
+    },
+    {
+      "id": "steel_spear",
+      "name": "Steel spear"
+    },
+    {
+      "id": "steel_sword",
+      "name": "Steel sword",
+      "price": 80,
+      "alch": 150
+    },
+    {
+      "id": "steel_warhammer",
+      "name": "Steel warhammer",
+      "alch": 240
+    },
+    {
+      "id": "studded_body",
+      "name": "Studded body"
+    },
+    {
+      "id": "studded_chaps",
+      "name": "Studded chaps"
+    },
+    {
+      "id": "super_antipoison",
+      "name": "super_antipoison",
+      "price": 760
+    },
+    {
+      "id": "super_attack",
+      "name": "super_attack",
+      "price": 1600
+    },
+    {
+      "id": "super_defence",
+      "name": "super_defence",
+      "price": 1600
+    },
+    {
+      "id": "super_set",
+      "name": "super_set",
+      "price": 7867
+    },
+    {
+      "id": "super_strength",
+      "name": "super_strength",
+      "price": 4667
+    },
+    {
+      "id": "swordfish",
+      "name": "swordfish",
+      "price": 306
+    },
+    {
+      "id": "tbwt_cleaning_cloth",
+      "name": "Cleaning cloth"
+    },
+    {
+      "id": "thread",
+      "name": "Thread ×10",
+      "price": 6
+    },
+    {
+      "id": "tin_ore",
+      "name": "Tin ore",
+      "price": 4
+    },
+    {
+      "id": "tinderbox",
+      "name": "Tinderbox"
+    },
+    {
+      "id": "tomato",
+      "name": "Tomato"
+    },
+    {
+      "id": "tooth_half_key",
+      "name": "tooth_half_key",
+      "price": 110000
+    },
+    {
+      "id": "training_shortbow",
+      "name": "Training shortbow",
+      "stackable": false,
+      "requirements": {
+        "skills": {
+          "ranged": 5
+        },
+        "notes": "Fixture ranged requirement for source-backed parser tests."
+      },
+      "notes": "Synthetic source-backed fixture item for parser tests."
+    },
+    {
+      "id": "trout",
+      "name": "trout",
+      "price": 35
+    },
+    {
+      "id": "tuna",
+      "name": "Tuna",
+      "price": 108
+    },
+    {
+      "id": "uncut_diamond",
+      "name": "uncut_diamond",
+      "price": 4100
+    },
+    {
+      "id": "uncut_emerald",
+      "name": "uncut_emerald",
+      "price": 4140
+    },
+    {
+      "id": "uncut_ruby",
+      "name": "uncut_ruby",
+      "price": 2800
+    },
+    {
+      "id": "uncut_sapphire",
+      "name": "uncut_sapphire",
+      "price": 1400,
+      "stackable": false
+    },
+    {
+      "id": "unholy_book",
+      "name": "Unholy book (Zamorak)"
+    },
+    {
+      "id": "unholy_symbol",
+      "name": "Unholy symbol"
+    },
+    {
+      "id": "unicorn_horn_dust",
+      "name": "Unicorn horn dust",
+      "price": 2260
+    },
+    {
+      "id": "unidentified_guam",
+      "name": "unidentified_guam",
+      "price": 1840
+    },
+    {
+      "id": "unidentified_rogues_purse",
+      "name": "Unid. rogues purse"
+    },
+    {
+      "id": "unidentified_snake_weed",
+      "name": "Unid. snake weed"
+    },
+    {
+      "id": "vial_empty",
+      "name": "Vial (empty)",
+      "price": 5
+    },
+    {
+      "id": "vial_water",
+      "name": "Vial of water",
+      "price": 347
+    },
+    {
+      "id": "warrior_helm",
+      "name": "Warrior helm"
+    },
+    {
+      "id": "water_talisman",
+      "name": "Water talisman",
+      "price": 500
+    },
+    {
+      "id": "waterrune",
+      "name": "Water rune ×6",
+      "price": 17
+    },
+    {
+      "id": "weapon_poison",
+      "name": "Weapon poison",
+      "price": 8800
+    },
+    {
+      "id": "white_berries",
+      "name": "White berries",
+      "price": 1330
+    },
+    {
+      "id": "willow_shortbow",
+      "name": "Willow shortbow"
+    },
+    {
+      "id": "wizard_boots",
+      "name": "Wizard boots"
+    },
+    {
+      "id": "wizard_robe_top",
+      "name": "Wizard robe (top)"
+    },
+    {
+      "id": "yew_longbow",
+      "name": "Yew longbow"
+    },
+    {
+      "id": "yew_shortbow",
+      "name": "Yew shortbow"
+    },
+    {
+      "id": "zamorak_robe_bottom",
+      "name": "Zamorak robe (bottom)"
+    }
+  ]
+}

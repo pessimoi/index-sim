@@ -7,6 +7,8 @@ export default [
   {
     ignores: [
       "node_modules/**",
+      ".sources/**",
+      ".vite/**",
       "dist/**",
       "coverage/**",
       "playwright-report/**",

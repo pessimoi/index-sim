@@ -1,0 +1,17 @@
+[magic_spell_wind_strike]
+table=magic_spell_table
+data=spell,^wind_strike
+data=name,Wind Strike
+data=levelrequired,1
+data=runesrequired,mindrune,1,airrune,1,null,null
+data=experience,55
+data=maxhit,2
+
+[magic_spell_water_strike]
+table=magic_spell_table
+data=spell,^water_strike
+data=name,Water Strike
+data=levelrequired,5
+data=runesrequired,mindrune,1,waterrune,1,airrune,1
+data=experience,75
+data=maxhit,4

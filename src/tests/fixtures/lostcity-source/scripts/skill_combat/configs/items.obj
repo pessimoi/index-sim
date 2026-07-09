@@ -1,0 +1,42 @@
+[rune_scimitar]
+name=Rune scimitar
+cost=25600
+wearpos=righthand
+param=stabattack,7
+param=slashattack,45
+param=crushattack,-2
+param=strengthbonus,44
+param=attackrate,4
+
+[bronze_arrow]
+name=Bronze arrow
+cost=1
+stackable=yes
+wearpos=quiver
+param=rangebonus,7
+
+[ring_of_recoil]
+name=Ring of recoil
+cost=900
+wearpos=ring
+
+[bones]
+name=Bones
+cost=1
+
+[big_bones]
+name=Big bones
+cost=1
+
+[bronze_dart]
+name=Bronze dart
+cost=1
+wearpos=righthand
+category=weapon_thrown
+param=rangeattack,3
+param=rangebonus,1
+param=attackrate,3
+
+[missing_item]
+name=Missing item
+cost=1

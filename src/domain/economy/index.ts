@@ -1,4 +1,6 @@
 import { type EntityId, type PriceSet, type SimulationWarning } from "../shared";
+import { aliasesForCanonicalItemId, resolveCanonicalItemId } from "./canonical-item-id";
+export * from "./canonical-item-id";
 
 export type PriceLookupKind = "item-price" | "alch-value";
 
@@ -11,6 +13,10 @@ export interface PriceLookupWarning extends SimulationWarning {
 
 export interface PriceLookupResult {
   itemId: EntityId;
+  requestedItemId?: EntityId;
+  canonicalItemId?: EntityId;
+  lookupSource?: "identity" | "canonical" | "alias";
+  aliasItemId?: EntityId;
   value: number | null;
   warning?: PriceLookupWarning;
 }
@@ -53,7 +59,50 @@ function lookupPrice(
 }
 
 export function lookupItemPrice(priceSet: PriceSet, itemId: EntityId): PriceLookupResult {
-  return lookupPrice(priceSet, itemId, "item-price", priceSet.itemPrices);
+  const resolved = resolveCanonicalItemId(itemId);
+  const canonicalItemId = resolved.canonicalItemId;
+  const directValue = priceSet.itemPrices[itemId];
+  if (hasUsablePrice(directValue)) {
+    return {
+      itemId,
+      requestedItemId: itemId,
+      canonicalItemId,
+      lookupSource: "identity",
+      value: directValue
+    };
+  }
+  const candidateIds = [
+    ...(canonicalItemId === itemId ? [] : [canonicalItemId]),
+    ...aliasesForCanonicalItemId(canonicalItemId).filter((alias) => alias !== itemId)
+  ];
+
+  for (const candidateId of candidateIds) {
+    const value = priceSet.itemPrices[candidateId];
+    if (hasUsablePrice(value)) {
+      return {
+        itemId: candidateId,
+        requestedItemId: itemId,
+        canonicalItemId,
+        lookupSource:
+          candidateId === itemId
+            ? "identity"
+            : candidateId === canonicalItemId
+              ? "canonical"
+              : "alias",
+        ...(candidateId !== canonicalItemId ? { aliasItemId: candidateId } : {}),
+        value
+      };
+    }
+  }
+
+  return {
+    itemId: canonicalItemId,
+    requestedItemId: itemId,
+    canonicalItemId,
+    lookupSource: canonicalItemId === itemId ? "identity" : "canonical",
+    value: null,
+    warning: missingWarning(priceSet, canonicalItemId, "item-price")
+  };
 }
 
 export function lookupAlchValue(priceSet: PriceSet, itemId: EntityId): PriceLookupResult {
@@ -67,10 +116,19 @@ export function collectMissingPriceWarnings(
 ): PriceLookupWarning[] {
   const values = lookupKind === "item-price" ? priceSet.itemPrices : priceSet.alchValues;
   const warnings: PriceLookupWarning[] = [];
+  const seenWarningKeys = new Set<string>();
 
   for (const itemId of itemIds) {
-    const result = lookupPrice(priceSet, itemId, lookupKind, values);
-    if (result.warning) warnings.push(result.warning);
+    const result =
+      lookupKind === "item-price"
+        ? lookupItemPrice(priceSet, itemId)
+        : lookupPrice(priceSet, itemId, lookupKind, values);
+    if (result.warning) {
+      const key = `${result.warning.code}:${result.warning.itemId}`;
+      if (seenWarningKeys.has(key)) continue;
+      seenWarningKeys.add(key);
+      warnings.push(result.warning);
+    }
   }
 
   return warnings;
