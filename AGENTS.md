@@ -44,14 +44,20 @@ The legacy `views.jsx` `ArchitectureBoard` is only a docs-link panel. Treat the 
 - Legacy planner domain logic: `planner-core.js`
 - Rewrite planner domain logic: `src/domain/planner`
 - Price snapshots: `prices.json`, `alch.json`, `price-history.json`
-- Generated game-data foundation: `scripts/generate-game-data.ts`, `scripts/game-data-generator-core.ts`, `src/data/generated/`, `docs/project/revision-impact/current.md`
+- Generated game-data workflow: `scripts/generate-game-data.ts`, `scripts/game-data-generator-core.ts`, `src/data/generated/`, `docs/project/revision-impact/current.md`
+- Raw LostCity source audit and candidate impact workflow: `scripts/lostcity-content-*.ts`, `scripts/report-lostcity-source-coverage.ts`, `scripts/report-lostcity-source-impact.ts`, `npm run data:source-audit`, `npm run data:source-impact`
+- Root runtime bootstrap: `src/adapters/generated`, using `src/data/generated/game-data.json` plus scheduled static prices and generated item fallbacks
+- Legacy runtime reference/bootstrap generator: `src/adapters/legacy-runtime`
+- Generated runtime replacement readiness adapter: `src/adapters/generated`
+- Generated runtime commands: `scripts/report-generated-runtime-readiness.ts`, `scripts/write-legacy-derived-runtime-snapshot.ts`, `npm run runtime:readiness`, `npm run runtime:coverage-plan`, `npm run runtime:write-legacy-derived`
+- Scheduled market price workflow: `.github/workflows/update-market-prices.yml`
 - Styling: `styles.css`
 - Rewrite implementation: `src/app`, `src/domain`, `src/data`, `src/adapters`, `src/tests`
 - Documentation map: `docs/README.md`
 
-The root app path is now the Vite rewrite. Legacy browser runtime files remain as an archived reference and fixture/data source, not as the production entrypoint.
+The root app path is now the Vite rewrite and boots from the validated source-backed generated Revision 274 snapshot. The legacy-derived static bridge and legacy browser runtime files remain regression/reference, fixture and rollback evidence, not the production entrypoint.
 
-No CI config, database schema or backend source is present in this checkout as of 2026-07-05.
+No general CI config, database schema or backend source is present in this checkout. The only GitHub Actions workflow is the scheduled market price writer, which is not a deploy or general test pipeline.
 
 ## Change recipes
 

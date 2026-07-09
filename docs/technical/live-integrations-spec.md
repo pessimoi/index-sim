@@ -90,13 +90,14 @@ The accepted market refresh target is scheduled repo automation that writes stat
 
 ## Live Integration Gap Buckets
 
-Status date: 2026-07-08. This table buckets the remaining live-integration
+Status date: 2026-07-09. This table buckets the remaining live-integration
 parity gaps for the current `Market price sync` and `Hiscores` feature
 inventory rows. `Market price sync` is `Valmis` for the accepted visible
 scheduled-static UI slice; `Hiscores` remains `Osittainen` because the approved
 live upstream and production runtime/hosting are still open. This bucket pass
-does not add provider code, GitHub Actions workflow files, raw upstream
-adapters, live calls, API shims or feature-status changes.
+does not add provider code, live calls, API shims or feature-status changes.
+[D-044](../project/decisions.md) keeps archived legacy `run_sim.py` and
+legacy `/api/*` shims archive-only for the current rewrite path.
 
 Current open `release-required` gap count for the visible rewrite release
 boundary: 0. The open production-live gaps below must stay out of release copy
@@ -105,12 +106,12 @@ unless their dependency is accepted and implemented.
 | Feature row | Accepted/current slice | Open gap | Bucket | Rationale | Dependencies and next action |
 | --- | --- | --- | --- | --- | --- |
 | Market price sync | Visible Settings/Economy path loads a validated scheduled static `PriceSet` when available, preserves local `PriceSet` import/export/reset, keeps browser-local history local and says upstream refresh is scheduled, not user-triggered. | Keep production copy free of user-triggered upstream refresh promises and stale `/api/prices`, `/api/scrape` or `run_sim.py` instructions. | `release-required` | This is required for the accepted scheduled-static market slice and is currently implemented/documented. | Keep the release-copy audit in [testing.md](testing.md) mandatory before release. |
-| Market price sync | Local scheduled writer foundation validates normalized fixture/input JSON and can update `prices.json`, `alch.json` and `price-history.json` candidates. | Raw live `markets.lostcity.rs` HTTP response adapter into the normalized writer input contract. | `blocked` | The target source is accepted by [D-021](../project/decisions.md), but the exact raw upstream response contract is not present in the repo. | Implement only after verifying the live response shape; do not store raw upstream dumps in docs or fixtures. |
-| Market price sync | [D-033](../project/decisions.md) and [D-034](../project/decisions.md) accept scheduled static JSON plus GitHub Actions cron/same-repo commits. | GitHub Actions cron workflow at 00:15 and 12:15 UTC with same-repo commit wiring. | `blocked` | The decision is accepted, but the workflow file is not implemented and depends on the raw adapter/writer integration. | Add workflow only in an implementation goal; omit `workflow_dispatch` and validate generated JSON before commit. |
-| Market price sync | Same scheduled-static model. | Claiming production scheduled-current market prices. | `blocked` | The UI can load static files, but production freshness is not true until the cron/writer has run and the latest output is validated. | Release notes must say scheduled-current only after the workflow exists and the latest run is verified. |
+| Market price sync | Local scheduled writer validates normalized fixture/input JSON, has a fixture-evidenced raw `markets.lostcity.rs` response adapter for `--upstream-url`, and can update `prices.json`, `alch.json` and `price-history.json` candidates. | Verify the exact live `markets.lostcity.rs` API/scrape response contract before relying on a production scheduled run. | `later` | The target source is accepted by [D-021](../project/decisions.md), and the repo has a narrow raw adapter based on sanitized fixtures plus legacy evidence. D-053 keeps live-shape proof out of the V1/trusted-tester gate, but it is still required before scheduled-current price claims. | Verify the live response shape with sanitized evidence before setting `MARKET_PRICES_UPSTREAM_URL`; do not store raw upstream dumps in docs or fixtures. |
+| Market price sync | [D-033](../project/decisions.md) and [D-034](../project/decisions.md) accept scheduled static JSON plus GitHub Actions cron/same-repo commits; `.github/workflows/update-market-prices.yml` now runs at 00:15 and 12:15 UTC and commits only approved market snapshot diffs. | Configure the verified `MARKET_PRICES_UPSTREAM_URL` repository variable and capture a successful scheduled run. | `later` | The workflow file exists with `contents: write`, no `workflow_dispatch`, no artifacts, output validation and commit-if-diff behavior, but it intentionally does not guess the unknown live endpoint. D-053 makes this later evidence, not a V1/trusted-tester blocker. | After live response contract verification, set the repo variable and validate the first scheduled run before claiming scheduled-current prices. |
+| Market price sync | Same scheduled-static model. | Claiming production scheduled-current market prices. | `blocked` | The UI can load static files and the scheduled workflow shape exists, but production freshness is not true until the verified live endpoint is configured and the latest scheduled output is validated. D-053 allows the trusted-tester handoff to proceed with static/bundled/imported price limitations. | Release notes must say scheduled-current only after the latest scheduled run is verified. |
 | Market price sync | Same scheduled-static model plus browser-local history. | Server-managed/shared price history, database-backed price history or account-backed price state. | `decision-needed` | [D-033](../project/decisions.md) explicitly chooses file-backed JSON and no database for market prices. A different shared-state model would be a new product/architecture decision. | Keep browser-local history local unless a new decision changes ownership. |
-| Market price sync | Same scheduled-static model. | Legacy `/api/prices`, `/api/scrape`, current-monster scrape behavior and `market.js` mutation model. | `legacy-only` | These are archived legacy/runtime behaviors, not production rewrite targets after [D-033](../project/decisions.md). | Keep as archive evidence unless a separate shim policy is accepted. |
-| Market price sync | Same-origin market status/sync API, browser adapter and mocked tests remain compatibility scaffolding. | Whether temporary `/api/prices` or `/api/scrape` shims should exist for archived parity testing. | `decision-needed` | Shim policy is separate from the scheduled-static production path and must not be inferred from current tests. | Decide archive-only vs compatibility-shim policy before adding routes. |
+| Market price sync | Same scheduled-static model. | Legacy `/api/prices`, `/api/scrape`, current-monster scrape behavior and `market.js` mutation model. | `legacy-only` | These are archived legacy/runtime behaviors, not production rewrite targets after [D-033](../project/decisions.md) and [D-044](../project/decisions.md). | Keep as archive evidence unless a future explicit legacy-runtime re-promotion decision changes the boundary. |
+| Market price sync | Same-origin market status/sync API, browser adapter and mocked tests remain compatibility scaffolding. | Temporary `/api/prices` or `/api/scrape` shims for archived parity testing. | `legacy-only` | D-044 accepts archive-only for legacy shims in the current rewrite path. The existing typed compatibility scaffolding may stay mocked/test-local, but no legacy shim routes should be added by default. | Reopen only through an explicit legacy-runtime re-promotion decision. |
 | Hiscores | Rewrite UI shows player input, same-origin status/lookup, validated adapter, preview/apply for combat skills and disabled/unavailable manual fallback copy without `run_sim.py` instructions. | Preserve input validation, same-origin calls, timeout, rate-limit and sanitized-error boundaries before any live provider is enabled. | `release-required` | These are required safety boundaries for the accepted hiscores workflow and current mocked/provider-disabled implementation. | Keep provider wiring behind the existing contract; do not bypass validation in UI code. |
 | Hiscores | Same current hiscores UI/API scaffold. | Authoritative hiscores upstream source and response format. | `blocked` | [D-022](../project/decisions.md) keeps the source open while an upstream API answer is pending; the visible HTML endpoint is candidate evidence, not an accepted API contract. | Verify and document the approved upstream before provider implementation. |
 | Hiscores | Same current hiscores UI/API scaffold. | Production runtime/hosting model for the same-origin hiscores API. | `decision-needed` | The repo has Vite dev/preview middleware, but no production backend/runtime/deploy target is accepted. | Choose hosting/runtime before claiming live hiscores availability. |
@@ -314,7 +315,7 @@ type MarketItemReport = {
 }
 ```
 
-Compatibility note: legacy `/api/prices` and `/api/scrape` may be implemented as temporary shims for archived parity testing, but the rewrite UI should call the typed market endpoints above.
+Compatibility note: [D-044](../project/decisions.md) keeps legacy `/api/prices` and `/api/scrape` shims archive-only for the current rewrite path. The rewrite UI should keep using typed endpoints/static scheduled data; add temporary legacy shims only after an explicit legacy-runtime re-promotion decision.
 
 ## Market source mapping
 
@@ -470,7 +471,7 @@ Current hiscores implementation note: `src/server/hiscores-core.ts` provides a f
 
 Current market implementation note: `src/server/market-core.ts` provides a framework-neutral status/sync handler and `src/server/vite-market-middleware.ts` exposes it in Vite dev/preview. The handler validates body size, request JSON, item count, item allowlist and same-origin request shape; expands current-monster/all-supported item sets through `src/data/market-sync-items.ts`; enforces a per-process sync rate limit and provider timeout; and returns sanitized `IntegrationErrorResponse` payloads. The default provider is disabled and performs no live upstream call.
 
-Decision update: this current handler remains useful for mocked tests and local compatibility, but [D-033](../project/decisions.md) changes the production market target to scheduled static JSON. The local scheduled writer foundation now exists; production still needs GitHub Actions cron wiring and the raw live upstream adapter before any market price refresh can be described as automated.
+Decision update: this current handler remains useful for mocked tests and local compatibility, but [D-033](../project/decisions.md) changes the production market target to scheduled static JSON. The local scheduled writer, fixture-evidenced raw adapter and scheduled commit-if-diff workflow now exist. [D-053](../project/decisions.md) keeps live response contract verification, `MARKET_PRICES_UPSTREAM_URL` configuration and a successful scheduled run out of the V1/trusted-tester gate, but they remain required before market prices can be described as scheduled-current.
 
 ### Phase 2b: scheduled market snapshot writer
 
@@ -485,7 +486,7 @@ Decision update: this current handler remains useful for mocked tests and local 
 - Keep credentials in repo automation, not in the browser app.
 - Do not add a database or user-triggered upstream refresh.
 
-Current implementation note: `scripts/write-scheduled-market-prices.ts` is the local writer entrypoint and `scripts/scheduled-market-writer-core.ts` owns the fixture-validated generation logic. The implemented normalized input contract is JSON shaped as:
+Current implementation note: `scripts/write-scheduled-market-prices.ts` is the local writer entrypoint, `scripts/scheduled-market-writer-core.ts` owns the fixture-validated generation logic and `scripts/markets-lostcity-raw-adapter.ts` normalizes sanitized raw `markets.lostcity.rs`-style JSON into the same writer contract for the `--upstream-url` path. `--input` remains the normalized fixture/dev path. The implemented normalized input contract is JSON shaped as:
 
 ```ts
 type ScheduledMarketWriterInput = {
@@ -513,9 +514,11 @@ type ScheduledMarketWriterInput = {
 };
 ```
 
-Rows are matched against `src/data/market-source-mapping.ts` by approved `itemId` and `sourceSlug`. Unknown item ids, mismatched source slugs, duplicate rows, invalid numeric values and missing approved items fail before any output write. Explicit `skipped` rows keep the previous output value and require a reason; if the previous value is missing, the run fails. Updated rows use the newest `history` samples when present, otherwise the direct price field, and write high-alch values from the accepted alch field aliases. The writer builds `prices.json`, `alch.json` and `price-history.json` in memory, validates the candidate outputs with the existing price/history schemas, writes deterministic JSON only after validation, skips unchanged file writes and keeps one shared price-history snapshot per 12-hour UTC bucket. Tests use repository-local fixtures and do not call live upstream services.
+Rows are matched against `src/data/market-source-mapping.ts` by approved `itemId` and `sourceSlug`. Unknown item ids, mismatched source slugs, duplicate rows, invalid numeric values and missing approved items fail before any output write. Explicit `skipped` rows keep the previous output value and require a reason; if the previous value is missing, the run fails. Updated rows use the newest `history` samples when present, otherwise the direct price field, and write high-alch values from the accepted alch field aliases. The raw adapter accepts only the approved `https://markets.lostcity.rs` origin in the CLI path, checks duplicate JSON keys/body size before normalization, maps slug-keyed or array rows through `MARKET_SOURCE_MAPPINGS`, supports the narrow sanitized fixture aliases for recent sale history and high-alch fields, and emits the same normalized rows before output generation. The writer builds `prices.json`, `alch.json` and `price-history.json` in memory, validates the candidate outputs with the existing price/history schemas, writes deterministic JSON only after validation, skips unchanged file writes and keeps one shared price-history snapshot per 12-hour UTC bucket. `.github/workflows/update-market-prices.yml` runs the writer on the accepted cron schedule with `vars.MARKET_PRICES_UPSTREAM_URL`, validates JSON, runs the focused writer and data/economy tests, runs `git diff --check`, rejects any changed file outside the three market snapshots and commits only if those files changed. Tests use repository-local fixtures and mocked fetches; they do not call live upstream services.
 
-Open question: this is the normalized writer input contract, not proof of the raw live `markets.lostcity.rs` HTTP response shape. The raw live response adapter and GitHub Actions workflow remain separate work.
+Freshness model: the committed `prices.json` `_scraped_at` value is the snapshot capture time for the current scheduled static `PriceSet`, and the newest `price-history.json` row is the retained shared history snapshot for its 12-hour bucket. The latest commit touching `prices.json`, `alch.json` or `price-history.json` identifies the latest accepted file change. The latest successful `Update market prices` GitHub Actions run identifies the latest scheduled validation attempt after the verified upstream URL is configured. A no-diff successful run does not create a commit or change `_scraped_at`; it is still evidence that the scheduled check completed. A failed run must leave the previous committed snapshot active and must not be used for scheduled-current release claims.
+
+Open question: the raw adapter is fixture-evidenced, not proof of the exact live `markets.lostcity.rs` HTTP response shape. D-053 keeps live response contract verification, setting `MARKET_PRICES_UPSTREAM_URL` and capturing the first successful scheduled run as separate later work unless a release claims scheduled-current market prices.
 
 ### Phase 3: rewrite adapters
 
@@ -539,7 +542,7 @@ Current implementation note: hiscores lookup is wired into the rewrite Levels wo
 
 - Add browser smoke coverage for both features with mocked endpoints.
 - Update [rewrite-parity-report.md](rewrite-parity-report.md) once there is evidence.
-- Decide whether any legacy `/api/*` compatibility shims still matter.
+- Keep legacy `/api/*` compatibility shims archive-only under D-044 unless a future explicit legacy-runtime re-promotion decision changes the boundary.
 - Keep `legacy/index.html` archived until the broader legacy-removal decision is accepted.
 
 ## Acceptance criteria
@@ -563,7 +566,7 @@ Market sync is acceptable when:
 - file import remains available as an offline fallback
 - tests cover mapping, validation, generated JSON files and UI load/fallback behavior
 
-Current status: the same-origin API, browser adapter, scheduled-only UI path, disabled-service import fallback, selected active `PriceSet` persistence, browser-local accepted-price history, read-only scheduled static snapshot loader/status contract and local scheduled writer foundation meet the validation, explicit `PriceSet`, offline-import, reload-restore, local-history, static-load fallback and fixture-based output-generation parts with mocked/provider tests. Goal 3 accepts the visible V1 replacement Market/Economy UI workflow on this scheduled/static and browser-local boundary. Full market-product acceptance still requires the raw live `markets.lostcity.rs` response adapter and GitHub Actions cron/commit workflow.
+Current status: the same-origin API, browser adapter, scheduled-only UI path, disabled-service import fallback, selected active `PriceSet` persistence, browser-local accepted-price history, read-only scheduled static snapshot loader/status contract, local scheduled writer and fixture-evidenced raw response adapter meet the validation, explicit `PriceSet`, offline-import, reload-restore, local-history, static-load fallback and fixture-based output-generation parts with mocked/provider tests. Goal 3 accepts the visible V1 replacement Market/Economy UI workflow on this scheduled/static and browser-local boundary. Full market-product acceptance still requires live response contract verification and GitHub Actions cron/commit workflow evidence.
 
 ## Open questions
 
@@ -571,6 +574,5 @@ Current status: the same-origin API, browser adapter, scheduled-only UI path, di
 - What is the production deployment target?
 - What is the authoritative hiscores upstream source?
 - What is the authoritative market API or scrape contract for `markets.lostcity.rs`?
-- What exact raw live upstream response adapter will feed the GitHub Actions writer's normalized `markets.lostcity.rs` input contract?
+- What exact live `markets.lostcity.rs` API/scrape response contract should the scheduled writer rely on in GitHub Actions?
 - Should remaining legacy market localStorage keys, especially full price history and unsupported metadata keys, be migrated or intentionally ignored?
-- Should temporary `/api/prices` and `/api/scrape` shims be kept for legacy parity testing?

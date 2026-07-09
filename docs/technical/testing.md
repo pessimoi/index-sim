@@ -8,7 +8,7 @@ Use [rewrite-parity-report.md](rewrite-parity-report.md) to interpret which user
 
 Accepted parity policy: legacy results are regression evidence, not the final truth source. Keep golden tests to catch accidental changes, but allow documented intentional deltas when the current accepted LostCityRS/Content revision or another accepted source shows the legacy app should be replaced.
 
-Game revision bumps are development changes, not scheduled data refreshes. The current generator foundation exposes `npm run data:generate` for repository-local source/output-path validation, schema-valid foundation output writing and a committed foundation revision-impact report. Once the authoritative parser and full hybrid calculation-impact suite exist, a revision PR should run `npm run data:generate`, schema validation, relevant domain tests, golden/parity checks and a calculation-impact report before any generated snapshot or formula change is accepted. The generated runtime data should be one normalized current snapshot at `src/data/generated/game-data.json`; old snapshots are not kept as separate files, because git history and PR diffs provide the review baseline. Snapshot validation should reject raw upstream dump shapes, historical snapshot archives and unused source-only content. The committed `docs/project/revision-impact/current.md` report must list source refs, generator metadata, generated-data diffs, merge-blocking hybrid-suite DPS/kills/hr/XP/hr/GP/hr/GP/XP diffs, informational all-monster scan outliers, intentional deltas and validation pass/fail status. Informational all-monster scan outliers use fixed simple melee/ranged/magic baselines and report DPS, kills/hr or XP/hr changes over 10%, GP/hr or GP/XP changes over 25%, missing required combat/drop/economy data, warning-count increases and monsters entering or leaving the scan. Until the authoritative parser/calculation-impact slice exists, do not fake an authoritative generated-data refresh by hand-editing source truth without documenting it as an open question or accepted manual exception.
+Game revision bumps are development changes, not scheduled data refreshes. The current generator exposes `npm run data:generate` for repository-local source/output-path validation, raw LostCity config/RuneScript parsing, schema-valid output writing and a committed revision-impact report. It writes one current source-backed snapshot at `src/data/generated/game-data.json`; git history and PR diffs provide the review baseline. D-059 makes that committed Revision 274 snapshot the root runtime through `src/adapters/generated`, with scheduled static prices first and generated item fallbacks second. The legacy-derived snapshots remain regression/reference inputs and are not the root bootstrap. Runtime readiness blocks missing expected identities, required simulator fields, monster combat/loot rows and PriceSet coverage; accepted source value changes belong to revision-impact evidence. The current snapshot is ready with zero blockers, the representative suite passes 10/10 cases under D-055/D-057, and the 189-evaluation informational scan records 22 advisory outliers. Snapshot validation rejects raw upstream dump shapes, historical snapshot archives and unused source-only content. Planner/setup/quick-action requirement consumers use generated requirements when present and the D-051 manual fallback when the active raw snapshot lacks an authoritative requirement skill map. Do not hand-edit generated source truth, include quest/clue exclusions, remove the requirement fallback or refresh accepted calculation baselines without the corresponding evidence and decision.
 
 ## Rewrite scaffold commands
 
@@ -85,28 +85,68 @@ npm run test -- src/tests/data-economy.test.ts src/tests/market-adapter.test.ts 
 npm run test:e2e -- src/tests/e2e/scaffold.spec.ts
 ```
 
-The focused writer tests validate the normalized scheduled `markets.lostcity.rs` fixture/input contract, invalid numeric rejection, missing approved item rejection, unknown item/source-slug rejection, skipped-item fallback to previous output values, 12-hour shared history bucket retention, no-op idempotence and the rule that invalid upstream data is rejected before output files are written. A local dry-run fixture check can be run without live upstream calls:
+The focused writer tests validate the normalized scheduled `markets.lostcity.rs` fixture/input contract, the sanitized raw-response adapter used by `--upstream-url`, approved-origin enforcement with mocked fetch, invalid numeric rejection, missing approved item rejection, unknown item/source-slug rejection, duplicate raw item rejection, skipped-item fallback to previous output values, 12-hour shared history bucket retention, no-op idempotence and the rule that invalid upstream data is rejected before output files are written. A local dry-run fixture check can be run without live upstream calls:
 
 ```sh
 npm run prices:write-scheduled -- --input src/tests/fixtures/market-writer/upstream-valid.json --item-ids lobster,rune_scimitar,dragon_bones --now 2026-07-08T00:15:00.000Z --dry-run
 ```
 
+The scheduled workflow lives at `.github/workflows/update-market-prices.yml`. It runs only on cron at 00:15 and 12:15 UTC, has no `workflow_dispatch`, requires the repository variable `MARKET_PRICES_UPSTREAM_URL`, uses `npm ci`, runs the writer through `--upstream-url`, validates JSON, runs the focused writer and data/economy tests, runs `git diff --check`, rejects changes outside `prices.json`, `alch.json` and `price-history.json`, and commits only when those three files have a real diff. Do not run the live workflow locally; verify the workflow shape with YAML parsing/static review and use the normalized dry-run fixture above for local no-network checks. Live scheduled-run evidence belongs in GitHub Actions after the exact upstream response contract is verified.
+
+Freshness and release-evidence checks for the scheduled market path:
+
+```sh
+node -e "const fs=require('fs'); const prices=JSON.parse(fs.readFileSync('prices.json','utf8')); const history=JSON.parse(fs.readFileSync('price-history.json','utf8')); const last=history.at(-1); console.log({pricesScrapedAt: new Date(prices._scraped_at*1000).toISOString(), lastHistoryAt: last ? new Date(last.t*1000).toISOString() : null, historySnapshots: history.length});"
+git log -1 --format="%h %cI %s" -- prices.json alch.json price-history.json
+git diff --check
+```
+
+For release-copy evidence, also run the live integration release-copy audit below and classify every hit. D-053 keeps live scheduled-market workflow evidence out of the V1/trusted-tester gate when the release is described as static/bundled/imported price limited. Scheduled-current market-price copy requires the latest successful `Update market prices` GitHub Actions run on the release branch after `MARKET_PRICES_UPSTREAM_URL` is configured. A failed run leaves the previous committed snapshot active; a no-op successful run is freshness evidence but does not change `_scraped_at` or create a commit.
+
 The other focused unit tests validate committed `prices.json`/`alch.json`/`price-history.json`, same-origin static loading, missing/invalid/fallback statuses, selected-over-scheduled fallback order and the rule that scheduled snapshot loading does not write `index-sim:price-set:selected` or `index-sim:price-history`. The Playwright scaffold checks Settings/Economy scheduled snapshot status, active scheduled PriceSet display, local PriceSet import override, reset back to scheduled fallback, browser-local history preservation and absence of stale production `/api/prices`, `/api/scrape` or `run_sim.py` copy.
 
-## Generated game data foundation tests
+## Generated game data tests
 
-The generated game data workflow currently has a foundation command and testable core. It validates that the default source path is the gitignored `.sources/lostcity-content/` checkout, that missing or non-directory sources fail with sanitized errors, that fixture source/output-root paths can be exercised without network access or raw upstream content, that generated `game-data.json` validates with `GameDataSnapshotSchema`, and that a repo-local output hygiene assertion rejects raw upstream dump keys, historical generated snapshot archive paths, market price history fields and absolute user-home paths before files are written.
+The generated game data workflow has a command and testable core. It validates that the default source path is the gitignored `.sources/lostcity-content/` checkout, that missing or non-directory sources fail with sanitized errors, that fixture source/output-root paths can be exercised without network access or raw upstream content, that the source-backed fixture extracts monster/drop/item/equipment/weapons/ammo/spells data and a top-level item requirement map into `GameDataSnapshot`, that generated `game-data.json` validates with `GameDataSnapshotSchema`, that requirement input accepts only strict v1 `attack`/`defence`/`ranged`/`magic` integer levels from 1 to 99, that identical item requirements from `items.json`, `weapons.json` and `equipment.json` merge deterministically, that conflicting requirement values fail with sanitized `source_slice_invalid`, that duplicate canonical item ids created by known alias mappings fail before output write, that revision-impact diff reporting covers valid, missing and invalid baselines, that representative calculation-impact reporting covers no-diff `pass`, changed `needs-review`, missing required entity `failed`, deterministic markdown, `--skip-calculation-impact` and `--impact-case-filter <tag-or-id>`, and that informational all-monster scan reporting covers a clean scan, DPS/kills/hr/XP/hr threshold outliers, GP/hr or GP/XP threshold outliers, warning-count increases, monsters entering/leaving the scan, deterministic `--impact-outlier-limit <number>` truncation and no `NaN`/`Infinity` report output. It also validates that a repo-local output hygiene assertion rejects raw upstream dump keys, historical generated snapshot archive paths, market price history fields and absolute user-home paths before files are written.
 
 ```sh
 npm run test -- src/tests/data-generator.test.ts
-npm run data:generate -- --source-dir src/tests/fixtures/data-generator/lostcity-content --output-root .vite/data-generator-output --generated-at 2026-07-08T00:00:00.000Z --dry-run
+npm run data:generate -- --source-dir src/tests/fixtures/data-generator/lostcity-content --output-root .vite/data-generator-output --generated-at 2026-07-08T00:00:00.000Z --dry-run --skip-calculation-impact
 ```
 
-The committed foundation outputs are validated by:
+The committed generated outputs are validated by:
 
 ```sh
 npm run test -- src/tests/data-economy.test.ts
 ```
+
+The active generated runtime adapter is covered by:
+
+```sh
+npm run test -- src/tests/generated-runtime-adapter.test.ts
+npm run runtime:readiness -- --example-limit 5
+npm run runtime:coverage-plan -- --example-limit 25
+npm run runtime:readiness -- --candidate legacy-derived-static --example-limit 5
+npm run runtime:write-legacy-derived -- --check
+```
+
+The focused test validates that committed generated data plus scheduled static prices and generated item fallbacks form a schema-valid `SimulationContext`, and that readiness becomes green only when all expected ids, required simulator fields, monster combat/loot rows and PriceSet coverage pass. It also covers scheduled-first price precedence, exact-first canonical item lookup, machine-readable missing/extra arrays and legacy-derived reference snapshot freshness. The default readiness command is a blocking gate and currently passes. `--allow-not-ready` remains available only for deliberate work on incomplete local candidates. `runtime:coverage-plan` prints a reviewer-friendly coverage view, `--json` exposes complete arrays, and the legacy-derived commands verify reference/regression artifacts rather than the production bootstrap.
+
+Current generated runtime coverage is ready: the raw Revision 274 generator resolves all expected runtime monster, item, weapon, ammo, spell and equipment identities and 63/63 core-loot tables. Runtime item price/alch fallbacks fill only scheduled-static gaps, and scheduled values retain precedence. D-058 keeps cut and uncut gem identities distinct; exact keys win and aliases are fallback-only. D-059 records the completed root bootstrap switch.
+
+The direct Revision 274 raw-source parser and calculation-impact evidence are covered by:
+
+```sh
+npm run test -- src/tests/lostcity-source-parser.test.ts
+npm run data:source-audit -- --example-limit 10
+npm run data:source-impact -- --impact-outlier-limit 25
+npm run data:source-impact -- --loot-only --impact-outlier-limit 25
+npm run data:source-impact -- --equipment-only --impact-outlier-limit 25
+npm run data:source-impact -- --combat-catalog-only --impact-outlier-limit 25
+npm run data:source-impact -- --detail-monster tribesman
+```
+
+The audit reads the gitignored `.sources/lostcity-content/` checkout recursively, follows config/category/delegated-handler behavior, fails duplicate config or `ai_queue3` definitions and emits repository-relative sanitized diagnostics. Current Revision 274 evidence maps all 63 runtime monsters, extracts 63/63 core-loot tables and resolves all expected runtime catalog identities; the generated item catalog contains 371 expected identities plus 15 source-only loot identities. Four quest-gated rows and 21 clue-scroll tertiary rows are explicit scoped exclusions. D-055, D-056 and D-057 own the accepted combat, loot, equipment and combat-catalog source deltas; D-059 owns runtime consumption.
 
 After generator source or schema/test changes, also run:
 
@@ -115,34 +155,51 @@ npm run typecheck
 git diff --check
 ```
 
-The current command writes only `src/data/generated/source-pin.json`, `src/data/generated/game-data.json` and `docs/project/revision-impact/current.md`. Do not commit `.sources/lostcity-content/`, raw upstream checkouts, historical generated snapshot directories or live upstream responses. The authoritative parser, full hybrid calculation-impact suite and runtime bootstrap switch are separate implementation slices.
+The source-backed generator command writes only `src/data/generated/source-pin.json`, `src/data/generated/game-data.json` and `docs/project/revision-impact/current.md`. The legacy-derived reference writer writes only `src/data/generated/legacy-derived-runtime-game-data.json` and `src/data/generated/legacy-derived-runtime-price-set.json`. Do not commit `.sources/lostcity-content/`, raw upstream checkouts, historical generated snapshot directories or live upstream responses. The raw parser is shared by the generator and the read-only audit/impact CLIs. Planner/setup/quick-action generated requirement consumption is covered by `src/tests/planner-domain.test.ts` and `src/tests/ui-view-model.test.ts` when a snapshot supplies requirements; the active raw snapshot currently exercises the D-051 fallback path.
+
+For a real revision bump PR, use [../operations/README.md](../operations/README.md#game-revision-bump-pr-runbook) as the review checklist. The minimum local evidence is the generator command against `.sources/lostcity-content`, `npm run test -- src/tests/data-generator.test.ts src/tests/data-economy.test.ts`, `npm run typecheck` and `git diff --check`; run `npm run test:golden` and relevant domain/UI tests when the revision-impact report shows changed calculation output or changed generated requirements.
+
+For a focused generated-requirements review pass covering the parser/schema contract, committed generated snapshot shape, Planner requirement lookup and loadout/gear-quick-action warning consumers:
+
+```sh
+npm run test -- src/tests/data-generator.test.ts src/tests/data-economy.test.ts src/tests/planner-domain.test.ts src/tests/ui-view-model.test.ts
+```
 
 ## V1 release evidence snapshot
 
-The latest consolidated release-evidence check was refreshed on 2026-07-08 for the current Vite/React rewrite path. This records executed checks only; it does not choose production hosting, CSP implementation, live upstream providers, scheduled job wiring, generated data runtime switch, full visual regression or deeper legacy migration.
+The latest functional release-evidence check was refreshed on 2026-07-10 for the source-backed Revision 274 root runtime. It does not choose production hosting, CSP implementation, live upstream providers, full visual regression or deeper legacy migration.
 
 | Check | Latest result | Notes and follow-up |
 | --- | --- | --- |
-| `npm run typecheck` | `pass` | Goal 7 rerun passed. Re-run after TypeScript or source changes. |
-| `npm run test` | `pass` | Goal 7 full Vitest run passed across 25 files and 408 tests. Includes unit, schema, UI/view-model, persistence, live-integration mock, migration, generated-data, scheduled-market-writer and performance smoke coverage, including D-042 legacy custom setup/cannon import tests. |
-| `npm run test:golden` | `pass` | Goal 7 golden fixture run passed 19 tests. Fixture changes still require an accepted baseline decision before updating snapshots. |
-| `npm run build` | `pass` | Goal 7 Vite build passed with only the known chunk-size warning. |
-| `npm run test:e2e` | `current sandbox rerun environment-only; earlier browser gate remains historical evidence` | Goal 7 current sandbox rerun failed before browser execution because the local Vite server could not bind `127.0.0.1:5173`: `listen EPERM: operation not permitted`. No Playwright assertion failed and no app/browser failure was observed. The latest browser-executed default gate remains the earlier localhost-capable run: 51 passed out of 51 tests in about 6.0 minutes, mocked/same-origin and without live upstream services. This Goal 7 run is not a fresh browser pass for the current checkout; rerun `npm run test:e2e` in a localhost-capable environment before a public release package, or record the freshness gap in trusted-tester handoff notes. |
-| Goal 1/2 focused Playwright reruns | `pass, superseded by full gate` | Focused escalated localhost runs were used to isolate Combat/Stats/Special, Duel, Planner, Dense/Compare, Cannon, Trip, Loot and numeric-snapshot smoke paths during stabilization. The later full `npm run test:e2e` pass remains the latest browser-executed default gate; the older failure matrix below is retained only as historical triage evidence. Goal 7 still needs a localhost-capable fresh browser rerun before a public release cut or when trusted-tester notes need fresh browser evidence. |
+| `npm run typecheck` | `pass` | 2026-07-10 D-059 refresh passed. |
+| `npm run test` | `pass` | 2026-07-10 full Vitest run passed across 28 files and 468 tests, including generated runtime, raw parser/generator, canonical economy, Planner/loadout requirements, UI/view-model, persistence, migration, scheduled-market writer and performance coverage. |
+| `npm run test:golden` | `pass` | 2026-07-10 golden fixture run passed 19 tests. Fixture changes still require an accepted baseline decision before updating snapshots. |
+| `npm run build` | `pass` | 2026-07-10 Vite build passed with only the known chunk-size warning. |
+| Generated/runtime evidence | `pass` | Deterministic raw Revision 274 generation produced 386 items and 63 monsters. Generated and legacy-reference readiness are `ready`, coverage has no blockers, legacy-derived reference snapshots are current, source audit has zero unresolved runtime identities, and combat, loot, equipment and combat-catalog impact commands completed without execution errors. The committed report owns accepted D-055/D-057 deltas and passes 10/10 representative cases with 22 advisory outliers across 189 evaluations. |
+| `npm run test:e2e` | `environment-limited before browser execution` | The 2026-07-10 full attempt stopped because the managed sandbox denied Vite binding to `127.0.0.1:5173` with `EPERM`. No Playwright assertion ran. The earlier localhost-capable 51/51 run remains historical browser evidence; rerun after D-059 in a localhost-capable environment. |
+| `npm run lint` | `known gap` | After adding `.sources/**` and `.vite/**` to ESLint global ignores, the command reaches repo code and reports 19 errors plus 8 warnings. Most are existing React effect/purity findings; smaller unused-assignment findings also remain. This is not recorded as a pass. |
+| `npm run format:check` | `known gap` | Repo-wide Prettier reports 62 files, including unchanged baseline files. Avoid a bulk formatting rewrite inside feature work; clean this in a dedicated maintenance change. |
+| Goal 1/2 focused Playwright reruns | `pass, superseded by full gate` | Focused escalated localhost runs were used to isolate Combat/Stats/Special, Duel, Planner, Dense/Compare, Cannon, Trip, Loot and numeric-snapshot smoke paths during stabilization. The later full `npm run test:e2e` pass remains the latest browser-executed default gate; the older failure matrix below is retained only as historical triage evidence. A localhost-capable fresh browser rerun is still needed before a public release cut or when trusted-tester notes need fresh browser evidence. |
 | Loot/Economy focused checks | `pass with sandbox-limited browser smoke` | On 2026-07-08, the Loot/Economy pass ran `npm run typecheck` and `npm run test -- src/tests/trip-loot-supply.test.ts src/tests/data-economy.test.ts src/tests/market-adapter.test.ts src/tests/market-ui-state.test.ts src/tests/ui-adapters.test.ts src/tests/price-import-notice.test.ts src/tests/market-server.test.ts src/tests/market-sync-items.test.ts src/tests/market-writer.test.ts src/tests/legacy-migration.test.ts src/tests/ui-view-model.test.ts`, passing 267 focused tests. The focused Loot/Economy Playwright smoke failed before browser execution with `listen EPERM: operation not permitted 127.0.0.1:5173`, matching the managed-sandbox localhost limitation and not superseding the earlier escalated 51/51 browser gate. No source formulas, fixture outputs or Playwright numeric expectations changed, so `npm run test:golden` was not rerun for that documentation/status closure. |
 | Goal 3 numeric snapshot audit | `pass with sandbox-limited browser rerun` | On 2026-07-08, focused numeric domain/view-model evidence passed: `npm run test -- src/tests/domain-core.test.ts src/tests/trip-loot-supply.test.ts src/tests/xp-parity.test.ts src/tests/ui-view-model.test.ts src/tests/data-economy.test.ts` passed 173 tests, and `npm run test:golden` passed 19 tests. Focused numeric Playwright and full `npm run test:e2e` rerun attempts in the current managed sandbox both failed before browser execution with `listen EPERM 127.0.0.1:5173`; this is environment-only and does not supersede the earlier escalated 51/51 browser gate. No Playwright numeric expectations, source formulas or golden fixtures were changed. |
 | Goal 4 release-gate refresh | `pass with environment-only browser rerun limitation` | Goal 4 reran `npm run typecheck`, the focused Trip set `npm run test -- src/tests/trip-loot-supply.test.ts src/tests/ui-adapters.test.ts src/tests/ui-view-model.test.ts src/tests/scaffold.test.ts src/tests/xp-parity.test.ts` with 178 passing tests, full `npm run test`, `npm run test:golden`, `npm run build`, `npm audit`, the static DOM/code-execution search, the static secrets search, the broader URL/API-copy search and the live-integration release-copy audit. All non-browser gates passed or had documented residual classifications. The only non-pass command was the focused Trip/Cannon Playwright smoke, which failed before browser execution with the managed-sandbox localhost `EPERM` limitation above. No source formulas, fixture outputs or Playwright numeric expectations changed. |
 | Goal 5 Planner focused checks | `pass with environment-only browser rerun limitation` | Goal 5 reran `npm run typecheck`, `npm run test -- src/tests/planner-domain.test.ts src/tests/planner-ui-state.test.ts src/tests/planner-ui-adapter.test.ts src/tests/ui-view-model.test.ts src/tests/legacy-migration.test.ts` with 131 passing tests, `npm run test:golden` with 19 passing tests, `npm audit`, the static DOM/code-execution search, the static secrets search and a Planner/localStorage migration boundary search. Non-browser checks passed or had documented residual classifications. The focused Planner Playwright smoke `npm run test:e2e -- --workers=1 --grep "Planner"` failed before browser execution with `listen EPERM: operation not permitted 127.0.0.1:5173`, matching the managed-sandbox localhost limitation and not superseding the earlier escalated 51/51 browser gate. No Planner source formulas, fixtures, persisted schema versions or Playwright numeric expectations changed. |
 | Goal 6 legacy migration focused checks | `pass with environment-only browser rerun limitation` | Goal 6 reran `npm run typecheck` and `npm run test -- src/tests/legacy-migration.test.ts src/tests/local-state-health.test.ts src/tests/ui-adapters.test.ts src/tests/market-ui-state.test.ts src/tests/price-import-notice.test.ts src/tests/planner-ui-state.test.ts` with 126 passing tests. The focused Import/Keep/Clear/local-state Playwright smoke `npm run test:e2e -- --workers=1 -g "legacy|local state"` failed before browser execution with `listen EPERM: operation not permitted 127.0.0.1:5173`, matching the managed-sandbox localhost limitation and not superseding the earlier escalated 51/51 browser gate. Goal 6 changed documentation/status only: no source formulas, fixture outputs, persisted schema versions, localStorage key lists or Playwright numeric expectations changed, so `npm run test:golden` was not rerun. |
 | D-042 Legacy Migration V1 custom/cannon import | `unit/typecheck/focused browser pass` | D-042 compatible nested `sim_input_v3.monsterSetups` and `sim_input_v3.cannonByMonster` import is implemented. `npm run test -- src/tests/legacy-migration.test.ts src/tests/ui-adapters.test.ts` passed 85 tests in the implementation pass; the current verification reran `npm run test -- src/tests/legacy-migration.test.ts` with 37 passing tests and `npm run typecheck` passed. The focused Playwright command suggested by the spec, `npm run test:e2e -- --grep "legacy migration"`, now starts under localhost escalation but selects no tests because current test titles do not contain that phrase. The equivalent current-title focused smoke `npm run test:e2e -- --grep "reviews and imports compatible legacy setup data|keeps legacy data and dismisses the migration notice|clears only known legacy data after confirmation"` passed 3/3 tests in Chromium and covers compatible nested custom setup/cannon import plus Import/Keep/Clear boundaries. |
-| Legacy Migration V1 UX/status closure | `unit/typecheck/focused browser pass` | Goal 3 closed the user-facing review copy for the accepted V1 boundary. The Settings notice now shows a metadata-only outcome summary for importable, skipped and review-only areas, makes `sim_planner_v1` and full legacy price history explicit review-only/not-migrated decisions, and keeps Import/Keep/Clear status copy separate. `npm run test -- src/tests/legacy-migration.test.ts` passed 37 tests and `npm run typecheck` passed. The Playwright scaffold source checks the outcome copy, Import/Keep/Clear status messages and absence of raw planner/history payload sentinels. The spec-suggested grep selected no tests under localhost escalation, so the current-title focused smoke `npm run test:e2e -- --grep "reviews and imports compatible legacy setup data|keeps legacy data and dismisses the migration notice|clears only known legacy data after confirmation"` was run instead and passed 3/3 tests in Chromium. |
-| Goal 7 release-gate and status check | `core pass; browser refresh pending` | Goal 7 reran the core release commands above plus `npm audit`, static DOM/code-execution search, static secrets search, broader URL/API-copy search and live-integration release-copy audit. Non-browser checks passed or had documented residual classifications. A localhost-capable browser smoke refresh is still needed for fresh browser evidence. |
-| `npm audit` | `pass` | Goal 7 reported 0 vulnerabilities. |
+| Legacy Migration V1 UX/status closure | `unit/typecheck/focused browser pass` | Goal 3 closed the user-facing review copy for the accepted V1 boundary. The Settings notice now shows a metadata-only outcome summary for importable, skipped and review-only areas, makes D-048 `sim_planner_v1` and D-049 full legacy price history explicit review-only/not-migrated decisions, and keeps Import/Keep/Clear status copy separate. `npm run test -- src/tests/legacy-migration.test.ts` passed 37 tests and `npm run typecheck` passed. The Playwright scaffold source checks the outcome copy, Import/Keep/Clear status messages and absence of raw planner/history payload sentinels. The spec-suggested grep selected no tests under localhost escalation, so the current-title focused smoke `npm run test:e2e -- --grep "reviews and imports compatible legacy setup data|keeps legacy data and dismisses the migration notice|clears only known legacy data after confirmation"` was run instead and passed 3/3 tests in Chromium. |
+| Goal 7 release-gate and status check | `historical core pass; browser refresh pending` | Goal 7 reran the then-current core release commands plus `npm audit`, static DOM/code-execution search, static secrets search, broader URL/API-copy search and live-integration release-copy audit. Non-browser checks passed or had documented residual classifications. The 2026-07-09 core refresh supersedes this row for non-browser gates; a localhost-capable browser smoke refresh is still needed for fresh browser evidence. |
+| 2026-07-09 generated-data/backlog maintenance focused check | `focused pass, superseded by same-day core refresh for non-browser gates` | The generated-data/backlog pass changed generator report copy, generated-data review docs, backlog status, idea-inbox maintenance and the fixture-owned representative calculation-impact suite, expanding it from the original melee/ranged/magic fixture cases to 9 fixture-owned cases covering cannon, recoil, alch-policy, loot-heavy/nested-loot, high-defence-pressure and low-level paths too. `npm run test -- src/tests/data-generator.test.ts src/tests/data-economy.test.ts` passed 57 tests, `npm run typecheck` passed and `git diff --check` passed. The later 2026-07-09 core refresh reran full unit, typecheck, golden, build, dependency audit and static release/security searches, but still does not claim fresh browser evidence. |
+| Legacy-derived static runtime bridge focused check | `historical pass; superseded by D-059` | This pass established the static snapshot and freshness gate while D-054 still kept it as root runtime truth. D-059 later superseded that bootstrap boundary after raw source coverage and impact evidence closed. The artifacts remain useful regression/reference evidence under `npm run runtime:write-legacy-derived -- --check`. |
+| Source-backed runtime coverage-plan focused check | `historical focused pass; superseded by completed coverage` | This pass added complete `missingIds`/`extraIds` arrays and `npm run runtime:coverage-plan` while source coverage was incomplete. The same command now reports zero blocking gaps for the active generated runtime. |
+| Runtime monster combat-stat source-slice batch | `historical focused pass; superseded by raw generator` | This normalized fixture batch introduced the combat-stat gate before raw loot integration. The active raw generator now supplies combat and 63/63 core-loot rows. |
+| Runtime combat catalog source-slice batch | `historical focused pass; superseded by raw generator` | This normalized fixture batch introduced weapon, ammo, spell and equipment field gates. The active raw generator now supplies all expected combat-catalog identities and accepted D-056/D-057 source deltas. |
+| Runtime item and PriceSet coverage batch | `historical focused pass; superseded by D-058/D-059` | This normalized fixture batch introduced item and PriceSet gates and the earlier 9-case/195-evaluation evidence. The active raw snapshot now uses distinct cut/uncut identities under D-058, passes 10/10 representative cases, records 22 outliers in 189 evaluations and is the root runtime under D-059. |
+| `npm audit` | `pass` | 2026-07-10 reported 0 vulnerabilities. |
 | `git diff --check` | `pass` | Passed after this documentation refresh. |
-| Static DOM/code execution search | `pass with classified residual` | Found only `src/adapters/browser/index.ts` `new Function`, classified as trusted bundled legacy data bootstrap in the adapter-owned sandbox. |
-| Static secrets search | `pass with false positives` | Found item/package/doc/test text such as `token`, `js-tokens`, `css-tokenizer`, local-state-health fixture text and no real API key, secret, bearer token, password or private key. |
+| Static DOM/code execution search | `pass with classified residual` | Found trusted bundled legacy source execution `new Function` use in `src/adapters/legacy-runtime/source-bootstrap.ts` and `scripts/report-generated-runtime-readiness.ts`; both execute repository-owned legacy source files for reference/readiness/regeneration, not user input. The root app bootstrap uses `src/adapters/generated` and committed validated JSON instead. |
+| Static secrets search | `pass with false positives` | Found item/package/doc/test text such as `token`, `js-tokens`, `css-tokenizer`, local-state-health fixture text and a URL password-rejection guard, with no real API key, secret, bearer token, password or private key. |
 | Release-copy audit | `pass with classified residuals` | Legacy `run_sim.py`, `/api/prices`, `/api/scrape` and legacy `/api/hiscores` hits remain archived evidence or documentation/history. Production rewrite paths use typed same-origin status/sync/lookup contracts and service-aware copy. The broader URL/API-copy audit also classifies CDN/Babel, `markets.lostcity.rs`, localhost and test URLs as archived legacy evidence, adapter/test contracts or documentation/history rather than production rewrite UI copy. |
-| Full visual regression | `not run` | Out of scope for this release-evidence check. The earlier passing default Playwright smoke remains historical browser evidence for the documented smoke scope, but Goal 7 could not produce a fresh browser pass in the current sandbox. |
+| Full visual regression | `not run` | Out of scope for this release-evidence check. The earlier passing default Playwright smoke remains historical browser evidence for the documented smoke scope, but the 2026-07-09 core refresh did not produce fresh browser evidence. |
 | Live upstream integration calls | `not run` | Automated tests must stay mocked until authoritative upstream and runtime/provider decisions are accepted. |
 
 ## Goal 3 numeric snapshot audit
@@ -154,7 +211,8 @@ browser gate. The current Codex sandbox cannot bind the Vite localhost server
 without escalation, so the Goal 3 focused Playwright rerun attempt is recorded
 as environment-only; the latest browser-executed evidence remains the earlier
 escalated `npm run test:e2e` pass with 51 passed out of 51 tests. Goal 7 did
-not produce fresh browser evidence in the managed sandbox.
+not produce fresh browser evidence in the managed sandbox, and the 2026-07-09
+core refresh did not rerun browser smoke.
 
 Current numeric failure classification summary:
 
@@ -193,8 +251,9 @@ Status date: 2026-07-08. This matrix records the pre-stabilization default
 `npm run test:e2e` failure triage for the Vite/React rewrite. It is retained as
 release-evidence history only. The latest browser-executed default gate is the
 later full `npm run test:e2e` pass above: 51 passed out of 51 tests after
-localhost sandbox escalation. Goal 7 could not refresh that browser gate in the
-managed sandbox.
+localhost sandbox escalation. The later managed-sandbox browser refresh attempt
+could not refresh that browser gate, and the 2026-07-09 core refresh did not
+rerun browser smoke.
 
 Classification meanings:
 
@@ -363,6 +422,7 @@ They cover:
 - duplicate legacy monster id detection before object conversion
 - malformed loot entry rejection for missing/invalid names, chances, quantities and nested `_expand` rows
 - rejecting malformed imported `PriceSet` JSON
+- canonical item/price alias resolver coverage for known legacy gem aliases, canonical-first economy lookup, duplicate alias collisions and missing-price preservation without mutating `PriceSet`
 - returning missing-price warnings without mutating the `PriceSet`
 
 ## Live integration schema tests
@@ -391,7 +451,7 @@ They cover:
 - fixture hygiene checks for local paths and known real player names
 
 They intentionally do not call live hiscores or market upstream services.
-Market price freshness is now scheduled-only GitHub Actions automation by decision. The local writer foundation is covered by `src/tests/market-writer.test.ts` with fixture data; app, unit and e2e tests should still avoid live market upstream calls. The scheduled workflow should use targeted writer, JSON and data/economy validation rather than the full browser smoke suite.
+Market price freshness is now scheduled-only GitHub Actions automation by decision. The local writer, fixture-evidenced raw adapter, scheduled workflow shape and committed-snapshot freshness commands are covered by fixture tests, mocked fetch and static workflow review; app, unit and e2e tests should still avoid live market upstream calls. The scheduled workflow uses targeted writer, JSON and data/economy validation rather than the full browser smoke suite.
 
 ## Hiscores API, adapter and UI state tests
 
@@ -432,7 +492,7 @@ They cover known legacy key detection, the policy table that classifies every kn
 
 The Playwright scaffold covers the user-facing notice/review flow: legacy keys show a migration notice, the review UX lists the metadata-only outcome summary, import plan, review/reset plan, per-key policy and exact clear list, nested legacy custom setup/cannon map rows appear in the import plan when compatible, Planner and full legacy price history copy state that they are review-only/not migrated in V1, raw planner/history payload sentinels are not shown, Import writes compatible setup, nested custom setup entries, nested cannon settings, loot prefs, hidden gear tiers, dense compare sort/relevance, hiscores last-player and accepted-price-history state while keeping legacy keys, `sim_planner_v1` stays review-only and does not overwrite existing `index-sim:planner-ui`, Import/Keep/Clear status messages are surfaced, Keep dismisses without deletion, Clear removes only known legacy keys after confirmation and an existing rewrite setup is not overwritten until the user chooses Import.
 
-Release evidence for legacy migration/reset should include the focused unit command above, `npm run test:e2e` for the user-facing notice/review flow, the release-copy audit `rg -n "run_sim.py|/api/prices|/api/scrape|/api/hiscores" index.html legacy/index.html src views.jsx planner.jsx market.js docs`, the static security searches from this document and a feature-inventory check confirming `Legacy saved setup migration` is `Valmis` for the accepted V1 boundary. `sim_planner_v1` and full legacy price-history payloads remain review-only/not migrated for V1.
+Release evidence for legacy migration/reset should include the focused unit command above, `npm run test:e2e` for the user-facing notice/review flow, the release-copy audit `rg -n "run_sim.py|/api/prices|/api/scrape|/api/hiscores" index.html legacy/index.html src views.jsx planner.jsx market.js docs`, the static security searches from this document and a feature-inventory check confirming `Legacy saved setup migration` is `Valmis` for the accepted V1 boundary. D-048 `sim_planner_v1` and D-049 full legacy price-history payloads remain review-only/not migrated for V1.
 
 ## Market API, adapter and UI state tests
 
@@ -492,7 +552,7 @@ npm run test -- src/tests/trip-loot-supply.test.ts
 They cover:
 
 - stackability, default loot actions and bone prayer XP rules
-- structured missing-price, approximate-data, gem price alias and fallback warnings
+- structured missing-price, approximate-data, canonical-resolver-backed direct loot, gem price alias and fallback warnings
 - combat-integrated parity for all 18 fixtures covering prayer, food, recoil, dragonfire, alch, ranged ammo, magic runes, low-value loot, cannon occupancy and cannonball supply
 - scarce/AFK spot target and respawn caps, visible inventory reserve details and prayer restore capacity fields
 - domain-owned general potion carry recommendation, including sustained-off inactive state, no-general-boost inactive fallback, non-finite manual-carry fallback, vial and single-dose under/over/matched state, `canApply` gating and long-trip carry scaling
@@ -517,7 +577,7 @@ Planner UI state and adapter foundation tests live in `src/tests/planner-ui-stat
 npm run test -- src/tests/planner-ui-state.test.ts src/tests/planner-ui-adapter.test.ts
 ```
 
-The visible Planner tab workflow is covered by the Playwright scaffold, including metric/current-XP/target/skill-lock edits, avg-over-session pending/Recompute behavior, gear-pool selection, the manual requirement-policy warning, persisted Planner UI state and the timeline/chart areas. For a focused browser smoke:
+The visible Planner tab workflow is covered by the Playwright scaffold, including metric/current-XP/target/skill-lock edits, avg-over-session pending/Recompute behavior, gear-pool selection, the D-051 manual fallback requirement warning, persisted Planner UI state and the timeline/chart areas. For a focused browser smoke:
 
 ```sh
 npm run test:e2e -- --grep "Planner"
@@ -584,7 +644,7 @@ They cover:
 - multi-prayer and multi-boost normalization, canonical `None` handling, unknown id dropping and same-category replacement before `SimulationRequest`
 - manual combat override persistence/defaulting and bounded domain behavior
 - active weapon, gear, ammo and spell selection mapping into `SimulationRequest`, including two-handed weapon shield lock/clear behavior
-- deterministic visible-candidate gear quick actions for the active combat style, including current-selection ties and shield-lock disabled state
+- deterministic visible-candidate gear quick actions for the active combat style, including current-selection ties, shield-lock disabled state and generated-or-fallback requirement reason copy
 - rewrite-owned monster-specific custom setup create/restore/remove helpers, persisted schema validation and dense row marker/calculation mapping
 - per-monster loot settings for high-alch enablement, kill overhead and talisman spot, with separate persistence and reset helpers from `index-sim:loot-prefs`
 - defaulting and sanitization for newly modeled trip-control fields in persisted rewrite setups
@@ -724,6 +784,7 @@ node -e "for (const f of ['prices.json','alch.json','price-history.json']) JSON.
 - XP calculation or XP row changes: `npm run test -- src/tests/xp-parity.test.ts`, `npm run test`, and `npm run test:golden` when current-behavior parity can change.
 - Trip/loot/supply domain changes: `npm run test -- src/tests/trip-loot-supply.test.ts`, `npm run test`, and `npm run test:golden` when current-behavior parity can change. Include `src/tests/xp-parity.test.ts` when `effectiveKph`, recoil, poison or cannon behavior can affect XP/hr.
 - Data or prices: JSON parse, `npm run test -- src/tests/data-economy.test.ts`, and representative simulation fixtures when simulation behavior can change.
+- Generated runtime readiness: `npm run test -- src/tests/generated-runtime-adapter.test.ts`, `npm run runtime:readiness -- --example-limit 5`, `npm run runtime:coverage-plan -- --example-limit 5`, `npm run test -- src/tests/data-generator.test.ts src/tests/data-economy.test.ts src/tests/trip-loot-supply.test.ts`, `npm run test:golden`, `npm run typecheck` and `git diff --check`. The default readiness command is blocking and must stay green for the active snapshot. Use `--allow-not-ready` only for deliberate incomplete local candidates. Rerun full domain/golden/browser evidence for generated snapshot value or bootstrap changes.
 - Planner: `npm run test -- src/tests/planner-domain.test.ts` for gear eligibility, scoring, stance selection and golden plan fixtures. Run full `npm run test` if planner changes interact with combat, trip, data or economy contracts.
 - UI/view-model changes: `npm run test -- src/tests/ui-view-model.test.ts`, `npm run test`, `npm run build` and `npm run test:e2e` when browser behavior changes.
 - Performance-sensitive UI/view-model changes: include `src/tests/ui-performance.test.ts` and browser smoke where possible; compare the level-input path and representative compare/planner workloads against the accepted performance budget.
