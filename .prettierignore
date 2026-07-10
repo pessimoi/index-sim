@@ -19,3 +19,5 @@ views.jsx
 prices.json
 alch.json
 price-history.json
+docs/project/revision-impact/current.md
+src/data/generated/

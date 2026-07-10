@@ -10,10 +10,17 @@ This directory is the project memory layer for humans and AI agents. It keeps cu
 - Technical map and architecture: [technical/README.md](technical/README.md)
 - Rewrite specification: [technical/rewrite-spec.md](technical/rewrite-spec.md)
 - UI parity specification: [technical/ui-parity-spec.md](technical/ui-parity-spec.md)
+- Legacy Planner parity specification: [technical/legacy-planner-parity-spec.md](technical/legacy-planner-parity-spec.md)
+- Shareable setup permalink specification: [technical/shareable-setup-permalink-spec.md](technical/shareable-setup-permalink-spec.md)
+- Visual regression specification: [technical/visual-regression-spec.md](technical/visual-regression-spec.md)
 - Live integrations specification: [technical/live-integrations-spec.md](technical/live-integrations-spec.md)
+- Hiscores live implementation specification: [technical/hiscores-live-implementation-spec.md](technical/hiscores-live-implementation-spec.md)
 - Testing strategy and commands: [technical/testing.md](technical/testing.md)
 - Running, build and deploy notes: [operations/README.md](operations/README.md)
+- Scheduled market live-evidence specification: [operations/market-live-evidence-spec.md](operations/market-live-evidence-spec.md)
+- Public deployment specification: [operations/public-deployment-spec.md](operations/public-deployment-spec.md)
 - Roadmap, backlog, decisions and ideas: [project/README.md](project/README.md)
+- Current worktree delivery specification: [project/worktree-delivery-spec.md](project/worktree-delivery-spec.md)
 
 ## Supporting audit snapshots
 
@@ -30,7 +37,11 @@ These files are useful evidence, but they are not the living source of truth. Pr
 - Product concepts belong in [product/README.md](product/README.md).
 - Legacy-to-rewrite feature coverage belongs in [product/feature-inventory.md](product/feature-inventory.md).
 - Legacy-to-rewrite UI layout and workflow parity requirements belong in [technical/ui-parity-spec.md](technical/ui-parity-spec.md).
+- Optional archived Planner behavior comparison requirements belong in [technical/legacy-planner-parity-spec.md](technical/legacy-planner-parity-spec.md).
 - Hiscores and live market sync requirements belong in [technical/live-integrations-spec.md](technical/live-integrations-spec.md).
+- Hiscores provider/runtime execution work belongs in [technical/hiscores-live-implementation-spec.md](technical/hiscores-live-implementation-spec.md).
+- Scheduled market live evidence and public deployment execution work belong in [operations/market-live-evidence-spec.md](operations/market-live-evidence-spec.md) and [operations/public-deployment-spec.md](operations/public-deployment-spec.md).
+- Reviewable commit grouping and delivery of the current worktree belong in [project/worktree-delivery-spec.md](project/worktree-delivery-spec.md).
 - Validation commands belong in [technical/testing.md](technical/testing.md).
 - Accepted choices and open decision boundaries belong in [project/decisions.md](project/decisions.md).
 - Future work belongs in [project/roadmap.md](project/roadmap.md), [project/backlog.md](project/backlog.md) or [project/idea-inbox.md](project/idea-inbox.md).

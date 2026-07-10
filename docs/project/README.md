@@ -9,6 +9,8 @@ This section owns planning material. Keep it light and keep implementation detai
 - [decisions.md](decisions.md): accepted decisions, recommendations and open decision boundaries.
 - [bug-triage.md](bug-triage.md): known legacy behavior risks and golden-fixture handling.
 - [idea-inbox.md](idea-inbox.md): ideas that are not ready for implementation.
+- [planner-parity/current.md](planner-parity/current.md): generated current legacy Planner behavior audit evidence.
+- [worktree-delivery-spec.md](worktree-delivery-spec.md): review, commit grouping, validation and safe `origin/master` delivery plan for the current accumulated worktree.
 
 ## Rules
 

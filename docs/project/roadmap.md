@@ -2,7 +2,7 @@
 
 ## Current direction
 
-The current app is a valuable static prototype of a 2004scape combat simulator. The rewrite direction is to preserve current end-user workflows, use legacy behavior as regression evidence and rebuild around explicit boundaries:
+The current root app is the source-backed Vite/React rewrite of the 2004scape combat simulator. The rewrite preserves current end-user workflows, uses the archived implementation as regression/reference evidence and owns explicit boundaries for:
 
 - typed domain core
 - validated game-data snapshots
@@ -39,8 +39,8 @@ Implementation requirements for the rewrite live in [../technical/rewrite-spec.m
 
 5. Add accepted live integrations.
    - Hiscores lookup and market price refresh should follow [../technical/live-integrations-spec.md](../technical/live-integrations-spec.md).
-   - Hiscores is required for v1, but the authoritative API/hosting answer is pending.
-   - Market prices target `markets.lostcity.rs`; scheduled-only GitHub Actions automation should write `prices.json`, `alch.json` and retained 12-hour `price-history.json` snapshots.
+   - Hiscores has a safe provider-disabled/manual-level fallback for the current trusted-tester target; live availability still needs an authoritative API and hosting answer.
+   - Market prices target `markets.lostcity.rs`; scheduled-only GitHub Actions automation writes `prices.json`, `alch.json` and retained 12-hour `price-history.json` snapshots. Live response verification, repository variable setup and the first successful scheduled run remain evidence boundaries before scheduled-current claims.
    - Shared setups, accounts and database storage remain open decisions.
 
 ## Not in scope yet
@@ -48,5 +48,5 @@ Implementation requirements for the rewrite live in [../technical/rewrite-spec.m
 - Auth or accounts.
 - Database-backed persistence.
 - Public API contract.
-- Server-side market jobs.
+- Request-triggered or server-managed market jobs beyond the accepted repository scheduler.
 - Full CI/CD or public deployment pipeline.

@@ -46,20 +46,20 @@ The view must use strips and tables, not dashboard cards. It should fit the firs
 
 Required order and behavior:
 
-| Slot | Melee label | Ranged label | Magic label | Behavior                                                                                                                                          |
-| ---- | ----------- | ------------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1    | TYPE        | TYPE         | TYPE        | Combat type segmented/select control. Changing type applies style defaults while preserving levels and target.                                    |
-| 2    | ATT         | RNG          | MAG         | Primary offensive level.                                                                                                                          |
-| 3    | STR         | reserved     | SPELL       | Melee strength, ranged reserved alignment cell, or magic spell select.                                                                            |
-| 4    | DEF         | DEF          | DEF         | Defence level.                                                                                                                                    |
-| 5    | STANCE      | STANCE       | STANCE      | Weapon/style control using the same stance options as the active combat type.                                                                     |
+| Slot | Melee label | Ranged label | Magic label | Behavior                                                                                                                                                   |
+| ---- | ----------- | ------------ | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | TYPE        | TYPE         | TYPE        | Combat type segmented/select control. Changing type applies style defaults while preserving levels and target.                                             |
+| 2    | ATT         | RNG          | MAG         | Primary offensive level.                                                                                                                                   |
+| 3    | STR         | reserved     | SPELL       | Melee strength, ranged reserved alignment cell, or magic spell select.                                                                                     |
+| 4    | DEF         | DEF          | DEF         | Defence level.                                                                                                                                             |
+| 5    | STANCE      | STANCE       | STANCE      | Weapon/style control using the same stance options as the active combat type.                                                                              |
 | 6    | PRAY        | PRAY         | PRAY        | Compact primary prayer selector. It preserves other active compatible prayer categories, shows a `+N` marker for them and updates rewrite `prayers` state. |
 | 7    | POT         | POT          | POT         | Compact primary boost selector. It preserves other active compatible boost categories, shows a `+N` marker for them and updates rewrite `boosts` state.    |
-| 8    | ACC+        | ACC+         | M+%         | Manual accuracy or magic accuracy adjustment. Empty value uses the derived equipment/stance value.                                                |
-| 9    | DMG+        | DMG+         | DMG%        | Manual damage adjustment. Empty value uses the derived equipment/ammo/spell value.                                                                |
-| 10   | SPD         | SPD          | SPD         | Manual attack speed in seconds. Empty value uses the weapon/style-derived speed.                                                                  |
-| 11   | F/KL        | F/KL         | F/KL        | Food per kill or current trip food pressure. If the rewrite cannot yet write this directly, show the current model value read-only.               |
-| 12   | TARGET      | TARGET       | TARGET      | Monster select. Changing target updates the metric strip and highlights the table row.                                                            |
+| 8    | ACC+        | ACC+         | M+%         | Manual accuracy or magic accuracy adjustment. Empty value uses the derived equipment/stance value.                                                         |
+| 9    | DMG+        | DMG+         | DMG%        | Manual damage adjustment. Empty value uses the derived equipment/ammo/spell value.                                                                         |
+| 10   | SPD         | SPD          | SPD         | Manual attack speed in seconds. Empty value uses the weapon/style-derived speed.                                                                           |
+| 11   | F/KL        | F/KL         | F/KL        | Food per kill or current trip food pressure. If the rewrite cannot yet write this directly, show the current model value read-only.                        |
+| 12   | TARGET      | TARGET       | TARGET      | Monster select. Changing target updates the metric strip and highlights the table row.                                                                     |
 
 The legacy source renders these controls into a 13-column grid even though the named control set is effectively 12 slots. The rewrite can keep 12 named slots plus a reserved rhythm column, or preserve 13 physical grid columns, but labels and visual rhythm should match the old spreadsheet.
 
@@ -118,12 +118,13 @@ Status date: 2026-07-08. The accepted V1 replacement line for this slice is
 visible workflow parity in the root Vite rewrite, not a clone of legacy
 script-order internals.
 
-| Classification | Items | Release impact |
-| --- | --- | --- |
-| `release-required` | Combat type controls in PlayerSidebar and compact setup strip route through the active combat-style tab; melee/ranged/magic loadouts stash and restore style-owned weapon, ammo, spell, gear, prayers, boosts, manual overrides and special-attack state; `SimulationRequest` receives normalized combat request data without UI-only or saved-setup state; Result summary keeps the existing metric strip and Active assumptions review/reset boundaries; Stats shows combat roll detail, XP routing, source breakdown/detail for normal attack, special attack and cannon, Trip/banking summary and normal-player hit distribution; supported melee/ranged special attack controls show current domain metrics; magic unsupported and DBA boost states suppress `specialAttack` request data. | Complete for this slice. |
-| `later` | Full price-aware, quest-aware, generated-requirement-aware or whole-loadout gear optimization; broader browser-display expansion; all-fixture browser-rendered numeric coverage; full visual regression; special/cannon hit distribution breakdowns beyond current normal-player hit distribution. | Not required unless a later release makes one of these evidence areas a blocker. |
-| `legacy-only` | Runtime Babel, CDN React, production `window.*` ownership, archived legacy layout internals and script-order coupling. | Not ported by design. |
-| `decision-needed` | New special attack formulas and magic DPS specials. | Keep as explicit future decisions, not blockers for the accepted V1 slice. D-046 accepts the current ranged/magic/halberd auto-safespot behavior as the V1 default UX with user override, and D-050 keeps the dragon halberd NPC-size fallback warning for V1. |
+| Classification         | Items                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Release impact                                                                                                                                                                                                                                                 |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `release-required`     | Combat type controls in PlayerSidebar and compact setup strip route through the active combat-style tab; melee/ranged/magic loadouts stash and restore style-owned weapon, ammo, spell, gear, prayers, boosts, manual overrides and special-attack state; `SimulationRequest` receives normalized combat request data without UI-only or saved-setup state; Result summary keeps the existing metric strip and Active assumptions review/reset boundaries; Stats shows combat roll detail, XP routing, source breakdown/detail for normal attack, special attack and cannon, Trip/banking summary and normal-player hit distribution; supported melee/ranged special attack controls show current domain metrics; magic unsupported and DBA boost states suppress `specialAttack` request data. | Complete for this slice.                                                                                                                                                                                                                                       |
+| `later`                | Full price-aware, quest-aware, generated-requirement-aware or whole-loadout gear optimization; browser detail coverage beyond the completed all-fixture metric strip; special/cannon hit distribution breakdowns beyond current normal-player hit distribution.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Not required unless a later release makes one of these evidence areas a blocker.                                                                                                                                                                               |
+| `implemented evidence` | Repository-local visual regression suite from [visual-regression-spec.md](visual-regression-spec.md).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Implemented with isolated Chromium config and reviewed Darwin baselines; remote merge-blocking status still needs a CI decision.                                                                                                                               |
+| `legacy-only`          | Runtime Babel, CDN React, production `window.*` ownership, archived legacy layout internals and script-order coupling.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | Not ported by design.                                                                                                                                                                                                                                          |
+| `decision-needed`      | New special attack formulas and magic DPS specials.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Keep as explicit future decisions, not blockers for the accepted V1 slice. D-046 accepts the current ranged/magic/halberd auto-safespot behavior as the V1 default UX with user override, and D-050 keeps the dragon halberd NPC-size fallback warning for V1. |
 
 ### Dense Monster Table
 
@@ -295,25 +296,27 @@ because later and decision-needed items below are not blockers for this slice.
 Decision: D-032 accepts the current release-path browser numeric coverage for
 this slice. The existing browser evidence covers representative default melee,
 melee alch-relevant, ranged safespot, ranged cannon, magic safespot and custom
-loot-settings marker rows plus related metric-strip workflows. All-fixture
-browser-display expansion and full visual regression are not release blockers
-unless a future user decision makes them required.
+loot-settings marker rows plus related metric-strip workflows. The user has now
+authorized the optional all-fixture browser-display expansion as later work; it
+is now completed non-blocking evidence. The repository-local visual matrix is
+also implemented; only remote merge-blocking promotion and broader future
+scenario/platform expansion remain outside the accepted release gate.
 
-| Item | Classification | Release note |
-| --- | --- | --- |
-| Dense shell, compact setup strip, metric strip, full all-monster table, default XP/hr sort, sortable headers, row target selection and active target marker | `release-required` | Implemented in the root workbench and smoke-covered. |
-| Monster/drop filters, show hidden/irrelevant toggle, reset filters, persisted irrelevant monster state and forced-current-target visibility | `release-required` | Implemented through rewrite-owned dense compare state and covered by view-model/browser tests. |
-| Row markers for custom setup, high-alch override, kill-overhead override, hidden/irrelevant and forced-current-target rows | `release-required` | Implemented and covered as release usability evidence. |
-| Custom setup dense row calculations and per-monster loot-setting markers | `release-required` | Implemented for rewrite-owned custom setups and current per-monster loot settings. |
-| Visible-row XP/hr and net GP/hr scale indicators | `release-required` | Implemented and browser-smoked through filtered visible-row paths. |
-| Mobile/tablet containment for the dense table | `release-required` | Implemented with contained horizontal table scroll and browser-smoked at mobile and tablet widths. |
-| Browser-rendered numeric snapshots for representative release paths | `release-required` | Accepted by D-032 as sufficient for this release slice. |
-| All-fixture browser-display expansion | `later` | Add only if a future release asks for every legacy fixture rendered in the browser. Domain/trip/XP fixture parity remains the current numeric baseline. |
-| Full visual regression suite | `later` | Not required by the current V1 replacement classification; add only if visual tolerance becomes a release requirement. |
-| Exact legacy CSS/layout pixel matching and script-order `window.*` internals | `legacy-only` | The rewrite preserves user workflow shape, not archived implementation internals. |
-| Deeper legacy compare-state migration beyond compatible `sim_compare_sort_v1` and `sim_irrelevant_v1` import | `decision-needed` | Do not implicitly read or migrate additional legacy compare maps without a separate migration/no-migration decision. |
-| Final default relationship between Dense Compare and the broader tabbed workbench | `decision-needed` | Current release can ship with Compare as the active dense pane; final product default remains a UX decision. |
-| Worker-backed compare calculation runner | `decision-needed` | Keep the current main-thread implementation unless performance evidence misses the accepted budget. |
+| Item                                                                                                                                                        | Classification         | Release note                                                                                                                                         |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Dense shell, compact setup strip, metric strip, full all-monster table, default XP/hr sort, sortable headers, row target selection and active target marker | `release-required`     | Implemented in the root workbench and smoke-covered.                                                                                                 |
+| Monster/drop filters, show hidden/irrelevant toggle, reset filters, persisted irrelevant monster state and forced-current-target visibility                 | `release-required`     | Implemented through rewrite-owned dense compare state and covered by view-model/browser tests.                                                       |
+| Row markers for custom setup, high-alch override, kill-overhead override, hidden/irrelevant and forced-current-target rows                                  | `release-required`     | Implemented and covered as release usability evidence.                                                                                               |
+| Custom setup dense row calculations and per-monster loot-setting markers                                                                                    | `release-required`     | Implemented for rewrite-owned custom setups and current per-monster loot settings.                                                                   |
+| Visible-row XP/hr and net GP/hr scale indicators                                                                                                            | `release-required`     | Implemented and browser-smoked through filtered visible-row paths.                                                                                   |
+| Mobile/tablet containment for the dense table                                                                                                               | `release-required`     | Implemented with contained horizontal table scroll and browser-smoked at mobile and tablet widths.                                                   |
+| Browser-rendered numeric snapshots for representative release paths                                                                                         | `release-required`     | Accepted by D-032 as sufficient for this release slice.                                                                                              |
+| All-fixture browser-display expansion                                                                                                                       | `completed optional`   | The 18-case rewrite fixture adapter is unit-covered; its focused metric-strip Playwright case passes 1/1 and the expanded default gate passes 56/56. |
+| Repository-local visual regression suite                                                                                                                    | `implemented evidence` | Implemented in [visual-regression-spec.md](visual-regression-spec.md); it is not a remote merge gate without a separate CI runner decision.          |
+| Exact legacy CSS/layout pixel matching and script-order `window.*` internals                                                                                | `legacy-only`          | The rewrite preserves user workflow shape, not archived implementation internals.                                                                    |
+| Deeper legacy compare-state migration beyond compatible `sim_compare_sort_v1` and `sim_irrelevant_v1` import                                                | `decision-needed`      | Do not implicitly read or migrate additional legacy compare maps without a separate migration/no-migration decision.                                 |
+| Final default relationship between Dense Compare and the broader tabbed workbench                                                                           | `decision-needed`      | Current release can ship with Compare as the active dense pane; final product default remains a UX decision.                                         |
+| Worker-backed compare calculation runner                                                                                                                    | `decision-needed`      | Keep the current main-thread implementation unless performance evidence misses the accepted budget.                                                  |
 
 ## Layout Contract
 
@@ -752,8 +755,10 @@ Required content:
 - Snapshot live loadout action.
 - Persisted setup snapshots.
 - Rename, load and delete snapshot controls.
+- Versioned snapshot export/import with bounded validation and non-destructive merge behavior.
 - Table comparing live and saved setups on the current monster.
 - Best markers for effective XP/hr, effective net GP/hr and GP/XP.
+- On-demand cross-monster matrix for live and saved setups with metric selection, filtering and per-monster best markers.
 
 Current implementation note: the rewrite Duel tab now exposes the visible
 snapshot workflow over the Goal 1 foundation. `src/app/state/duel-snapshots.ts`
@@ -763,12 +768,26 @@ persistence contract. Snapshot payloads store validated and normalized
 app-side mutations to 12 snapshots and do not store calculated results, upstream
 data, player names or shared-link data. The UI can snapshot the current setup,
 rename snapshots, load a snapshot into the live editor while preserving the
-current target monster, and delete individual snapshots. The comparison table
+current target monster, delete individual snapshots and export/import a strict
+version 1 JSON envelope. Import rejects oversized, malformed,
+unsupported-version and computed-result payloads, updates matching ids and adds
+new snapshots only while the current 12-entry cap has room. The comparison table
 uses `createDuelComparisonViewModel()` to build live plus snapshot rows by
 re-simulating each snapshot setup against the current active monster, including
 XP/hr, effective net GP/hr, GP/XP and best-marker fields where live can also win.
-Legacy `duelSetups` migration, account-backed saves, shared permalinks and a
-cross-monster Duel matrix remain out of scope.
+The optional Monster matrix is built only after an explicit user action through
+`createDuelMatrixViewModel()`. It evaluates the live setup and at most 12 saved
+setups across the current generated monster catalog, exposes DPS, XP/hr, net
+GP/hr and GP/XP views, supports a local monster filter and marks the best setup
+within each monster row. The matrix is not persisted and is treated as stale
+when setup, snapshot, price, cannon or loot inputs change, so normal setup edits
+do not trigger a full cross-monster recalculation.
+Compatible legacy `sim_input_v3.duelSetups` rows migrate through the same bounded
+form validation into rewrite-owned Duel snapshot storage. Existing rewrite
+snapshots win conflicts, the shared 12-entry cap applies and invalid or computed
+rows produce sanitized skip reasons. The planned active setup permalink is
+specified separately and does not share the Duel collection. Account-backed
+saves, shared Duel collections and server-backed sharing remain out of scope.
 
 ### Planner
 
@@ -793,6 +812,8 @@ Required content if price history remains a product feature:
 - Top gainers and fallers.
 - Item filter.
 - Movers table with item, trend sparkline, price, baseline, GP delta and percent delta.
+- Item-selectable chronological trend with latest, minimum, maximum, net change
+  and exact local snapshot points.
 
 Current implementation note: the Economy tab is complete for the accepted V1
 browser-local Loot/Economy slice. It shows the scheduled static price snapshot
@@ -805,10 +826,12 @@ valid scheduled static snapshot, then bundled prices as its fallback order. It
 shows active/latest price-set labels, latest snapshot age, tracked item count,
 snapshot count, moved item count, Previous/First/Snapshot baseline selection,
 item filter, top gainers/fallers and a movers table with latest price, baseline
-price, GP delta and percent delta. Missing or zero baseline prices render
+price, GP delta, percent delta and a chronological per-row sparkline. The item
+trend selector exposes a larger local timeline with latest/minimum/maximum/net
+change metrics and exact points. Missing items and zero baseline prices render
 without `Infinity`/`NaN`. `Clear history` requires confirmation and removes
-only the rewrite-owned `index-sim:price-history` key. Trend sparklines and
-fuller economy workflows are later enhancements, not blockers for this slice.
+only the rewrite-owned `index-sim:price-history` key. Shared/server history and
+live-provider workflows remain separate decision boundaries.
 
 ### Loot/Economy Release Classification
 
@@ -816,12 +839,12 @@ Status date: 2026-07-08. This classification applies to the visible
 Loot/Economy V1 replacement workflow in the root Vite rewrite, not to
 production market automation or full legacy storage migration.
 
-| Classification | Items | Release impact |
-| --- | --- | --- |
-| `release-required` | Current-monster loot action table; per-drop action selection for loot, skip, bury, alch, unid and value where applicable; per-monster high-alch, kill-overhead and talisman settings; current-monster reset and optimize actions with one-step Undo; loot value composition with top contributors and tail grouping; nested `_expand` drop detail; readable per-action net GP/hr impact detail; local price-history context in Loot row detail; structured missing, alias and fallback price warnings near Loot/Economy money values; active/latest price context; local PriceSet import override; reset-to-scheduled fallback; Snapshot now; confirmed Clear history for only `index-sim:price-history`; browser-local Economy movers analysis. | Complete for this slice. |
-| `later` | Trend sparklines, fuller economy analysis beyond the current movers table, all-fixture browser-display expansion and full visual regression. | Not required unless a later release makes one of these evidence areas a blocker. |
-| `legacy-only` | Archived `market.js` current-monster nested sync behavior, legacy script-order globals, legacy `/api/prices` or `/api/scrape` production copy and legacy runtime internals. | Not ported by design for the rewrite V1 path. |
-| `decision-needed` | Full legacy price-history migration, server-managed/shared price history, live provider evidence, live `markets.lostcity.rs` response verification, `MARKET_PRICES_UPSTREAM_URL` configuration and verified scheduled-run evidence. | Keep as explicit future decisions or blocked production work, not blockers for the accepted visible V1 slice. |
+| Classification     | Items                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | Release impact                                                                                                |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `release-required` | Current-monster loot action table; per-drop action selection for loot, skip, bury, alch, unid and value where applicable; per-monster high-alch, kill-overhead and talisman settings; current-monster reset and optimize actions with one-step Undo; loot value composition with top contributors and tail grouping; nested `_expand` drop detail; readable per-action net GP/hr impact detail; local price-history context in Loot row detail; structured missing, alias and fallback price warnings near Loot/Economy money values; active/latest price context; local PriceSet import override; reset-to-scheduled fallback; Snapshot now; confirmed Clear history for only `index-sim:price-history`; browser-local Economy movers analysis with per-row sparklines and an item-selectable chronological trend. | Complete for this slice.                                                                                      |
+| `later`            | Further Economy analysis beyond the local movers/trend workflow, visual scenarios beyond the implemented repository-local matrix and remote merge-gate promotion.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Not required unless a later release makes one of these evidence areas a blocker.                              |
+| `legacy-only`      | Archived `market.js` current-monster nested sync behavior, legacy script-order globals, legacy `/api/prices` or `/api/scrape` production copy and legacy runtime internals.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Not ported by design for the rewrite V1 path.                                                                 |
+| `decision-needed`  | Full legacy price-history migration, server-managed/shared price history, live provider evidence, live `markets.lostcity.rs` response verification, `MARKET_PRICES_UPSTREAM_URL` configuration and verified scheduled-run evidence.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Keep as explicit future decisions or blocked production work, not blockers for the accepted visible V1 slice. |
 
 ### Settings
 
@@ -888,7 +911,8 @@ or decision-needed scope.
 
 ### Phase E: missing tab parity
 
-- Legacy `duelSetups` migration remains a separate decision.
+- Compatible legacy `duelSetups` migration is implemented; unsupported rows stay
+  non-fatal and visible only through sanitized migration metadata.
 - Add remaining Settings parity, subject to product decisions for live sync and
   price history.
 - Add any remaining persisted UI state for settings or later accepted

@@ -6,7 +6,11 @@
 - [rewrite-spec.md](rewrite-spec.md): implementation-grade rewrite specification.
 - [rewrite-parity-report.md](rewrite-parity-report.md): current legacy-vs-rewrite calculation reliability audit.
 - [ui-parity-spec.md](ui-parity-spec.md): legacy-to-rewrite UI layout, tab order and workflow parity target.
+- [legacy-planner-parity-spec.md](legacy-planner-parity-spec.md): implemented archived Planner behavior comparison and gap-classification contract.
+- [shareable-setup-permalink-spec.md](shareable-setup-permalink-spec.md): static, review-before-load setup sharing contract.
+- [visual-regression-spec.md](visual-regression-spec.md): deterministic Playwright screenshot coverage and baseline policy.
 - [live-integrations-spec.md](live-integrations-spec.md): hiscores lookup and live market sync product/API specification.
+- [hiscores-live-implementation-spec.md](hiscores-live-implementation-spec.md): decision prerequisites and implementation/evidence plan for the remaining live Hiscores provider/runtime slice.
 - [testing.md](testing.md): current validation commands and future test strategy.
 
 ## Related evidence
