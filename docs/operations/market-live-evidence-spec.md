@@ -52,6 +52,7 @@ Sanitized live evidence from 2026-07-10:
 - the public item catalog resolved the bounded 80-item allowlist; 30 stale legacy slugs were corrected and ambiguous dragonhide/half-key identities were resolved from canonical source identities
 - current completed rows use one coin-only offer for their per-item GP amount; item, mixed and ambiguous multiple offers are skipped
 - the full `--dry-run` completed without writes and reported 69 updated plus 11 retained/skipped mappings
+- candidate review found 9 new market prices and 52 changed existing prices; the largest relative delta was 33.6%, with no order-of-magnitude mapping/unit outlier
 - the candidate diff remained limited to `prices.json` and `price-history.json`
 - no raw page, username, session cookie or local absolute path was stored or committed
 
@@ -239,10 +240,10 @@ Live checks are opt-in and must not run in the default unit suite. The GitHub cr
 - [x] Redirect, timeout, content-type and pre-read size hardening implemented and tested
 - [x] Sanitized live-contract evidence recorded without raw payload
 - [x] `--dry-run` succeeds against the verified endpoint with no writes
-- [ ] Candidate counts and value changes reviewed
+- [x] Candidate counts and value changes reviewed
 - [ ] Repository variable contains the exact safe endpoint and no secret
 - [ ] First cron completes validation and changes only approved files, or produces a verified no-op
 - [ ] Workflow logs and commit contain no sensitive/raw source material
 - [ ] Freshness evidence records run, commit/no-op, `_scraped_at` and checks
 - [ ] Scheduled-current copy is promoted only after the evidence passes
-- [ ] Feature inventory remains `Valmis` because this closes operations evidence, not a missing visible workflow
+- [x] Feature inventory remains `Valmis` because this closes operations evidence, not a missing visible workflow

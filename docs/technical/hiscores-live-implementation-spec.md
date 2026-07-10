@@ -246,13 +246,13 @@ Do not record raw upstream payloads, real player profiles, credentials, local ab
 
 ## Final acceptance criteria
 
-- [ ] Authoritative source and source terms are accepted and documented
+- [x] Authoritative source and source terms are accepted and documented
 - [ ] Production runtime/hosting and log policy are accepted and documented
-- [ ] Provider adapter is server-only, allowlisted, bounded and fixture-tested
-- [ ] Existing same-origin API and browser contracts remain stable
-- [ ] Missing configuration fails to a sanitized manual-fallback state
+- [x] Provider adapter is server-only, allowlisted, bounded and fixture-tested
+- [x] Existing same-origin API and browser contracts remain stable
+- [x] Missing configuration fails to a sanitized manual-fallback state
 - [ ] Production routing, no-store and rate limiting are verified
 - [ ] No player name, raw payload or credential leaks through logs, API errors or UI copy
-- [ ] Opt-in live smoke evidence is recorded without raw personal data
+- [x] Opt-in live smoke evidence is recorded without raw personal data
 - [ ] Operations, testing, backlog and feature inventory reflect the deployed state
 - [ ] `Hiscores` moves to `Valmis` only after all preceding criteria pass

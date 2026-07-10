@@ -23,7 +23,7 @@
     "runtime:write-legacy-derived": "$NODE node_modules/vite-node/vite-node.mjs --config vitest.config.ts scripts/write-legacy-derived-runtime-snapshot.ts",
     "planner:parity": "$NODE node_modules/vitest/vitest.mjs run --config vitest.config.ts src/tests/planner-parity.test.ts src/tests/planner-domain.test.ts && $NODE node_modules/vite-node/vite-node.mjs --config vitest.config.ts scripts/report-legacy-planner-parity.ts",
     "planner:parity:report": "$NODE node_modules/vite-node/vite-node.mjs --config vitest.config.ts scripts/report-legacy-planner-parity.ts",
-    "prices:write-scheduled": "$NODE node_modules/vite-node/vite-node.mjs --config vitest.config.ts scripts/write-scheduled-market-prices.ts",
+    "prices:write-scheduled": "SCHEDULED_MARKET_WRITER_CLI=1 $NODE node_modules/vite-node/vite-node.mjs --config vitest.config.ts scripts/write-scheduled-market-prices.ts",
     "deploy:verify-artifact": "$NODE node_modules/vite-node/vite-node.mjs --config vitest.config.ts scripts/verify-public-deployment.ts artifact",
     "deploy:smoke": "$NODE node_modules/vite-node/vite-node.mjs --config vitest.config.ts scripts/verify-public-deployment.ts http",
     "test:e2e": "playwright test",

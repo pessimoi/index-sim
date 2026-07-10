@@ -424,11 +424,10 @@ export async function main(): Promise<void> {
 
 function isDirectCliRun(): boolean {
   const currentFile = fileURLToPath(import.meta.url);
-  const argvHasCurrentFile = process.argv.some((arg) => resolve(arg) === currentFile);
-  const viteNodeScriptRun =
-    process.env.VITEST !== "true" &&
-    currentFile.replace(/\\/g, "/").endsWith("/scripts/write-scheduled-market-prices.ts");
-  return argvHasCurrentFile || viteNodeScriptRun;
+  return (
+    process.env.SCHEDULED_MARKET_WRITER_CLI === "1" ||
+    process.argv.some((arg) => resolve(arg) === currentFile)
+  );
 }
 
 if (isDirectCliRun()) {
