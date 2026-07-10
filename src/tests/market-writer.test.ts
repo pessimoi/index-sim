@@ -127,11 +127,17 @@ function itemPagePayload(slug: string, prices: number[]): string {
       soldListings: {
         current_page: 1,
         data: prices.map((price, index) => ({
-          price,
+          price: null,
           quantity: index + 1,
           type: index % 2 === 0 ? "buy" : "sell",
           soldAt: soldAt(index + 1),
-          username: `private-${index}`
+          username: `private-${index}`,
+          offers: [
+            {
+              title: "For each item:",
+              items: [{ quantity: price, item: { slug: "coins" } }]
+            }
+          ]
         }))
       }
     }
@@ -295,6 +301,20 @@ describe("scheduled market writer", () => {
       contentType: "text/html; charset=UTF-8",
       mapping
     });
+    const ambiguousPayload = JSON.parse(itemPagePayload("lobster", [200, 210, 220]));
+    ambiguousPayload.props.soldListings.data[1].offers = [
+      {
+        items: [
+          { quantity: 100, item: { slug: "coins" } },
+          { quantity: 1, item: { slug: "rune_scimitar" } }
+        ]
+      }
+    ];
+    const ambiguousItem = parseMarketsLostcityItemPage({
+      text: JSON.stringify(ambiguousPayload),
+      contentType: "application/json",
+      mapping
+    });
 
     expect(jsonItem).toEqual(htmlItem);
     expect(JSON.stringify(jsonItem)).not.toContain("private-");
@@ -303,6 +323,7 @@ describe("scheduled market writer", () => {
       expect.objectContaining({ price: 210, quantity: 2, type: "sell" }),
       expect.objectContaining({ price: 220, quantity: 3, type: "buy" })
     ]);
+    expect(ambiguousItem.history?.map((trade) => trade.price)).toEqual([200, 220]);
   });
 
   it("rejects invalid normalized/raw rows and incomplete approved mapping sets", () => {
@@ -312,21 +333,42 @@ describe("scheduled market writer", () => {
     expectWriterError(() => createOutputs("upstream-unknown-item.json"), "unknown_item");
     expectWriterError(() => createOutputs("upstream-unknown-slug.json"), "unknown_source_slug");
     expectWriterError(() => parseRawFixture("raw-duplicate-item.json"), "duplicate_item");
-  });
-
-  it("requires an existing price when an item must be retained", () => {
+    const allSkipped = parseFixture("upstream-valid.json");
     expectWriterError(
       () =>
         createScheduledMarketSnapshotOutputs({
-          upstream: parseFixture("upstream-valid.json"),
-          previousPrices: Object.fromEntries(
-            Object.entries(BASE_PRICES).filter(([key]) => key !== "dragon_bones")
-          ),
+          upstream: {
+            ...allSkipped,
+            items: allSkipped.items.map((item) => ({
+              itemId: item.itemId,
+              sourceSlug: item.sourceSlug,
+              status: "skipped" as const,
+              reason: "No usable completed trades"
+            }))
+          },
+          previousPrices: BASE_PRICES,
           previousPriceHistory: BASE_HISTORY,
           mappings: TEST_MAPPINGS,
           capturedAt: CAPTURED_AT
         }),
-      "missing_previous_value"
+      "invalid_upstream"
+    );
+  });
+
+  it("keeps an unavailable new market price omitted for generated runtime fallback", () => {
+    const outputs = createScheduledMarketSnapshotOutputs({
+      upstream: parseFixture("upstream-valid.json"),
+      previousPrices: Object.fromEntries(
+        Object.entries(BASE_PRICES).filter(([key]) => key !== "dragon_bones")
+      ),
+      previousPriceHistory: BASE_HISTORY,
+      mappings: TEST_MAPPINGS,
+      capturedAt: CAPTURED_AT
+    });
+
+    expect(outputs.prices).not.toHaveProperty("dragon_bones");
+    expect(outputs.report.items.find((item) => item.itemId === "dragon_bones")?.reason).toContain(
+      "no previous market price"
     );
   });
 
@@ -371,6 +413,7 @@ describe("scheduled market writer", () => {
       const fetchMock = vi.fn(async (url: string) => {
         const slug = decodeURIComponent(new URL(url).pathname.split("/").at(-1) ?? "");
         fetchedSlugs.push(slug);
+        if (slug === "dragon_bones") return new Response("", { status: 404 });
         return pageResponse(
           slug,
           slug === "lobster"
@@ -505,15 +548,15 @@ describe("scheduled market writer", () => {
       message: "Scheduled market upstream response exceeds safe size limit"
     });
 
-    await expect(
-      runScheduledMarketWriter(args, {
-        fetchImpl: async () =>
-          new Response("plain text", { status: 200, headers: { "Content-Type": "text/plain" } }),
-        requestDelayMs: 0
-      })
-    ).rejects.toMatchObject({
+    const contractError = await runScheduledMarketWriter(args, {
+      fetchImpl: async () =>
+        new Response("plain text", { status: 200, headers: { "Content-Type": "text/plain" } }),
+      requestDelayMs: 0
+    }).catch((error: unknown) => error);
+    expect(contractError).toMatchObject({
       code: "invalid_upstream",
-      message: "Market item page response has an unsupported content type"
+      message: "Market item page response has an unsupported content type",
+      issues: ["itemId: lobster"]
     });
   });
 });

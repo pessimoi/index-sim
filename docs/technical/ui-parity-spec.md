@@ -586,7 +586,7 @@ Required content:
 - Prayer XP from burying.
 - Loot value composition section.
 
-Current implementation note: the root rewrite UI exposes the full current-target loot workflow, meaningful action controls, per-monster settings, composition/nested/action-impact detail and price-history context from the same merged shared/local analysis used by Economy. Generated high alch controls alch profitability. Economy owns the read-only shared plus local comparison workflow; D-049 still keeps full legacy history migration out of V1, while acceptable automated-use and scheduled-run evidence remain operations work.
+Current implementation note: the root rewrite UI exposes the full current-target loot workflow, meaningful action controls, per-monster settings, composition/nested/action-impact detail and price-history context from the same merged shared/local analysis used by Economy. Generated high alch controls alch profitability. Economy owns the read-only shared plus local comparison workflow; D-049 still keeps full legacy history migration out of V1, while root-variable and scheduled-run evidence remain operations work after the successful live dry-run.
 
 #### Loot/Economy nested workflow parity slice
 
@@ -604,7 +604,7 @@ Source and status:
 - Current state: the drop table, action selection, per-action net GP/hr impact,
   full nested drop detail, loot value composition, trip-state row labels,
   merged shared/local history context in Loot row detail and Economy exist. This
-  visible slice is closed; acceptable automated-use/run evidence, backend/account
+  visible slice is closed; configured scheduled-run evidence, backend/account
   history and full legacy history migration remain outside the slice.
 
 In scope:
@@ -836,7 +836,7 @@ production market automation or full legacy storage migration.
 | `release-required` | Current-monster loot actions/settings; reset/optimize with Undo; loot composition/nested detail; structured price warnings; active market-price context; generated high alch; local PriceSet override/reset; shared read-only plus local comparison history; `Save local comparison`; confirmed `Clear local history`; movers, sparklines and item trends. | Complete for this slice.                                                                          |
 | `later`            | Further Economy analysis beyond the local movers/trend workflow, visual scenarios beyond the implemented repository-local matrix and remote merge-gate promotion.                                                                                                                                                                                          | Not required unless a later release makes one of these evidence areas a blocker.                  |
 | `legacy-only`      | Archived `market.js` current-monster nested sync behavior, legacy script-order globals, legacy `/api/prices` or `/api/scrape` production copy and legacy runtime internals.                                                                                                                                                                                | Not ported by design for the rewrite V1 path.                                                     |
-| `decision-needed`  | Full legacy history migration, backend/account history, acceptable automated-use evidence, `MARKET_PRICES_UPSTREAM_URL` configuration and verified scheduled-run evidence.                                                                                                                                                                                 | Keep as explicit future or external production work, not blockers for the accepted visible slice. |
+| `decision-needed`  | Full legacy history migration, backend/account history, `MARKET_PRICES_UPSTREAM_URL` configuration and verified scheduled-run evidence.                                                                                                                                                                                                                    | Keep as explicit future or external production work, not blockers for the accepted visible slice. |
 
 ### Settings
 

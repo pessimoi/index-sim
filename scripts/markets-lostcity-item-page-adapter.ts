@@ -7,15 +7,35 @@ import {
   type ScheduledMarketUpstreamItem
 } from "./scheduled-market-writer-core";
 
+const TradeOfferItemSchema = z
+  .object({
+    quantity: z.number().int().positive(),
+    item: z
+      .object({
+        slug: z.string().min(1)
+      })
+      .passthrough()
+  })
+  .passthrough();
+
+const TradeOfferSchema = z
+  .object({
+    items: z.array(TradeOfferItemSchema).max(20)
+  })
+  .passthrough();
+
 const CompletedTradeSchema = z
   .object({
-    price: NonNegativeNumberSchema.refine((value) => value > 0, "Price must be positive"),
+    price: NonNegativeNumberSchema.refine((value) => value > 0, "Price must be positive")
+      .nullable()
+      .optional(),
     quantity: z.number().int().positive(),
     type: z.enum(["buy", "sell"]),
     soldAt: z
       .string()
       .min(1)
-      .refine((value) => Number.isFinite(Date.parse(value)), "Invalid sold timestamp")
+      .refine((value) => Number.isFinite(Date.parse(value)), "Invalid sold timestamp"),
+    offers: z.array(TradeOfferSchema).max(20).default([])
   })
   .passthrough();
 
@@ -98,6 +118,14 @@ function formatIssue(issue: { path: PropertyKey[]; message: string }): string {
   return `${path}: ${issue.message}`;
 }
 
+function completedTradeUnitPrice(trade: z.infer<typeof CompletedTradeSchema>): number | null {
+  if (trade.price !== null && trade.price !== undefined) return trade.price;
+  if (trade.offers.length !== 1) return null;
+  const items = trade.offers[0]?.items ?? [];
+  if (items.length !== 1 || items[0]?.item.slug !== "coins") return null;
+  return items[0].quantity;
+}
+
 export function parseMarketsLostcityItemPage(input: {
   text: string;
   contentType: string;
@@ -129,18 +157,27 @@ export function parseMarketsLostcityItemPage(input: {
     );
   }
 
-  const history = page.props.soldListings.data.map((trade) => ({
-    price: trade.price,
-    quantity: trade.quantity,
-    type: trade.type,
-    soldAt: trade.soldAt
-  }));
+  const history = page.props.soldListings.data.flatMap((trade) => {
+    const price = completedTradeUnitPrice(trade);
+    return price === null
+      ? []
+      : [
+          {
+            price,
+            quantity: trade.quantity,
+            type: trade.type,
+            soldAt: trade.soldAt
+          }
+        ];
+  });
 
   return {
     itemId: input.mapping.itemId,
     sourceSlug: input.mapping.sourceSlug,
     status: history.length ? "updated" : "skipped",
-    ...(history.length ? { history } : { reason: "No completed trades on item page" })
+    ...(history.length
+      ? { history }
+      : { reason: "No completed coin-denominated trades on item page" })
   };
 }
 

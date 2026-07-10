@@ -1,6 +1,6 @@
 # Scheduled market live-evidence specification
 
-- Status: item-page contract and fetch hardening implemented; automated-use acceptance and scheduled-run evidence pending
+- Status: live contract, crawler policy and full dry-run evidenced; repository variable and first scheduled run pending
 - Date: 2026-07-10
 - Owner: operations docs
 - Source: conditional backlog work and accepted decisions D-021, D-033, D-034 and D-053
@@ -39,17 +39,28 @@ The repository already has:
 
 Bounded 2026-07-10 inspection established the item route pattern `/items/{slug}`, Inertia
 component `items/show/page`, a ten-row first `soldListings` page and completed-row fields
-`price`, `quantity`, `type` and `soldAt`. Both buy and sell rows are realized trades.
-Usernames are intentionally discarded at the adapter boundary. This evidence does not
-confirm acceptable automated use for the full allowlist, configure the repository variable
+`price`, `quantity`, `type`, `soldAt` and `offers`. Current rows use `price: null`; a single
+offer containing one `coins` item carries the per-item GP amount. The adapter skips item
+swaps, mixed offers and ambiguous multiple offers. Both buy and sell rows are realized
+trades, and usernames are discarded at the adapter boundary. Public `robots.txt` currently
+allows `/` for the general `User-agent: *` group and sets no crawl delay; this supports the
+accepted sequential twice-daily read policy but does not configure the repository variable
 or prove a first scheduled run.
+
+Sanitized live evidence from 2026-07-10:
+
+- the public item catalog resolved the bounded 80-item allowlist; 30 stale legacy slugs were corrected and ambiguous dragonhide/half-key identities were resolved from canonical source identities
+- current completed rows use one coin-only offer for their per-item GP amount; item, mixed and ambiguous multiple offers are skipped
+- the full `--dry-run` completed without writes and reported 69 updated plus 11 retained/skipped mappings
+- the candidate diff remained limited to `prices.json` and `price-history.json`
+- no raw page, username, session cookie or local absolute path was stored or committed
 
 ## Preconditions
 
 Before any live fetch:
 
 1. keep the configured base exactly `https://markets.lostcity.rs/`; item paths are derived from the allowlist
-2. confirm the sequential twice-daily item-page reads are acceptable automated use
+2. recheck that public crawler policy still permits the sequential twice-daily item-page reads
 3. confirm the response contains no credentials, player information or other data that must not enter the workflow
 4. retain the completed fetch hardening requirements below
 5. ensure the repository and target branch permit the workflow's same-repo commit with `GITHUB_TOKEN`
@@ -79,7 +90,9 @@ The network path now enforces:
 - early `Content-Length` rejection when the declared size exceeds the accepted one-megabyte import policy
 - a bounded streaming read that aborts once the actual body crosses the same limit, including when `Content-Length` is absent or false
 - HTML/JSON content-type validation before Inertia parsing
-- sanitized timeout, stream, unsupported-contract and oversized-response errors
+- mapping-specific 404 retention with allowlisted item-id diagnostics
+- an all-retained hard gate that prevents stale values from receiving a fresh capture timestamp
+- sanitized timeout, stream, non-404 HTTP, unsupported-contract and oversized-response errors
 
 The raw live body must remain memory-only and must never be written as an artifact, cache, log attachment or committed fixture by the workflow.
 
@@ -222,10 +235,10 @@ Live checks are opt-in and must not run in the default unit suite. The GitHub cr
 ## Acceptance checklist
 
 - [x] Item-page path and Inertia response shape verified with bounded metadata-only evidence
-- [ ] Acceptable sequential automated use verified
+- [x] Public crawler policy reviewed for the accepted sequential automated use
 - [x] Redirect, timeout, content-type and pre-read size hardening implemented and tested
-- [ ] Sanitized live-contract evidence recorded without raw payload
-- [ ] `--dry-run` succeeds against the verified endpoint with no writes
+- [x] Sanitized live-contract evidence recorded without raw payload
+- [x] `--dry-run` succeeds against the verified endpoint with no writes
 - [ ] Candidate counts and value changes reviewed
 - [ ] Repository variable contains the exact safe endpoint and no secret
 - [ ] First cron completes validation and changes only approved files, or produces a verified no-op

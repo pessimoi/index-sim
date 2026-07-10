@@ -34,6 +34,7 @@ export interface CliOptions {
 
 interface FetchResponseLike {
   ok: boolean;
+  status: number;
   headers: { get(name: string): string | null };
   body: ReadableStream<Uint8Array> | null;
 }
@@ -234,7 +235,8 @@ async function fetchMarketItemPage(
     if (!response.ok) {
       throw new ScheduledMarketWriterError(
         "invalid_upstream",
-        "Scheduled market upstream request failed"
+        "Scheduled market upstream request failed",
+        [`httpStatus: ${response.status}`]
       );
     }
     return {
@@ -249,7 +251,8 @@ async function fetchMarketItemPage(
     if (error instanceof ScheduledMarketWriterError) throw error;
     throw new ScheduledMarketWriterError(
       "invalid_upstream",
-      "Scheduled market upstream request failed"
+      "Scheduled market upstream request failed",
+      ["network-error"]
     );
   } finally {
     if (timeoutId !== undefined) clearTimeout(timeoutId);
@@ -306,14 +309,31 @@ async function readUpstream(
       await networkOptions.delayImpl(networkOptions.requestDelayMs);
     }
     const target = new URL(`/items/${encodeURIComponent(mapping.sourceSlug)}`, root);
-    const response = await fetchMarketItemPage(target, fetchImpl, networkOptions);
-    items.push(
-      parseMarketsLostcityItemPage({
-        text: response.text,
-        contentType: response.contentType,
-        mapping
-      })
-    );
+    try {
+      const response = await fetchMarketItemPage(target, fetchImpl, networkOptions);
+      items.push(
+        parseMarketsLostcityItemPage({
+          text: response.text,
+          contentType: response.contentType,
+          mapping
+        })
+      );
+    } catch (error) {
+      if (!(error instanceof ScheduledMarketWriterError)) throw error;
+      if (error.issues.includes("httpStatus: 404")) {
+        items.push({
+          itemId: mapping.itemId,
+          sourceSlug: mapping.sourceSlug,
+          status: "skipped",
+          reason: "Market item page was not found"
+        });
+        continue;
+      }
+      throw new ScheduledMarketWriterError(error.code, error.message, [
+        `itemId: ${mapping.itemId}`,
+        ...error.issues.filter((issue) => !issue.startsWith("itemId:"))
+      ]);
+    }
   }
 
   return createMarketsLostcityItemPageResponse({
@@ -414,7 +434,11 @@ function isDirectCliRun(): boolean {
 if (isDirectCliRun()) {
   main().catch((error: unknown) => {
     if (error instanceof ScheduledMarketWriterError) {
-      console.error(`Scheduled market writer failed: ${error.code}`);
+      const itemIssue = error.issues.find((issue) => issue.startsWith("itemId:"));
+      const detailIssue = error.issues.find((issue) => !issue.startsWith("itemId:"));
+      console.error(
+        `Scheduled market writer failed: ${error.code}${itemIssue ? ` (${itemIssue})` : ""}${detailIssue ? ` - ${detailIssue}` : ""}`
+      );
     } else {
       console.error("Scheduled market writer failed: internal-error");
     }

@@ -1,45 +1,43 @@
 import type { MarketSourceMapping } from "../domain/shared";
 import { MARKET_SOURCE_ID, parseMarketSourceMappings } from "./schemas";
 
-const LEGACY_SLUG_MAP_NOTE =
-  "Derived from legacy market.js SLUG_MAP evidence; not an authoritative source mapping.";
-const LEGACY_SPECIAL_KEYS_NOTE =
-  "Derived from legacy market.js SPECIAL_KEYS evidence; source slug is provisional until an authoritative mapping exists.";
+const CATALOG_AUDITED_NOTE =
+  "Source slug reviewed against the markets.lostcity.rs item catalog on 2026-07-10.";
 
 const slugMapEntries: ReadonlyArray<[string, string]> = [
-  ["sapphire", "uncut_sapphire"],
-  ["emerald", "uncut_emerald"],
-  ["ruby", "uncut_ruby"],
-  ["diamond", "uncut_diamond"],
-  ["dragonstone", "uncut_dragonstone"],
+  ["sapphire", "sapphire"],
+  ["emerald", "emerald"],
+  ["ruby", "ruby"],
+  ["diamond", "diamond"],
+  ["dragonstone", "dragonstone"],
   ["bones", "bones"],
   ["big_bones", "big_bones"],
   ["dragon_bones", "dragon_bones"],
-  ["airrune", "air_rune"],
-  ["waterrune", "water_rune"],
-  ["earthrune", "earth_rune"],
-  ["firerune", "fire_rune"],
-  ["mindrune", "mind_rune"],
-  ["bodyrune", "body_rune"],
-  ["chaosrune", "chaos_rune"],
-  ["deathrune", "death_rune"],
-  ["bloodrune", "blood_rune"],
-  ["naturerune", "nature_rune"],
-  ["lawrune", "law_rune"],
-  ["cosmicrune", "cosmic_rune"],
-  ["soulrune", "soul_rune"],
+  ["airrune", "airrune"],
+  ["waterrune", "waterrune"],
+  ["earthrune", "earthrune"],
+  ["firerune", "firerune"],
+  ["mindrune", "mindrune"],
+  ["bodyrune", "bodyrune"],
+  ["chaosrune", "chaosrune"],
+  ["deathrune", "deathrune"],
+  ["bloodrune", "bloodrune"],
+  ["naturerune", "naturerune"],
+  ["lawrune", "lawrune"],
+  ["cosmicrune", "cosmicrune"],
+  ["soulrune", "soulrune"],
   ["bronze_arrow", "bronze_arrow"],
   ["iron_arrow", "iron_arrow"],
   ["steel_arrow", "steel_arrow"],
   ["rune_arrow", "rune_arrow"],
-  ["bolt", "crossbow_bolt"],
+  ["bolt", "bolt"],
   ["tuna", "tuna"],
   ["lobster", "lobster"],
   ["bass", "bass"],
   ["swordfish", "swordfish"],
   ["shark", "shark"],
-  ["dragonhide_green", "green_dragonhide"],
-  ["dragonhide_blue", "blue_dragonhide"],
+  ["dragonhide_green", "dragonhide_green"],
+  ["dragonhide_blue", "dragonhide_blue"],
   ["coal", "coal"],
   ["gold_ore", "gold_ore"],
   ["mithril_ore", "mithril_ore"],
@@ -48,9 +46,9 @@ const slugMapEntries: ReadonlyArray<[string, string]> = [
   ["gold_bar", "gold_bar"],
   ["steel_bar", "steel_bar"],
   ["mithril_bar", "mithril_bar"],
-  ["adamantite_bar", "adamant_bar"],
+  ["adamantite_bar", "adamantite_bar"],
   ["limpwurt_root", "limpwurt_root"],
-  ["cow_hide", "cowhide"],
+  ["cow_hide", "cow_hide"],
   ["body_talisman", "body_talisman"],
   ["air_talisman", "air_talisman"],
   ["chaos_talisman", "chaos_talisman"],
@@ -75,20 +73,20 @@ const specialKeyEntries: ReadonlyArray<[string, string]> = [
   ["uncut_ruby", "uncut_ruby"],
   ["uncut_diamond", "uncut_diamond"],
   ["uncut_dragonstone", "uncut_dragonstone"],
-  ["loop_half_key", "loop_half_key"],
-  ["tooth_half_key", "tooth_half_key"],
+  ["loop_half_key", "keyhalf2"],
+  ["tooth_half_key", "keyhalf1"],
   ["cosmic_talisman", "cosmic_talisman"],
   ["herb_guam", "guam_leaf"],
   ["herb_marrentill", "marentill"],
-  ["herb_tarromin", "herb_tarromin"],
-  ["herb_harralander", "herb_harralander"],
-  ["herb_ranarr", "herb_ranarr"],
-  ["herb_irit", "herb_irit"],
-  ["herb_avantoe", "herb_avantoe"],
-  ["herb_kwuarm", "herb_kwuarm"],
-  ["herb_cadantine", "herb_cadantine"],
-  ["herb_lantadyme", "herb_lantadyme"],
-  ["herb_dwarf_weed", "herb_dwarf_weed"],
+  ["herb_tarromin", "tarromin"],
+  ["herb_harralander", "harralander"],
+  ["herb_ranarr", "ranarr_weed"],
+  ["herb_irit", "irit_leaf"],
+  ["herb_avantoe", "avantoe"],
+  ["herb_kwuarm", "kwuarm"],
+  ["herb_cadantine", "cadantine"],
+  ["herb_lantadyme", "lantadyme"],
+  ["herb_dwarf_weed", "dwarf_weed"],
   ["unidentified_guam", "unidentified_guam"]
 ];
 
@@ -106,18 +104,18 @@ function mapping(itemId: string, sourceSlug: string, notes: string): MarketSourc
 
 export const MARKET_SOURCE_MAPPING_PROVENANCE = {
   source: "manual",
-  sourceRef: "market.js SLUG_MAP and SPECIAL_KEYS",
-  verifiedAt: "2026-07-05",
+  sourceRef: "markets.lostcity.rs/api/items catalog lookup",
+  verifiedAt: "2026-07-10",
   notes:
-    "Initial allowlist is legacy-derived and intentionally non-canonical until an authoritative market source mapping is accepted."
+    "The bounded allowlist was matched to current catalog slugs by generated item name, with ambiguous dragonhide and half-key identities resolved from canonical item ids/source identities."
 } as const;
 
 export const MARKET_SOURCE_MAPPINGS = parseMarketSourceMappings([
   ...slugMapEntries.map(([itemId, sourceSlug]) =>
-    mapping(itemId, sourceSlug, LEGACY_SLUG_MAP_NOTE)
+    mapping(itemId, sourceSlug, CATALOG_AUDITED_NOTE)
   ),
   ...specialKeyEntries.map(([itemId, sourceSlug]) =>
-    mapping(itemId, sourceSlug, LEGACY_SPECIAL_KEYS_NOTE)
+    mapping(itemId, sourceSlug, CATALOG_AUDITED_NOTE)
   )
 ]);
 

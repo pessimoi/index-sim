@@ -213,19 +213,23 @@ describe("market integration schemas", () => {
 });
 
 describe("market source mapping foundation", () => {
-  it("validates the legacy-derived market source mapping", () => {
+  it("validates the source-catalog-audited market mapping", () => {
     const mappings = parseMarketSourceMappings(MARKET_SOURCE_MAPPINGS);
 
-    expect(MARKET_SOURCE_MAPPING_PROVENANCE.notes).toContain("non-canonical");
+    expect(MARKET_SOURCE_MAPPING_PROVENANCE.sourceRef).toContain("api/items");
     expect(mappings.length).toBeGreaterThan(70);
     expect(MARKET_SOURCE_ITEM_ALLOWLIST.has("lobster")).toBe(true);
     expect(MARKET_SOURCE_ITEM_ALLOWLIST.has("herb_guam")).toBe(true);
     expect(mappings.find((mapping) => mapping.itemId === "herb_guam")).toMatchObject({
       sourceSlug: "guam_leaf",
-      notes: expect.stringContaining("provisional")
+      notes: expect.stringContaining("item catalog")
     });
-    expect(mappings.find((mapping) => mapping.itemId === "lobster")?.notes).toContain(
-      "not an authoritative"
+    expect(mappings.find((mapping) => mapping.itemId === "airrune")?.sourceSlug).toBe("airrune");
+    expect(mappings.find((mapping) => mapping.itemId === "loop_half_key")?.sourceSlug).toBe(
+      "keyhalf2"
+    );
+    expect(mappings.find((mapping) => mapping.itemId === "tooth_half_key")?.sourceSlug).toBe(
+      "keyhalf1"
     );
   });
 

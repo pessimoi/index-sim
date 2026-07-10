@@ -280,7 +280,7 @@ Accepted target source:
 - Market refresh is scheduled-only repo automation. It writes `prices.json` and `price-history.json`, validates them and commits only real diffs. Generated game data owns high alch.
 - The scheduler is GitHub Actions cron at 00:15 and 12:15 UTC, using the repository `GITHUB_TOKEN` with `contents: write` and no `workflow_dispatch` manual trigger.
 - Do not add databases, user-triggered upstream refresh or deploy-specific shared storage for market prices.
-- The local writer, normalized fixture contract, D-062 item-page adapter/estimator and scheduled workflow are present. Acceptable automated use, exact root variable configuration and first successful scheduled-run evidence are not present yet.
+- The local writer, normalized fixture contract, D-062 item-page adapter/estimator, catalog-audited mapping, public crawler-policy review, full 80-mapping live dry-run and scheduled workflow are present. Exact root variable configuration and first successful scheduled-run evidence are not present yet.
 
 Core model:
 
@@ -617,7 +617,7 @@ Current acceptance status: the 2026-07-06 consolidated release-evidence pass is 
 - Backend/runtime: still required for accepted hiscores if direct browser APIs are not viable, but concrete framework, hosting, cache and deployment shape remain undecided. Market price refresh uses scheduled static JSON instead of a user-triggered backend sync path.
 - Database: no database for market price refresh; broader database use is still undecided.
 - Live integrations: implement hiscores and market price refresh according to [live-integrations-spec.md](live-integrations-spec.md); hiscores waits for the authoritative API answer.
-- Price history: `price-history.json` keeps 12-hour points for 90 days and one latest point per older UTC day; Economy loads it read-only beside local comparisons. The item-page writer and workflow exist, while automated-use acceptance, root URL configuration and first successful run remain operations evidence.
+- Price history: `price-history.json` keeps 12-hour points for 90 days and one latest point per older UTC day; Economy loads it read-only beside local comparisons. The item-page writer, catalog audit, crawler-policy review and live dry-run exist, while root URL configuration and the first successful scheduled run remain operations evidence.
 - Data generator implementation: `npm run data:generate` reads the pinned raw Revision 274 checkout and writes the active schema-valid source pin, game-data snapshot and revision-impact report. Every expected runtime identity and all 63 core-loot tables resolve, and runtime readiness has zero blockers. Normalized `index-sim-source-slice` inputs remain fixture-only parser/schema tests.
 - Game revision updates: the PR/review policy, 10-case representative report and 189-evaluation all-monster scan are accepted. D-055 through D-059 record reviewed combat, loot, equipment, catalog, canonical-identity and runtime-switch decisions. Four quest-gated and 21 clue-scroll tertiary rows remain explicit exclusions until their domain policy is separately accepted.
 - Planner item requirements: generated snapshot data is consumed when present with a manual fallback; which authoritative upstream fields and fallback-removal policy should close this?

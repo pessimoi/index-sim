@@ -25,7 +25,6 @@ export type ScheduledMarketWriterErrorCode =
   | "unknown_source_slug"
   | "duplicate_item"
   | "missing_item"
-  | "missing_previous_value"
   | "output_validation_failed";
 
 export class ScheduledMarketWriterError extends Error {
@@ -421,14 +420,9 @@ function buildUpstreamItemMap(
   return items;
 }
 
-function existingValue(record: Record<string, number>, itemId: string, outputName: string): number {
-  const value = record[itemId];
-  if (value !== undefined) return value;
-  throw new ScheduledMarketWriterError(
-    "missing_previous_value",
-    "Skipped scheduled market item has no previous output value",
-    [`${outputName}: ${itemId}`]
-  );
+function retainedReason(reason: string | undefined, hasPreviousValue: boolean): string {
+  const base = reason ?? "No usable completed trade price";
+  return hasPreviousValue ? base : `${base}; no previous market price`;
 }
 
 export function buildScheduledPriceHistory(input: {
@@ -515,7 +509,7 @@ export function createScheduledMarketSnapshotOutputs(
     }
 
     if (upstreamItem.status === "skipped") {
-      existingValue(prices, mapping.itemId, "prices.json");
+      const hasPreviousValue = prices[mapping.itemId] !== undefined;
       reportItems.push({
         itemId: mapping.itemId,
         sourceSlug: mapping.sourceSlug,
@@ -524,7 +518,7 @@ export function createScheduledMarketSnapshotOutputs(
         observations: 0,
         acceptedObservations: 0,
         rejectedObservations: 0,
-        reason: upstreamItem.reason
+        reason: retainedReason(upstreamItem.reason, hasPreviousValue)
       });
       continue;
     }
@@ -535,7 +529,7 @@ export function createScheduledMarketSnapshotOutputs(
       sampleSize
     });
     if (estimate.status === "retained") {
-      existingValue(prices, mapping.itemId, "prices.json");
+      const hasPreviousValue = prices[mapping.itemId] !== undefined;
       reportItems.push({
         itemId: mapping.itemId,
         sourceSlug: mapping.sourceSlug,
@@ -545,7 +539,7 @@ export function createScheduledMarketSnapshotOutputs(
         acceptedObservations: estimate.acceptedObservations,
         rejectedObservations: estimate.rejectedObservations,
         latestTradeAt: estimate.latestTradeAt,
-        reason: estimate.reason
+        reason: retainedReason(estimate.reason, hasPreviousValue)
       });
       continue;
     }
@@ -579,6 +573,13 @@ export function createScheduledMarketSnapshotOutputs(
 
   const skipped = reportItems.filter((item) => item.status === "skipped").length;
   const updated = reportItems.length - skipped;
+  if (updated === 0) {
+    throw new ScheduledMarketWriterError(
+      "invalid_upstream",
+      "Scheduled market writer produced no updated item prices",
+      [`requested: ${reportItems.length}`]
+    );
+  }
 
   return {
     prices: sortedPrices,
