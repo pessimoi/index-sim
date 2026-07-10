@@ -1,6 +1,6 @@
 # Public deployment specification
 
-- Status: decision-ready; implementation blocked on host/runtime decisions
+- Status: provider-neutral validation implemented; deployment blocked on host/runtime decisions
 - Date: 2026-07-10
 - Owner: operations docs
 - Source: conditional public-release and deploy-hardening backlog work
@@ -19,8 +19,11 @@ The repository currently has:
 - a root Vite/React application built with `npm run build`
 - static runtime data emitted to `dist`, including the three market JSON files
 - local `npm run dev` and `npm run preview` commands
-- same-origin Hiscores middleware for local dev/preview, with no live provider
+- same-origin Hiscores middleware with the D-061 provider in local dev/preview, but no production runtime
 - a narrow scheduled market-price workflow, not a general CI/CD pipeline
+- Node 22/npm 10 alignment through `.nvmrc`, package engines and the current workflow
+- `npm run deploy:verify-artifact` for deterministic root-path artifact, market-contract and hygiene checks
+- `npm run deploy:smoke` for bounded provider-preview HTTPS route/header/cache/status checks
 - no deploy script, public hosting configuration or accepted public domain
 - no database, auth, account, tenant, payment or admin service
 
@@ -107,6 +110,7 @@ The deployment artifact is the output of a clean checkout at one commit:
 ```sh
 npm ci
 npm run build
+npm run deploy:verify-artifact
 ```
 
 Requirements:
@@ -118,6 +122,13 @@ Requirements:
 - No raw upstream dump, local absolute path, `.env`, token, test artifact or development-only cache enters `dist`.
 - Source maps remain disabled unless a later explicit observability/privacy decision enables protected maps.
 - The release records commit SHA, build command, environment and artifact checksum or provider deployment id.
+
+The implemented artifact verifier reports the artifact SHA-256, file/asset
+counts, total bytes, market timestamp and retained history count. It rejects
+unexpected root files, non-hashed assets, source maps, symlinks, local absolute
+paths and common secret material without printing file contents. It currently
+enforces the repository's root-path build shape; choosing a sub-path still
+requires the decision and implementation described above.
 
 If a provider builds remotely, its build must be reproducible from the same commit and lockfile. Provider-generated changes must not be written back to the source branch.
 
@@ -172,6 +183,7 @@ npm run typecheck
 npm run test
 npm run test:golden
 npm run build
+npm run deploy:verify-artifact
 npm run lint
 npm run format:check
 npm audit
@@ -188,6 +200,19 @@ npm run test:e2e:visual
 If visual baselines are platform-specific, use the reviewed baseline platform or explicitly record why a different environment cannot act as the visual authority.
 
 ## Deployment smoke checks
+
+The provider-neutral HTTP smoke is implemented and can be run after a preview
+origin exists:
+
+```sh
+npm run deploy:smoke -- --origin "https://<preview-origin>" --hiscores-mode absent
+```
+
+The origin must be a credential-free HTTPS origin root. `absent` requires the
+Hiscores status route to be non-successful, `disabled` requires a validated
+`available: false` response and `enabled` requires `available: true`. Enabled
+mode validates status only: the command never sends a player name, because the
+lookup smoke remains gated by the production access-log policy.
 
 Against preview and production, verify:
 
@@ -282,10 +307,9 @@ Do not use force push as deployment rollback. A source correction after a bad re
 
 ### Goal 3: Implement release validation
 
-- connect the repository quality gate to the selected deployment path
-- deploy an immutable preview artifact
-- add post-deploy HTTP/browser smoke checks
-- prevent failed checks from promoting production
+- implemented provider-neutral artifact validation and focused tests
+- implemented bounded post-deploy HTTP smoke for routes, caches, headers, market files, API fallback and Hiscores status mode
+- still requires the selected provider path to connect the full quality gate, deploy an immutable preview and prevent failed promotion
 
 ### Goal 4: Validate and hand over production
 
@@ -309,7 +333,7 @@ Do not use force push as deployment rollback. A source correction after a bad re
 ## Acceptance checklist
 
 - [ ] Host/runtime, URL shape, Hiscores release state, deploy trigger and log policy are accepted
-- [ ] Clean commit builds a reproducible, secret-free artifact
+- [x] Current root-path build passes the reproducible artifact hygiene/schema/checksum gate
 - [ ] Route order prevents SPA fallback from masking API failures
 - [ ] Cache policy distinguishes index, hashed assets, market JSON and player API responses
 - [ ] CSP and security headers are verified on preview and production

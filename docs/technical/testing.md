@@ -22,6 +22,45 @@ npm run lint
 npm run format:check
 ```
 
+Node 22 and npm 10 are the repository runtime contract. `.nvmrc`, the root
+`package.json` engines and the scheduled workflow use the same major versions.
+
+## Provider-neutral deployment validation
+
+After `npm run build`, validate the local artifact without selecting a host:
+
+```sh
+npm run test -- src/tests/deployment-readiness.test.ts
+npm run deploy:verify-artifact
+```
+
+The artifact command requires root `index.html`, hashed Vite JavaScript/CSS
+references, `prices.json`, `alch.json` and `price-history.json`; validates the
+market schemas and `_scraped_at`; rejects unexpected root files, non-hashed
+assets, source maps, symlinks, local absolute paths and common secret material;
+and prints only counts, timestamps, total bytes and a deterministic SHA-256.
+
+After a provider preview exists, run the bounded no-write HTTPS smoke against
+the exact origin root:
+
+```sh
+npm run deploy:smoke -- --origin "https://<preview-origin>" --hiscores-mode absent
+```
+
+Use `disabled` only when a same-origin status endpoint returns the validated
+`available: false` contract, and `enabled` only when it returns `available:
+true`. The smoke checks status only and intentionally never sends a player name;
+a live lookup remains gated by the accepted production logging policy. The
+smoke rejects credentials, paths, query strings, fragments and non-HTTPS
+origins; redirects, timeouts, oversized bodies and raw network errors stay
+bounded/sanitized. It verifies security headers and cache classes on root,
+hashed assets, stable market JSON and Hiscores status, and rejects an unknown
+`/api/*` probe that is masked by a successful SPA fallback.
+
+The focused tests use synthetic artifacts and mocked responses. They make no
+live upstream or deployment request. Provider preview and production evidence
+remain separate release work after host/runtime decisions.
+
 Acceptance/security passes should also run:
 
 ```sh

@@ -51,6 +51,7 @@ The legacy `views.jsx` `ArchitectureBoard` is only a docs-link panel. Treat the 
 - Generated runtime replacement readiness adapter: `src/adapters/generated`
 - Generated runtime commands: `scripts/report-generated-runtime-readiness.ts`, `scripts/write-legacy-derived-runtime-snapshot.ts`, `npm run runtime:readiness`, `npm run runtime:coverage-plan`, `npm run runtime:write-legacy-derived`
 - Scheduled market price workflow: `.github/workflows/update-market-prices.yml`
+- Provider-neutral deployment validation: `scripts/deployment-readiness-core.ts`, `scripts/verify-public-deployment.ts`, `npm run deploy:verify-artifact`, `npm run deploy:smoke`
 - Styling: `styles.css`
 - Rewrite implementation: `src/app`, `src/domain`, `src/data`, `src/adapters`, `src/tests`
 - Documentation map: `docs/README.md`
