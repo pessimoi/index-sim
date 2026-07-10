@@ -4,7 +4,6 @@ import {
   PRICE_SET_IMPORT_MAX_BYTES,
   PriceHistorySchema,
   PriceMapSchema,
-  createPriceSetFromLegacyRecords,
   parsePriceHistory
 } from "../src/data/schemas";
 import { NonNegativeNumberSchema } from "../src/data/schemas/game-data";
@@ -13,6 +12,12 @@ import type { MarketSourceMapping } from "../src/domain/shared";
 
 export const SCHEDULED_MARKET_HISTORY_BUCKET_SECONDS = 12 * 60 * 60;
 export const SCHEDULED_MARKET_SAMPLE_SIZE = 5;
+export const SCHEDULED_MARKET_FINE_HISTORY_RETENTION_SECONDS = 90 * 24 * 60 * 60;
+export const SCHEDULED_MARKET_MAX_TRADE_AGE_SECONDS = 90 * 24 * 60 * 60;
+export const SCHEDULED_MARKET_MAX_LATEST_TRADE_AGE_SECONDS = 30 * 24 * 60 * 60;
+export const SCHEDULED_MARKET_FRESH_TRADE_AGE_SECONDS = 7 * 24 * 60 * 60;
+export const SCHEDULED_MARKET_MAD_THRESHOLD = 3.5;
+export const SCHEDULED_MARKET_MEDIAN_RATIO_LIMIT = 3;
 
 export type ScheduledMarketWriterErrorCode =
   | "invalid_upstream"
@@ -60,7 +65,14 @@ const UpstreamItemSchema = z
       .array(
         z
           .object({
-            price: NonNegativeNumberSchema
+            price: NonNegativeNumberSchema,
+            quantity: z.number().int().positive().optional(),
+            type: z.enum(["buy", "sell"]).optional(),
+            soldAt: z
+              .string()
+              .min(1)
+              .refine((value) => Number.isFinite(Date.parse(value)), "Invalid sold timestamp")
+              .optional()
           })
           .strict()
       )
@@ -87,13 +99,18 @@ const UpstreamResponseSchema = z
 
 export type ScheduledMarketUpstreamItem = z.infer<typeof UpstreamItemSchema>;
 export type ScheduledMarketUpstreamResponse = z.infer<typeof UpstreamResponseSchema>;
+export type ScheduledMarketPriceQuality = "high" | "medium" | "low" | "retained";
 
 export interface ScheduledMarketWriterReportItem {
   itemId: string;
   sourceSlug: string;
   status: "updated" | "skipped";
   price?: number;
-  alchValue?: number;
+  quality: ScheduledMarketPriceQuality;
+  observations: number;
+  acceptedObservations: number;
+  rejectedObservations: number;
+  latestTradeAt?: string;
   reason?: string;
 }
 
@@ -108,10 +125,8 @@ export interface ScheduledMarketWriterReport {
 
 export interface ScheduledMarketSnapshotOutputs {
   prices: Record<string, number>;
-  alchValues: Record<string, number>;
   priceHistory: Array<{ t: number; prices: Record<string, number> }>;
   pricesText: string;
-  alchText: string;
   priceHistoryText: string;
   report: ScheduledMarketWriterReport;
 }
@@ -119,7 +134,6 @@ export interface ScheduledMarketSnapshotOutputs {
 export interface CreateScheduledMarketSnapshotOutputInput {
   upstream: ScheduledMarketUpstreamResponse;
   previousPrices: unknown;
-  previousAlchValues: unknown;
   previousPriceHistory: unknown;
   mappings: readonly MarketSourceMapping[];
   capturedAt?: Date;
@@ -213,43 +227,162 @@ function historyBucket(timestampSeconds: number): number {
   return Math.floor(timestampSeconds / SCHEDULED_MARKET_HISTORY_BUCKET_SECONDS);
 }
 
+function dayBucket(timestampSeconds: number): number {
+  return Math.floor(timestampSeconds / (24 * 60 * 60));
+}
+
 function priceWithoutMetadata(prices: Record<string, number>): Record<string, number> {
   return PriceMapSchema.parse(
     Object.fromEntries(Object.entries(prices).filter(([key]) => !key.startsWith("_")))
   );
 }
 
-function highAlchFromItem(item: ScheduledMarketUpstreamItem): number | undefined {
+function median(values: readonly number[]): number {
+  const sorted = [...values].sort((left, right) => left - right);
+  const midpoint = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0 ? (sorted[midpoint - 1] + sorted[midpoint]) / 2 : sorted[midpoint];
+}
+
+function withinMedianRatio(price: number, medianPrice: number): boolean {
+  if (medianPrice <= 0) return price === medianPrice;
   return (
-    item.highAlch ??
-    item.highalch ??
-    item.high_alch ??
-    item.alch ??
-    item.item?.highAlch ??
-    item.item?.highalch ??
-    item.item?.high_alch ??
-    item.item?.alch
+    price >= medianPrice / SCHEDULED_MARKET_MEDIAN_RATIO_LIMIT &&
+    price <= medianPrice * SCHEDULED_MARKET_MEDIAN_RATIO_LIMIT
   );
 }
 
-function averageRecentPrice(
-  item: ScheduledMarketUpstreamItem,
-  sampleSize: number
-): number | undefined {
-  const historyPrices = (item.history ?? []).slice(0, sampleSize).map((entry) => entry.price);
-  const samples = historyPrices.length
-    ? historyPrices
-    : item.price !== undefined
-      ? [item.price]
-      : item.item?.price !== undefined
-        ? [item.item.price]
-        : [];
-  if (!samples.length) return undefined;
-  return Math.round(samples.reduce((sum, price) => sum + price, 0) / samples.length);
+interface MarketTradeObservation {
+  price: number;
+  soldAtMs: number;
+}
+
+export interface ScheduledMarketPriceEstimate {
+  status: "updated" | "retained";
+  price?: number;
+  quality: ScheduledMarketPriceQuality;
+  observations: number;
+  acceptedObservations: number;
+  rejectedObservations: number;
+  latestTradeAt?: string;
+  reason?: string;
+}
+
+function acceptedOutlierFilteredTrades(
+  trades: readonly MarketTradeObservation[]
+): MarketTradeObservation[] {
+  const medianPrice = median(trades.map((trade) => trade.price));
+  if (trades.length <= 4) {
+    return trades.filter((trade) => withinMedianRatio(trade.price, medianPrice));
+  }
+
+  const absoluteDeviations = trades.map((trade) => Math.abs(trade.price - medianPrice));
+  const mad = median(absoluteDeviations);
+  if (mad === 0) {
+    return trades.filter((trade) => withinMedianRatio(trade.price, medianPrice));
+  }
+  return trades.filter(
+    (trade) =>
+      (0.6745 * Math.abs(trade.price - medianPrice)) / mad <= SCHEDULED_MARKET_MAD_THRESHOLD
+  );
+}
+
+function estimateQuality(
+  acceptedCount: number,
+  latestAgeSeconds: number
+): ScheduledMarketPriceQuality {
+  if (acceptedCount >= 10 && latestAgeSeconds <= SCHEDULED_MARKET_FRESH_TRADE_AGE_SECONDS) {
+    return "high";
+  }
+  if (acceptedCount >= 5) return "medium";
+  return "low";
+}
+
+export function estimateScheduledMarketPrice(input: {
+  item: ScheduledMarketUpstreamItem;
+  capturedAt: Date;
+  sampleSize?: number;
+}): ScheduledMarketPriceEstimate {
+  const capturedAtMs = input.capturedAt.getTime();
+  const oldestAcceptedMs = capturedAtMs - SCHEDULED_MARKET_MAX_TRADE_AGE_SECONDS * 1000;
+  const latestAcceptedMs = capturedAtMs + 5 * 60 * 1000;
+  const fallbackTimestampMs = capturedAtMs;
+  const history = input.item.history ?? [];
+  const directPrice = input.item.price ?? input.item.item?.price;
+  const candidates = history.length
+    ? history
+    : directPrice === undefined
+      ? []
+      : [{ price: directPrice }];
+  const trades = candidates
+    .map((trade, index): MarketTradeObservation | null => {
+      if (trade.price <= 0) return null;
+      const soldAtMs = trade.soldAt ? Date.parse(trade.soldAt) : fallbackTimestampMs - index;
+      if (
+        !Number.isFinite(soldAtMs) ||
+        soldAtMs < oldestAcceptedMs ||
+        soldAtMs > latestAcceptedMs
+      ) {
+        return null;
+      }
+      return { price: trade.price, soldAtMs };
+    })
+    .filter((trade): trade is MarketTradeObservation => trade !== null)
+    .sort((left, right) => right.soldAtMs - left.soldAtMs);
+
+  if (trades.length < 3) {
+    return {
+      status: "retained",
+      quality: "retained",
+      observations: trades.length,
+      acceptedObservations: trades.length,
+      rejectedObservations: candidates.length - trades.length,
+      reason: "Fewer than 3 usable completed trades"
+    };
+  }
+
+  const accepted = acceptedOutlierFilteredTrades(trades);
+  const latestTrade = accepted[0];
+  if (accepted.length < 3 || !latestTrade) {
+    return {
+      status: "retained",
+      quality: "retained",
+      observations: trades.length,
+      acceptedObservations: accepted.length,
+      rejectedObservations: candidates.length - accepted.length,
+      reason: "Fewer than 3 trades remained after outlier filtering"
+    };
+  }
+
+  const latestAgeSeconds = Math.max(0, Math.floor((capturedAtMs - latestTrade.soldAtMs) / 1000));
+  const latestTradeAt = new Date(latestTrade.soldAtMs).toISOString();
+  if (latestAgeSeconds > SCHEDULED_MARKET_MAX_LATEST_TRADE_AGE_SECONDS) {
+    return {
+      status: "retained",
+      quality: "retained",
+      observations: trades.length,
+      acceptedObservations: accepted.length,
+      rejectedObservations: candidates.length - accepted.length,
+      latestTradeAt,
+      reason: "Latest usable completed trade is older than 30 days"
+    };
+  }
+
+  const priceSamples = accepted.slice(0, input.sampleSize ?? SCHEDULED_MARKET_SAMPLE_SIZE);
+  return {
+    status: "updated",
+    price: Math.round(
+      priceSamples.reduce((sum, trade) => sum + trade.price, 0) / priceSamples.length
+    ),
+    quality: estimateQuality(accepted.length, latestAgeSeconds),
+    observations: trades.length,
+    acceptedObservations: accepted.length,
+    rejectedObservations: candidates.length - accepted.length,
+    latestTradeAt
+  };
 }
 
 function requiredMappings(mappings: readonly MarketSourceMapping[]): MarketSourceMapping[] {
-  return mappings.filter((mapping) => mapping.syncPrice || mapping.syncAlch);
+  return mappings.filter((mapping) => mapping.syncPrice);
 }
 
 function buildUpstreamItemMap(
@@ -298,7 +431,7 @@ function existingValue(record: Record<string, number>, itemId: string, outputNam
   );
 }
 
-function buildPriceHistory(input: {
+export function buildScheduledPriceHistory(input: {
   existingHistory: Array<{ t: number; prices: Record<string, number> }>;
   currentPrices: Record<string, number>;
   capturedAtSeconds: number;
@@ -317,24 +450,32 @@ function buildPriceHistory(input: {
     prices: sortedNumericRecord(priceWithoutMetadata(input.currentPrices))
   });
 
-  return [...snapshotsByBucket.values()].sort((left, right) => left.t - right.t);
+  const fineRetentionCutoff =
+    input.capturedAtSeconds - SCHEDULED_MARKET_FINE_HISTORY_RETENTION_SECONDS;
+  const fineSnapshots: Array<{ t: number; prices: Record<string, number> }> = [];
+  const olderSnapshotsByDay = new Map<number, { t: number; prices: Record<string, number> }>();
+
+  for (const snapshot of [...snapshotsByBucket.values()].sort((left, right) => left.t - right.t)) {
+    if (snapshot.t >= fineRetentionCutoff) {
+      fineSnapshots.push(snapshot);
+      continue;
+    }
+    const bucket = dayBucket(snapshot.t);
+    const current = olderSnapshotsByDay.get(bucket);
+    if (!current || snapshot.t > current.t) olderSnapshotsByDay.set(bucket, snapshot);
+  }
+
+  return [...olderSnapshotsByDay.values(), ...fineSnapshots].sort(
+    (left, right) => left.t - right.t
+  );
 }
 
 function validateOutputs(input: {
   prices: Record<string, number>;
-  alchValues: Record<string, number>;
   priceHistory: Array<{ t: number; prices: Record<string, number> }>;
-  capturedAt: string;
 }): void {
   try {
-    createPriceSetFromLegacyRecords({
-      id: "scheduled-market-writer-validation",
-      label: "Scheduled market writer validation",
-      source: "scraped",
-      createdAt: input.capturedAt,
-      itemPrices: input.prices,
-      alchValues: input.alchValues
-    });
+    PriceMapSchema.parse(input.prices);
     PriceHistorySchema.parse(input.priceHistory);
   } catch {
     throw new ScheduledMarketWriterError(
@@ -349,7 +490,6 @@ export function createScheduledMarketSnapshotOutputs(
 ): ScheduledMarketSnapshotOutputs {
   const upstream = parseScheduledMarketUpstreamResponse(input.upstream);
   const previousPrices = parseRawPriceRecord(input.previousPrices, "prices.json");
-  const previousAlchValues = parseRawPriceRecord(input.previousAlchValues, "alch.json");
   const previousPriceHistory = parsePriceHistory(input.previousPriceHistory);
   const mappings = requiredMappings(input.mappings);
   const upstreamItems = buildUpstreamItemMap(upstream, mappings);
@@ -362,7 +502,6 @@ export function createScheduledMarketSnapshotOutputs(
     ...previousPrices,
     _scraped_at: capturedAtSeconds
   };
-  const alchValues: Record<string, number> = { ...previousAlchValues };
   const reportItems: ScheduledMarketWriterReportItem[] = [];
 
   for (const mapping of mappings) {
@@ -376,54 +515,57 @@ export function createScheduledMarketSnapshotOutputs(
     }
 
     if (upstreamItem.status === "skipped") {
-      if (mapping.syncPrice) existingValue(prices, mapping.itemId, "prices.json");
-      if (mapping.syncAlch) existingValue(alchValues, mapping.itemId, "alch.json");
+      existingValue(prices, mapping.itemId, "prices.json");
       reportItems.push({
         itemId: mapping.itemId,
         sourceSlug: mapping.sourceSlug,
         status: "skipped",
+        quality: "retained",
+        observations: 0,
+        acceptedObservations: 0,
+        rejectedObservations: 0,
         reason: upstreamItem.reason
       });
       continue;
     }
 
-    const price = averageRecentPrice(upstreamItem, sampleSize);
-    const alch = highAlchFromItem(upstreamItem);
-
-    if (mapping.syncPrice) {
-      if (price === undefined) {
-        throw new ScheduledMarketWriterError(
-          "invalid_upstream",
-          "Updated scheduled market item is missing price data",
-          [`itemId: ${mapping.itemId}`]
-        );
-      }
-      prices[mapping.itemId] = price;
+    const estimate = estimateScheduledMarketPrice({
+      item: upstreamItem,
+      capturedAt,
+      sampleSize
+    });
+    if (estimate.status === "retained") {
+      existingValue(prices, mapping.itemId, "prices.json");
+      reportItems.push({
+        itemId: mapping.itemId,
+        sourceSlug: mapping.sourceSlug,
+        status: "skipped",
+        quality: estimate.quality,
+        observations: estimate.observations,
+        acceptedObservations: estimate.acceptedObservations,
+        rejectedObservations: estimate.rejectedObservations,
+        latestTradeAt: estimate.latestTradeAt,
+        reason: estimate.reason
+      });
+      continue;
     }
-
-    if (mapping.syncAlch) {
-      if (alch === undefined) {
-        throw new ScheduledMarketWriterError(
-          "invalid_upstream",
-          "Updated scheduled market item is missing high-alch data",
-          [`itemId: ${mapping.itemId}`]
-        );
-      }
-      alchValues[mapping.itemId] = alch;
-    }
+    prices[mapping.itemId] = estimate.price as number;
 
     reportItems.push({
       itemId: mapping.itemId,
       sourceSlug: mapping.sourceSlug,
       status: "updated",
-      price: mapping.syncPrice ? price : undefined,
-      alchValue: mapping.syncAlch ? alch : undefined
+      price: estimate.price,
+      quality: estimate.quality,
+      observations: estimate.observations,
+      acceptedObservations: estimate.acceptedObservations,
+      rejectedObservations: estimate.rejectedObservations,
+      latestTradeAt: estimate.latestTradeAt
     });
   }
 
   const sortedPrices = sortedNumericRecord(prices);
-  const sortedAlchValues = sortedNumericRecord(alchValues);
-  const priceHistory = buildPriceHistory({
+  const priceHistory = buildScheduledPriceHistory({
     existingHistory: previousPriceHistory,
     currentPrices: sortedPrices,
     capturedAtSeconds
@@ -432,9 +574,7 @@ export function createScheduledMarketSnapshotOutputs(
 
   validateOutputs({
     prices: sortedPrices,
-    alchValues: sortedAlchValues,
-    priceHistory,
-    capturedAt: capturedAtIso
+    priceHistory
   });
 
   const skipped = reportItems.filter((item) => item.status === "skipped").length;
@@ -442,10 +582,8 @@ export function createScheduledMarketSnapshotOutputs(
 
   return {
     prices: sortedPrices,
-    alchValues: sortedAlchValues,
     priceHistory,
     pricesText: stableJson(sortedPrices),
-    alchText: stableJson(sortedAlchValues),
     priceHistoryText: stableJson(priceHistory),
     report: {
       source: MARKET_SOURCE_ID,

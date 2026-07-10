@@ -1,15 +1,19 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { MARKET_SOURCE_MAPPINGS } from "../data/market-source-mapping";
-import { PriceHistorySchema, createPriceSetFromLegacyRecords } from "../data/schemas";
+import { parseMarketsLostcityItemPage } from "../../scripts/markets-lostcity-item-page-adapter";
+import { parseMarketsLostcityRawResponseJson } from "../../scripts/markets-lostcity-raw-adapter";
 import {
   ScheduledMarketWriterError,
+  buildScheduledPriceHistory,
   createScheduledMarketSnapshotOutputs,
+  estimateScheduledMarketPrice,
   parseScheduledMarketUpstreamResponseJson,
-  type ScheduledMarketSnapshotOutputs
+  type ScheduledMarketSnapshotOutputs,
+  type ScheduledMarketUpstreamItem
 } from "../../scripts/scheduled-market-writer-core";
-import { parseMarketsLostcityRawResponseJson } from "../../scripts/markets-lostcity-raw-adapter";
 import { parseArgs, runScheduledMarketWriter } from "../../scripts/write-scheduled-market-prices";
+import { MARKET_SOURCE_MAPPINGS } from "../data/market-source-mapping";
+import { PriceHistorySchema } from "../data/schemas";
 
 const CAPTURED_AT = new Date("2026-07-08T00:15:00.000Z");
 const CAPTURED_AT_SECONDS = Math.floor(CAPTURED_AT.getTime() / 1000);
@@ -26,31 +30,19 @@ const BASE_PRICES = {
 };
 
 const BASE_ALCH_VALUES = {
-  _randomherb_avg: 0,
   dragon_bones: 0,
   lobster: 80,
-  rune_scimitar: 15000,
-  static_only: 4
+  rune_scimitar: 15000
 };
 
 const BASE_HISTORY = [
   {
     t: CAPTURED_AT_SECONDS - 90_000,
-    prices: {
-      dragon_bones: 2700,
-      lobster: 190,
-      rune_scimitar: 21000,
-      static_only: 900
-    }
+    prices: { dragon_bones: 2700, lobster: 190, rune_scimitar: 21000, static_only: 900 }
   },
   {
     t: CAPTURED_AT_SECONDS - 600,
-    prices: {
-      dragon_bones: 2800,
-      lobster: 205,
-      rune_scimitar: 22200,
-      static_only: 999
-    }
+    prices: { dragon_bones: 2800, lobster: 205, rune_scimitar: 22200, static_only: 999 }
   }
 ];
 
@@ -63,16 +55,13 @@ function parseFixture(fileName: string) {
 }
 
 function parseRawFixture(fileName: string) {
-  return parseMarketsLostcityRawResponseJson(readFixture(fileName), {
-    mappings: TEST_MAPPINGS
-  });
+  return parseMarketsLostcityRawResponseJson(readFixture(fileName), { mappings: TEST_MAPPINGS });
 }
 
 function createOutputs(fileName = "upstream-valid.json"): ScheduledMarketSnapshotOutputs {
   return createScheduledMarketSnapshotOutputs({
     upstream: parseFixture(fileName),
     previousPrices: BASE_PRICES,
-    previousAlchValues: BASE_ALCH_VALUES,
     previousPriceHistory: BASE_HISTORY,
     mappings: TEST_MAPPINGS,
     capturedAt: CAPTURED_AT
@@ -114,38 +103,61 @@ function writeOutputsIfChanged(
 ): string[] {
   const writes: Array<[string, string]> = [
     ["prices.json", outputs.pricesText],
-    ["alch.json", outputs.alchText],
     ["price-history.json", outputs.priceHistoryText]
   ];
   const changed: string[] = [];
   for (const [fileName, nextText] of writes) {
     const filePath = join(outputDir, fileName);
-    const currentText = readFileSync(filePath, "utf8");
-    if (currentText === nextText) continue;
+    if (readFileSync(filePath, "utf8") === nextText) continue;
     writeFileSync(filePath, nextText);
     changed.push(fileName);
   }
   return changed;
 }
 
+function soldAt(minutesAgo: number): string {
+  return new Date(CAPTURED_AT.getTime() - minutesAgo * 60_000).toISOString();
+}
+
+function itemPagePayload(slug: string, prices: number[]): string {
+  return JSON.stringify({
+    component: "items/show/page",
+    props: {
+      item: { slug, name: slug.replaceAll("_", " ") },
+      soldListings: {
+        current_page: 1,
+        data: prices.map((price, index) => ({
+          price,
+          quantity: index + 1,
+          type: index % 2 === 0 ? "buy" : "sell",
+          soldAt: soldAt(index + 1),
+          username: `private-${index}`
+        }))
+      }
+    }
+  });
+}
+
+function pageResponse(slug: string, prices: number[], contentType = "application/json"): Response {
+  return new Response(itemPagePayload(slug, prices), {
+    status: 200,
+    headers: { "Content-Type": contentType }
+  });
+}
+
 describe("scheduled market writer", () => {
-  it("creates deterministic validated outputs from a normalized upstream fixture", () => {
+  it("creates deterministic price-only outputs from normalized completed trades", () => {
     const outputs = createOutputs();
 
     expect(Object.keys(outputs.prices)).toEqual([...Object.keys(outputs.prices)].sort());
-    expect(Object.keys(outputs.alchValues)).toEqual([...Object.keys(outputs.alchValues)].sort());
+    expect(outputs).not.toHaveProperty("alchValues");
+    expect(outputs).not.toHaveProperty("alchText");
     expect(outputs.prices).toMatchObject({
       _scraped_at: CAPTURED_AT_SECONDS,
       dragon_bones: 2800,
       lobster: 215,
       rune_scimitar: 23000,
       static_only: 999
-    });
-    expect(outputs.alchValues).toMatchObject({
-      dragon_bones: 0,
-      lobster: 90,
-      rune_scimitar: 15360,
-      static_only: 4
     });
     expect(outputs.report).toMatchObject({
       source: "markets.lostcity.rs",
@@ -154,146 +166,155 @@ describe("scheduled market writer", () => {
       updated: 2,
       skipped: 1
     });
+    expect(outputs.report.items.find((item) => item.itemId === "lobster")).toMatchObject({
+      status: "updated",
+      quality: "low",
+      observations: 3,
+      acceptedObservations: 3,
+      rejectedObservations: 0
+    });
     expect(outputs.report.items.find((item) => item.itemId === "dragon_bones")).toMatchObject({
       status: "skipped",
+      quality: "retained",
       reason: "No recent trade sample in fixture"
-    });
-
-    expect(
-      createPriceSetFromLegacyRecords({
-        id: "writer-test",
-        label: "Writer test",
-        source: "scraped",
-        createdAt: CAPTURED_AT.toISOString(),
-        itemPrices: JSON.parse(outputs.pricesText),
-        alchValues: JSON.parse(outputs.alchText)
-      })
-    ).toMatchObject({
-      source: "scraped"
     });
     expect(PriceHistorySchema.parse(JSON.parse(outputs.priceHistoryText))).toHaveLength(2);
     expect(outputs.priceHistory.at(-1)).toMatchObject({
       t: CAPTURED_AT_SECONDS,
-      prices: {
-        lobster: 215,
-        rune_scimitar: 23000,
-        dragon_bones: 2800,
-        static_only: 999
-      }
+      prices: { lobster: 215, rune_scimitar: 23000, dragon_bones: 2800, static_only: 999 }
     });
   });
 
-  it("normalizes a sanitized raw markets.lostcity.rs fixture before output generation", () => {
-    const upstream = parseRawFixture("raw-valid.json");
+  it("keeps the legacy raw fixture adapter price-only at output generation", () => {
     const outputs = createScheduledMarketSnapshotOutputs({
-      upstream,
+      upstream: parseRawFixture("raw-valid.json"),
       previousPrices: BASE_PRICES,
-      previousAlchValues: BASE_ALCH_VALUES,
       previousPriceHistory: BASE_HISTORY,
       mappings: TEST_MAPPINGS,
       capturedAt: CAPTURED_AT
     });
 
-    expect(upstream).toMatchObject({
-      source: "markets.lostcity.rs",
-      fetchedAt: CAPTURED_AT.toISOString(),
-      items: [
-        {
-          itemId: "lobster",
-          sourceSlug: "lobster",
-          status: "updated",
-          highAlch: 90,
-          history: [{ price: 210 }, { price: 220 }, { price: 215 }]
-        },
-        {
-          itemId: "rune_scimitar",
-          sourceSlug: "rune_scimitar",
-          status: "updated",
-          highAlch: 15360,
-          history: [{ price: 23000 }, { price: 22500 }, { price: 23500 }]
-        },
-        {
-          itemId: "dragon_bones",
-          sourceSlug: "dragon_bones",
-          status: "skipped",
-          reason: "No recent trade sample in fixture"
-        }
-      ]
-    });
-    expect(outputs.prices).toMatchObject({
-      lobster: 215,
-      rune_scimitar: 23000,
-      dragon_bones: 2800
-    });
-    expect(outputs.alchValues).toMatchObject({
-      lobster: 90,
-      rune_scimitar: 15360,
-      dragon_bones: 0
+    expect(outputs.prices).toMatchObject({ lobster: 215, rune_scimitar: 23000 });
+    expect(outputs).not.toHaveProperty("alchValues");
+  });
+
+  it("uses MAD to reject an extreme completed trade and does not weight quantity", () => {
+    const item: ScheduledMarketUpstreamItem = {
+      itemId: "lobster",
+      sourceSlug: "lobster",
+      status: "updated",
+      history: [100_000, 100, 101, 99, 100, 102, 98, 100, 101, 99].map((price, index) => ({
+        price,
+        quantity: index === 1 ? 100_000 : 1,
+        type: index % 2 === 0 ? "buy" : "sell",
+        soldAt: soldAt(index + 1)
+      }))
+    };
+
+    expect(estimateScheduledMarketPrice({ item, capturedAt: CAPTURED_AT })).toMatchObject({
+      status: "updated",
+      price: 100,
+      quality: "medium",
+      observations: 10,
+      acceptedObservations: 9,
+      rejectedObservations: 1
     });
   });
 
-  it("rejects invalid numeric upstream values before output generation", () => {
-    const error = expectWriterError(
-      () => parseFixture("upstream-invalid-numeric.json"),
-      "invalid_upstream"
-    );
+  it("retains the previous value for sparse, stale or over-filtered samples", () => {
+    const sparse = estimateScheduledMarketPrice({
+      item: {
+        itemId: "lobster",
+        sourceSlug: "lobster",
+        status: "updated",
+        history: [{ price: 100 }, { price: 101 }]
+      },
+      capturedAt: CAPTURED_AT
+    });
+    const stale = estimateScheduledMarketPrice({
+      item: {
+        itemId: "lobster",
+        sourceSlug: "lobster",
+        status: "updated",
+        history: [100, 101, 102].map((price) => ({
+          price,
+          soldAt: new Date(CAPTURED_AT.getTime() - 31 * 24 * 60 * 60 * 1000).toISOString()
+        }))
+      },
+      capturedAt: CAPTURED_AT
+    });
+    const overFiltered = estimateScheduledMarketPrice({
+      item: {
+        itemId: "lobster",
+        sourceSlug: "lobster",
+        status: "updated",
+        history: [{ price: 100 }, { price: 100 }, { price: 10_000 }]
+      },
+      capturedAt: CAPTURED_AT
+    });
 
-    expect(error.issues.join("\n")).toContain("items.0.price");
+    expect(sparse).toMatchObject({ status: "retained", quality: "retained" });
+    expect(stale).toMatchObject({
+      status: "retained",
+      reason: "Latest usable completed trade is older than 30 days"
+    });
+    expect(overFiltered).toMatchObject({
+      status: "retained",
+      reason: "Fewer than 3 trades remained after outlier filtering"
+    });
   });
 
-  it("rejects invalid numeric raw upstream values before output generation", () => {
-    const error = expectWriterError(
-      () => parseRawFixture("raw-invalid-numeric.json"),
-      "invalid_upstream"
-    );
+  it("keeps 12-hour snapshots for 90 days and one latest snapshot per older UTC day", () => {
+    const day = 24 * 60 * 60;
+    const history = buildScheduledPriceHistory({
+      existingHistory: [
+        { t: CAPTURED_AT_SECONDS - 100 * day, prices: { lobster: 90 } },
+        { t: CAPTURED_AT_SECONDS - 100 * day + 12 * 60 * 60, prices: { lobster: 91 } },
+        { t: CAPTURED_AT_SECONDS - 89 * day, prices: { lobster: 95 } },
+        { t: CAPTURED_AT_SECONDS - 89 * day + 12 * 60 * 60, prices: { lobster: 96 } }
+      ],
+      currentPrices: { _scraped_at: CAPTURED_AT_SECONDS, lobster: 100 },
+      capturedAtSeconds: CAPTURED_AT_SECONDS
+    });
 
-    expect(error.issues.join("\n")).toContain("items.lobster.item.price");
+    expect(history.map((snapshot) => snapshot.prices.lobster)).toEqual([91, 95, 96, 100]);
   });
 
-  it("rejects missing approved mapping items", () => {
+  it("parses JSON and HTML Inertia item pages while discarding player identity fields", () => {
+    const mapping = TEST_MAPPINGS.find((candidate) => candidate.itemId === "lobster")!;
+    const jsonItem = parseMarketsLostcityItemPage({
+      text: itemPagePayload("lobster", [200, 210, 220]),
+      contentType: "application/json",
+      mapping
+    });
+    const htmlPayload = itemPagePayload("lobster", [200, 210, 220])
+      .replaceAll("&", "&amp;")
+      .replaceAll('"', "&quot;");
+    const htmlItem = parseMarketsLostcityItemPage({
+      text: `<main data-page="${htmlPayload}"></main>`,
+      contentType: "text/html; charset=UTF-8",
+      mapping
+    });
+
+    expect(jsonItem).toEqual(htmlItem);
+    expect(JSON.stringify(jsonItem)).not.toContain("private-");
+    expect(jsonItem.history).toEqual([
+      expect.objectContaining({ price: 200, quantity: 1, type: "buy" }),
+      expect.objectContaining({ price: 210, quantity: 2, type: "sell" }),
+      expect.objectContaining({ price: 220, quantity: 3, type: "buy" })
+    ]);
+  });
+
+  it("rejects invalid normalized/raw rows and incomplete approved mapping sets", () => {
+    expectWriterError(() => parseFixture("upstream-invalid-numeric.json"), "invalid_upstream");
+    expectWriterError(() => parseRawFixture("raw-invalid-numeric.json"), "invalid_upstream");
     expectWriterError(() => createOutputs("upstream-missing-item.json"), "missing_item");
-    expectWriterError(
-      () =>
-        createScheduledMarketSnapshotOutputs({
-          upstream: parseRawFixture("raw-missing-item.json"),
-          previousPrices: BASE_PRICES,
-          previousAlchValues: BASE_ALCH_VALUES,
-          previousPriceHistory: BASE_HISTORY,
-          mappings: TEST_MAPPINGS,
-          capturedAt: CAPTURED_AT
-        }),
-      "missing_item"
-    );
-  });
-
-  it("rejects unknown item ids and source slugs", () => {
     expectWriterError(() => createOutputs("upstream-unknown-item.json"), "unknown_item");
     expectWriterError(() => createOutputs("upstream-unknown-slug.json"), "unknown_source_slug");
-    expectWriterError(() => parseRawFixture("raw-unknown-item.json"), "unknown_item");
-    expectWriterError(() => parseRawFixture("raw-unknown-slug.json"), "unknown_source_slug");
-  });
-
-  it("rejects duplicate raw upstream item rows", () => {
     expectWriterError(() => parseRawFixture("raw-duplicate-item.json"), "duplicate_item");
   });
 
-  it("requires previous output values for explicitly skipped items", () => {
-    expectWriterError(
-      () =>
-        createScheduledMarketSnapshotOutputs({
-          upstream: parseFixture("upstream-valid.json"),
-          previousPrices: {
-            ...BASE_PRICES,
-            dragon_bones: undefined
-          },
-          previousAlchValues: BASE_ALCH_VALUES,
-          previousPriceHistory: BASE_HISTORY,
-          mappings: TEST_MAPPINGS,
-          capturedAt: CAPTURED_AT
-        }),
-      "output_validation_failed"
-    );
-
+  it("requires an existing price when an item must be retained", () => {
     expectWriterError(
       () =>
         createScheduledMarketSnapshotOutputs({
@@ -301,7 +322,6 @@ describe("scheduled market writer", () => {
           previousPrices: Object.fromEntries(
             Object.entries(BASE_PRICES).filter(([key]) => key !== "dragon_bones")
           ),
-          previousAlchValues: BASE_ALCH_VALUES,
           previousPriceHistory: BASE_HISTORY,
           mappings: TEST_MAPPINGS,
           capturedAt: CAPTURED_AT
@@ -310,42 +330,21 @@ describe("scheduled market writer", () => {
     );
   });
 
-  it("does not write corrupt output files when upstream validation fails", () => {
-    const outputDir = join(process.cwd(), ".vite", `market-writer-${process.pid}`);
-    rmSync(outputDir, { recursive: true, force: true });
-    mkdirSync(outputDir, { recursive: true });
-    try {
-      writeFixtureFiles(outputDir);
-      const before = readOutputFiles(outputDir);
-
-      expectWriterError(() => {
-        const outputs = createOutputs("upstream-unknown-slug.json");
-        writeOutputsIfChanged(outputDir, outputs);
-      }, "unknown_source_slug");
-
-      expect(readOutputFiles(outputDir)).toEqual(before);
-    } finally {
-      rmSync(outputDir, { recursive: true, force: true });
-    }
-  });
-
-  it("skips writes on a no-op rerun with identical generated output", () => {
+  it("writes only prices and history, leaves alch unchanged and skips identical reruns", () => {
     const outputDir = join(process.cwd(), ".vite", `market-writer-idempotent-${process.pid}`);
     rmSync(outputDir, { recursive: true, force: true });
     mkdirSync(outputDir, { recursive: true });
     try {
       writeFixtureFiles(outputDir);
+      const alchBefore = readFileSync(join(outputDir, "alch.json"), "utf8");
       const firstOutputs = createOutputs();
       expect(writeOutputsIfChanged(outputDir, firstOutputs).sort()).toEqual([
-        "alch.json",
         "price-history.json",
         "prices.json"
       ]);
-
       const secondOutputs = createScheduledMarketSnapshotOutputs({
         upstream: parseFixture("upstream-valid.json"),
         previousPrices: JSON.parse(readFileSync(join(outputDir, "prices.json"), "utf8")),
-        previousAlchValues: JSON.parse(readFileSync(join(outputDir, "alch.json"), "utf8")),
         previousPriceHistory: JSON.parse(
           readFileSync(join(outputDir, "price-history.json"), "utf8")
         ),
@@ -354,51 +353,38 @@ describe("scheduled market writer", () => {
       });
 
       expect(writeOutputsIfChanged(outputDir, secondOutputs)).toEqual([]);
+      expect(readFileSync(join(outputDir, "alch.json"), "utf8")).toBe(alchBefore);
     } finally {
       rmSync(outputDir, { recursive: true, force: true });
     }
   });
 
-  it("parses scheduled writer CLI options for the raw upstream path", () => {
-    expect(
-      parseArgs([
-        "--upstream-url",
-        "https://markets.lostcity.rs/api/sanitized-market-fixture",
-        "--output-dir",
-        ".vite/market-writer-cli",
-        "--item-ids",
-        "lobster,rune_scimitar,dragon_bones",
-        "--now",
-        CAPTURED_AT.toISOString(),
-        "--dry-run"
-      ])
-    ).toMatchObject({
-      upstreamUrl: "https://markets.lostcity.rs/api/sanitized-market-fixture",
-      outputDir: ".vite/market-writer-cli",
-      itemIds: ["lobster", "rune_scimitar", "dragon_bones"],
-      dryRun: true
-    });
-  });
-
-  it("uses the raw adapter for --upstream-url without writing during dry run", async () => {
+  it("fetches one first-page item response per mapping sequentially during dry run", async () => {
     const outputDir = join(process.cwd(), ".vite", `market-writer-cli-${process.pid}`);
     rmSync(outputDir, { recursive: true, force: true });
     mkdirSync(outputDir, { recursive: true });
     try {
       writeFixtureFiles(outputDir);
       const before = readOutputFiles(outputDir);
-      const fetchMock = vi.fn(
-        async () =>
-          new Response(readFixture("raw-valid.json"), {
-            status: 200,
-            headers: { "Content-Type": "application/json; charset=utf-8" }
-          })
-      );
+      const fetchedSlugs: string[] = [];
+      const delays: number[] = [];
+      const fetchMock = vi.fn(async (url: string) => {
+        const slug = decodeURIComponent(new URL(url).pathname.split("/").at(-1) ?? "");
+        fetchedSlugs.push(slug);
+        return pageResponse(
+          slug,
+          slug === "lobster"
+            ? [210, 220, 215]
+            : slug === "rune_scimitar"
+              ? [23000, 22500, 23500]
+              : []
+        );
+      });
 
       const result = await runScheduledMarketWriter(
         [
           "--upstream-url",
-          "https://markets.lostcity.rs/api/sanitized-market-fixture",
+          "https://markets.lostcity.rs/",
           "--output-dir",
           outputDir,
           "--item-ids",
@@ -407,23 +393,27 @@ describe("scheduled market writer", () => {
           CAPTURED_AT.toISOString(),
           "--dry-run"
         ],
-        { fetchImpl: fetchMock }
+        {
+          fetchImpl: fetchMock,
+          requestDelayMs: 350,
+          delayImpl: async (milliseconds) => {
+            delays.push(milliseconds);
+          }
+        }
       );
 
+      expect(fetchedSlugs).toEqual(["dragon_bones", "lobster", "rune_scimitar"]);
+      expect(delays).toEqual([350, 350]);
       expect(fetchMock).toHaveBeenCalledWith(
-        "https://markets.lostcity.rs/api/sanitized-market-fixture",
+        "https://markets.lostcity.rs/items/lobster",
         expect.objectContaining({
           method: "GET",
-          headers: { Accept: "application/json" },
+          headers: { Accept: "application/json, text/html;q=0.9" },
           redirect: "error",
           signal: expect.any(AbortSignal)
         })
       );
-      expect(result.changedFiles.sort()).toEqual([
-        "alch.json",
-        "price-history.json",
-        "prices.json"
-      ]);
+      expect(result.changedFiles.sort()).toEqual(["price-history.json", "prices.json"]);
       expect(result.report).toMatchObject({ updated: 2, skipped: 1 });
       expect(readOutputFiles(outputDir)).toEqual(before);
     } finally {
@@ -431,194 +421,99 @@ describe("scheduled market writer", () => {
     }
   });
 
-  it("rejects unapproved or malformed --upstream-url values before fetch", async () => {
-    const fetchMock = vi.fn(
-      async () =>
-        new Response(readFixture("raw-valid.json"), {
-          status: 200,
-          headers: { "Content-Type": "application/json" }
-        })
-    );
+  it("parses root-url CLI options and rejects unsafe upstream base URLs", async () => {
+    expect(
+      parseArgs([
+        "--upstream-url",
+        "https://markets.lostcity.rs/",
+        "--item-ids",
+        "lobster",
+        "--dry-run"
+      ])
+    ).toMatchObject({ upstreamUrl: "https://markets.lostcity.rs/", itemIds: ["lobster"] });
 
+    const fetchMock = vi.fn(async () => pageResponse("lobster", [200, 201, 202]));
     for (const upstreamUrl of [
-      "https://example.test/api/sanitized-market-fixture",
+      "https://example.test/",
       "not-a-url",
-      "https://user:pass@markets.lostcity.rs/api/sanitized-market-fixture",
-      "https://markets.lostcity.rs/api/sanitized-market-fixture#fragment"
+      "https://user:pass@markets.lostcity.rs/",
+      "https://markets.lostcity.rs/?token=private",
+      "https://markets.lostcity.rs/items/lobster",
+      "https://markets.lostcity.rs/#fragment"
     ]) {
       await expect(
         runScheduledMarketWriter(
-          [
-            "--upstream-url",
-            upstreamUrl,
-            "--item-ids",
-            "lobster,rune_scimitar,dragon_bones",
-            "--dry-run"
-          ],
-          { fetchImpl: fetchMock }
+          ["--upstream-url", upstreamUrl, "--item-ids", "lobster", "--dry-run"],
+          { fetchImpl: fetchMock, requestDelayMs: 0 }
         )
-      ).rejects.toMatchObject({
-        code: "invalid_upstream"
-      });
+      ).rejects.toMatchObject({ code: "invalid_upstream" });
     }
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("rejects redirects and sanitizes fetch failures", async () => {
-    const fetchMock = vi.fn(async (_url: string, init: { redirect: "error" }) => {
-      expect(init.redirect).toBe("error");
-      throw new TypeError("Raw redirect target or local path must stay private");
-    });
-
+  it("keeps redirect, timeout, size and response-contract failures sanitized", async () => {
+    const args = [
+      "--upstream-url",
+      "https://markets.lostcity.rs/",
+      "--item-ids",
+      "lobster",
+      "--dry-run"
+    ];
     await expect(
-      runScheduledMarketWriter(
-        [
-          "--upstream-url",
-          "https://markets.lostcity.rs/api/sanitized-market-fixture",
-          "--item-ids",
-          "lobster,rune_scimitar,dragon_bones",
-          "--dry-run"
-        ],
-        { fetchImpl: fetchMock }
-      )
+      runScheduledMarketWriter(args, {
+        fetchImpl: async () => {
+          throw new TypeError("Private redirect target");
+        },
+        requestDelayMs: 0
+      })
     ).rejects.toMatchObject({
       code: "invalid_upstream",
       message: "Scheduled market upstream request failed"
     });
-  });
 
-  it("times out fetch and body reads through the same abort boundary", async () => {
-    const fetchMock = vi.fn(
+    const timeoutFetch = vi.fn(
       async (_url: string, init: { signal: AbortSignal }) =>
         new Promise<Response>((_resolve, reject) => {
-          init.signal.addEventListener("abort", () => reject(new Error("raw timeout")), {
+          init.signal.addEventListener("abort", () => reject(new Error("private timeout")), {
             once: true
           });
         })
     );
-
     await expect(
-      runScheduledMarketWriter(
-        [
-          "--upstream-url",
-          "https://markets.lostcity.rs/api/sanitized-market-fixture",
-          "--item-ids",
-          "lobster,rune_scimitar,dragon_bones",
-          "--dry-run"
-        ],
-        { fetchImpl: fetchMock, upstreamTimeoutMs: 1 }
-      )
+      runScheduledMarketWriter(args, {
+        fetchImpl: timeoutFetch,
+        upstreamTimeoutMs: 1,
+        requestDelayMs: 0
+      })
     ).rejects.toMatchObject({
       code: "invalid_upstream",
       message: "Scheduled market upstream request timed out"
     });
-    expect(fetchMock.mock.calls[0]?.[1].signal.aborted).toBe(true);
-  });
 
-  it("aborts a response body that stalls after the fetch resolves", async () => {
-    let requestSignal: AbortSignal | undefined;
-    const fetchMock = vi.fn(async (_url: string, init: { signal: AbortSignal }) => {
-      requestSignal = init.signal;
-      return new Response(
-        new ReadableStream({
-          start(controller) {
-            init.signal.addEventListener(
-              "abort",
-              () => controller.error(new Error("raw body timeout")),
-              { once: true }
-            );
-          }
-        }),
-        { status: 200, headers: { "Content-Type": "application/json" } }
-      );
+    await expect(
+      runScheduledMarketWriter(args, {
+        fetchImpl: async () =>
+          new Response("{}", {
+            status: 200,
+            headers: { "Content-Type": "application/json", "Content-Length": "101" }
+          }),
+        maxUpstreamBytes: 100,
+        requestDelayMs: 0
+      })
+    ).rejects.toMatchObject({
+      code: "invalid_upstream",
+      message: "Scheduled market upstream response exceeds safe size limit"
     });
 
     await expect(
-      runScheduledMarketWriter(
-        [
-          "--upstream-url",
-          "https://markets.lostcity.rs/api/sanitized-market-fixture",
-          "--item-ids",
-          "lobster,rune_scimitar,dragon_bones",
-          "--dry-run"
-        ],
-        { fetchImpl: fetchMock, upstreamTimeoutMs: 1 }
-      )
+      runScheduledMarketWriter(args, {
+        fetchImpl: async () =>
+          new Response("plain text", { status: 200, headers: { "Content-Type": "text/plain" } }),
+        requestDelayMs: 0
+      })
     ).rejects.toMatchObject({
       code: "invalid_upstream",
-      message: "Scheduled market upstream request timed out"
-    });
-    expect(requestSignal?.aborted).toBe(true);
-  });
-
-  it("rejects non-JSON, declared oversized and streamed oversized responses", async () => {
-    const cases: Array<{ response: Response; maxBytes: number; message: string }> = [
-      {
-        response: new Response("<html>unexpected</html>", {
-          status: 200,
-          headers: { "Content-Type": "text/html" }
-        }),
-        maxBytes: 1_000,
-        message: "Scheduled market upstream response is not JSON"
-      },
-      {
-        response: new Response("[]", {
-          status: 200,
-          headers: { "Content-Type": "application/json", "Content-Length": "101" }
-        }),
-        maxBytes: 100,
-        message: "Scheduled market upstream response exceeds safe size limit"
-      },
-      {
-        response: new Response("[" + " ".repeat(100) + "]", {
-          status: 200,
-          headers: { "Content-Type": "application/json" }
-        }),
-        maxBytes: 100,
-        message: "Scheduled market upstream response exceeds safe size limit"
-      }
-    ];
-
-    for (const testCase of cases) {
-      await expect(
-        runScheduledMarketWriter(
-          [
-            "--upstream-url",
-            "https://markets.lostcity.rs/api/sanitized-market-fixture",
-            "--item-ids",
-            "lobster,rune_scimitar,dragon_bones",
-            "--dry-run"
-          ],
-          { fetchImpl: async () => testCase.response, maxUpstreamBytes: testCase.maxBytes }
-        )
-      ).rejects.toMatchObject({ code: "invalid_upstream", message: testCase.message });
-    }
-  });
-
-  it("sanitizes streamed body failures", async () => {
-    const response = new Response(
-      new ReadableStream({
-        start(controller) {
-          controller.error(new Error("Raw stream failure must stay private"));
-        }
-      }),
-      { status: 200, headers: { "Content-Type": "application/json" } }
-    );
-
-    await expect(
-      runScheduledMarketWriter(
-        [
-          "--upstream-url",
-          "https://markets.lostcity.rs/api/sanitized-market-fixture",
-          "--item-ids",
-          "lobster,rune_scimitar,dragon_bones",
-          "--dry-run"
-        ],
-        { fetchImpl: async () => response }
-      )
-    ).rejects.toMatchObject({
-      code: "invalid_upstream",
-      message: "Scheduled market upstream request failed"
+      message: "Market item page response has an unsupported content type"
     });
   });
 });

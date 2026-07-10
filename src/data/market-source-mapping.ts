@@ -92,19 +92,14 @@ const specialKeyEntries: ReadonlyArray<[string, string]> = [
   ["unidentified_guam", "unidentified_guam"]
 ];
 
-function mapping(
-  itemId: string,
-  sourceSlug: string,
-  notes: string,
-  syncAlch = true
-): MarketSourceMapping {
+function mapping(itemId: string, sourceSlug: string, notes: string): MarketSourceMapping {
   return {
     itemId,
     sourceSlug,
     source: MARKET_SOURCE_ID,
     tradeable: true,
     syncPrice: true,
-    syncAlch,
+    syncAlch: false,
     notes
   };
 }

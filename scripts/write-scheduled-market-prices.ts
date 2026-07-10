@@ -5,18 +5,23 @@ import { MARKET_SOURCE_MAPPINGS } from "../src/data/market-source-mapping";
 import { parseJsonWithDuplicateKeyCheck } from "../src/data/reliability";
 import { MARKET_SOURCE_ID, PRICE_SET_IMPORT_MAX_BYTES } from "../src/data/schemas";
 import type { MarketSourceMapping } from "../src/domain/shared";
-import { parseMarketsLostcityRawResponseJson } from "./markets-lostcity-raw-adapter";
+import {
+  createMarketsLostcityItemPageResponse,
+  parseMarketsLostcityItemPage
+} from "./markets-lostcity-item-page-adapter";
 import {
   ScheduledMarketWriterError,
   createScheduledMarketSnapshotOutputs,
   parseScheduledMarketUpstreamResponseJson,
   type ScheduledMarketSnapshotOutputs,
+  type ScheduledMarketUpstreamItem,
   type ScheduledMarketWriterReport,
   type ScheduledMarketUpstreamResponse
 } from "./scheduled-market-writer-core";
 
-type PriceFileName = "prices.json" | "alch.json" | "price-history.json";
+type PriceFileName = "prices.json" | "price-history.json";
 export const SCHEDULED_MARKET_UPSTREAM_TIMEOUT_MS = 15_000;
+export const SCHEDULED_MARKET_REQUEST_DELAY_MS = 350;
 
 export interface CliOptions {
   input?: string;
@@ -37,7 +42,7 @@ type FetchLike = (
   url: string,
   init: {
     method: "GET";
-    headers: { Accept: "application/json" };
+    headers: { Accept: "application/json, text/html;q=0.9" };
     redirect: "error";
     signal: AbortSignal;
   }
@@ -47,6 +52,8 @@ export interface RunScheduledMarketWriterDependencies {
   fetchImpl?: FetchLike;
   maxUpstreamBytes?: number;
   upstreamTimeoutMs?: number;
+  requestDelayMs?: number;
+  delayImpl?: (milliseconds: number) => Promise<void>;
 }
 
 export interface RunScheduledMarketWriterResult {
@@ -61,8 +68,8 @@ export function usage(): string {
     "",
     "Options:",
     "  --input <path>          Read a repository-local normalized upstream fixture/response.",
-    "  --upstream-url <url>    Fetch a raw markets.lostcity.rs response and normalize it.",
-    "  --output-dir <path>     Directory containing prices.json, alch.json and price-history.json.",
+    "  --upstream-url <url>    Fetch approved markets.lostcity.rs item pages from this root URL.",
+    "  --output-dir <path>     Directory containing prices.json and price-history.json.",
     "  --item-ids <ids>        Optional comma-separated allowlisted item ids for fixture/dev checks.",
     "  --now <iso>             Override capture time for repeatable local checks.",
     "  --dry-run               Validate and report changed files without writing.",
@@ -147,16 +154,6 @@ function declaredContentLength(response: FetchResponseLike): number | null {
   return Number.isSafeInteger(bytes) && bytes >= 0 ? bytes : null;
 }
 
-function assertJsonResponse(response: FetchResponseLike): void {
-  const contentType = response.headers.get("Content-Type")?.toLowerCase() ?? "";
-  if (!contentType.startsWith("application/json")) {
-    throw new ScheduledMarketWriterError(
-      "invalid_upstream",
-      "Scheduled market upstream response is not JSON"
-    );
-  }
-}
-
 async function readBoundedResponseText(
   response: FetchResponseLike,
   maxBytes: number,
@@ -208,16 +205,11 @@ async function readBoundedResponseText(
   return new TextDecoder().decode(bytes);
 }
 
-async function readUpstreamText(
-  options: CliOptions,
+async function fetchMarketItemPage(
+  target: URL,
   fetchImpl: FetchLike,
   networkOptions: { maxBytes: number; timeoutMs: number }
-): Promise<string> {
-  if (options.input) {
-    return readFileSync(resolve(options.input), "utf8");
-  }
-
-  const target = parseApprovedUpstreamUrl(options.upstreamUrl);
+): Promise<{ text: string; contentType: string }> {
   const controller = new AbortController();
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
@@ -235,7 +227,7 @@ async function readUpstreamText(
   const fetchAndRead = async () => {
     const response = await fetchImpl(target.href, {
       method: "GET",
-      headers: { Accept: "application/json" },
+      headers: { Accept: "application/json, text/html;q=0.9" },
       redirect: "error",
       signal: controller.signal
     });
@@ -245,8 +237,10 @@ async function readUpstreamText(
         "Scheduled market upstream request failed"
       );
     }
-    assertJsonResponse(response);
-    return readBoundedResponseText(response, networkOptions.maxBytes, controller.signal);
+    return {
+      text: await readBoundedResponseText(response, networkOptions.maxBytes, controller.signal),
+      contentType: response.headers.get("Content-Type") ?? ""
+    };
   };
 
   try {
@@ -278,7 +272,9 @@ function parseApprovedUpstreamUrl(upstreamUrl: string | undefined): URL {
     target.origin !== `https://${MARKET_SOURCE_ID}` ||
     target.username !== "" ||
     target.password !== "" ||
-    target.hash !== ""
+    target.hash !== "" ||
+    target.search !== "" ||
+    target.pathname !== "/"
   ) {
     throw new ScheduledMarketWriterError(
       "invalid_upstream",
@@ -292,11 +288,38 @@ async function readUpstream(
   options: CliOptions,
   mappings: readonly MarketSourceMapping[],
   fetchImpl: FetchLike,
-  networkOptions: { maxBytes: number; timeoutMs: number }
+  networkOptions: {
+    maxBytes: number;
+    timeoutMs: number;
+    requestDelayMs: number;
+    delayImpl: (milliseconds: number) => Promise<void>;
+  }
 ): Promise<ScheduledMarketUpstreamResponse> {
-  const upstreamText = await readUpstreamText(options, fetchImpl, networkOptions);
-  if (options.input) return parseScheduledMarketUpstreamResponseJson(upstreamText);
-  return parseMarketsLostcityRawResponseJson(upstreamText, { mappings });
+  if (options.input) {
+    return parseScheduledMarketUpstreamResponseJson(readFileSync(resolve(options.input), "utf8"));
+  }
+
+  const root = parseApprovedUpstreamUrl(options.upstreamUrl);
+  const items: ScheduledMarketUpstreamItem[] = [];
+  for (const [index, mapping] of mappings.entries()) {
+    if (index > 0 && networkOptions.requestDelayMs > 0) {
+      await networkOptions.delayImpl(networkOptions.requestDelayMs);
+    }
+    const target = new URL(`/items/${encodeURIComponent(mapping.sourceSlug)}`, root);
+    const response = await fetchMarketItemPage(target, fetchImpl, networkOptions);
+    items.push(
+      parseMarketsLostcityItemPage({
+        text: response.text,
+        contentType: response.contentType,
+        mapping
+      })
+    );
+  }
+
+  return createMarketsLostcityItemPageResponse({
+    items,
+    fetchedAt: options.now ?? new Date()
+  });
 }
 
 function readJsonFile(outputDir: string, fileName: PriceFileName): unknown {
@@ -340,12 +363,15 @@ export async function runScheduledMarketWriter(
   const mappings = selectMappings(options.itemIds);
   const upstream = await readUpstream(options, mappings, dependencies.fetchImpl ?? fetch, {
     maxBytes: dependencies.maxUpstreamBytes ?? PRICE_SET_IMPORT_MAX_BYTES,
-    timeoutMs: dependencies.upstreamTimeoutMs ?? SCHEDULED_MARKET_UPSTREAM_TIMEOUT_MS
+    timeoutMs: dependencies.upstreamTimeoutMs ?? SCHEDULED_MARKET_UPSTREAM_TIMEOUT_MS,
+    requestDelayMs: dependencies.requestDelayMs ?? SCHEDULED_MARKET_REQUEST_DELAY_MS,
+    delayImpl:
+      dependencies.delayImpl ??
+      ((milliseconds) => new Promise((resolveDelay) => setTimeout(resolveDelay, milliseconds)))
   });
   const outputs = createScheduledMarketSnapshotOutputs({
     upstream,
     previousPrices: readJsonFile(outputDir, "prices.json"),
-    previousAlchValues: readJsonFile(outputDir, "alch.json"),
     previousPriceHistory: readJsonFile(outputDir, "price-history.json"),
     mappings,
     capturedAt: options.now
@@ -354,9 +380,6 @@ export async function runScheduledMarketWriter(
   const changedFiles = [
     writeIfChanged(resolve(outputDir, "prices.json"), outputs.pricesText, options.dryRun)
       ? "prices.json"
-      : null,
-    writeIfChanged(resolve(outputDir, "alch.json"), outputs.alchText, options.dryRun)
-      ? "alch.json"
       : null,
     writeIfChanged(
       resolve(outputDir, "price-history.json"),

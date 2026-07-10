@@ -1,6 +1,6 @@
 # Scheduled market live-evidence specification
 
-- Status: fetch hardening complete; live contract and scheduled-run evidence pending
+- Status: item-page contract and fetch hardening implemented; automated-use acceptance and scheduled-run evidence pending
 - Date: 2026-07-10
 - Owner: operations docs
 - Source: conditional backlog work and accepted decisions D-021, D-033, D-034 and D-053
@@ -23,31 +23,33 @@ The remaining work is release/operations evidence, not a duplicate feature imple
 
 The repository already has:
 
-- `scripts/markets-lostcity-raw-adapter.ts` for fixture-evidenced raw response normalization
+- `scripts/markets-lostcity-item-page-adapter.ts` for first-page Inertia `soldListings` parsing
 - `scripts/write-scheduled-market-prices.ts` for `--input`, `--upstream-url` and `--dry-run`
-- validated candidate generation for `prices.json`, `alch.json` and `price-history.json`
+- adaptive MAD/median filtering, 90/30-day freshness gates and prior-price retention
+- validated candidate generation for `prices.json` and `price-history.json`; generated game data owns high alch
 - duplicate, unknown-item, canonical mapping and output validation gates
-- one shared history entry per 12-hour UTC bucket
+- 12-hour shared history for 90 days plus one latest point per older UTC day
 - no-op behavior when generated files are unchanged
 - `.github/workflows/update-market-prices.yml` at 00:15 and 12:15 UTC
 - same-repo commit-if-diff with `GITHUB_TOKEN` and `contents: write`
 - a repository variable boundary named `MARKET_PRICES_UPSTREAM_URL`
-- workflow guards that allow only the three approved market files to change
+- workflow guards that allow only the two approved market files to change
 - fixed-origin fetch hardening with redirect rejection, one 15-second fetch/body timeout,
-  JSON content-type enforcement and a one-megabyte pre-parse response limit
+  HTML/JSON contract enforcement and a one-megabyte pre-parse response limit per item page
 
-The first-party site manifest exposes a `GET /api/items` route, but this environment has
-not produced a bounded response-contract sample that proves the route matches the writer
-adapter. The repo therefore does not yet have verified evidence for the exact live
-endpoint/shape, acceptable automated-use terms, configured repository variable or first
-successful scheduled run. The route must not be configured from manifest evidence alone.
+Bounded 2026-07-10 inspection established the item route pattern `/items/{slug}`, Inertia
+component `items/show/page`, a ten-row first `soldListings` page and completed-row fields
+`price`, `quantity`, `type` and `soldAt`. Both buy and sell rows are realized trades.
+Usernames are intentionally discarded at the adapter boundary. This evidence does not
+confirm acceptable automated use for the full allowlist, configure the repository variable
+or prove a first scheduled run.
 
 ## Preconditions
 
 Before any live fetch:
 
-1. verify the exact HTTPS endpoint path owned by `markets.lostcity.rs`
-2. confirm the endpoint may be used by the twice-daily repository automation
+1. keep the configured base exactly `https://markets.lostcity.rs/`; item paths are derived from the allowlist
+2. confirm the sequential twice-daily item-page reads are acceptable automated use
 3. confirm the response contains no credentials, player information or other data that must not enter the workflow
 4. retain the completed fetch hardening requirements below
 5. ensure the repository and target branch permit the workflow's same-repo commit with `GITHUB_TOKEN`
@@ -76,8 +78,8 @@ The network path now enforces:
 - one 15-second `AbortSignal` timeout spanning fetch and response-body consumption
 - early `Content-Length` rejection when the declared size exceeds the accepted one-megabyte import policy
 - a bounded streaming read that aborts once the actual body crosses the same limit, including when `Content-Length` is absent or false
-- JSON content-type validation before body parsing
-- sanitized timeout, stream, non-JSON and oversized-response errors
+- HTML/JSON content-type validation before Inertia parsing
+- sanitized timeout, stream, unsupported-contract and oversized-response errors
 
 The raw live body must remain memory-only and must never be written as an artifact, cache, log attachment or committed fixture by the workflow.
 
@@ -85,17 +87,17 @@ The raw live body must remain memory-only and must never be written as an artifa
 
 ### Phase 1: Verify the live contract safely
 
-Use an approved local or review environment after fetch hardening. Make one bounded request to the exact endpoint and record only:
+Use an approved local or review environment after fetch hardening. Review bounded item-page requests and record only:
 
-- endpoint origin and reviewed path, with credentials/query secrets absent
+- fixed origin and reviewed `/items/{slug}` path pattern, with credentials/query secrets absent
 - UTC timestamp
 - HTTP status
 - content type
 - bounded byte count
 - SHA-256 of the response body
 - top-level shape category, such as object or array
-- source row count
-- mapped item, price, alch and history counts
+- completed row count and buy/sell counts
+- mapped item, accepted/rejected observation and retained-price counts
 - unknown, duplicate, missing and rejected counts
 - parser/contract version or commit SHA
 
@@ -103,19 +105,19 @@ Do not commit or paste the raw response. Do not record local absolute paths. If 
 
 ### Phase 2: Run a no-write live candidate check
 
-With the exact reviewed endpoint:
+With the exact reviewed root:
 
 ```sh
-npm run prices:write-scheduled -- --upstream-url "<verified markets.lostcity.rs endpoint>" --dry-run
+npm run prices:write-scheduled -- --upstream-url "https://markets.lostcity.rs/" --dry-run
 ```
 
 The check must:
 
 - produce no file write
-- parse through the same raw adapter used by cron
+- parse every allowlisted first-page response through the same item-page adapter used by cron
 - report sanitized candidate counts and warnings
 - pass canonical item mapping and duplicate gates
-- produce valid candidates for all three market files
+- produce valid candidates for both market files without changing `alch.json`
 - stay within the accepted response and timeout limits
 
 Review differences against the committed market snapshots without accepting unexplained mass deletion, timestamp regression, implausible price distributions or unknown canonical identities.
@@ -126,8 +128,8 @@ Set `MARKET_PRICES_UPSTREAM_URL` as a repository Actions variable only after the
 
 Configuration checks:
 
-- value starts with the exact approved `https://markets.lostcity.rs` origin
-- value has no credentials, fragment or secret query value
+- value is exactly `https://markets.lostcity.rs/`
+- value has no path suffix, credentials, query or fragment
 - workflow permissions remain only `contents: write`
 - no `workflow_dispatch` trigger is added
 - no broad secret, artifact upload or persistent cache is introduced
@@ -139,9 +141,9 @@ Do not duplicate the URL in browser code or public runtime configuration.
 
 Wait for the existing cron rather than adding a manual upstream-refresh trigger. For the first successful run, verify:
 
-- the writer fetched the reviewed endpoint
+- the writer fetched one first page per approved mapping sequentially
 - validation and focused tests passed
-- only `prices.json`, `alch.json` and `price-history.json` changed, or the run correctly reported no diff
+- only `prices.json` and `price-history.json` changed, or the run correctly reported no diff
 - any commit author/message matches the workflow contract
 - `_scraped_at` and the history bucket reflect the accepted source time policy
 - a changed run produced exactly one intended commit
@@ -181,7 +183,7 @@ Only then may product/operations copy say that prices are scheduled-current. If 
 - The endpoint variable contains no secret; if the source later requires a credential, stop and reopen the security/operations decision boundary.
 - Network requests are fixed to the approved HTTPS origin and protected against redirect-based SSRF.
 - Response time and size are bounded before full parsing.
-- Workflow permissions stay repository-content-only and file changes stay limited to the three market JSON files.
+- Workflow permissions stay repository-content-only and file changes stay limited to the two market JSON files.
 - Error output is sanitized and contains no raw body, token, absolute path or parser-internal dump.
 - Generated-data workflow remains repository-local with deterministic source/output hygiene.
 
@@ -198,7 +200,7 @@ git diff --check
 After a candidate write in a controlled review branch, if one is intentionally performed:
 
 ```sh
-node -e "JSON.parse(require('fs').readFileSync('prices.json','utf8')); JSON.parse(require('fs').readFileSync('alch.json','utf8')); JSON.parse(require('fs').readFileSync('price-history.json','utf8'))"
+node -e "JSON.parse(require('fs').readFileSync('prices.json','utf8')); JSON.parse(require('fs').readFileSync('price-history.json','utf8'))"
 npm run test -- src/tests/market-writer.test.ts src/tests/data-economy.test.ts
 git diff --check
 ```
@@ -219,7 +221,8 @@ Live checks are opt-in and must not run in the default unit suite. The GitHub cr
 
 ## Acceptance checklist
 
-- [ ] Exact endpoint and acceptable automated use verified
+- [x] Item-page path and Inertia response shape verified with bounded metadata-only evidence
+- [ ] Acceptable sequential automated use verified
 - [x] Redirect, timeout, content-type and pre-read size hardening implemented and tested
 - [ ] Sanitized live-contract evidence recorded without raw payload
 - [ ] `--dry-run` succeeds against the verified endpoint with no writes
