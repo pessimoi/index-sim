@@ -65,6 +65,7 @@ export interface PriceHistoryMoverRow {
   baselinePrice: number | null;
   gpDelta: number | null;
   percentDelta: number | null;
+  trendPrices: number[];
 }
 
 export interface PriceHistoryMoversAnalysis {
@@ -75,6 +76,28 @@ export interface PriceHistoryMoversAnalysis {
   rows: PriceHistoryMoverRow[];
   topGainers: PriceHistoryMoverRow[];
   topFallers: PriceHistoryMoverRow[];
+}
+
+export interface PriceHistoryTrendPoint {
+  snapshotKey: string;
+  capturedAt: string;
+  snapshotLabel: string;
+  sourcePriceSetId: string;
+  price: number;
+  gpDeltaFromPrevious: number | null;
+  percentDeltaFromPrevious: number | null;
+}
+
+export interface PriceHistoryTrendAnalysis {
+  itemId: string;
+  itemLabel: string;
+  points: PriceHistoryTrendPoint[];
+  firstPrice: number | null;
+  latestPrice: number | null;
+  minimumPrice: number | null;
+  maximumPrice: number | null;
+  netGpDelta: number | null;
+  netPercentDelta: number | null;
 }
 
 export interface AnalyzePriceHistoryMoversOptions {
@@ -189,6 +212,55 @@ function percentDelta(latestPrice: number | null, baselinePrice: number | null):
   return ((latestPrice - baselinePrice) / baselinePrice) * 100;
 }
 
+export function analyzePriceHistoryTrend(
+  history: BrowserPriceHistoryState,
+  itemId: string,
+  itemLabels: Record<string, string> = {}
+): PriceHistoryTrendAnalysis {
+  const validatedHistory = BrowserPriceHistoryStateSchema.parse(history);
+  const normalizedItemId = itemId.trim();
+  const points = [...validatedHistory.snapshots]
+    .reverse()
+    .flatMap((snapshot): PriceHistoryTrendPoint[] => {
+      const price = normalizedItemId ? nullablePrice(snapshot.itemPrices, normalizedItemId) : null;
+      if (price === null) return [];
+      return [
+        {
+          snapshotKey: priceHistorySnapshotKey(snapshot),
+          capturedAt: snapshot.capturedAt,
+          snapshotLabel: snapshot.label,
+          sourcePriceSetId: snapshot.sourcePriceSetId,
+          price,
+          gpDeltaFromPrevious: null,
+          percentDeltaFromPrevious: null
+        }
+      ];
+    })
+    .map((point, index, allPoints) => {
+      const previousPrice = allPoints[index - 1]?.price ?? null;
+      return {
+        ...point,
+        gpDeltaFromPrevious: priceDelta(point.price, previousPrice),
+        percentDeltaFromPrevious: percentDelta(point.price, previousPrice)
+      };
+    });
+  const firstPrice = points[0]?.price ?? null;
+  const latestPrice = points.at(-1)?.price ?? null;
+  const prices = points.map((point) => point.price);
+
+  return {
+    itemId: normalizedItemId,
+    itemLabel: itemLabels[normalizedItemId] ?? (normalizedItemId.replaceAll("_", " ") || "-"),
+    points,
+    firstPrice,
+    latestPrice,
+    minimumPrice: prices.length ? Math.min(...prices) : null,
+    maximumPrice: prices.length ? Math.max(...prices) : null,
+    netGpDelta: priceDelta(latestPrice, firstPrice),
+    netPercentDelta: percentDelta(latestPrice, firstPrice)
+  };
+}
+
 function compareNullableNumbers(
   left: number | null,
   right: number | null,
@@ -243,7 +315,11 @@ export function analyzePriceHistoryMovers(
         latestPrice,
         baselinePrice,
         gpDelta: priceDelta(latestPrice, baselinePrice),
-        percentDelta: percentDelta(latestPrice, baselinePrice)
+        percentDelta: percentDelta(latestPrice, baselinePrice),
+        trendPrices: [...snapshots].reverse().flatMap((snapshot) => {
+          const price = nullablePrice(snapshot.itemPrices, itemId);
+          return price === null ? [] : [price];
+        })
       };
     })
     .filter((row) =>

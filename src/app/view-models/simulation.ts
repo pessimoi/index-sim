@@ -319,13 +319,7 @@ export interface SetupRequirementSummaryViewModel {
 }
 
 export type MonsterCardStatKey =
-  | "combat"
-  | "hitpoints"
-  | "attack"
-  | "strength"
-  | "defence"
-  | "magic"
-  | "attackSpeed";
+  "combat" | "hitpoints" | "attack" | "strength" | "defence" | "magic" | "attackSpeed";
 
 export interface MonsterCardStatViewModel {
   key: MonsterCardStatKey;
@@ -335,12 +329,7 @@ export interface MonsterCardStatViewModel {
 }
 
 export type MonsterCardDefenceKey = "stab" | "slash" | "crush" | "range" | "magic";
-export type MonsterCardDefenceField =
-  | "defStab"
-  | "defSlash"
-  | "defCrush"
-  | "defRange"
-  | "defMagic";
+export type MonsterCardDefenceField = "defStab" | "defSlash" | "defCrush" | "defRange" | "defMagic";
 
 export interface MonsterCardDefenceRowViewModel {
   key: MonsterCardDefenceKey;
@@ -587,6 +576,47 @@ export interface DuelComparisonViewModel {
   rows: DuelComparisonRowViewModel[];
 }
 
+export type DuelMatrixMetricId = "dps" | "effectiveXpPerHour" | "effectiveNetGpPerHour" | "gpPerXp";
+
+export interface DuelMatrixMetricValuesViewModel {
+  dps: number | null;
+  effectiveXpPerHour: number | null;
+  effectiveNetGpPerHour: number | null;
+  gpPerXp: number | null;
+}
+
+export interface DuelMatrixCellViewModel {
+  setupId: string;
+  values: DuelMatrixMetricValuesViewModel;
+  best: Record<DuelMatrixMetricId, boolean>;
+}
+
+export interface DuelMatrixSetupViewModel {
+  id: string;
+  snapshotId: EntityId | null;
+  source: DuelComparisonRowSource;
+  name: string;
+  combatStyle: CombatStyle;
+  loadoutLabel: string;
+}
+
+export interface DuelMatrixRowViewModel {
+  monsterId: EntityId;
+  monsterName: string;
+  monsterLevel: number | null;
+  isCurrentTarget: boolean;
+  cells: DuelMatrixCellViewModel[];
+}
+
+export interface DuelMatrixViewModel {
+  currentMonsterId: EntityId;
+  monsterCount: number;
+  setupCount: number;
+  cellCount: number;
+  setups: DuelMatrixSetupViewModel[];
+  rows: DuelMatrixRowViewModel[];
+}
+
 export type DenseCompareRowMarkerId = "custom" | "alch" | "overhead" | "hidden" | "target";
 
 export interface DenseCompareRowMarkerViewModel {
@@ -798,9 +828,7 @@ export function gearQuickActionForSlot(input: GearQuickActionInput): GearQuickAc
   const attackType = input.combatStyle === "melee" ? (activeStance?.type ?? "slash") : "slash";
   const candidates = input.options.flatMap((option) => {
     const item =
-      option.id === "none"
-        ? { name: "None" }
-        : input.gameData.equipment[input.slot]?.[option.id];
+      option.id === "none" ? { name: "None" } : input.gameData.equipment[input.slot]?.[option.id];
     if (!item) return [];
     return [
       {
@@ -1035,11 +1063,7 @@ function expandedRows(drop: LootBreakdownEntry): LootExpandedRowViewModel[] {
       tag: stringField(record, "tag"),
       weight,
       weightLabel:
-        weight !== null
-          ? formatNumber(weight)
-          : stringWeight !== null
-            ? stringWeight
-            : null,
+        weight !== null ? formatNumber(weight) : stringWeight !== null ? stringWeight : null,
       chance,
       qty,
       qtyLabel: qty !== null ? formatNumber(qty, 2) : null,
@@ -1219,8 +1243,7 @@ function createLootValueComposition(trip: TripLootSupplyResult): LootValueCompos
       action: null,
       actionLabel: "Mixed",
       gpPerKill: otherGpPerKill,
-      shareOfPositivePct:
-        positiveGpPerKill > 0 ? (otherGpPerKill / positiveGpPerKill) * 100 : null,
+      shareOfPositivePct: positiveGpPerKill > 0 ? (otherGpPerKill / positiveGpPerKill) * 100 : null,
       stateLabel: null,
       childCount: hiddenDrops.reduce(
         (sum, entry) => sum + (Array.isArray(entry.drop._expand) ? entry.drop._expand.length : 0),
@@ -1254,7 +1277,10 @@ const MONEY_WARNING_CODES = new Set([
 ]);
 const SPECIAL_WARNING_CODES = new Set(["dragon-halberd-npc-size-fallback"]);
 const ACTIVE_ASSUMPTIONS_VISIBLE_LIMIT = 5;
-const PROTECT_PRAYER_LABELS: Record<Exclude<CombatSetupFormState["trip"]["protect"], "none">, string> = {
+const PROTECT_PRAYER_LABELS: Record<
+  Exclude<CombatSetupFormState["trip"]["protect"], "none">,
+  string
+> = {
   melee: "Protect from melee",
   missiles: "Protect from missiles",
   magic: "Protect from magic"
@@ -1325,7 +1351,8 @@ function activeAssumptionLootSettingParts(
   } else if (form.trip.alching) {
     parts.push("high alch on");
   }
-  if (rawSettings?.overheadSec != null) parts.push(`overhead ${formatNumber(settings.overheadSec ?? 0, 1)}s`);
+  if (rawSettings?.overheadSec != null)
+    parts.push(`overhead ${formatNumber(settings.overheadSec ?? 0, 1)}s`);
   if (rawSettings?.talismanSpot === "overground") parts.push("talisman overground");
   return parts;
 }
@@ -1364,7 +1391,8 @@ function activeAssumptionSupplyParts(form: CombatSetupFormState): string[] {
   if (form.trip.dbaRestore !== defaults.dbaRestore) {
     parts.push(form.trip.dbaRestore ? "DBA restore on" : "DBA restore off");
   }
-  if (form.trip.antifire !== defaults.antifire) parts.push(`antifire ${form.trip.antifire ? "on" : "off"}`);
+  if (form.trip.antifire !== defaults.antifire)
+    parts.push(`antifire ${form.trip.antifire ? "on" : "off"}`);
   if (form.trip.antipoison !== defaults.antipoison) {
     parts.push(`antipoison ${form.trip.antipoison ? "on" : "off"}`);
   }
@@ -1382,13 +1410,16 @@ function activeAssumptionValidLootOverrideCount(
   effectiveOverrideCount: number
 ): number {
   if (effectiveOverrideCount > 0) return effectiveOverrideCount;
-  return Object.values(lootPrefs).filter((value) =>
-    LOOT_ACTION_ORDER.includes(value as LootAction)
-  ).length;
+  return Object.values(lootPrefs).filter((value) => LOOT_ACTION_ORDER.includes(value as LootAction))
+    .length;
 }
 
-const SETUP_REQUIREMENT_SKILLS = ["attack", "defence", "ranged", "magic"] as const satisfies
-  readonly SetupRequirementSkill[];
+const SETUP_REQUIREMENT_SKILLS = [
+  "attack",
+  "defence",
+  "ranged",
+  "magic"
+] as const satisfies readonly SetupRequirementSkill[];
 
 const SETUP_REQUIREMENT_SLOT_LABELS: Record<SetupRequirementSlot, string> = {
   weapon: "Weapon",
@@ -1469,7 +1500,8 @@ function requirementPolicyForLookups(
   return {
     policyLabel: "Generated requirement data",
     source: "generated",
-    provenance: generated.provenance ?? context.gameData.provenance ?? PLANNER_REQUIREMENT_PROVENANCE
+    provenance:
+      generated.provenance ?? context.gameData.provenance ?? PLANNER_REQUIREMENT_PROVENANCE
   };
 }
 
@@ -1561,8 +1593,7 @@ function createActiveAssumptionsSummaryViewModel(input: {
       label: "Setup requirements",
       value: activeAssumptionCountLabel(input.setupRequirements.warningCount, "warning"),
       detail:
-        input.setupRequirements.warnings[0]?.message ??
-        "Requirement checks flag this loadout.",
+        input.setupRequirements.warnings[0]?.message ?? "Requirement checks flag this loadout.",
       reviewTab: combatReviewTab,
       tone: "warning",
       priority: 12
@@ -1796,7 +1827,9 @@ function createActiveAssumptionsSummaryViewModel(input: {
     });
   }
 
-  rows.sort((left, right) => left.priority - right.priority || left.label.localeCompare(right.label));
+  rows.sort(
+    (left, right) => left.priority - right.priority || left.label.localeCompare(right.label)
+  );
   const visibleRows = rows.slice(0, ACTIVE_ASSUMPTIONS_VISIBLE_LIMIT);
   const hiddenRows = rows.slice(ACTIVE_ASSUMPTIONS_VISIBLE_LIMIT);
   return {
@@ -1882,7 +1915,8 @@ function createLootRows(
       const candidatePrefs: Record<string, LootAction> =
         action === defaultDrop.pref ? {} : { [drop.rowId]: action };
       const candidate = simulateWithLootPrefs(input, context, candidatePrefs);
-      const candidateDrop = candidate.lootBreakdown.find((entry) => entry.rowId === drop.rowId) ?? drop;
+      const candidateDrop =
+        candidate.lootBreakdown.find((entry) => entry.rowId === drop.rowId) ?? drop;
       return {
         action,
         label: lootActionLabel(action),
@@ -2088,9 +2122,7 @@ function xpRoutingRow(input: {
   };
 }
 
-function createXpRoutingViewModel(input: {
-  result: FullSimulationResult;
-}): XpRoutingViewModel {
+function createXpRoutingViewModel(input: { result: FullSimulationResult }): XpRoutingViewModel {
   const xp = input.result.xp;
   const trip = input.result.trip;
   const rows: XpRoutingRowViewModel[] = [
@@ -2450,12 +2482,7 @@ function createStatsSourceBreakdownViewModel(input: {
       ),
       statsSourceMetric("sparse-state", "Sparse state", null, sparseState),
       statsSourceMetric("idle", "Idle", null, cannon.idle ? "Yes" : "No"),
-      statsSourceMetric(
-        "respawn-bound",
-        "Respawn-bound",
-        null,
-        cannon.respawnBound ? "Yes" : "No"
-      )
+      statsSourceMetric("respawn-bound", "Respawn-bound", null, cannon.respawnBound ? "Yes" : "No")
     );
   }
 
@@ -2620,9 +2647,7 @@ function createHitDistributionViewModel(
       return {
         id: bucket.id,
         label: bucket.label,
-        ariaLabel: `${damageText}: ${percentLabel}${
-          bucket.isMaxHit ? ", max hit bucket" : ""
-        }`,
+        ariaLabel: `${damageText}: ${percentLabel}${bucket.isMaxHit ? ", max hit bucket" : ""}`,
         probability: bucket.probability,
         percentLabel,
         widthPercent:
@@ -2839,11 +2864,7 @@ export function createDenseCompareScaleModel(
             widthPercent: netWidth,
             tone: netTone,
             ariaLabel: `${row.monsterName} net GP/hr ${formatNumber(row.netGpPerHour)}, ${
-              netTone === "negative"
-                ? "loss"
-                : netTone === "positive"
-                  ? "profit"
-                  : "break-even"
+              netTone === "negative" ? "loss" : netTone === "positive" ? "profit" : "break-even"
             } scaled to visible rows`
           }
         }
@@ -2861,12 +2882,7 @@ export function createSimulationViewModel(
   options: SimulationViewModelOptions = {}
 ): SimulationViewModel {
   const request = formToSimulationRequest(form, context.gameData);
-  const fullInput = fullSimulationInputFor(
-    form,
-    request,
-    cannonByMonster,
-    lootSettingsByMonster
-  );
+  const fullInput = fullSimulationInputFor(form, request, cannonByMonster, lootSettingsByMonster);
   const fullResult = simulateFullSimulation({ ...fullInput, lootPrefs }, context);
   const combat = fullResult.combat;
   const trip = fullResult.trip;
@@ -3051,13 +3067,7 @@ export function createDuelComparisonViewModel(
     lootSettingsByMonster,
     { includeLootRows: false }
   );
-  const liveBaseRow = duelBaseRowFromSimulation(
-    "duel-live",
-    "live",
-    null,
-    "Live loadout",
-    liveVm
-  );
+  const liveBaseRow = duelBaseRowFromSimulation("duel-live", "live", null, "Live loadout", liveVm);
   const snapshotBaseRows = normalizedSnapshots.map((snapshot) => {
     const snapshotForm = normalizeFormState({
       ...snapshot.form,
@@ -3119,6 +3129,125 @@ export function createDuelComparisonViewModel(
     snapshotLimit: MAX_DUEL_SNAPSHOTS,
     liveRow,
     snapshotRows,
+    rows
+  };
+}
+
+export function createDuelMatrixViewModel(
+  form: CombatSetupFormState,
+  duelSnapshots: DuelSnapshotsState,
+  context: SimulationContext,
+  cannonByMonster: CannonByMonsterState = {},
+  lootPrefsByMonster: Record<string, Record<string, LootAction | string | undefined>> = {},
+  lootSettingsByMonster: LootSettingsByMonsterState = {}
+): DuelMatrixViewModel {
+  const currentForm = normalizeFormState(form);
+  const normalizedSnapshots = normalizeDuelSnapshotsState(duelSnapshots).snapshots;
+  const setupDefinitions = [
+    {
+      id: "duel-live",
+      snapshotId: null,
+      source: "live" as const,
+      name: "Live setup",
+      form: currentForm
+    },
+    ...normalizedSnapshots.map((snapshot) => ({
+      id: `duel-snapshot:${snapshot.id}`,
+      snapshotId: snapshot.id,
+      source: "snapshot" as const,
+      name: snapshot.name,
+      form: normalizeFormState(snapshot.form)
+    }))
+  ];
+  const setupResults = setupDefinitions.map((setup) => {
+    const metadataVm = createSimulationViewModel(
+      { ...setup.form, monsterId: currentForm.monsterId },
+      context,
+      cannonByMonster,
+      lootPrefsByMonster[currentForm.monsterId] ?? {},
+      lootSettingsByMonster,
+      { includeLootRows: false }
+    );
+    const rowsByMonster = new Map(
+      createDenseCompareRows(
+        setup.form,
+        context,
+        DEFAULT_DENSE_COMPARE_SORT_STATE,
+        cannonByMonster,
+        lootPrefsByMonster,
+        {},
+        lootSettingsByMonster
+      ).map((row) => [row.monsterId, row])
+    );
+
+    return {
+      setup: {
+        id: setup.id,
+        snapshotId: setup.snapshotId,
+        source: setup.source,
+        name: setup.name,
+        combatStyle: setup.form.combatStyle,
+        loadoutLabel: duelLoadoutLabel(metadataVm)
+      } satisfies DuelMatrixSetupViewModel,
+      rowsByMonster
+    };
+  });
+  const setups = setupResults.map((result) => result.setup);
+  const monsters = Object.values(context.gameData.monsters).sort((left, right) =>
+    left.name.localeCompare(right.name)
+  );
+  const rows = monsters.map((monster) => {
+    const values = setupResults.map((result): DuelMatrixMetricValuesViewModel => {
+      const row = result.rowsByMonster.get(monster.id);
+      return {
+        dps: row?.dps ?? null,
+        effectiveXpPerHour: row?.xpPerHour ?? null,
+        effectiveNetGpPerHour: row?.netGpPerHour ?? null,
+        gpPerXp: row ? gpPerXpValue(row.netGpPerHour, row.xpPerHour) : null
+      };
+    });
+    const best = {
+      dps: finiteBest(values.map((value) => value.dps)),
+      effectiveXpPerHour: finiteBest(values.map((value) => value.effectiveXpPerHour)),
+      effectiveNetGpPerHour: finiteBest(values.map((value) => value.effectiveNetGpPerHour)),
+      gpPerXp: finiteBest(values.map((value) => value.gpPerXp))
+    };
+    const cells = setupResults.map((result, index): DuelMatrixCellViewModel => ({
+      setupId: result.setup.id,
+      values: values[index]!,
+      best: {
+        dps: isBestDuelValue(values[index]!.dps, best.dps, setups.length),
+        effectiveXpPerHour: isBestDuelValue(
+          values[index]!.effectiveXpPerHour,
+          best.effectiveXpPerHour,
+          setups.length,
+          0.5
+        ),
+        effectiveNetGpPerHour: isBestDuelValue(
+          values[index]!.effectiveNetGpPerHour,
+          best.effectiveNetGpPerHour,
+          setups.length,
+          0.5
+        ),
+        gpPerXp: isBestDuelValue(values[index]!.gpPerXp, best.gpPerXp, setups.length)
+      }
+    }));
+
+    return {
+      monsterId: monster.id,
+      monsterName: monster.name,
+      monsterLevel: monster.level ?? null,
+      isCurrentTarget: monster.id === currentForm.monsterId,
+      cells
+    };
+  });
+
+  return {
+    currentMonsterId: currentForm.monsterId,
+    monsterCount: rows.length,
+    setupCount: setups.length,
+    cellCount: rows.length * setups.length,
+    setups,
     rows
   };
 }

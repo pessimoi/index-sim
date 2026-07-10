@@ -1,4 +1,4 @@
-import { weaponStances } from "@/domain/combat";
+import { isSupportedSpecialAttackWeapon, weaponStances } from "@/domain/combat";
 import {
   EQUIPMENT_SLOTS,
   type CombatStyle,
@@ -11,17 +11,26 @@ import {
 import { FOOD, lootPreferenceKey, lootPreferenceKeysForMonster } from "@/domain/trip";
 import { HiscoresPlayerNameSchema, createPriceSetFromLegacyRecords } from "@/data/schemas";
 import {
+  BOOST_SELECTION_OPTIONS,
   CannonByMonsterSchema,
   CombatSetupFormSchema,
   CustomSetupsByMonsterSchema,
   DEFAULT_CANNON_SETTINGS,
   DEFAULT_FORM_STATE,
+  PRAYER_SELECTION_OPTIONS,
+  normalizeBoostSelection,
   normalizeFormState,
+  normalizePrayerSelection,
   setCombatStyleDefaults,
   type CannonByMonsterState,
   type CombatSetupFormState,
   type CustomSetupsByMonsterState
 } from "@/app/state/ui-state";
+import {
+  MAX_DUEL_SNAPSHOTS,
+  createDuelSnapshot,
+  type DuelSnapshotsState
+} from "@/app/state/duel-snapshots";
 import {
   DenseCompareSortStateSchema,
   type DenseCompareSortKey,
@@ -102,6 +111,7 @@ export interface LegacySetupMigrationReport {
   irrelevantMonsterIds: string[] | null;
   customSetupsByMonster: CustomSetupsByMonsterState | null;
   cannonByMonster: CannonByMonsterState | null;
+  duelSnapshots: DuelSnapshotsState | null;
 }
 
 export interface LegacySetupMigrationOptions {
@@ -109,6 +119,7 @@ export interface LegacySetupMigrationOptions {
   gameData: GameDataSnapshot;
   currentCustomSetupsByMonster?: CustomSetupsByMonsterState;
   currentCannonByMonster?: CannonByMonsterState;
+  currentDuelSnapshots?: DuelSnapshotsState;
   maxInputBytes?: number;
   maxPriceBytes?: number;
   maxHiscoresBytes?: number;
@@ -129,6 +140,8 @@ const MAX_LEGACY_NESTED_REVIEW_KEYS = 500;
 const COMBAT_STYLES = ["melee", "ranged", "magic"] as const satisfies readonly CombatStyle[];
 const PROTECT_PRAYERS = ["none", "melee", "missiles", "magic"] as const;
 const PRAYER_MODES = ["potions", "altar", "none"] as const;
+const LEGACY_PRAYER_IDS = new Set(PRAYER_SELECTION_OPTIONS.map((option) => option.id));
+const LEGACY_BOOST_IDS = new Set(BOOST_SELECTION_OPTIONS.map((option) => option.id));
 const LEGACY_PRICE_HISTORY_KEYS = [
   "sim_price_history_v1",
   "sim_price_history_sanitized_v1",
@@ -406,11 +419,12 @@ function inspectLegacySetupInput(
   }
 
   inspectLegacyNestedSetupAreas(parsed, options, report);
+  const importedFieldCountBeforeActiveSetup = report.importedFields.length;
 
   const draft = cloneDefaultFormState();
   mapLegacyInput(parsed, draft, options.gameData, report);
 
-  if (report.importedFields.length === 0) {
+  if (report.importedFields.length === importedFieldCountBeforeActiveSetup) {
     warn(report, "Legacy active setup input did not contain any safely importable fields.");
     return;
   }
@@ -433,6 +447,87 @@ function inspectLegacyNestedSetupAreas(
 ): void {
   inspectLegacyCustomSetups(legacy.monsterSetups, options, report);
   inspectLegacyCannonByMonster(legacy.cannonByMonster, options, report);
+  inspectLegacyDuelSetups(legacy, options, report);
+}
+
+function inspectLegacyDuelSetups(
+  legacy: LegacyRecord,
+  options: LegacySetupMigrationOptions,
+  report: LegacySetupMigrationReport
+): void {
+  const field = "sim_input_v3.duelSetups";
+  const value = legacy.duelSetups;
+  if (value === undefined) return;
+  if (!Array.isArray(value)) {
+    skip(report, field, "legacy Duel snapshots were skipped because the shape is not an array");
+    warn(report, "Legacy Duel snapshots were detected but their shape is not importable.");
+    return;
+  }
+  if (value.length === 0) return;
+  if (value.length > MAX_LEGACY_NESTED_REVIEW_KEYS) {
+    skip(report, field, "legacy Duel snapshot list exceeds safe entry limit");
+    warn(report, "Legacy Duel snapshots were detected but exceed the safe entry limit.");
+    return;
+  }
+
+  const current = options.currentDuelSnapshots?.snapshots ?? [];
+  const existingIds = new Set(current.map((snapshot) => snapshot.id));
+  const availableSlots = Math.max(0, MAX_DUEL_SNAPSHOTS - current.length);
+  const snapshots: DuelSnapshotsState["snapshots"] = [];
+
+  const baseDraft = cloneDefaultFormState();
+  mapLegacyInput(legacy, baseDraft, options.gameData, createReport([]));
+
+  for (const [index, entry] of value.entries()) {
+    const entryField = `${field}.${index}`;
+    if (snapshots.length >= availableSlots) {
+      skip(report, entryField, "rewrite Duel snapshot limit has no remaining room");
+      continue;
+    }
+    if (!isRecord(entry) || !isRecord(entry.setup)) {
+      skip(report, entryField, "expected an object with a setup snapshot");
+      continue;
+    }
+    if (typeof entry.name !== "string" || !entry.name.trim()) {
+      skip(report, `${entryField}.name`, "expected a non-empty snapshot name");
+      continue;
+    }
+    if ("result" in entry || "simulationResult" in entry) {
+      skip(report, entryField, "computed result payloads are not imported");
+      continue;
+    }
+
+    const id = `legacy-duel-${index + 1}`;
+    if (existingIds.has(id)) {
+      skip(report, entryField, "rewrite Duel snapshot already exists; kept rewrite-owned snapshot");
+      continue;
+    }
+
+    const childReport = createReport([]);
+    const draft = CombatSetupFormSchema.parse(baseDraft);
+    mapLegacyInput(entry.setup, draft, options.gameData, childReport, { mapMonster: false });
+    copyNestedReportFindings(childReport, entryField, report);
+    if (childReport.importedFields.length === 0) {
+      skip(report, entryField, "no safely importable Duel setup fields");
+      continue;
+    }
+
+    try {
+      snapshots.push(createDuelSnapshot(id, entry.name, normalizeFormState(draft)));
+      existingIds.add(id);
+      importField(report, `duelSnapshots.${id}`);
+    } catch {
+      skip(report, entryField, "mapped Duel snapshot failed rewrite validation");
+    }
+  }
+
+  if (snapshots.length === 0) {
+    warn(report, "Legacy Duel snapshots did not contain any safely importable entries.");
+    return;
+  }
+
+  report.duelSnapshots = { snapshots };
+  importField(report, "duelSnapshots");
 }
 
 function inspectLegacyCustomSetups(
@@ -443,7 +538,11 @@ function inspectLegacyCustomSetups(
   const field = "sim_input_v3.monsterSetups";
   if (value === undefined) return;
   if (!isRecord(value)) {
-    skip(report, field, "legacy custom setup snapshots were skipped because the shape is not an object map");
+    skip(
+      report,
+      field,
+      "legacy custom setup snapshots were skipped because the shape is not an object map"
+    );
     warn(report, "Legacy custom setup snapshots were detected but their shape is not importable.");
     return;
   }
@@ -508,7 +607,10 @@ function inspectLegacyCustomSetups(
   const validated = CustomSetupsByMonsterSchema.safeParse(imported);
   if (!validated.success) {
     skip(report, field, "legacy custom setup snapshots failed rewrite validation");
-    warn(report, "Legacy custom setup snapshots were ignored because they failed rewrite validation.");
+    warn(
+      report,
+      "Legacy custom setup snapshots were ignored because they failed rewrite validation."
+    );
     return;
   }
 
@@ -552,7 +654,11 @@ function inspectLegacyCannonByMonster(
       continue;
     }
     if (existing[monsterId]) {
-      skip(report, entryField, "rewrite cannon settings already exist; kept rewrite-owned settings");
+      skip(
+        report,
+        entryField,
+        "rewrite cannon settings already exist; kept rewrite-owned settings"
+      );
       continue;
     }
 
@@ -1039,7 +1145,8 @@ function createReport(foundKeys: LegacyStorageKey[]): LegacySetupMigrationReport
     denseCompareSort: null,
     irrelevantMonsterIds: null,
     customSetupsByMonster: null,
-    cannonByMonster: null
+    cannonByMonster: null,
+    duelSnapshots: null
   };
 }
 
@@ -1057,8 +1164,119 @@ function mapLegacyInput(
   mapAmmo(legacy, draft, gameData, report);
   mapSpell(legacy, draft, gameData, report);
   mapGear(legacy, draft, gameData, report);
+  mapSelections(legacy, draft, report);
+  mapLoadoutPolicy(legacy, draft, gameData, report);
   mapTrip(legacy, draft, report);
   mapStyle(legacy, draft, gameData, report);
+}
+
+function mapSelections(
+  legacy: LegacyRecord,
+  draft: MutableFormState,
+  report: LegacySetupMigrationReport
+): void {
+  mapSelectionArray(
+    legacy.prayers,
+    "prayers",
+    LEGACY_PRAYER_IDS,
+    normalizePrayerSelection,
+    (value) => {
+      draft.prayers = value;
+    },
+    report
+  );
+  mapSelectionArray(
+    legacy.boosts,
+    "boosts",
+    LEGACY_BOOST_IDS,
+    normalizeBoostSelection,
+    (value) => {
+      draft.boosts = value;
+    },
+    report
+  );
+}
+
+function mapSelectionArray(
+  value: unknown,
+  field: "prayers" | "boosts",
+  allowed: ReadonlySet<string>,
+  normalize: (keys: readonly string[]) => EntityId[],
+  assign: (keys: EntityId[]) => void,
+  report: LegacySetupMigrationReport
+): void {
+  if (value === undefined) return;
+  if (!Array.isArray(value)) {
+    skip(report, field, "expected an array of selection ids");
+    return;
+  }
+
+  const accepted: string[] = [];
+  for (const [index, key] of value.entries()) {
+    if (key === "none") continue;
+    if (typeof key === "string" && allowed.has(key)) accepted.push(key);
+    else skip(report, `${field}.${index}`, "unknown selection id");
+  }
+  assign(normalize(accepted));
+  importField(report, field);
+}
+
+function mapLoadoutPolicy(
+  legacy: LegacyRecord,
+  draft: MutableFormState,
+  gameData: GameDataSnapshot,
+  report: LegacySetupMigrationReport
+): void {
+  mapFormBoolean(legacy, draft, report, "sustained");
+  mapFormBoolean(legacy, draft, report, "ringOfWealth");
+
+  if (legacy.repotThreshold !== undefined) {
+    const value = legacy.repotThreshold;
+    if (
+      value === null ||
+      (typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 120)
+    ) {
+      draft.repotThreshold = value;
+      importField(report, "repotThreshold");
+    } else {
+      skip(report, "repotThreshold", "expected null or an integer from 1 to 120");
+    }
+  }
+
+  const specWeapon = readString(legacy, ["specWeapon"]);
+  const specAmmo = readString(legacy, ["specAmmo"]);
+  if (specWeapon == null && specAmmo == null) return;
+  if (specWeapon === "none") {
+    draft.specialAttack = { weaponId: "none", ammoId: "none" };
+    importField(report, "specialAttack");
+    return;
+  }
+  if (specWeapon == null || !isSupportedSpecialAttackWeapon(specWeapon, draft.combatStyle)) {
+    skip(report, "specialAttack.weaponId", "unknown special attack weapon for combat style");
+    return;
+  }
+  if (specAmmo != null && specAmmo !== "none" && !gameData.ammo[specAmmo]) {
+    skip(report, "specialAttack.ammoId", "unknown special attack ammo id");
+    return;
+  }
+  draft.specialAttack = { weaponId: specWeapon, ammoId: specAmmo ?? "none" };
+  importField(report, "specialAttack");
+}
+
+function mapFormBoolean(
+  legacy: LegacyRecord,
+  draft: MutableFormState,
+  report: LegacySetupMigrationReport,
+  field: "sustained" | "ringOfWealth"
+): void {
+  const value = legacy[field];
+  if (value === undefined) return;
+  if (typeof value === "boolean") {
+    draft[field] = value;
+    importField(report, field);
+  } else {
+    skip(report, field, "expected a boolean");
+  }
 }
 
 function mapCombatStyle(

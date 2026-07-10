@@ -43,11 +43,7 @@ import {
   SELECTED_PRICE_SET_VERSION,
   loadSelectedPriceSet
 } from "./selected-price-set";
-import {
-  REWRITE_SETUP_STORAGE_KEY,
-  REWRITE_SETUP_VERSION,
-  SavedSetupSchema
-} from "./ui-state";
+import { REWRITE_SETUP_STORAGE_KEY, REWRITE_SETUP_VERSION, SavedSetupSchema } from "./ui-state";
 
 export const LOCAL_STATE_HEALTH_REASON_VALUES = [
   "invalid_json",
@@ -62,12 +58,7 @@ export const LOCAL_STATE_HEALTH_REASON_VALUES = [
 export type LocalStateHealthReason = (typeof LOCAL_STATE_HEALTH_REASON_VALUES)[number];
 
 export type LocalStateHealthStatus =
-  | "missing"
-  | "loaded"
-  | "version-mismatch"
-  | "invalid"
-  | "unavailable"
-  | "save-failed";
+  "missing" | "loaded" | "version-mismatch" | "invalid" | "unavailable" | "save-failed";
 
 export type LocalStateHealthItemId =
   | "rewrite-setup"
@@ -142,9 +133,7 @@ export interface LocalStateClearResult {
   failedKeys: string[];
 }
 
-type HealthLoadResult =
-  | LoadPersistedResult<unknown>
-  | ReturnType<typeof loadSelectedPriceSet>;
+type HealthLoadResult = LoadPersistedResult<unknown> | ReturnType<typeof loadSelectedPriceSet>;
 
 interface LocalStateHealthDescriptor {
   id: LocalStateHealthItemId;

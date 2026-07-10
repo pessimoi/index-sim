@@ -21,6 +21,7 @@ import {
   createDenseCompareRows,
   createDenseCompareScaleModel,
   createDuelComparisonViewModel,
+  createDuelMatrixViewModel,
   createMonsterCardViewModel,
   createPlannerViewModel,
   createSimulationViewModel,
@@ -634,17 +635,13 @@ describe("rewrite UI view models", () => {
 
   it("summarizes enabled cannon settings with a Cannon review target", async () => {
     const { context } = await loadBundledLegacyContext();
-    const result = createSimulationViewModel(
-      DEFAULT_FORM_STATE,
-      context,
-      {
-        giant: {
-          enabled: true,
-          targets: 6,
-          respawnSec: 30
-        }
+    const result = createSimulationViewModel(DEFAULT_FORM_STATE, context, {
+      giant: {
+        enabled: true,
+        targets: 6,
+        respawnSec: 30
       }
-    );
+    });
 
     expect(activeAssumptionRow(result, "cannon-enabled")).toMatchObject({
       label: "Cannon",
@@ -795,7 +792,8 @@ describe("rewrite UI view models", () => {
 
   it("keeps structured money warnings available for UI surfacing", async () => {
     const { context } = await loadBundledLegacyContext();
-    const { uncut_sapphire: _uncutSapphire, ...itemPrices } = context.priceSet.itemPrices;
+    const itemPrices = { ...context.priceSet.itemPrices };
+    delete itemPrices.uncut_sapphire;
     const result = createSimulationViewModel(DEFAULT_FORM_STATE, {
       ...context,
       priceSet: {
@@ -1571,8 +1569,7 @@ describe("rewrite UI view models", () => {
       maxHit: result.combat.specialAttack?.maxHit
     });
     expect(result.statsSourceBreakdown.rows.find((row) => row.id === "special-attack")?.dps).toBe(
-      (result.combat.specialAttack?.dpsWithSpec ?? 0) -
-        (result.combat.specialAttack?.dpsBase ?? 0)
+      (result.combat.specialAttack?.dpsWithSpec ?? 0) - (result.combat.specialAttack?.dpsBase ?? 0)
     );
     expect(specialDetail).toMatchObject({
       id: "special-attack",
@@ -1860,9 +1857,7 @@ describe("rewrite UI view models", () => {
     expect(metrics.get("effective-accuracy")?.numericValue).toBe(
       result.combat.debug.effectiveAccuracy
     );
-    expect(metrics.get("effective-damage")?.numericValue).toBe(
-      result.combat.debug.effectiveDamage
-    );
+    expect(metrics.get("effective-damage")?.numericValue).toBe(result.combat.debug.effectiveDamage);
     expect(metrics.get("hit-chance")?.numericValue).toBe(result.combat.hitChance);
     expect(metrics.get("attack-cycle")?.numericValue).toBe(result.combat.attackTicks);
     expect(metrics.get("ttk")?.numericValue).toBe(result.combat.ttkSec);
@@ -1988,9 +1983,7 @@ describe("rewrite UI view models", () => {
       context
     );
     const result = createSimulationViewModel(DEFAULT_FORM_STATE, context);
-    const normalAttack = result.statsSourceBreakdown.rows.find(
-      (row) => row.id === "normal-attack"
-    );
+    const normalAttack = result.statsSourceBreakdown.rows.find((row) => row.id === "normal-attack");
 
     expect(result.combat).toEqual(fullResult.combat);
     expect(result.trip).toEqual(fullResult.trip);
@@ -2363,23 +2356,84 @@ describe("rewrite UI view models", () => {
     expect(Number.isFinite(snapshotRow.effectiveNetGpPerHour)).toBe(true);
     expect(duel.liveRow.dps).toBe(liveVm.result.rates.effectiveDps);
     expect(duel.liveRow.effectiveXpPerHour).toBe(liveVm.result.xp.effectiveXpPerHour);
-    expect(duel.liveRow.effectiveNetGpPerHour).toBe(
-      liveVm.result.rates.effectiveNetGpPerHour
-    );
+    expect(duel.liveRow.effectiveNetGpPerHour).toBe(liveVm.result.rates.effectiveNetGpPerHour);
     expect(snapshotRow.dps).toBe(snapshotVm.result.rates.effectiveDps);
     expect(snapshotRow.effectiveXpPerHour).toBe(snapshotVm.result.xp.effectiveXpPerHour);
-    expect(snapshotRow.effectiveNetGpPerHour).toBe(
-      snapshotVm.result.rates.effectiveNetGpPerHour
-    );
+    expect(snapshotRow.effectiveNetGpPerHour).toBe(snapshotVm.result.rates.effectiveNetGpPerHour);
     expect(snapshotRow.deltas.dps).toBeCloseTo(snapshotRow.dps - duel.liveRow.dps);
     expect(
       duel.rows.some(
-        (row) =>
-          row.best.effectiveXpPerHour || row.best.effectiveNetGpPerHour || row.best.gpPerXp
+        (row) => row.best.effectiveXpPerHour || row.best.effectiveNetGpPerHour || row.best.gpPerXp
       )
     ).toBe(true);
     expect(JSON.stringify(snapshot)).not.toContain("effectiveXpPerHour");
   }, 15_000);
+
+  it("builds an all-monster Duel matrix only from live and saved setup inputs", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const snapshotForm = normalizeFormState({
+      ...switchCombatStyleLoadout(DEFAULT_FORM_STATE, "ranged"),
+      monsterId: "firegiant",
+      weaponId: "magic_shortbow",
+      ammoId: "mith_arrow",
+      prayers: ["none"],
+      boosts: ["ranging"]
+    });
+    const snapshot = createDuelSnapshot("snap-ranged", "Ranged saved", snapshotForm);
+    const matrix = createDuelMatrixViewModel(
+      DEFAULT_FORM_STATE,
+      { snapshots: [snapshot] },
+      context
+    );
+    const currentTargetRow = matrix.rows.find(
+      (row) => row.monsterId === DEFAULT_FORM_STATE.monsterId
+    );
+    const currentTargetLive = createSimulationViewModel(DEFAULT_FORM_STATE, context);
+    const currentTargetSaved = createSimulationViewModel(
+      { ...snapshotForm, monsterId: DEFAULT_FORM_STATE.monsterId },
+      context
+    );
+
+    expect(matrix).toMatchObject({
+      currentMonsterId: DEFAULT_FORM_STATE.monsterId,
+      monsterCount: Object.keys(context.gameData.monsters).length,
+      setupCount: 2,
+      cellCount: Object.keys(context.gameData.monsters).length * 2
+    });
+    expect(matrix.setups).toMatchObject([
+      { id: "duel-live", source: "live", name: "Live setup", combatStyle: "melee" },
+      {
+        id: "duel-snapshot:snap-ranged",
+        snapshotId: "snap-ranged",
+        source: "snapshot",
+        name: "Ranged saved",
+        combatStyle: "ranged"
+      }
+    ]);
+    expect(matrix.rows.map((row) => row.monsterName)).toEqual(
+      [...matrix.rows.map((row) => row.monsterName)].sort((left, right) =>
+        left.localeCompare(right)
+      )
+    );
+    expect(currentTargetRow).toMatchObject({
+      monsterId: DEFAULT_FORM_STATE.monsterId,
+      isCurrentTarget: true
+    });
+    expect(currentTargetRow?.cells).toHaveLength(2);
+    expect(currentTargetRow?.cells[0]?.values).toMatchObject({
+      dps: currentTargetLive.result.rates.effectiveDps,
+      effectiveXpPerHour: currentTargetLive.result.xp.effectiveXpPerHour,
+      effectiveNetGpPerHour: currentTargetLive.result.rates.effectiveNetGpPerHour
+    });
+    expect(currentTargetRow?.cells[1]?.values).toMatchObject({
+      dps: currentTargetSaved.result.rates.effectiveDps,
+      effectiveXpPerHour: currentTargetSaved.result.xp.effectiveXpPerHour,
+      effectiveNetGpPerHour: currentTargetSaved.result.rates.effectiveNetGpPerHour
+    });
+    expect(currentTargetRow?.cells.some((cell) => cell.best.effectiveXpPerHour)).toBe(true);
+    expect(snapshot.form.monsterId).toBe("firegiant");
+    expect(JSON.stringify(matrix)).not.toContain("sourceRef");
+  }, 30_000);
 
   it("builds full current-monster loot rows with stable duplicate-safe row ids", async () => {
     const { context } = await loadBundledLegacyContext();
@@ -2669,7 +2723,9 @@ describe("rewrite UI view models", () => {
     expect(slowOverhead.trip.killsPerHour).toBeLessThan(alchDisabled.trip.killsPerHour);
     expect(overground.trip.gpPerKill).not.toBe(alchDisabled.trip.gpPerKill);
 
-    const overrideAction = alchable.availableActions.find((action) => action !== alchable.defaultPref);
+    const overrideAction = alchable.availableActions.find(
+      (action) => action !== alchable.defaultPref
+    );
     expect(overrideAction).toBeDefined();
     if (!overrideAction) throw new Error("Expected an available loot override action");
     const summarized = createSimulationViewModel(
@@ -2956,7 +3012,11 @@ describe("rewrite UI view models", () => {
       netGpPerHour,
       bound: "none"
     });
-    const rows = [row("visible-low", 50, -100), row("visible-best", 200, 300), row("visible-loss", 100, -400)];
+    const rows = [
+      row("visible-low", 50, -100),
+      row("visible-best", 200, 300),
+      row("visible-loss", 100, -400)
+    ];
     const scales = createDenseCompareScaleModel(rows);
 
     expect(scales["visible-best"].xpPerHour).toMatchObject({

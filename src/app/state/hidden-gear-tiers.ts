@@ -14,7 +14,11 @@ export const GEAR_TIER_DEFS = [
   { id: "blue_dhide", label: "Blue d-hide" },
   { id: "red_dhide", label: "Red d-hide" },
   { id: "leather", label: "Leather" },
-  { id: "low_bows", label: "Low-level bows", description: "Hide low-level bows below magic shortbow" },
+  {
+    id: "low_bows",
+    label: "Low-level bows",
+    description: "Hide low-level bows below magic shortbow"
+  },
   { id: "mage_1def", label: "1 defence magic" }
 ] as const;
 

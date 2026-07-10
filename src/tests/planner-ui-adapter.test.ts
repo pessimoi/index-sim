@@ -48,7 +48,9 @@ describe("planner UI adapter", () => {
 
     const adapter = createPlannerDomainAdapter(DEFAULT_FORM_STATE, context, {}, plannerState);
 
-    expect(adapter.input.request).toEqual(formToSimulationRequest(DEFAULT_FORM_STATE, context.gameData));
+    expect(adapter.input.request).toEqual(
+      formToSimulationRequest(DEFAULT_FORM_STATE, context.gameData)
+    );
     expect(adapter.input.request).not.toHaveProperty("plannerTargets");
     expect(adapter.input.request).not.toHaveProperty("plannerUiState");
     expect(adapter.input.request).not.toHaveProperty("targetLevels");
@@ -106,10 +108,12 @@ describe("planner UI adapter", () => {
       hint: expect.any(String)
     });
     expect(
-      editor.slots.flatMap((slot) => slot.options).every((option) => {
-        if (option.id === "none") return true;
-        return context.gameData.items[option.id]?.provenance?.source !== "hypothetical";
-      })
+      editor.slots
+        .flatMap((slot) => slot.options)
+        .every((option) => {
+          if (option.id === "none") return true;
+          return context.gameData.items[option.id]?.provenance?.source !== "hypothetical";
+        })
     ).toBe(true);
   });
 

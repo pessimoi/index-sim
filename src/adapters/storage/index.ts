@@ -28,12 +28,10 @@ export type LoadPersistedResult<T> =
   | { status: "unavailable"; value: null; reason: "read_failed" };
 
 export type SavePersistedResult<T> =
-  | { status: "saved"; envelope: PersistedEnvelope<T> }
-  | { status: "failed"; reason: "save_failed" };
+  { status: "saved"; envelope: PersistedEnvelope<T> } | { status: "failed"; reason: "save_failed" };
 
 export type ClearPersistedResult =
-  | { status: "cleared" }
-  | { status: "failed"; reason: "clear_failed" };
+  { status: "cleared" } | { status: "failed"; reason: "clear_failed" };
 
 const EnvelopeSchema = z
   .object({

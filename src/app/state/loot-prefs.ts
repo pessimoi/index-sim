@@ -16,10 +16,7 @@ export const LOOT_ACTION_VALUES = [
 export const LootActionSchema = z.enum(LOOT_ACTION_VALUES);
 
 const RawLootPrefsStateSchema = z
-  .record(
-    z.string().min(1).max(120),
-    z.record(z.string().min(1).max(180), z.unknown()).catch({})
-  )
+  .record(z.string().min(1).max(120), z.record(z.string().min(1).max(180), z.unknown()).catch({}))
   .catch({});
 
 export const LootPrefsStateSchema = RawLootPrefsStateSchema.transform((state) => {

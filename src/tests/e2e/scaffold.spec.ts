@@ -1,4 +1,18 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { readFileSync } from "node:fs";
+import { createGeneratedRuntimePriceSet } from "../../adapters/generated/price-fallback";
+import { createScheduledStaticPriceSnapshotStatus } from "../../adapters/market";
+import { LOOT_PREFS_STORAGE_KEY, LOOT_PREFS_VERSION } from "../../app/state/loot-prefs";
+import { LOOT_SETTINGS_STORAGE_KEY, LOOT_SETTINGS_VERSION } from "../../app/state/loot-settings";
+import {
+  REWRITE_SETUP_STORAGE_KEY,
+  REWRITE_SETUP_VERSION,
+  savedSetupFromForm
+} from "../../app/state/ui-state";
+import { createSimulationViewModel, formatNumber } from "../../app/view-models/simulation";
+import { parseGameDataSnapshot } from "../../data/schemas/game-data";
+import { LEGACY_GOLDEN_CASES } from "../fixtures/legacy-case-definitions";
+import { createRewriteFixtureCase } from "../helpers/rewrite-fixture";
 
 const RESULT_NUMERIC_LABELS = [
   "DPS",
@@ -10,6 +24,44 @@ const RESULT_NUMERIC_LABELS = [
   "GP/KILL",
   "SUPPLY/KILL"
 ] as const;
+
+const ALL_FIXTURE_NUMERIC_LABELS = [
+  "DPS",
+  "MAX HIT",
+  "HIT %",
+  "TTK",
+  "KILLS/HR",
+  "XP/HR",
+  "GP/HR",
+  "GP/HR NET",
+  "SUPPLY/KILL",
+  "GP/KILL"
+] as const;
+
+const GENERATED_BROWSER_FIXTURE_GAME_DATA = parseGameDataSnapshot(
+  JSON.parse(readFileSync(new URL("../../data/generated/game-data.json", import.meta.url), "utf8"))
+);
+const GENERATED_BROWSER_FIXTURE_PRICE_STATUS = createScheduledStaticPriceSnapshotStatus(
+  {
+    pricesText: readFileSync(new URL("../../../prices.json", import.meta.url), "utf8"),
+    alchText: readFileSync(new URL("../../../alch.json", import.meta.url), "utf8"),
+    priceHistoryText: readFileSync(new URL("../../../price-history.json", import.meta.url), "utf8")
+  },
+  { loadedAt: "2026-07-10T00:00:00.000Z" }
+);
+if (
+  GENERATED_BROWSER_FIXTURE_PRICE_STATUS.status !== "loaded" ||
+  GENERATED_BROWSER_FIXTURE_PRICE_STATUS.scheduledPriceSet === null
+) {
+  throw new Error("Scheduled browser fixture PriceSet is unavailable.");
+}
+const GENERATED_BROWSER_FIXTURE_CONTEXT = {
+  gameData: GENERATED_BROWSER_FIXTURE_GAME_DATA,
+  priceSet: createGeneratedRuntimePriceSet(
+    GENERATED_BROWSER_FIXTURE_PRICE_STATUS.scheduledPriceSet,
+    GENERATED_BROWSER_FIXTURE_GAME_DATA
+  )
+};
 
 const CANNON_NUMERIC_LABELS = [
   "Effective targets",
@@ -59,6 +111,39 @@ async function metricSnapshot(region: Locator, labels: readonly string[]) {
 
 async function resultMetricSnapshot(page: Page) {
   return metricSnapshot(page.getByLabel("Simulation results"), RESULT_NUMERIC_LABELS);
+}
+
+function fixtureDuration(seconds: number): string {
+  if (!Number.isFinite(seconds)) return "unlimited";
+  if (seconds < 60) return `${formatNumber(seconds, 1)}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = Math.round(seconds % 60)
+    .toString()
+    .padStart(2, "0");
+  return `${minutes}:${remainingSeconds}`;
+}
+
+function allFixtureExpectedMetrics(vm: ReturnType<typeof createSimulationViewModel>) {
+  return {
+    DPS: formatNumber(vm.combat.effectiveDps, 2),
+    "MAX HIT": formatNumber(vm.combat.maxHit, 1),
+    "HIT %": `${formatNumber(vm.combat.hitChance * 100, 1)}%`,
+    TTK: fixtureDuration(vm.combat.ttkSec),
+    "KILLS/HR": formatNumber(vm.trip.killsPerHour),
+    "XP/HR": formatNumber(vm.effectiveXpPerHour),
+    "GP/HR": formatNumber(vm.trip.gpPerHour),
+    "GP/HR NET": formatNumber(vm.trip.effectiveNetGpPerHour),
+    "SUPPLY/KILL": formatNumber(vm.trip.supply.supplyCostPerKill),
+    "GP/KILL": formatNumber(vm.trip.gpPerKill)
+  };
+}
+
+function fixtureStorageEnvelope<T>(version: number, data: T) {
+  return {
+    version,
+    savedAt: "2026-07-10T00:00:00.000Z",
+    data
+  };
 }
 
 function activeMonsterDefence(card: Locator) {
@@ -175,9 +260,7 @@ test("loads the dense combat spreadsheet root", async ({ page }) => {
   await expect(page.getByRole("table", { name: "All monsters" })).toBeVisible();
   await expect(page.getByText("All monsters")).toBeVisible();
   await expect(page.getByText("DPS").first()).toBeVisible();
-  await expect(
-    page.getByText("Live hiscores lookup is not configured in this run.")
-  ).toBeVisible();
+  await expect(page.getByText("Live hiscores lookup is not configured in this run.")).toBeVisible();
   await page.getByLabel("Workbench tabs").getByRole("button", { name: "Economy" }).click();
   const market = page.locator('section[aria-label="Market price data"]');
   await expect(
@@ -223,7 +306,9 @@ test("keeps hiscores disabled fallback focused on manual Player levels", async (
   await expect(hiscores.getByLabel("Player", { exact: true })).toBeEnabled();
   await expect(hiscores.getByRole("button", { name: "Lookup" })).toBeDisabled();
   await expect(hiscores).toContainText("Live hiscores lookup is not configured in this run.");
-  await expect(hiscores).toContainText("Use the Player level fields above to edit levels manually.");
+  await expect(hiscores).toContainText(
+    "Use the Player level fields above to edit levels manually."
+  );
 
   await playerLevels.getByLabel("ATT", { exact: true }).fill("66");
   await playerLevels.getByLabel("STR", { exact: true }).fill("67");
@@ -233,7 +318,9 @@ test("keeps hiscores disabled fallback focused on manual Player levels", async (
   expect(lookupRequested).toBe(false);
 });
 
-test("renders scheduled price status and keeps local PriceSet overrides separate", async ({ page }) => {
+test("renders scheduled price status and keeps local PriceSet overrides separate", async ({
+  page
+}) => {
   let refreshRequested = false;
   await page.route("**/api/market/status", async (route) => {
     await route.fulfill({
@@ -264,9 +351,7 @@ test("renders scheduled price status and keeps local PriceSet overrides separate
   const activePriceSetSummary = market.getByLabel("Market active PriceSet summary");
   const scheduledSummary = market.getByLabel("Scheduled price snapshot summary");
 
-  await expect(market).toContainText(
-    "Market upstream refresh is scheduled, not user-triggered."
-  );
+  await expect(market).toContainText("Market upstream refresh is scheduled, not user-triggered.");
   await expect(scheduledSummary).toContainText("Status Loaded");
   await expect(scheduledSummary).toContainText("Label Scheduled static prices");
   await expect(activePriceSetSummary).toContainText("Active source Scheduled snapshot");
@@ -337,9 +422,7 @@ test("renders scheduled price status and keeps local PriceSet overrides separate
   await page.reload();
   await page.getByLabel("Workbench tabs").getByRole("button", { name: "Economy" }).click();
   const reloadedMarket = page.locator('section[aria-label="Market price data"]');
-  const reloadedActivePriceSetSummary = reloadedMarket.getByLabel(
-    "Market active PriceSet summary"
-  );
+  const reloadedActivePriceSetSummary = reloadedMarket.getByLabel("Market active PriceSet summary");
   await expect(reloadedActivePriceSetSummary).toContainText(
     "Label Disabled market imported prices"
   );
@@ -483,10 +566,9 @@ test("shows Stats XP routing trip summary and hit distribution", async ({ page }
   const assumptions = page.getByLabel("Active assumptions");
   await expect(assumptions).toContainText("Cannon");
   await assumptions.getByRole("button", { name: "Review Cannon" }).click();
-  await expect(page.getByLabel("Workbench tabs").getByRole("button", { name: "Cannon" })).toHaveAttribute(
-    "aria-pressed",
-    "true"
-  );
+  await expect(
+    page.getByLabel("Workbench tabs").getByRole("button", { name: "Cannon" })
+  ).toHaveAttribute("aria-pressed", "true");
   await page.getByLabel("Workbench tabs").getByRole("button", { name: "Stats" }).click();
   await expect(
     analysis
@@ -528,8 +610,9 @@ test("switches the target through MonsterCard and keeps shell state in sync", as
   await expect(card.getByLabel("Current setup state")).toContainText("Default setup");
   await card.getByLabel("Target", { exact: true }).selectOption("rock_crab");
 
-  await expect(page.getByLabel("Setup context").getByRole("heading", { name: "Rock Crab" }))
-    .toBeVisible();
+  await expect(
+    page.getByLabel("Setup context").getByRole("heading", { name: "Rock Crab" })
+  ).toBeVisible();
   await expect(card.getByRole("heading", { name: "Rock Crab" })).toBeVisible();
   const afterMetrics = await resultMetricSnapshot(page);
   expect(Object.keys(beforeMetrics).some((key) => beforeMetrics[key] !== afterMetrics[key])).toBe(
@@ -564,15 +647,26 @@ test("places MonsterCard after the active pane on mobile", async ({ page }) => {
 
   const shell = page.getByLabel("Workbench shell");
   await expect(shell).toBeVisible();
-  const shellOrder = await shell.locator(":scope > *").evaluateAll((nodes) =>
-    nodes.map((node) => node.getAttribute("aria-label"))
-  );
+  const shellOrder = await shell
+    .locator(":scope > *")
+    .evaluateAll((nodes) => nodes.map((node) => node.getAttribute("aria-label")));
   expect(shellOrder).toEqual(["Player sidebar", "Workbench center", "Monster card"]);
 
   const card = page.getByLabel("Monster card");
   await expect(card).toBeVisible();
   await expect(card.getByLabel("Target", { exact: true })).toBeVisible();
   await expect(activeMonsterDefence(card)).toBeVisible();
+
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Planner" }).click();
+  const planner = page.getByRole("region", { name: "Planner", exact: true });
+  await expect(planner.getByLabel("Planner summary")).toBeVisible();
+  const [plannerBox, mobileCardBox] = await Promise.all([
+    planner.boundingBox(),
+    card.boundingBox()
+  ]);
+  expect(plannerBox).not.toBeNull();
+  expect(mobileCardBox).not.toBeNull();
+  expect(mobileCardBox!.y).toBeGreaterThanOrEqual(plannerBox!.y + plannerBox!.height - 1);
 });
 
 test("keeps Dense Compare mobile and tablet overflow contained", async ({ page }) => {
@@ -621,17 +715,13 @@ test("keeps Dense Compare mobile and tablet overflow contained", async ({ page }
     ]);
     expect(headerBox).not.toBeNull();
     expect(firstVisibleBodyBox).not.toBeNull();
-    expect(firstVisibleBodyBox!.y).toBeGreaterThanOrEqual(
-      headerBox!.y + headerBox!.height - 1
-    );
+    expect(firstVisibleBodyBox!.y).toBeGreaterThanOrEqual(headerBox!.y + headerBox!.height - 1);
 
     const activeRow = table.getByRole("row", { name: /Giant lvl 28/ });
     await expectActiveDenseRow(table, /Giant lvl 28/);
     await activeRow.getByRole("button", { name: /Mark .* irrelevant/ }).click();
     await expect(activeRow.getByLabel("Marked irrelevant for Hill Giant")).toBeVisible();
-    await expect(
-      activeRow.getByLabel("Current target kept visible for Hill Giant")
-    ).toBeVisible();
+    await expect(activeRow.getByLabel("Current target kept visible for Hill Giant")).toBeVisible();
 
     await page.getByLabel("Monster filter").fill("rock crab");
     await page
@@ -640,9 +730,7 @@ test("keeps Dense Compare mobile and tablet overflow contained", async ({ page }
       .fill("very long impossible dragon bones and rune chainbody filter value");
     await expect(activeRow).toBeVisible();
     await expect(activeRow.locator("td").first()).toContainText(">");
-    await expect(
-      activeRow.getByLabel("Current target kept visible for Hill Giant")
-    ).toBeVisible();
+    await expect(activeRow.getByLabel("Current target kept visible for Hill Giant")).toBeVisible();
     await expectPageWidthContained(page);
   }
 });
@@ -696,7 +784,7 @@ test("recomputes the Planner tab workflow from visible planner controls", async 
   });
 });
 
-test("uses the Duel tab to snapshot rename load delete and persist setup comparisons", async ({
+test("uses the Duel tab to snapshot import export rename load delete and persist setup comparisons", async ({
   page
 }) => {
   test.setTimeout(90_000);
@@ -732,6 +820,18 @@ test("uses the Duel tab to snapshot rename load delete and persist setup compari
       !raw.includes("effectiveXpPerHour")
     );
   });
+  const exportedSnapshotJson = await page.evaluate(() => {
+    const saved = JSON.parse(window.localStorage.getItem("index-sim:duel-snapshots") ?? "null");
+    return JSON.stringify({
+      version: 1,
+      exportedAt: "2026-07-10T12:00:00.000Z",
+      data: saved.data
+    });
+  });
+  const downloadPromise = page.waitForEvent("download");
+  await duel.getByRole("button", { name: "Export snapshots" }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe("index-sim-duel-snapshots.json");
 
   await page.reload();
   await page.getByLabel("Workbench tabs").getByRole("button", { name: "Duel" }).click();
@@ -790,6 +890,54 @@ test("uses the Duel tab to snapshot rename load delete and persist setup compari
       window.localStorage.getItem("duel_unrelated_key") === "keep"
     );
   });
+
+  await reloadedDuel.getByLabel("Import snapshots").setInputFiles({
+    name: "duel-snapshots.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(exportedSnapshotJson)
+  });
+  await expect(reloadedDuel.getByLabel("Duel snapshot import notice")).toContainText(
+    "1 added, 0 updated"
+  );
+  await expect(reloadedTable.getByLabel("Rename snapshot Melee saved")).toBeVisible();
+  await page.waitForFunction(() => {
+    const raw = window.localStorage.getItem("index-sim:duel-snapshots");
+    if (!raw) return false;
+    const saved = JSON.parse(raw);
+    return (
+      saved.data?.snapshots?.[0]?.name === "Melee saved" &&
+      window.localStorage.getItem("duel_unrelated_key") === "keep"
+    );
+  });
+});
+
+test("builds and filters the all-monster Duel setup matrix on demand", async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.goto("/");
+  const tabs = page.getByLabel("Workbench tabs");
+
+  await tabs.getByRole("button", { name: "Duel" }).click();
+  const duel = page.getByRole("region", { name: "Duel", exact: true });
+  await duel.getByRole("button", { name: "Snapshot current setup" }).click();
+  await tabs.getByRole("button", { name: "Ranged" }).click();
+  await tabs.getByRole("button", { name: "Duel" }).click();
+
+  await expect(duel.getByRole("table", { name: "All-monster setup matrix" })).toHaveCount(0);
+  await duel.getByRole("button", { name: "Monster matrix" }).click();
+  const matrix = duel.getByRole("table", { name: "All-monster setup matrix" });
+  await expect(matrix).toBeVisible({ timeout: 30_000 });
+  await expect(matrix.locator("thead th")).toHaveCount(3);
+  await expect.poll(async () => matrix.locator("tbody tr").count()).toBeGreaterThan(60);
+  await expect(matrix.locator('tbody tr[aria-current="true"]')).toHaveCount(1);
+  await expect(matrix.locator('td[aria-label*="XP/hr"]')).not.toHaveCount(0);
+  await expect(matrix.locator("td.best")).not.toHaveCount(0);
+
+  await duel.getByLabel("Duel matrix metric").getByRole("button", { name: "DPS" }).click();
+  await expect(matrix.locator('td[aria-label*="DPS"]')).not.toHaveCount(0);
+  await duel.getByLabel("Find matrix monster").fill("tribesman");
+  await expect(matrix.locator("tbody tr")).toHaveCount(1);
+  await expect(matrix.getByRole("row", { name: /Tribesman/ })).toBeVisible();
+  await expectPageWidthContained(page);
 });
 
 test("reviews and imports compatible legacy setup data", async ({ page }) => {
@@ -812,7 +960,19 @@ test("reviews and imports compatible legacy setup data", async ({ page }) => {
         },
         cannonByMonster: {
           dagannoth: { enabled: true, targets: 6, respawnSec: 30 }
-        }
+        },
+        duelSetups: [
+          {
+            name: "Legacy ranged",
+            setup: {
+              combatType: "ranged",
+              weapon: "magic_shortbow",
+              ammo: "rune_arrow",
+              style: "rapid",
+              boosts: ["ranging"]
+            }
+          }
+        ]
       })
     );
     window.localStorage.setItem(
@@ -828,7 +988,13 @@ test("reviews and imports compatible legacy setup data", async ({ page }) => {
           metric: "balanced",
           targetLevels: { attack: 70, strength: 70, defence: 50, ranged: 50, magic: 50 },
           currentXp: { attack: 1000, strength: 2000, defence: 0, ranged: 0, magic: 0 },
-          skillLocks: { attack: false, strength: true, defence: false, ranged: false, magic: false },
+          skillLocks: {
+            attack: false,
+            strength: true,
+            defence: false,
+            ranged: false,
+            magic: false
+          },
           averageOverSession: true,
           onlyCurrentGear: false,
           gearPool: {}
@@ -877,11 +1043,10 @@ test("reviews and imports compatible legacy setup data", async ({ page }) => {
   await expect(migration).toBeVisible();
   await expect(migration.getByLabel("Legacy data summary")).toContainText("Legacy setup ready");
   await expect(migration.getByLabel("Legacy data summary")).toContainText("Hiscores player ready");
-  await expect(migration.getByLabel("Legacy data summary")).toContainText(
-    "Loot preferences ready"
-  );
+  await expect(migration.getByLabel("Legacy data summary")).toContainText("Loot preferences ready");
   await expect(migration.getByLabel("Legacy data summary")).toContainText("Custom setups ready");
   await expect(migration.getByLabel("Legacy data summary")).toContainText("Cannon map ready");
+  await expect(migration.getByLabel("Legacy data summary")).toContainText("Duel snapshots ready");
   await expect(migration.getByLabel("Legacy data summary")).toContainText(
     "Hidden gear tiers ready"
   );
@@ -894,9 +1059,7 @@ test("reviews and imports compatible legacy setup data", async ({ page }) => {
   await expect(migration.getByLabel("Legacy data summary")).toContainText(
     "Review-only decisions shown"
   );
-  await expect(migration.getByLabel("Legacy migration outcome")).toContainText(
-    "Import action:"
-  );
+  await expect(migration.getByLabel("Legacy migration outcome")).toContainText("Import action:");
   await expect(migration.getByLabel("Legacy migration outcome")).toContainText(
     "Custom setups: 1 importable, 0 skipped"
   );
@@ -904,17 +1067,16 @@ test("reviews and imports compatible legacy setup data", async ({ page }) => {
     "Cannon map: 1 importable, 0 skipped"
   );
   await expect(migration.getByLabel("Legacy migration outcome")).toContainText(
+    "Duel snapshots: 1 importable, 0 skipped"
+  );
+  await expect(migration.getByLabel("Legacy migration outcome")).toContainText(
     "Rewrite Planner V1 does not import legacy Planner state; Import and Keep leave it in legacy storage."
   );
   await expect(migration.getByLabel("Legacy migration outcome")).toContainText(
     "Full legacy price history is review-only in V1; 1 history key detected and not migrated."
   );
-  await expect(migration.getByLabel("Legacy migration outcome")).toContainText(
-    "Keep action:"
-  );
-  await expect(migration.getByLabel("Legacy migration outcome")).toContainText(
-    "Clear action:"
-  );
+  await expect(migration.getByLabel("Legacy migration outcome")).toContainText("Keep action:");
+  await expect(migration.getByLabel("Legacy migration outcome")).toContainText("Clear action:");
   await expect(migration).not.toContainText("planner-payload-sentinel");
   await expect(migration).not.toContainText("history-payload-sentinel");
   await expect(migration.getByLabel("Legacy import and review plan")).toContainText(
@@ -925,6 +1087,9 @@ test("reviews and imports compatible legacy setup data", async ({ page }) => {
   );
   await expect(migration.getByLabel("Legacy import and review plan")).toContainText(
     "Legacy cannon map into rewrite per-monster cannon settings"
+  );
+  await expect(migration.getByLabel("Legacy import and review plan")).toContainText(
+    "Legacy Duel snapshots into rewrite Duel snapshot storage"
   );
   await expect(migration.getByLabel("Legacy import and review plan")).toContainText(
     "Loot preferences into rewrite per-monster drop actions"
@@ -988,6 +1153,9 @@ test("reviews and imports compatible legacy setup data", async ({ page }) => {
       parsed.data?.cannonByMonster?.dagannoth?.enabled === true &&
       parsed.data?.cannonByMonster?.dagannoth?.targets === 6 &&
       parsed.data?.cannonByMonster?.dagannoth?.respawnSec === 30 &&
+      (window.localStorage.getItem("index-sim:duel-snapshots") ?? "").includes(
+        '"name":"Legacy ranged"'
+      ) &&
       (window.localStorage.getItem("index-sim:hidden-gear-tiers") ?? "").includes(
         '"bronze":true'
       ) &&
@@ -1013,9 +1181,7 @@ test("reviews and imports compatible legacy setup data", async ({ page }) => {
       window.localStorage.getItem("sim_price_history_v1") !== null &&
       window.localStorage.getItem("sim_hiscore_player") !== null &&
       window.localStorage.getItem("index-sim:legacy-migration-dismissed") !== null &&
-      (window.localStorage.getItem("index-sim:planner-ui") ?? "").includes(
-        '"metric":"balanced"'
-      ) &&
+      (window.localStorage.getItem("index-sim:planner-ui") ?? "").includes('"metric":"balanced"') &&
       !(window.localStorage.getItem("index-sim:planner-ui") ?? "").includes('"metric":"xph"') &&
       (window.localStorage.getItem("index-sim:hiscores:last-player") ?? "").includes(
         "Fixture Player"
@@ -1038,12 +1204,14 @@ test("reviews and imports compatible legacy setup data", async ({ page }) => {
       "MAX HIT": "14.0",
       "HIT %": "78.7%",
       "XP/HR": "17,756",
-      "GP/HR NET": "-238,749",
+      "GP/HR NET": "-266,358",
       "KILLS/HR": "109",
-      "GP/KILL": "613",
+      "GP/KILL": "72",
       "SUPPLY/KILL": "5,292"
     }
   });
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Duel" }).click();
+  await expect(page.getByLabel("Rename snapshot Legacy ranged")).toHaveValue("Legacy ranged");
 });
 
 test("updates manual combat overrides and resets to derived values", async ({ page }) => {
@@ -1657,8 +1825,14 @@ test("filters hidden gear tiers while keeping current selections", async ({ page
 
   await tabs.getByRole("button", { name: "Melee" }).click();
   await expect(meleePane.getByLabel("Body", { exact: true })).toHaveValue("iron_platebody");
-  const helmOptions = await meleePane.getByLabel("Helm", { exact: true }).locator("option").allTextContents();
-  const bodyOptions = await meleePane.getByLabel("Body", { exact: true }).locator("option").allTextContents();
+  const helmOptions = await meleePane
+    .getByLabel("Helm", { exact: true })
+    .locator("option")
+    .allTextContents();
+  const bodyOptions = await meleePane
+    .getByLabel("Body", { exact: true })
+    .locator("option")
+    .allTextContents();
   expect(helmOptions.join("\n")).not.toContain("Iron full helm");
   expect(bodyOptions.join("\n")).toContain("Iron platebody");
   expect(bodyOptions.join("\n")).toContain("None");
@@ -1676,9 +1850,7 @@ test("filters hidden gear tiers while keeping current selections", async ({ page
   ).toBeChecked();
   await page.getByLabel("Workbench tabs").getByRole("button", { name: "Melee" }).click();
   const reloadedMeleePane = page.getByLabel("Equipment loadout");
-  await expect(reloadedMeleePane.getByLabel("Body", { exact: true })).toHaveValue(
-    "iron_platebody"
-  );
+  await expect(reloadedMeleePane.getByLabel("Body", { exact: true })).toHaveValue("iron_platebody");
   const reloadedHelmOptions = await reloadedMeleePane
     .getByLabel("Helm", { exact: true })
     .locator("option")
@@ -1994,6 +2166,57 @@ test("shows dense row markers for custom setup and per-monster loot settings", a
   await expect(greenDragonRow.getByLabel("Kill overhead override for Green Dragon")).toBeVisible();
 });
 
+test("matches browser-rendered result metrics for every golden fixture setup", async ({ page }) => {
+  test.setTimeout(180_000);
+  await page.goto("/");
+
+  for (const definition of LEGACY_GOLDEN_CASES) {
+    const fixture = createRewriteFixtureCase(definition, GENERATED_BROWSER_FIXTURE_CONTEXT);
+    const expectedVm = createSimulationViewModel(
+      fixture.form,
+      GENERATED_BROWSER_FIXTURE_CONTEXT,
+      fixture.cannonByMonster,
+      fixture.lootPrefsByMonster[fixture.form.monsterId] ?? {},
+      fixture.lootSettingsByMonster,
+      { includeLootRows: false }
+    );
+    const storageState = {
+      [REWRITE_SETUP_STORAGE_KEY]: JSON.stringify(
+        fixtureStorageEnvelope(
+          REWRITE_SETUP_VERSION,
+          savedSetupFromForm(fixture.form, undefined, fixture.cannonByMonster)
+        )
+      ),
+      [LOOT_PREFS_STORAGE_KEY]: JSON.stringify(
+        fixtureStorageEnvelope(LOOT_PREFS_VERSION, fixture.lootPrefsByMonster)
+      ),
+      [LOOT_SETTINGS_STORAGE_KEY]: JSON.stringify(
+        fixtureStorageEnvelope(LOOT_SETTINGS_VERSION, fixture.lootSettingsByMonster)
+      )
+    };
+
+    await page.evaluate((entries) => {
+      window.localStorage.clear();
+      for (const [key, value] of Object.entries(entries)) {
+        window.localStorage.setItem(key, value);
+      }
+    }, storageState);
+    await page.reload();
+
+    const resultStrip = page.getByLabel("Simulation results");
+    await expect(resultStrip, definition.id).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByLabel("TYPE", { exact: true }), definition.id).toHaveValue(
+      fixture.form.combatStyle
+    );
+    await expect(page.getByLabel("TARGET", { exact: true }), definition.id).toHaveValue(
+      fixture.form.monsterId
+    );
+    expect(await metricSnapshot(resultStrip, ALL_FIXTURE_NUMERIC_LABELS), definition.id).toEqual(
+      allFixtureExpectedMetrics(expectedVm)
+    );
+  }
+});
+
 test("matches browser-rendered dense numeric snapshots", async ({ page }) => {
   await page.goto("/");
   const table = page.getByRole("table", { name: "All monsters" });
@@ -2023,7 +2246,10 @@ test("matches browser-rendered dense numeric snapshots", async ({ page }) => {
   );
   await page.getByLabel("Workbench tabs").getByRole("button", { name: "Compare" }).click();
   await expect(
-    table.getByRole("row", { name: /Dagannoth \(lvl 74\)/ }).locator("td").nth(3)
+    table
+      .getByRole("row", { name: /Dagannoth \(lvl 74\)/ })
+      .locator("td")
+      .nth(3)
   ).toHaveText("2.24");
   const cannonRanged = await denseNumericSnapshot(table, /Dagannoth \(lvl 74\)/);
   const cannonRangedResults = await resultMetricSnapshot(page);
@@ -2044,18 +2270,18 @@ test("matches browser-rendered dense numeric snapshots", async ({ page }) => {
       ttk: "12.8s",
       killsPerHour: "235",
       xpPerHour: "21,573",
-      gpPerKill: "537",
-      gpPerHour: "126,132",
-      netGpPerHour: "-78,561"
+      gpPerKill: "524",
+      gpPerHour: "123,059",
+      netGpPerHour: "-80,579"
     },
     defaultMeleeResults: {
       DPS: "3.05",
       "MAX HIT": "16.4",
       "HIT %": "88.9%",
       "XP/HR": "21,573",
-      "GP/HR NET": "-78,561",
+      "GP/HR NET": "-80,579",
       "KILLS/HR": "235",
-      "GP/KILL": "537",
+      "GP/KILL": "524",
       "SUPPLY/KILL": "1,047"
     },
     rangedSafespot: {
@@ -2065,18 +2291,18 @@ test("matches browser-rendered dense numeric snapshots", async ({ page }) => {
       ttk: "45.6s",
       killsPerHour: "73",
       xpPerHour: "14,525",
-      gpPerKill: "620",
-      gpPerHour: "45,419",
-      netGpPerHour: "-183,914"
+      gpPerKill: "630",
+      gpPerHour: "46,191",
+      netGpPerHour: "-183,475"
     },
     rangedSafespotResults: {
       DPS: "1.96",
       "MAX HIT": "10.0",
       "HIT %": "70.6%",
       "XP/HR": "14,525",
-      "GP/HR NET": "-183,914",
+      "GP/HR NET": "-183,475",
       "KILLS/HR": "73",
-      "GP/KILL": "620",
+      "GP/KILL": "630",
       "SUPPLY/KILL": "5,026"
     },
     cannonRanged: {
@@ -2086,18 +2312,18 @@ test("matches browser-rendered dense numeric snapshots", async ({ page }) => {
       ttk: "32.3s",
       killsPerHour: "326",
       xpPerHour: "37,421",
-      gpPerKill: "87",
-      gpPerHour: "28,484",
-      netGpPerHour: "-478,051"
+      gpPerKill: "65",
+      gpPerHour: "21,266",
+      netGpPerHour: "-481,907"
     },
     cannonRangedResults: {
       DPS: "2.24",
       "MAX HIT": "10.0",
       "HIT %": "80.7%",
       "XP/HR": "37,421",
-      "GP/HR NET": "-478,051",
+      "GP/HR NET": "-481,907",
       "KILLS/HR": "326",
-      "GP/KILL": "87",
+      "GP/KILL": "65",
       "SUPPLY/KILL": "2,828"
     },
     cannonOutput: {
@@ -2107,7 +2333,7 @@ test("matches browser-rendered dense numeric snapshots", async ({ page }) => {
       "Balls/kill": "4.41",
       "Cannon Ranged XP/hr": "45,075",
       "Effective XP/hr": "37,421",
-      "Effective net GP/hr": "-478,051",
+      "Effective net GP/hr": "-481,907",
       "Ball cost/hr": "744,459",
       "Ball cost/kill": "1,763",
       "Ball price": "400",
@@ -2165,9 +2391,12 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
   await magicPane.getByLabel("Spell", { exact: true }).selectOption("fire_wave");
   await page.getByLabel("TARGET", { exact: true }).selectOption("blue_dragon");
   await tabs.getByRole("button", { name: "Compare" }).click();
-  await expect(table.getByRole("row", { name: /Blue Dragon/ }).locator("td").nth(2)).toHaveText(
-    "20.0"
-  );
+  await expect(
+    table
+      .getByRole("row", { name: /Blue Dragon/ })
+      .locator("td")
+      .nth(2)
+  ).toHaveText("20.0");
   const magicSafespot = await denseNumericSnapshot(table, /Blue Dragon/);
   const magicSafespotResults = await resultMetricSnapshot(page);
   await expectActiveDenseRow(table, /Blue Dragon/);
@@ -2228,18 +2457,18 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
       ttk: "12.8s",
       killsPerHour: "235",
       xpPerHour: "21,573",
-      gpPerKill: "537",
-      gpPerHour: "126,132",
-      netGpPerHour: "-78,561"
+      gpPerKill: "524",
+      gpPerHour: "123,059",
+      netGpPerHour: "-80,579"
     },
     meleeBaselineResults: {
       DPS: "3.05",
       "MAX HIT": "16.4",
       "HIT %": "88.9%",
       "XP/HR": "21,573",
-      "GP/HR NET": "-78,561",
+      "GP/HR NET": "-80,579",
       "KILLS/HR": "235",
-      "GP/KILL": "537",
+      "GP/KILL": "524",
       "SUPPLY/KILL": "1,047"
     },
     meleeAlchRelevant: {
@@ -2249,18 +2478,18 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
       ttk: "23.2s",
       killsPerHour: "140",
       xpPerHour: "18,290",
-      gpPerKill: "480",
-      gpPerHour: "67,415",
-      netGpPerHour: "-98,217"
+      gpPerKill: "481",
+      gpPerHour: "67,465",
+      netGpPerHour: "-98,190"
     },
     meleeAlchRelevantResults: {
       DPS: "2.81",
       "MAX HIT": "16.4",
       "HIT %": "82.1%",
       "XP/HR": "18,290",
-      "GP/HR NET": "-98,217",
+      "GP/HR NET": "-98,190",
       "KILLS/HR": "140",
-      "GP/KILL": "480",
+      "GP/KILL": "481",
       "SUPPLY/KILL": "1,791"
     },
     rangedSafespot: {
@@ -2270,18 +2499,18 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
       ttk: "45.6s",
       killsPerHour: "73",
       xpPerHour: "14,525",
-      gpPerKill: "620",
-      gpPerHour: "45,419",
-      netGpPerHour: "-183,914"
+      gpPerKill: "630",
+      gpPerHour: "46,191",
+      netGpPerHour: "-183,475"
     },
     rangedSafespotResults: {
       DPS: "1.96",
       "MAX HIT": "10.0",
       "HIT %": "70.6%",
       "XP/HR": "14,525",
-      "GP/HR NET": "-183,914",
+      "GP/HR NET": "-183,475",
       "KILLS/HR": "73",
-      "GP/KILL": "620",
+      "GP/KILL": "630",
       "SUPPLY/KILL": "5,026"
     },
     rangedCannon: {
@@ -2291,18 +2520,18 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
       ttk: "32.3s",
       killsPerHour: "326",
       xpPerHour: "37,421",
-      gpPerKill: "87",
-      gpPerHour: "28,484",
-      netGpPerHour: "-478,051"
+      gpPerKill: "65",
+      gpPerHour: "21,266",
+      netGpPerHour: "-481,907"
     },
     rangedCannonResults: {
       DPS: "2.24",
       "MAX HIT": "10.0",
       "HIT %": "80.7%",
       "XP/HR": "37,421",
-      "GP/HR NET": "-478,051",
+      "GP/HR NET": "-481,907",
       "KILLS/HR": "326",
-      "GP/KILL": "87",
+      "GP/KILL": "65",
       "SUPPLY/KILL": "2,828"
     },
     magicSafespot: {
@@ -2312,18 +2541,18 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
       ttk: "1:33",
       killsPerHour: "37",
       xpPerHour: "21,210",
-      gpPerKill: "6,598",
-      gpPerHour: "246,025",
-      netGpPerHour: "-420,425"
+      gpPerKill: "6,604",
+      gpPerHour: "246,236",
+      netGpPerHour: "-420,342"
     },
     magicSafespotResults: {
       DPS: "1.19",
       "MAX HIT": "20.0",
       "HIT %": "35.7%",
       "XP/HR": "21,210",
-      "GP/HR NET": "-420,425",
+      "GP/HR NET": "-420,342",
       "KILLS/HR": "37",
-      "GP/KILL": "6,598",
+      "GP/KILL": "6,604",
       "SUPPLY/KILL": "35,568"
     },
     customLootSettings: {
@@ -2333,18 +2562,18 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
       ttk: "40.9s",
       killsPerHour: "67",
       xpPerHour: "8,443",
-      gpPerKill: "6,088",
-      gpPerHour: "410,373",
-      netGpPerHour: "69,068"
+      gpPerKill: "6,094",
+      gpPerHour: "410,755",
+      netGpPerHour: "69,227"
     },
     customLootSettingsResults: {
       DPS: "1.97",
       "MAX HIT": "22.9",
       "HIT %": "72.4%",
       "XP/HR": "8,443",
-      "GP/HR NET": "69,068",
+      "GP/HR NET": "69,227",
       "KILLS/HR": "67",
-      "GP/KILL": "6,088",
+      "GP/KILL": "6,094",
       "SUPPLY/KILL": "3,634"
     }
   });
@@ -2520,7 +2749,9 @@ test("updates manual food controls and recoil ring count", async ({ page }) => {
   await expect(reloadedTrip.getByLabel("Recoil rings")).toHaveValue("6");
 });
 
-test("updates trip food, banking and inventory reserve controls across styles", async ({ page }) => {
+test("updates trip food, banking and inventory reserve controls across styles", async ({
+  page
+}) => {
   test.setTimeout(90_000);
   await page.goto("/");
   const tabs = page.getByLabel("Workbench tabs");
@@ -2672,9 +2903,7 @@ test("updates trip potion carry controls and grouped potion summary", async ({ p
   await expect(reloadedTrip.getByLabel("Single-dose")).toBeChecked();
   await expect(reloadedTrip.getByLabel("Potion vials")).toBeDisabled();
   await expect(reloadedTrip.getByLabel("Potion doses")).toHaveValue("6");
-  await expect(page.locator('[aria-label="Potions trip summary"]')).toContainText(
-    "6 doses/type"
-  );
+  await expect(page.locator('[aria-label="Potions trip summary"]')).toContainText("6 doses/type");
 });
 
 test("shows inactive trip potion recommendation states", async ({ page }) => {
@@ -2881,7 +3110,9 @@ test("updates current monster loot actions, reset and optimize", async ({ page }
   await expect(bigBonesAction).toHaveValue("bury");
 
   await loot.getByRole("button", { name: "Optimize net GP/hr" }).click();
-  await expect(page.getByLabel("Local state undo")).toContainText("Optimized loot actions for Hill Giant");
+  await expect(page.getByLabel("Local state undo")).toContainText(
+    "Optimized loot actions for Hill Giant"
+  );
   await expect(page.getByLabel("Local state undo")).not.toContainText("Reset loot overrides");
   await expect(loot.locator(".loot-status")).toContainText("Optimized loot actions");
   await expect(bigBonesAction).toHaveValue("loot");
@@ -2917,7 +3148,10 @@ test("shows loot value composition, nested detail and action impact detail", asy
     "No local history"
   );
 
-  await page.getByLabel(/Action for Big bones/).first().selectOption("loot");
+  await page
+    .getByLabel(/Action for Big bones/)
+    .first()
+    .selectOption("loot");
   await expect(composition).toContainText("Big bones");
   await expect(composition).toContainText("Loot");
 
@@ -2942,7 +3176,10 @@ test("matches browser-rendered numeric snapshots for loot action and trip overri
   await tabs.getByRole("button", { name: "Loot" }).click();
   const drops = page.getByRole("table", { name: "Current monster drops" });
   await expect.poll(async () => drops.locator("tbody tr").count()).toBeGreaterThan(8);
-  await page.getByLabel(/Action for Big bones/).first().selectOption("loot");
+  await page
+    .getByLabel(/Action for Big bones/)
+    .first()
+    .selectOption("loot");
   await tabs.getByRole("button", { name: "Compare" }).click();
   const lootAction = await resultMetricSnapshot(page);
 
@@ -2989,9 +3226,9 @@ test("matches browser-rendered numeric snapshots for loot action and trip overri
       "MAX HIT": "16.4",
       "HIT %": "88.9%",
       "XP/HR": "21,573",
-      "GP/HR NET": "-18,464",
+      "GP/HR NET": "-20,482",
       "KILLS/HR": "235",
-      "GP/KILL": "927",
+      "GP/KILL": "914",
       "SUPPLY/KILL": "1,047"
     },
     tripSummary: {
@@ -3010,9 +3247,9 @@ test("matches browser-rendered numeric snapshots for loot action and trip overri
       "MAX HIT": "16.4",
       "HIT %": "75.5%",
       "XP/HR": "20,093",
-      "GP/HR NET": "-59,306",
+      "GP/HR NET": "-59,137",
       "KILLS/HR": "80",
-      "GP/KILL": "1,768",
+      "GP/KILL": "1,772",
       "SUPPLY/KILL": "3,079"
     }
   });
@@ -3063,7 +3300,7 @@ test("matches browser-rendered numeric snapshots for imported price sets", async
     "Price warnings"
   );
   await expect(page.locator('[aria-label="Result price warnings"]')).toContainText(
-    "using fallback"
+    "Missing price for loot item"
   );
   const importedPrices = await resultMetricSnapshot(page);
 
@@ -3075,9 +3312,9 @@ test("matches browser-rendered numeric snapshots for imported price sets", async
       "MAX HIT": "16.4",
       "HIT %": "88.9%",
       "XP/HR": "21,573",
-      "GP/HR NET": "-121,783",
+      "GP/HR NET": "-169,821",
       "KILLS/HR": "235",
-      "GP/KILL": "393",
+      "GP/KILL": "82",
       "SUPPLY/KILL": "1,184"
     }
   });
@@ -3094,9 +3331,7 @@ test("matches browser-rendered numeric snapshots for imported price sets", async
   expect(reloadedImportedPrices).toEqual(importedPrices);
 
   await page.getByLabel("Workbench tabs").getByRole("button", { name: "Loot" }).click();
-  await expect(page.locator('[aria-label="Loot price warnings"]')).toContainText(
-    "Price warnings"
-  );
+  await expect(page.locator('[aria-label="Loot price warnings"]')).toContainText("Price warnings");
 
   await page.getByLabel("Workbench tabs").getByRole("button", { name: "Economy" }).click();
   await expect(page.locator('[aria-label="Economy price warnings"]')).toContainText(
@@ -3231,9 +3466,7 @@ test("keeps market UI scheduled-only when the compatibility sync API exists", as
     "Active source Scheduled snapshot"
   );
   await expect(market.getByRole("button", { name: /Sync|Refresh|Scrape/ })).toHaveCount(0);
-  await expect(market).toContainText(
-    "Market upstream refresh is scheduled, not user-triggered."
-  );
+  await expect(market).toContainText("Market upstream refresh is scheduled, not user-triggered.");
   const bodyText = await page.locator("body").innerText();
   expect(bodyText).not.toContain("/api/prices");
   expect(bodyText).not.toContain("/api/scrape");
@@ -3287,6 +3520,16 @@ test("analyzes and manages browser-local price history in Economy", async ({ pag
   await expect(page.getByLabel("Top fallers")).toContainText("Big bones");
   await expect(page.getByRole("table", { name: "Price movers" })).toContainText("Lobster");
   await expect(page.getByRole("table", { name: "Price movers" })).toContainText("Big bones");
+  await expect(page.getByRole("img", { name: /Big bones price trend/ })).toBeVisible();
+  await page.getByLabel("Trend item").selectOption("big_bones");
+  const itemTrend = page.getByLabel("Item price trend");
+  await expect(itemTrend).toContainText("Big bones");
+  await expect(itemTrend).toContainText("Latest350");
+  await expect(itemTrend).toContainText("Minimum300");
+  await expect(itemTrend).toContainText("Maximum500");
+  await expect(itemTrend).toContainText("+50 / +16.7%");
+  await expect(page.getByRole("img", { name: "Big bones local price trend" })).toBeVisible();
+  await expect(page.getByLabel("Price points for Big bones")).toContainText("2026-07-04");
 
   await page.getByLabel("Workbench tabs").getByRole("button", { name: "Loot" }).click();
   const bigBonesRow = page.getByRole("table", { name: "Current monster drops" }).getByRole("row", {
@@ -3320,6 +3563,8 @@ test("analyzes and manages browser-local price history in Economy", async ({ pag
   ).not.toBe(null);
   await page.getByRole("button", { name: "Confirm clear history" }).click();
   await expect(page.getByLabel("Price history summary")).toContainText("Snapshots 0");
+  await expect(page.getByLabel("Trend item")).toBeDisabled();
+  await expect(page.getByLabel("Item price trend")).toContainText("No local price points");
   expect(await page.evaluate(() => window.localStorage.getItem("index-sim:price-history"))).toBe(
     null
   );

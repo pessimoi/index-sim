@@ -5,7 +5,8 @@ import {
   formatMarketSyncReportDetails,
   keepMarketSyncFailureContext,
   resolveActivePriceSetFallback,
-  summarizeMarketSyncReport
+  summarizeMarketSyncReport,
+  withGeneratedScheduledPriceFallbacks
 } from "../app/state/market-sync";
 import {
   createScheduledStaticPriceSnapshotStatus,
@@ -14,6 +15,7 @@ import {
 import { createMemoryStorage } from "../adapters/storage";
 import {
   analyzePriceHistoryMovers,
+  analyzePriceHistoryTrend,
   appendAcceptedPriceSetToHistory,
   BrowserPriceHistoryStateSchema,
   DEFAULT_PRICE_HISTORY_STATE,
@@ -170,11 +172,7 @@ describe("market sync UI state helpers", () => {
       },
       {
         itemLabel: (itemId) =>
-          itemId === "big_bones"
-            ? "Big bones"
-            : itemId === "lobster"
-              ? "Lobster"
-              : undefined
+          itemId === "big_bones" ? "Big bones" : itemId === "lobster" ? "Lobster" : undefined
       }
     );
 
@@ -229,6 +227,37 @@ describe("market sync UI state helpers", () => {
     expect(details.items).toHaveLength(1);
     expect(details.items[0]).toMatchObject({ itemId: "lobster", status: "failed" });
     expect(details.counts).toEqual({ all: 2, updated: 1, skipped: 0, failed: 1 });
+  });
+
+  it("keeps scheduled values authoritative while filling missing generated item values", () => {
+    const context = fixtureContext();
+    context.gameData.items = {
+      lobster: { id: "lobster", name: "Lobster", price: 190, alch: 12 },
+      rune_sword: { id: "rune_sword", name: "Rune sword", price: 12_345, alch: 8_320 }
+    };
+    const scheduledStatus = createScheduledStaticPriceSnapshotStatus({
+      pricesText: JSON.stringify({ lobster: 210 }),
+      alchText: JSON.stringify({ lobster: 15 })
+    });
+
+    const composed = withGeneratedScheduledPriceFallbacks(scheduledStatus, context.gameData);
+
+    expect(composed).not.toBe(scheduledStatus);
+    expect(composed.scheduledPriceSet?.itemPrices).toEqual({
+      lobster: 210,
+      rune_sword: 12_345
+    });
+    expect(composed.scheduledPriceSet?.alchValues).toEqual({ lobster: 15, rune_sword: 8_320 });
+    expect(scheduledStatus.scheduledPriceSet?.itemPrices).toEqual({ lobster: 210 });
+  });
+
+  it("leaves non-loaded scheduled snapshot states unchanged", () => {
+    const context = fixtureContext();
+    const missingStatus = createScheduledStaticPriceSnapshotStatus({});
+
+    expect(withGeneratedScheduledPriceFallbacks(missingStatus, context.gameData)).toBe(
+      missingStatus
+    );
   });
 
   it("models a valid scheduled snapshot as the active fallback over bundled prices", () => {
@@ -293,24 +322,27 @@ describe("market sync UI state helpers", () => {
         { fallbackPriceSet: fixtureContext().priceSet }
       )
     ]
-  ] as const)("models %s scheduled snapshots as non-fatal fallback notices", (_caseName, status) => {
-    const bundled = fixtureContext().priceSet;
-    const resolution = resolveActivePriceSetFallback({
-      bundledPriceSet: bundled,
-      selectedPriceSet: null,
-      scheduledSnapshotStatus: status
-    });
-    const statusViewModel = createScheduledPriceSnapshotViewModel(status, resolution.origin);
+  ] as const)(
+    "models %s scheduled snapshots as non-fatal fallback notices",
+    (_caseName, status) => {
+      const bundled = fixtureContext().priceSet;
+      const resolution = resolveActivePriceSetFallback({
+        bundledPriceSet: bundled,
+        selectedPriceSet: null,
+        scheduledSnapshotStatus: status
+      });
+      const statusViewModel = createScheduledPriceSnapshotViewModel(status, resolution.origin);
 
-    expect(resolution.origin).toBe("bundled");
-    expect(resolution.priceSet.id).toBe("base");
-    expect(statusViewModel).toMatchObject({
-      statusLabel: "Fallback",
-      tone: "warning",
-      fallbackLabel: "Bundled prices active"
-    });
-    expect(statusViewModel.message).toContain("Using the current PriceSet fallback");
-  });
+      expect(resolution.origin).toBe("bundled");
+      expect(resolution.priceSet.id).toBe("base");
+      expect(statusViewModel).toMatchObject({
+        statusLabel: "Fallback",
+        tone: "warning",
+        fallbackLabel: "Bundled prices active"
+      });
+      expect(statusViewModel.message).toContain("Using the current PriceSet fallback");
+    }
+  );
 
   it("accepted imported PriceSet adds a browser-local history snapshot", () => {
     const priceSet = importedPriceSet();
@@ -593,8 +625,16 @@ describe("market sync UI state helpers", () => {
     });
 
     expect(previous.movedItemCount).toBe(2);
-    expect(previous.topGainers[0]).toMatchObject({ itemId: "lobster", gpDelta: 50 });
-    expect(previous.topFallers[0]).toMatchObject({ itemId: "big_bones", gpDelta: -150 });
+    expect(previous.topGainers[0]).toMatchObject({
+      itemId: "lobster",
+      gpDelta: 50,
+      trendPrices: [100, 200, 250]
+    });
+    expect(previous.topFallers[0]).toMatchObject({
+      itemId: "big_bones",
+      gpDelta: -150,
+      trendPrices: [300, 500, 350]
+    });
     expect(first.rows.find((row) => row.itemId === "lobster")).toMatchObject({
       gpDelta: 150,
       percentDelta: 150
@@ -603,6 +643,90 @@ describe("market sync UI state helpers", () => {
     expect(snapshot.rows.find((row) => row.itemId === "big_bones")).toMatchObject({
       gpDelta: -150,
       percentDelta: -30
+    });
+  });
+
+  it("builds a chronological item trend while skipping snapshots without the item", () => {
+    const history = BrowserPriceHistoryStateSchema.parse({
+      snapshots: [
+        {
+          capturedAt: "2026-07-06T12:00:00.000Z",
+          sourcePriceSetId: "latest",
+          label: "Latest",
+          itemPrices: { lobster: 250 }
+        },
+        {
+          capturedAt: "2026-07-05T18:00:00.000Z",
+          sourcePriceSetId: "missing",
+          label: "Missing item",
+          itemPrices: { big_bones: 500 }
+        },
+        {
+          capturedAt: "2026-07-05T12:00:00.000Z",
+          sourcePriceSetId: "middle",
+          label: "Middle",
+          itemPrices: { lobster: 200 }
+        },
+        {
+          capturedAt: "2026-07-04T12:00:00.000Z",
+          sourcePriceSetId: "first",
+          label: "First",
+          itemPrices: { lobster: 100 }
+        }
+      ]
+    });
+
+    const trend = analyzePriceHistoryTrend(history, "lobster", { lobster: "Lobster" });
+
+    expect(trend).toMatchObject({
+      itemId: "lobster",
+      itemLabel: "Lobster",
+      firstPrice: 100,
+      latestPrice: 250,
+      minimumPrice: 100,
+      maximumPrice: 250,
+      netGpDelta: 150,
+      netPercentDelta: 150
+    });
+    expect(trend.points.map((point) => point.sourcePriceSetId)).toEqual([
+      "first",
+      "middle",
+      "latest"
+    ]);
+    expect(trend.points.map((point) => point.gpDeltaFromPrevious)).toEqual([null, 100, 50]);
+    expect(trend.points.map((point) => point.percentDeltaFromPrevious)).toEqual([null, 100, 25]);
+  });
+
+  it("keeps empty and zero-based item trends finite", () => {
+    const history = BrowserPriceHistoryStateSchema.parse({
+      snapshots: [
+        {
+          capturedAt: "2026-07-06T12:00:00.000Z",
+          sourcePriceSetId: "latest",
+          label: "Latest",
+          itemPrices: { zero_item: 10 }
+        },
+        {
+          capturedAt: "2026-07-05T12:00:00.000Z",
+          sourcePriceSetId: "first",
+          label: "First",
+          itemPrices: { zero_item: 0 }
+        }
+      ]
+    });
+
+    expect(analyzePriceHistoryTrend(history, "missing_item")).toMatchObject({
+      points: [],
+      firstPrice: null,
+      latestPrice: null,
+      minimumPrice: null,
+      maximumPrice: null,
+      netGpDelta: null,
+      netPercentDelta: null
+    });
+    expect(analyzePriceHistoryTrend(history, "zero_item")).toMatchObject({
+      netGpDelta: 10,
+      netPercentDelta: null
     });
   });
 

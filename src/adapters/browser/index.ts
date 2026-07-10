@@ -1,5 +1,12 @@
 export { loadBundledLegacyContext } from "../legacy-runtime";
 export type { LegacyRuntimeBootstrapResult as BrowserBootstrapResult } from "../legacy-runtime";
+export {
+  captureBrowserShareableSetupFragment,
+  captureShareableSetupFragment,
+  createBrowserShareableSetupUrl,
+  createShareableSetupUrl,
+  writeShareableSetupToClipboard
+} from "./shareable-url";
 
 export function downloadJsonFile(fileName: string, value: unknown): void {
   const blob = new Blob([JSON.stringify(value, null, 2)], {

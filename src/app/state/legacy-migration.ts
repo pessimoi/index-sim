@@ -11,6 +11,4 @@ export const LegacyMigrationDismissedStateSchema = z
   })
   .strict();
 
-export type LegacyMigrationDismissedState = z.infer<
-  typeof LegacyMigrationDismissedStateSchema
->;
+export type LegacyMigrationDismissedState = z.infer<typeof LegacyMigrationDismissedStateSchema>;

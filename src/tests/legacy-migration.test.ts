@@ -10,6 +10,7 @@ import {
   inspectLegacySetupMigration
 } from "../adapters/storage/legacy-migration";
 import { HIDDEN_GEAR_TIERS_STORAGE_KEY } from "../app/state/hidden-gear-tiers";
+import { MAX_DUEL_SNAPSHOTS, createDuelSnapshot } from "../app/state/duel-snapshots";
 import { LOOT_PREFS_STORAGE_KEY } from "../app/state/loot-prefs";
 import { PLANNER_UI_STORAGE_KEY } from "../app/state/planner";
 import {
@@ -307,6 +308,140 @@ describe("legacy storage migration foundation", () => {
     );
   });
 
+  it("imports validated legacy Duel snapshots with inherited player context", () => {
+    const storage = createMemoryStorage({
+      [LEGACY_INPUT_STORAGE_KEY]: JSON.stringify({
+        combatType: "melee",
+        attack: 71,
+        strength: 72,
+        defence: 73,
+        hp: 74,
+        ranged: 75,
+        magic: 76,
+        prayer: 77,
+        _monsterId: "greater_demon",
+        duelSetups: [
+          {
+            name: "  Rune   arrows  ",
+            setup: {
+              combatType: "ranged",
+              weapon: "magic_shortbow",
+              ammo: "rune_arrow",
+              style: "rapid",
+              prayers: ["clarity"],
+              boosts: ["ranging"],
+              sustained: false,
+              repotThreshold: null,
+              ringOfWealth: true,
+              specWeapon: "magic_shortbow",
+              specAmmo: "rune_arrow"
+            }
+          },
+          { name: "Missing setup" },
+          {
+            name: "Computed payload",
+            setup: { combatType: "melee", weapon: "rune_scimitar" },
+            result: { effectiveXpPerHour: 123 }
+          }
+        ]
+      })
+    });
+
+    const report = inspectLegacySetupMigration({ storage, gameData });
+
+    expect(report.duelSnapshots?.snapshots).toHaveLength(1);
+    expect(report.duelSnapshots?.snapshots[0]).toMatchObject({
+      id: "legacy-duel-1",
+      name: "Rune arrows",
+      form: {
+        combatStyle: "ranged",
+        monsterId: "greater_demon",
+        weaponId: "magic_shortbow",
+        ammoId: "rune_arrow",
+        styleId: "rapid",
+        levels: {
+          attack: 71,
+          strength: 72,
+          defence: 73,
+          hitpoints: 74,
+          ranged: 75,
+          magic: 76,
+          prayer: 77
+        },
+        prayers: ["clarity"],
+        boosts: ["ranging"],
+        sustained: false,
+        repotThreshold: null,
+        ringOfWealth: true,
+        specialAttack: { weaponId: "magic_shortbow", ammoId: "rune_arrow" }
+      }
+    });
+    expect(report.importedFields).toEqual(
+      expect.arrayContaining([
+        "duelSnapshots",
+        "duelSnapshots.legacy-duel-1",
+        "sim_input_v3.duelSetups.0.prayers",
+        "sim_input_v3.duelSetups.0.boosts",
+        "sim_input_v3.duelSetups.0.specialAttack"
+      ])
+    );
+    expect(report.skippedFields).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          field: "sim_input_v3.duelSetups.1",
+          reason: "expected an object with a setup snapshot"
+        }),
+        expect.objectContaining({
+          field: "sim_input_v3.duelSetups.2",
+          reason: "computed result payloads are not imported"
+        })
+      ])
+    );
+  });
+
+  it("keeps rewrite Duel snapshots and applies the shared snapshot limit", () => {
+    const currentSnapshots = {
+      snapshots: [
+        createDuelSnapshot("legacy-duel-1", "Rewrite owned", DEFAULT_FORM_STATE),
+        ...Array.from({ length: MAX_DUEL_SNAPSHOTS - 2 }, (_, index) =>
+          createDuelSnapshot(`current-${index}`, `Current ${index}`, DEFAULT_FORM_STATE)
+        )
+      ]
+    };
+    const storage = createMemoryStorage({
+      [LEGACY_INPUT_STORAGE_KEY]: JSON.stringify({
+        duelSetups: [
+          { name: "Conflict", setup: { combatType: "melee", weapon: "rune_scimitar" } },
+          { name: "Fits", setup: { combatType: "melee", weapon: "dragon_longsword" } },
+          { name: "Overflow", setup: { combatType: "ranged", weapon: "magic_shortbow" } }
+        ]
+      })
+    });
+
+    const report = inspectLegacySetupMigration({
+      storage,
+      gameData,
+      currentDuelSnapshots: currentSnapshots
+    });
+
+    expect(report.setup).toBeNull();
+    expect(report.duelSnapshots?.snapshots.map((snapshot) => snapshot.id)).toEqual([
+      "legacy-duel-2"
+    ]);
+    expect(report.skippedFields).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          field: "sim_input_v3.duelSetups.0",
+          reason: "rewrite Duel snapshot already exists; kept rewrite-owned snapshot"
+        }),
+        expect.objectContaining({
+          field: "sim_input_v3.duelSetups.2",
+          reason: "rewrite Duel snapshot limit has no remaining room"
+        })
+      ])
+    );
+  });
+
   it("keeps existing rewrite custom setup entries over conflicting legacy snapshots", () => {
     const existingGiantSetup = normalizeFormState({
       ...DEFAULT_FORM_STATE,
@@ -359,7 +494,8 @@ describe("legacy storage migration foundation", () => {
       expect.arrayContaining([
         expect.objectContaining({
           field: "sim_input_v3.monsterSetups",
-          reason: "legacy custom setup snapshots were skipped because the shape is not an object map"
+          reason:
+            "legacy custom setup snapshots were skipped because the shape is not an object map"
         }),
         expect.objectContaining({
           field: "sim_input_v3.cannonByMonster",

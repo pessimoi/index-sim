@@ -1,8 +1,9 @@
-import { performance } from "node:perf_hooks";
 import { loadBundledLegacyContext } from "../adapters/browser";
+import { createDuelSnapshot } from "../app/state/duel-snapshots";
 import { DEFAULT_FORM_STATE, type CombatSetupFormState } from "../app/state/ui-state";
 import {
   createCompareRows,
+  createDuelMatrixViewModel,
   createPlannerViewModel,
   createSimulationViewModel
 } from "../app/view-models/simulation";
@@ -19,10 +20,11 @@ function levelVariant(index: number): CombatSetupFormState {
   };
 }
 
-function measureMs(work: () => void): number {
-  const started = performance.now();
+function measureCpuMs(work: () => void): number {
+  const started = process.cpuUsage();
   work();
-  return performance.now() - started;
+  const elapsed = process.cpuUsage(started);
+  return (elapsed.user + elapsed.system) / 1_000;
 }
 
 describe("rewrite UI performance smoke", () => {
@@ -35,7 +37,7 @@ describe("rewrite UI performance smoke", () => {
 
   it("keeps the immediate level-input calculation path small", () => {
     const forms = Array.from({ length: 12 }, (_, index) => levelVariant(index));
-    const immediateMs = measureMs(() => {
+    const immediateMs = measureCpuMs(() => {
       for (const form of forms) createSimulationViewModel(form, context);
     });
     const immediateAverageMs = immediateMs / forms.length;
@@ -45,10 +47,10 @@ describe("rewrite UI performance smoke", () => {
 
   it("documents compare and planner as heavy deferred work", () => {
     const forms = [levelVariant(0), levelVariant(1)];
-    const immediateMs = measureMs(() => {
+    const immediateMs = measureCpuMs(() => {
       for (const form of forms) createSimulationViewModel(form, context);
     });
-    const fullPanelMs = measureMs(() => {
+    const fullPanelMs = measureCpuMs(() => {
       for (const form of forms) {
         createSimulationViewModel(form, context);
         createCompareRows(form, context, 8);
@@ -58,4 +60,17 @@ describe("rewrite UI performance smoke", () => {
 
     expect(fullPanelMs).toBeGreaterThan(immediateMs * 3);
   }, 15_000);
+
+  it("keeps the explicitly requested maximum-size Duel matrix bounded", () => {
+    const snapshots = Array.from({ length: 12 }, (_, index) =>
+      createDuelSnapshot(`matrix-${index}`, `Matrix ${index + 1}`, levelVariant(index))
+    );
+    let cellCount = 0;
+    const matrixMs = measureCpuMs(() => {
+      cellCount = createDuelMatrixViewModel(DEFAULT_FORM_STATE, { snapshots }, context).cellCount;
+    });
+
+    expect(cellCount).toBe(Object.keys(context.gameData.monsters).length * 13);
+    expect(matrixMs).toBeLessThan(12_000);
+  }, 20_000);
 });

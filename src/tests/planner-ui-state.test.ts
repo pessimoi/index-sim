@@ -56,11 +56,7 @@ describe("planner UI state", () => {
       gearPool: { weapon: ["rune_scimitar"] }
     });
 
-    const envelope = savePlannerUiState(
-      storage,
-      state,
-      () => new Date("2026-07-06T12:00:00.000Z")
-    );
+    const envelope = savePlannerUiState(storage, state, () => new Date("2026-07-06T12:00:00.000Z"));
     const loaded = loadPlannerUiState(storage);
 
     expect(envelope).toMatchObject({

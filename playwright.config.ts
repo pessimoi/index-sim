@@ -2,6 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./src/tests/e2e",
+  testIgnore: "**/*.visual.spec.ts",
   timeout: 60000,
   fullyParallel: true,
   reporter: "list",
@@ -16,10 +17,9 @@ export default defineConfig({
     }
   ],
   webServer: {
-    command:
-      "bash -lc 'node node_modules/vite/bin/vite.js --config vite.config.ts --host 127.0.0.1 --port 5173'",
+    command: "bash -lc 'npm run build && npm run preview -- --host 127.0.0.1 --port 5173'",
     url: "http://127.0.0.1:5173",
-    reuseExistingServer: true,
-    timeout: 120000
+    reuseExistingServer: false,
+    timeout: 180000
   }
 });

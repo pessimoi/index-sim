@@ -34,7 +34,8 @@ const MAX_MANUAL_ATTACK_SPEED_SEC = 12;
 
 export type SetupMode = z.infer<typeof SetupModeSchema>;
 
-type SelectionCategory = "att" | "str" | "def" | "rng" | "mag" | "gauntlets" | "restore" | "special";
+type SelectionCategory =
+  "att" | "str" | "def" | "rng" | "mag" | "gauntlets" | "restore" | "special";
 
 export interface SetupSelectionOption {
   id: EntityId;

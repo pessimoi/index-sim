@@ -1,4 +1,7 @@
+import { createGeneratedRuntimePriceSet } from "@/adapters/generated/price-fallback";
+import type { ScheduledStaticPriceSnapshotStatus } from "@/adapters/market";
 import type {
+  GameDataSnapshot,
   PriceSet,
   IntegrationSeverity,
   MarketItemReport,
@@ -6,7 +9,6 @@ import type {
   MarketSyncResponse,
   SimulationContext
 } from "@/domain/shared";
-import type { ScheduledStaticPriceSnapshotStatus } from "@/adapters/market";
 
 export type ActivePriceSetOrigin = "selected" | "scheduled" | "bundled";
 
@@ -40,6 +42,20 @@ export function scheduledPriceSetFromStatus(
   status: ScheduledStaticPriceSnapshotStatus | null
 ): PriceSet | null {
   return status?.status === "loaded" ? status.scheduledPriceSet : null;
+}
+
+export function withGeneratedScheduledPriceFallbacks(
+  status: ScheduledStaticPriceSnapshotStatus,
+  gameData: GameDataSnapshot
+): ScheduledStaticPriceSnapshotStatus {
+  if (status.status !== "loaded" || status.scheduledPriceSet === null) {
+    return status;
+  }
+
+  return {
+    ...status,
+    scheduledPriceSet: createGeneratedRuntimePriceSet(status.scheduledPriceSet, gameData)
+  };
 }
 
 export function resolveActivePriceSetFallback(input: {

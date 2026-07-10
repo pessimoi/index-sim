@@ -8,7 +8,13 @@ import {
   type FormEvent
 } from "react";
 import { ZodError } from "zod";
-import { downloadJsonFile, readBrowserFileText } from "@/adapters/browser";
+import {
+  captureBrowserShareableSetupFragment,
+  createBrowserShareableSetupUrl,
+  downloadJsonFile,
+  readBrowserFileText,
+  writeShareableSetupToClipboard
+} from "@/adapters/browser";
 import {
   HiscoresAdapterError,
   fetchHiscoresStatus,
@@ -61,12 +67,18 @@ import type {
   PriceSet,
   SimulationContext
 } from "@/domain/shared";
-import { FOOD, defaultOverhead, lootPreferenceKeysForMonster, type LootAction } from "@/domain/trip";
+import {
+  FOOD,
+  defaultOverhead,
+  lootPreferenceKeysForMonster,
+  type LootAction
+} from "@/domain/trip";
 import {
   activePriceSetOriginLabel,
   createScheduledPriceSnapshotViewModel,
   resolveActivePriceSetFallback,
   scheduledPriceSetFromStatus,
+  withGeneratedScheduledPriceFallbacks,
   type ActivePriceSetOrigin
 } from "./state/market-sync";
 import {
@@ -106,11 +118,16 @@ import {
 } from "./state/hidden-gear-tiers";
 import {
   DEFAULT_DUEL_SNAPSHOTS_STATE,
+  DUEL_SNAPSHOTS_IMPORT_MAX_BYTES,
   DUEL_SNAPSHOTS_STORAGE_KEY,
   DUEL_SNAPSHOTS_VERSION,
+  DuelSnapshotsImportError,
   DuelSnapshotsStateSchema,
   appendDuelSnapshot,
   createDuelSnapshot,
+  createDuelSnapshotsExport,
+  mergeDuelSnapshots,
+  parseDuelSnapshotsExportText,
   removeDuelSnapshot,
   renameDuelSnapshot,
   type DuelSnapshotsState
@@ -139,6 +156,7 @@ import {
 } from "./state/loot-settings";
 import {
   analyzePriceHistoryMovers,
+  analyzePriceHistoryTrend,
   appendAcceptedPriceSetToHistory,
   BrowserPriceHistoryStateSchema,
   DEFAULT_PRICE_HISTORY_STATE,
@@ -150,7 +168,8 @@ import {
   type PriceHistoryBaselineMode,
   type PriceHistoryMoverRow,
   type PriceHistoryMoverSortKey,
-  type PriceHistoryMoverSortState
+  type PriceHistoryMoverSortState,
+  type PriceHistoryTrendAnalysis
 } from "./state/price-history";
 import {
   createPriceImportSuccessNotice,
@@ -163,6 +182,15 @@ import {
   saveSelectedPriceSet,
   type LoadSelectedPriceSetResult
 } from "./state/selected-price-set";
+import {
+  ShareableSetupError,
+  applyShareableSetup,
+  buildShareableSetupEnvelope,
+  decodeShareableSetupEnvelope,
+  encodeShareableSetupEnvelope,
+  reviewShareableSetup,
+  type ShareableSetupReview
+} from "./state/shareable-setup";
 import {
   PLANNER_METRICS,
   PLANNER_SKILLS,
@@ -223,6 +251,7 @@ import {
   createDenseCompareScaleModel,
   createDenseCompareRows,
   createDuelComparisonViewModel,
+  createDuelMatrixViewModel,
   gearQuickActionForSlot,
   createPlannerGearPoolEditorViewModel,
   createPlannerPanelViewModel,
@@ -237,6 +266,8 @@ import {
   type DenseCompareScaleCellViewModel,
   type DenseCompareRowViewModel,
   type DuelComparisonRowViewModel,
+  type DuelMatrixMetricId,
+  type DuelMatrixViewModel,
   type CalculationWarningViewModel,
   type MonsterCardViewModel,
   type PlannerGearPoolEditorViewModel,
@@ -414,6 +445,18 @@ interface SetupImportNotice {
   tone: "success" | "error";
   message: string;
   details?: string[];
+}
+
+type ShareableSetupInspection =
+  { status: "ready"; review: ShareableSetupReview } | { status: "error"; message: string };
+
+interface ShareSetupDialogState {
+  url: string;
+  targetLabel: string;
+  combatStyle: CombatStyle;
+  cannonEnabled: boolean;
+  lootPreferenceCount: number;
+  copyStatus: "idle" | "copied" | "failed";
 }
 
 interface PendingUndo {
@@ -675,6 +718,94 @@ function InlineImportNotice({
   );
 }
 
+function ShareSetupDialog({
+  state,
+  onCopy,
+  onClose
+}: {
+  state: ShareSetupDialogState;
+  onCopy: () => void;
+  onClose: () => void;
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const urlFieldRef = useRef<HTMLInputElement>(null);
+  const titleId = useId();
+  const urlId = useId();
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (!dialog.open) dialog.showModal();
+    urlFieldRef.current?.focus();
+    return () => {
+      if (dialog.open) dialog.close();
+    };
+  }, []);
+
+  return (
+    <dialog
+      ref={dialogRef}
+      className="share-setup-dialog"
+      aria-labelledby={titleId}
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
+      }}
+    >
+      <div className="share-setup-dialog-header">
+        <div>
+          <span className="eyebrow">Portable setup</span>
+          <h2 id={titleId}>Share setup</h2>
+        </div>
+        <button type="button" onClick={onClose} aria-label="Close share setup dialog">
+          Close
+        </button>
+      </div>
+      <p>
+        {state.targetLabel} · {state.combatStyle} · Player levels included
+      </p>
+      <div className="share-setup-summary" aria-label="Shared setup contents">
+        <span>Cannon {state.cannonEnabled ? "included" : "off"}</span>
+        <span>{formatNumber(state.lootPreferenceCount)} loot choices</span>
+        <span>Uses recipient prices</span>
+      </div>
+      <div className="field share-setup-url-field">
+        <label htmlFor={urlId}>Setup link</label>
+        <input
+          ref={urlFieldRef}
+          id={urlId}
+          type="text"
+          readOnly
+          value={state.url}
+          onFocus={(event) => event.currentTarget.select()}
+        />
+      </div>
+      <p className="share-setup-privacy-note">
+        Anyone with this link can read the included levels and setup choices. The link is encoded,
+        not encrypted.
+      </p>
+      <div className="share-setup-dialog-actions">
+        <button type="button" onClick={onCopy}>
+          Copy
+        </button>
+        <button type="button" onClick={onClose}>
+          Done
+        </button>
+      </div>
+      {state.copyStatus !== "idle" ? (
+        <p
+          className={`inline-status ${state.copyStatus === "copied" ? "success" : "error"}`}
+          role="status"
+        >
+          {state.copyStatus === "copied"
+            ? "Link copied"
+            : "Clipboard unavailable. Select the link and copy it manually."}
+        </p>
+      ) : null}
+    </dialog>
+  );
+}
+
 const WORKBENCH_TABS = [
   { id: "stats", label: "Stats" },
   { id: "melee", label: "Melee", combatStyle: "melee" },
@@ -868,6 +999,36 @@ function duelDeltaDisplay(value: number | null, digits = 0): string {
   return digits === 0 ? formatDelta(value) : signedDecimal(value, digits);
 }
 
+const DUEL_MATRIX_METRICS: ReadonlyArray<{ id: DuelMatrixMetricId; label: string }> = [
+  { id: "dps", label: "DPS" },
+  { id: "effectiveXpPerHour", label: "XP/hr" },
+  { id: "effectiveNetGpPerHour", label: "Net GP/hr" },
+  { id: "gpPerXp", label: "GP/XP" }
+];
+
+function duelMatrixMetricLabel(metricId: DuelMatrixMetricId): string {
+  return DUEL_MATRIX_METRICS.find((metric) => metric.id === metricId)?.label ?? metricId;
+}
+
+function duelMatrixMetricDisplay(metricId: DuelMatrixMetricId, value: number | null): string {
+  if (value == null || !Number.isFinite(value)) return "-";
+  return formatNumber(value, metricId === "dps" || metricId === "gpPerXp" ? 2 : 0);
+}
+
+type DuelViewMode = "current-target" | "monster-matrix";
+
+interface BuiltDuelMatrixState {
+  model: DuelMatrixViewModel;
+  source: {
+    form: CombatSetupFormState;
+    snapshots: DuelSnapshotsState;
+    context: SimulationContext;
+    cannonByMonster: CannonByMonsterState;
+    lootPrefsByMonster: LootPrefsState;
+    lootSettingsByMonster: LootSettingsByMonsterState;
+  };
+}
+
 function duelSnapshotId(): string {
   return `duel-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -898,6 +1059,144 @@ function selectedOptionLabel(options: readonly SelectOption[], ids: readonly str
 function moverTone(row: PriceHistoryMoverRow): string | undefined {
   if (row.gpDelta === null || row.gpDelta === 0) return undefined;
   return row.gpDelta > 0 ? "gain" : "loss";
+}
+
+function PriceTrendChart({ trend }: { trend: PriceHistoryTrendAnalysis }) {
+  if (trend.points.length === 0) {
+    return (
+      <div className="economy-trend empty" aria-label="Item price trend">
+        <div className="section-title-row">
+          <h3>Item trend</h3>
+          <span className="status-pill">empty</span>
+        </div>
+        <p>No local price points</p>
+      </div>
+    );
+  }
+
+  const width = 720;
+  const height = 176;
+  const paddingX = 26;
+  const paddingTop = 18;
+  const paddingBottom = 24;
+  const plotWidth = width - paddingX * 2;
+  const plotHeight = height - paddingTop - paddingBottom;
+  const minimum = trend.minimumPrice ?? 0;
+  const maximum = trend.maximumPrice ?? minimum;
+  const range = Math.max(1, maximum - minimum);
+  const denominator = Math.max(1, trend.points.length - 1);
+  const points = trend.points.map((point, index) => ({
+    ...point,
+    x: paddingX + (index / denominator) * plotWidth,
+    y: paddingTop + ((maximum - point.price) / range) * plotHeight
+  }));
+  const linePoints = points.map((point) => `${point.x},${point.y}`).join(" ");
+
+  return (
+    <div className="economy-trend" aria-label="Item price trend">
+      <div className="section-title-row">
+        <h3>{trend.itemLabel}</h3>
+        <span className="status-pill">{formatNumber(trend.points.length)} points</span>
+      </div>
+      <dl className="economy-trend-summary">
+        <div>
+          <dt>Latest</dt>
+          <dd>{optionalPrice(trend.latestPrice)}</dd>
+        </div>
+        <div>
+          <dt>Minimum</dt>
+          <dd>{optionalPrice(trend.minimumPrice)}</dd>
+        </div>
+        <div>
+          <dt>Maximum</dt>
+          <dd>{optionalPrice(trend.maximumPrice)}</dd>
+        </div>
+        <div>
+          <dt>Net change</dt>
+          <dd
+            className={
+              trend.netGpDelta === null || trend.netGpDelta === 0
+                ? undefined
+                : trend.netGpDelta > 0
+                  ? "gain"
+                  : "loss"
+            }
+          >
+            {optionalDelta(trend.netGpDelta)} / {optionalPercent(trend.netPercentDelta)}
+          </dd>
+        </div>
+      </dl>
+      <svg
+        className="economy-trend-chart"
+        viewBox={`0 0 ${width} ${height}`}
+        role="img"
+        aria-label={`${trend.itemLabel} local price trend`}
+      >
+        <title>{`${trend.itemLabel} local price trend from ${optionalPrice(
+          trend.firstPrice
+        )} to ${optionalPrice(trend.latestPrice)}`}</title>
+        <line
+          className="economy-trend-axis"
+          x1={paddingX}
+          x2={width - paddingX}
+          y1={height - paddingBottom}
+          y2={height - paddingBottom}
+        />
+        <polyline className="economy-trend-line" points={linePoints} />
+        {points.map((point, index) => (
+          <circle
+            className="economy-trend-point"
+            key={`${point.snapshotKey}-${index}`}
+            cx={point.x}
+            cy={point.y}
+            r="4"
+          >
+            <title>{`${point.capturedAt}: ${formatNumber(point.price)}`}</title>
+          </circle>
+        ))}
+      </svg>
+      <ol className="economy-trend-points" aria-label={`Price points for ${trend.itemLabel}`}>
+        {trend.points.map((point, index) => (
+          <li key={`${point.snapshotKey}-${index}`}>
+            <time dateTime={point.capturedAt}>{point.capturedAt.slice(0, 10)}</time>
+            <strong>{formatNumber(point.price)}</strong>
+            <span>{optionalDelta(point.gpDeltaFromPrevious)}</span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+function PriceTrendSparkline({ row }: { row: PriceHistoryMoverRow }) {
+  const width = 96;
+  const height = 28;
+  const padding = 3;
+  const minimum = row.trendPrices.length ? Math.min(...row.trendPrices) : 0;
+  const maximum = row.trendPrices.length ? Math.max(...row.trendPrices) : minimum;
+  const range = Math.max(1, maximum - minimum);
+  const denominator = Math.max(1, row.trendPrices.length - 1);
+  const points = row.trendPrices.map((price, index) => ({
+    price,
+    x: padding + (index / denominator) * (width - padding * 2),
+    y: padding + ((maximum - price) / range) * (height - padding * 2)
+  }));
+
+  if (points.length === 0) return <span>-</span>;
+
+  return (
+    <svg
+      className="economy-sparkline"
+      viewBox={`0 0 ${width} ${height}`}
+      role="img"
+      aria-label={`${row.itemLabel} price trend, ${row.trendPrices.map(formatNumber).join(" to ")}`}
+    >
+      <polyline points={points.map((point) => `${point.x},${point.y}`).join(" ")} />
+      {points.map((point, index) => (
+        <circle key={`${point.price}-${index}`} cx={point.x} cy={point.y} r="2" />
+      ))}
+    </svg>
+  );
 }
 
 function metric(label: string, value: string, tone?: string) {
@@ -946,7 +1245,9 @@ function CalculationWarningSummary({
           {warning.message}
         </span>
       ))}
-      {warnings.length > visible.length && <span>{formatNumber(warnings.length - visible.length)} more</span>}
+      {warnings.length > visible.length && (
+        <span>{formatNumber(warnings.length - visible.length)} more</span>
+      )}
     </div>
   );
 }
@@ -1301,6 +1602,9 @@ function legacyMigrationSummaryItems(report: LegacySetupMigrationReport): string
   const cannonMapFound =
     report.cannonByMonster != null ||
     report.skippedFields.some((field) => field.field.startsWith("sim_input_v3.cannonByMonster"));
+  const duelSnapshotsFound =
+    report.duelSnapshots != null ||
+    report.skippedFields.some((field) => field.field.startsWith("sim_input_v3.duelSetups"));
   const reviewNeeded = report.keyReview.some(
     (item) => item.found && item.disposition !== "migrate"
   );
@@ -1330,6 +1634,11 @@ function legacyMigrationSummaryItems(report: LegacySetupMigrationReport): string
       : cannonMapFound
         ? "Cannon map skipped"
         : "No cannon map",
+    report.duelSnapshots != null
+      ? "Duel snapshots ready"
+      : duelSnapshotsFound
+        ? "Duel snapshots skipped"
+        : "No Duel snapshots",
     report.hiddenGearTiers != null
       ? "Hidden gear tiers ready"
       : foundKeys.has("sim_hidden_tiers_v1")
@@ -1364,6 +1673,9 @@ function legacyMigrationImportPlan(report: LegacySetupMigrationReport): string[]
   }
   if (report.cannonByMonster != null) {
     items.push("Legacy cannon map into rewrite per-monster cannon settings");
+  }
+  if (report.duelSnapshots != null) {
+    items.push("Legacy Duel snapshots into rewrite Duel snapshot storage");
   }
   if (report.lootPrefs != null) {
     items.push("Loot preferences into rewrite per-monster drop actions");
@@ -1409,6 +1721,8 @@ function legacyMigrationOutcomeItems(report: LegacySetupMigrationReport): string
   const customSetupSkipCount = countSkippedLegacyFields(report, "sim_input_v3.monsterSetups");
   const cannonImportCount = Object.keys(report.cannonByMonster ?? {}).length;
   const cannonSkipCount = countSkippedLegacyFields(report, "sim_input_v3.cannonByMonster");
+  const duelSnapshotImportCount = report.duelSnapshots?.snapshots.length ?? 0;
+  const duelSnapshotSkipCount = countSkippedLegacyFields(report, "sim_input_v3.duelSetups");
   const reviewOnlyKeyCount = report.keyReview.filter(
     (item) => item.found && item.disposition === "review-only"
   ).length;
@@ -1445,6 +1759,13 @@ function legacyMigrationOutcomeItems(report: LegacySetupMigrationReport): string
     items.push(
       `Cannon map: ${formatNumber(cannonImportCount)} importable, ${formatNumber(
         cannonSkipCount
+      )} skipped.`
+    );
+  }
+  if (duelSnapshotImportCount > 0 || duelSnapshotSkipCount > 0) {
+    items.push(
+      `Duel snapshots: ${formatNumber(duelSnapshotImportCount)} importable, ${formatNumber(
+        duelSnapshotSkipCount
       )} skipped.`
     );
   }
@@ -1554,7 +1875,8 @@ function describeSetupImportError(error: unknown): SetupImportNotice {
   if (error instanceof Error && /^File exceeds \d+ bytes$/.test(error.message)) {
     return {
       tone: "error",
-      message: "Setup import failed: the file is too large. Choose an exported setup JSON under 250 KB."
+      message:
+        "Setup import failed: the file is too large. Choose an exported setup JSON under 250 KB."
     };
   }
 
@@ -1576,6 +1898,49 @@ function describeSetupImportError(error: unknown): SetupImportNotice {
   }
 
   return { tone: "error", message: "Setup import failed. Check the file and try again." };
+}
+
+function describeShareableSetupError(error: unknown): string {
+  if (error instanceof ShareableSetupError) {
+    if (error.code === "body_too_large") return "Shared setup link is too large.";
+    if (error.code === "duplicate_keys") return "Shared setup link contains duplicate data.";
+    if (error.code === "unsupported_version") {
+      return "Shared setup link uses an unsupported version.";
+    }
+    if (error.code === "incompatible_entities") {
+      return "Shared setup references data unavailable in this game version.";
+    }
+  }
+  return "Shared setup link is invalid and was not loaded.";
+}
+
+function describeDuelSnapshotsImportError(error: unknown): SetupImportNotice {
+  const code =
+    error instanceof DuelSnapshotsImportError
+      ? error.code
+      : error instanceof Error && /^File exceeds \d+ bytes$/.test(error.message)
+        ? "body_too_large"
+        : null;
+
+  if (code === "body_too_large") {
+    return {
+      tone: "error",
+      message: "Duel import failed: choose a Duel snapshot export under 250 KB."
+    };
+  }
+  if (code === "invalid_json") {
+    return { tone: "error", message: "Duel import failed: the file is not valid JSON." };
+  }
+  if (code === "unsupported_version") {
+    return {
+      tone: "error",
+      message: `Duel import failed: this app only supports Duel snapshot version ${DUEL_SNAPSHOTS_VERSION}.`
+    };
+  }
+  return {
+    tone: "error",
+    message: "Duel import failed: the file is not a valid Duel snapshot export."
+  };
 }
 
 function statusText(
@@ -1955,9 +2320,7 @@ function localStateHealthExportFileName(report: LocalStateHealthReport): string 
 }
 
 function localStateRecoveryStatus(report: LocalStateHealthReport): string {
-  return report.hasAttention
-    ? `${formatNumber(report.attentionCount)} need attention`
-    : "Healthy";
+  return report.hasAttention ? `${formatNumber(report.attentionCount)} need attention` : "Healthy";
 }
 
 export function App() {
@@ -1983,17 +2346,22 @@ export function App() {
     useState<LootPrefsState>(loadInitialLootPrefs);
   const [lootSettingsByMonster, setLootSettingsByMonster] =
     useState<LootSettingsByMonsterState>(loadInitialLootSettings);
-  const [hiddenGearTiers, setHiddenGearTiers] =
-    useState<HiddenGearTiersState>(loadInitialHiddenGearTiers);
-  const [duelSnapshots, setDuelSnapshots] =
-    useState<DuelSnapshotsState>(loadInitialDuelSnapshots);
+  const [hiddenGearTiers, setHiddenGearTiers] = useState<HiddenGearTiersState>(
+    loadInitialHiddenGearTiers
+  );
+  const [duelSnapshots, setDuelSnapshots] = useState<DuelSnapshotsState>(loadInitialDuelSnapshots);
+  const [duelViewMode, setDuelViewMode] = useState<DuelViewMode>("current-target");
+  const [duelMatrixMetric, setDuelMatrixMetric] =
+    useState<DuelMatrixMetricId>("effectiveXpPerHour");
+  const [duelMatrixFilter, setDuelMatrixFilter] = useState("");
+  const [duelMatrixBuild, setDuelMatrixBuild] = useState<BuiltDuelMatrixState | null>(null);
+  const [duelMatrixBusy, setDuelMatrixBusy] = useState(false);
   const [priceHistory, setPriceHistory] =
     useState<BrowserPriceHistoryState>(loadInitialPriceHistory);
   const [bundledPriceSet, setBundledPriceSet] = useState<PriceSet | null>(null);
   const [scheduledSnapshotStatus, setScheduledSnapshotStatus] =
     useState<ScheduledStaticPriceSnapshotStatus | null>(null);
-  const [activePriceSetOrigin, setActivePriceSetOrigin] =
-    useState<ActivePriceSetOrigin>("bundled");
+  const [activePriceSetOrigin, setActivePriceSetOrigin] = useState<ActivePriceSetOrigin>("bundled");
   const [plannerState, setPlannerState] = useState<PlannerUiState>(loadInitialPlannerUiState);
   const [plannerComputedState, setPlannerComputedState] =
     useState<PlannerUiState>(loadInitialPlannerUiState);
@@ -2001,8 +2369,9 @@ export function App() {
     loadInitialLegacyMigrationDismissed
   );
   const [legacyClearPending, setLegacyClearPending] = useState(false);
-  const [localStateHealthReport, setLocalStateHealthReport] =
-    useState<LocalStateHealthReport>(() => initialLocalStateHealthReport);
+  const [localStateHealthReport, setLocalStateHealthReport] = useState<LocalStateHealthReport>(
+    () => initialLocalStateHealthReport
+  );
   const [localStateRecoveryBlockedIds, setLocalStateRecoveryBlockedIds] = useState<
     LocalStateHealthItemId[]
   >(() => initialLocalStateRecoveryBlockedIds);
@@ -2012,6 +2381,7 @@ export function App() {
   const [localStateStorageFailures, setLocalStateStorageFailures] = useState<
     LocalStateStorageFailure[]
   >([]);
+  const [priceAgeNowMs, setPriceAgeNowMs] = useState(() => Date.now());
   const [localStateRecoveryNotice, setLocalStateRecoveryNotice] = useState<string | null>(() =>
     localStorageAccessUnavailable ? LOCAL_STATE_PERSISTENCE_NOTICE : null
   );
@@ -2020,6 +2390,11 @@ export function App() {
   const [status, setStatus] = useState("Loading source-backed runtime data");
   const [fatalError, setFatalError] = useState<string | null>(null);
   const [setupImportNotice, setSetupImportNotice] = useState<SetupImportNotice | null>(null);
+  const [receivedShareableSetupPayload] = useState(captureBrowserShareableSetupFragment);
+  const [shareReviewDismissed, setShareReviewDismissed] = useState(false);
+  const [shareDialog, setShareDialog] = useState<ShareSetupDialogState | null>(null);
+  const [shareCreateNotice, setShareCreateNotice] = useState<string | null>(null);
+  const [duelImportNotice, setDuelImportNotice] = useState<SetupImportNotice | null>(null);
   const [priceImportNotice, setPriceImportNotice] = useState<ScopedPriceImportNotice | null>(null);
   const [priceLabel, setPriceLabel] = useState(
     "Scheduled static prices + generated item fallbacks"
@@ -2034,7 +2409,6 @@ export function App() {
   } | null>(null);
   const hiscoresPlayerRef = useRef(hiscoresPlayer);
   const hiscoresLookupSequenceRef = useRef(0);
-  const [marketStatus, setMarketStatus] = useState<MarketStatusResponse | null>(null);
   const [marketNotice, setMarketNotice] = useState<{
     tone: "neutral" | "success" | "warning" | "error";
     message: string;
@@ -2043,6 +2417,7 @@ export function App() {
     useState<PriceHistoryBaselineMode>("previous");
   const [economySnapshotKey, setEconomySnapshotKey] = useState("");
   const [economyItemFilter, setEconomyItemFilter] = useState("");
+  const [economyTrendItemId, setEconomyTrendItemId] = useState("");
   const [economySort, setEconomySort] = useState<PriceHistoryMoverSortState>({
     key: "gpDelta",
     direction: "desc"
@@ -2052,6 +2427,7 @@ export function App() {
   const [lootNotice, setLootNotice] = useState<string | null>(null);
   const [pendingUndo, setPendingUndo] = useState<PendingUndo | null>(null);
   const [activeTab, setActiveTab] = useState<WorkbenchTabId>("compare");
+  const shareSetupButtonRef = useRef<HTMLButtonElement>(null);
   const heavyForm = useDebouncedValue(form, 250);
   const localStateRecoveryBlocked = (itemId: LocalStateHealthItemId): boolean =>
     localStateRecoveryBlockedIds.includes(itemId);
@@ -2121,9 +2497,16 @@ export function App() {
     );
   };
 
+  /* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps -- Storage failures are external-system state and this effect refreshes their sanitized UI report. */
   useEffect(() => {
     refreshLocalStateHealthReport(localStateStorageFailures);
   }, [localStateStorageFailures]);
+  /* eslint-enable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
+
+  useEffect(() => {
+    const timerId = window.setInterval(() => setPriceAgeNowMs(Date.now()), 60_000);
+    return () => window.clearInterval(timerId);
+  }, []);
 
   useEffect(() => {
     hiscoresPlayerRef.current = hiscoresPlayer;
@@ -2154,14 +2537,12 @@ export function App() {
     fetchMarketStatus()
       .then((result) => {
         if (cancelled) return;
-        setMarketStatus(result);
         setMarketNotice(
           result.available ? null : { tone: "neutral", message: marketUnavailableMessage(result) }
         );
       })
       .catch((caught: unknown) => {
         if (cancelled) return;
-        setMarketStatus(null);
         setMarketNotice({ tone: "error", message: describeMarketError(caught) });
       });
     return () => {
@@ -2182,14 +2563,18 @@ export function App() {
           fallbackPriceSet: restoredPriceSet ?? bundledContext.priceSet
         });
         if (cancelled) return;
+        const runtimeScheduledStatus = withGeneratedScheduledPriceFallbacks(
+          scheduledStatus,
+          bundledContext.gameData
+        );
         const fallbackResolution = resolveActivePriceSetFallback({
           bundledPriceSet: bundledContext.priceSet,
           selectedPriceSet: restoredPriceSet,
-          scheduledSnapshotStatus: scheduledStatus
+          scheduledSnapshotStatus: runtimeScheduledStatus
         });
-        const scheduledLoaded = scheduledStatus.status === "loaded";
+        const scheduledLoaded = runtimeScheduledStatus.status === "loaded";
         setBundledPriceSet(bundledContext.priceSet);
-        setScheduledSnapshotStatus(scheduledStatus);
+        setScheduledSnapshotStatus(runtimeScheduledStatus);
         setActivePriceSetOrigin(fallbackResolution.origin);
         if (restoredPriceSet) {
           setStatus(
@@ -2243,13 +2628,14 @@ export function App() {
         storage,
         gameData: context.gameData,
         currentCustomSetupsByMonster: customSetupsByMonster,
-        currentCannonByMonster: cannonByMonster
+        currentCannonByMonster: cannonByMonster,
+        currentDuelSnapshots: duelSnapshots
       });
       return report.foundKeys.length > 0 ? report : null;
     } catch {
       return null;
     }
-  }, [cannonByMonster, context, customSetupsByMonster, legacyMigrationDismissed]);
+  }, [cannonByMonster, context, customSetupsByMonster, duelSnapshots, legacyMigrationDismissed]);
   const denseCompareForGameData = useMemo(
     () =>
       context
@@ -2273,6 +2659,7 @@ export function App() {
     return next;
   }, [context, lootPrefsByMonster]);
 
+  /* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps -- These effects synchronize versioned app state to browser storage and surface sanitized storage failures. */
   useEffect(() => {
     if (!readyToPersist || shouldSkipLocalStatePersist("rewrite-setup")) return;
     persistLocalState(
@@ -2333,6 +2720,7 @@ export function App() {
     if (!readyToPersist || shouldSkipLocalStatePersist("planner-ui")) return;
     persistLocalState("planner-ui", plannerUiStorageOptions, plannerState);
   }, [localStateRecoveryBlockedIds, plannerState, readyToPersist]);
+  /* eslint-enable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
 
   const currentLootRowIds = useMemo(() => {
     if (!context) return [];
@@ -2347,6 +2735,15 @@ export function App() {
     () => lootSettingsForMonster(lootSettingsByMonster, form.monsterId),
     [form.monsterId, lootSettingsByMonster]
   );
+  const receivedShareableSetupInspection = useMemo<ShareableSetupInspection | null>(() => {
+    if (!context || !receivedShareableSetupPayload) return null;
+    try {
+      const envelope = decodeShareableSetupEnvelope(receivedShareableSetupPayload);
+      return { status: "ready", review: reviewShareableSetup(envelope, context.gameData) };
+    } catch (error) {
+      return { status: "error", message: describeShareableSetupError(error) };
+    }
+  }, [context, receivedShareableSetupPayload]);
   const priceHistorySummary = useMemo(
     () => summarizePriceHistory(priceHistory, context?.priceSet ?? null),
     [context?.priceSet, priceHistory]
@@ -2387,6 +2784,24 @@ export function App() {
       priceHistory,
       priceHistoryItemLabels
     ]
+  );
+  const priceHistoryTrendItemOptions = useMemo<SelectOption[]>(() => {
+    const itemIds = new Set(
+      priceHistory.snapshots.flatMap((snapshot) => Object.keys(snapshot.itemPrices))
+    );
+    return [...itemIds]
+      .map((itemId) => ({ id: itemId, label: priceHistoryItemLabels[itemId] ?? itemId }))
+      .sort((left, right) => left.label.localeCompare(right.label));
+  }, [priceHistory, priceHistoryItemLabels]);
+  const effectiveEconomyTrendItemId = priceHistoryTrendItemOptions.some(
+    (option) => option.id === economyTrendItemId
+  )
+    ? economyTrendItemId
+    : (priceHistoryMovers.rows[0]?.itemId ?? priceHistoryTrendItemOptions[0]?.id ?? "");
+  const priceHistoryTrend = useMemo(
+    () =>
+      analyzePriceHistoryTrend(priceHistory, effectiveEconomyTrendItemId, priceHistoryItemLabels),
+    [effectiveEconomyTrendItemId, priceHistory, priceHistoryItemLabels]
   );
   const lootPriceHistoryMovers = useMemo(
     () =>
@@ -2488,6 +2903,25 @@ export function App() {
       lootSettingsByMonster
     ]
   );
+  const duelMatrixFresh =
+    duelMatrixBuild != null &&
+    duelMatrixBuild.source.form === form &&
+    duelMatrixBuild.source.snapshots === duelSnapshots &&
+    duelMatrixBuild.source.context === context &&
+    duelMatrixBuild.source.cannonByMonster === cannonByMonster &&
+    duelMatrixBuild.source.lootPrefsByMonster === lootPrefsForGameData &&
+    duelMatrixBuild.source.lootSettingsByMonster === lootSettingsByMonster;
+  const duelMatrix = duelMatrixFresh ? duelMatrixBuild.model : null;
+  const filteredDuelMatrixRows = useMemo(() => {
+    if (!duelMatrix) return [];
+    const query = duelMatrixFilter.trim().toLocaleLowerCase();
+    if (!query) return duelMatrix.rows;
+    return duelMatrix.rows.filter(
+      (row) =>
+        row.monsterName.toLocaleLowerCase().includes(query) ||
+        row.monsterId.toLocaleLowerCase().includes(query)
+    );
+  }, [duelMatrix, duelMatrixFilter]);
   const denseCompareRows = useMemo(
     () =>
       context
@@ -2688,7 +3122,12 @@ export function App() {
   } | null>(() => {
     if (!context || activeTab !== "planner") return null;
     try {
-      const plan = createPlannerViewModel(form, context, lootSettingsByMonster, plannerComputedState);
+      const plan = createPlannerViewModel(
+        form,
+        context,
+        lootSettingsByMonster,
+        plannerComputedState
+      );
       return {
         panel: createPlannerPanelViewModel(plan),
         error: null
@@ -2770,11 +3209,7 @@ export function App() {
     });
   };
 
-  const setUndoableStatus = (
-    label: string,
-    restoreLabel: string,
-    restore: () => void
-  ) => {
+  const setUndoableStatus = (label: string, restoreLabel: string, restore: () => void) => {
     setPendingUndo({
       id: localUndoId(),
       label,
@@ -2899,6 +3334,7 @@ export function App() {
       !legacyMigrationReport?.setup &&
       legacyMigrationReport?.customSetupsByMonster == null &&
       legacyMigrationReport?.cannonByMonster == null &&
+      legacyMigrationReport?.duelSnapshots == null &&
       legacyMigrationReport?.lootPrefs == null &&
       !legacyMigrationReport?.hiddenGearTiers &&
       !legacyMigrationReport?.denseCompareSort &&
@@ -2974,10 +3410,19 @@ export function App() {
       unblockReplacedLocalState(["rewrite-setup"]);
     }
     if (legacyMigrationReport.lootPrefs != null) {
-      const nextLootPrefs = mergeLootPrefsState(lootPrefsForGameData, legacyMigrationReport.lootPrefs);
+      const nextLootPrefs = mergeLootPrefsState(
+        lootPrefsForGameData,
+        legacyMigrationReport.lootPrefs
+      );
       persistLocalState("loot-prefs", lootPrefsStorageOptions, nextLootPrefs);
       setLootPrefsByMonster(nextLootPrefs);
       unblockReplacedLocalState(["loot-prefs"]);
+    }
+    if (legacyMigrationReport.duelSnapshots != null) {
+      const merged = mergeDuelSnapshots(duelSnapshots, legacyMigrationReport.duelSnapshots);
+      persistLocalState("duel-snapshots", duelSnapshotsStorageOptions, merged.state);
+      setDuelSnapshots(merged.state);
+      unblockReplacedLocalState(["duel-snapshots"]);
     }
     if (legacyMigrationReport.hiddenGearTiers != null) {
       persistLocalState(
@@ -3191,17 +3636,12 @@ export function App() {
     }
     setPriceHistory(DEFAULT_PRICE_HISTORY_STATE);
     setPriceHistoryClearPending(false);
-    setStatus(
-      !persistedClear
-        ? "Cleared price history for this session"
-        : "Cleared price history"
-    );
+    setStatus(!persistedClear ? "Cleared price history for this session" : "Cleared price history");
     setMarketNotice({
       tone: !persistedClear ? "neutral" : "success",
-      message:
-        !persistedClear
-          ? "Cleared price history for this session. Local storage is unavailable, so reload may restore it."
-          : "Cleared local price history"
+      message: !persistedClear
+        ? "Cleared price history for this session. Local storage is unavailable, so reload may restore it."
+        : "Cleared local price history"
     });
   };
 
@@ -3288,14 +3728,12 @@ export function App() {
   const updatePlannerAverageOverSession = (averageOverSession: boolean) =>
     setPlannerState((current) => normalizePlannerUiState({ ...current, averageOverSession }));
 
-  const updatePlannerGearPoolItem = (
-    slot: PlannerGearSlot,
-    itemId: string,
-    selected: boolean
-  ) => {
+  const updatePlannerGearPoolItem = (slot: PlannerGearSlot, itemId: string, selected: boolean) => {
     if (!context) return;
     const allowedPool = plannerAllowedPool(form.combatStyle, context);
-    setPlannerState((current) => setPlannerGearPoolItem(current, allowedPool, slot, itemId, selected));
+    setPlannerState((current) =>
+      setPlannerGearPoolItem(current, allowedPool, slot, itemId, selected)
+    );
   };
 
   const resetPlannerGearPool = (slot: PlannerGearSlot) =>
@@ -3373,6 +3811,39 @@ export function App() {
     : hasCurrentCustomSetup
       ? "Default setup - custom saved"
       : "Default setup";
+  const buildDuelMatrix = () => {
+    if (duelMatrixBusy || duelSnapshots.snapshots.length === 0) return;
+    const source = {
+      form,
+      snapshots: duelSnapshots,
+      context,
+      cannonByMonster,
+      lootPrefsByMonster: lootPrefsForGameData,
+      lootSettingsByMonster
+    };
+    setDuelViewMode("monster-matrix");
+    setDuelMatrixBusy(true);
+    setStatus("Building Duel monster matrix");
+    window.setTimeout(() => {
+      try {
+        const model = createDuelMatrixViewModel(
+          source.form,
+          source.snapshots,
+          source.context,
+          source.cannonByMonster,
+          source.lootPrefsByMonster,
+          source.lootSettingsByMonster
+        );
+        setDuelMatrixBuild({ model, source });
+        setStatus(`Duel matrix ready: ${model.monsterCount} monsters, ${model.setupCount} setups`);
+      } catch {
+        setDuelMatrixBuild(null);
+        setStatus("Duel matrix could not be built");
+      } finally {
+        setDuelMatrixBusy(false);
+      }
+    }, 0);
+  };
   const snapshotCurrentSetup = () => {
     const snapshot = createDuelSnapshot(
       duelSnapshotId(),
@@ -3380,7 +3851,42 @@ export function App() {
       form
     );
     setDuelSnapshots((current) => appendDuelSnapshot(current, snapshot));
+    setDuelImportNotice(null);
     setStatus(`Snapshot saved: ${snapshot.name}`);
+  };
+  const exportDuelSnapshots = () => {
+    downloadJsonFile(
+      "index-sim-duel-snapshots.json",
+      createDuelSnapshotsExport(duelSnapshots, new Date())
+    );
+    setDuelImportNotice({
+      tone: "success",
+      message: `Exported ${duelSnapshots.snapshots.length} Duel snapshots.`
+    });
+    setStatus("Exported Duel snapshots");
+  };
+  const importDuelSnapshots = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      setDuelImportNotice(null);
+      const imported = parseDuelSnapshotsExportText(
+        await readBrowserFileText(file, DUEL_SNAPSHOTS_IMPORT_MAX_BYTES)
+      );
+      const merged = mergeDuelSnapshots(duelSnapshots, imported.data);
+      setDuelSnapshots(merged.state);
+      unblockReplacedLocalState(["duel-snapshots"]);
+      const skipped =
+        merged.skippedCount > 0 ? ` ${merged.skippedCount} skipped at the limit.` : "";
+      const message = `Imported Duel snapshots: ${merged.addedCount} added, ${merged.updatedCount} updated.${skipped}`;
+      setDuelImportNotice({ tone: "success", message });
+      setStatus(message);
+    } catch (caught) {
+      setDuelImportNotice(describeDuelSnapshotsImportError(caught));
+      setStatus("Duel snapshot import failed");
+    } finally {
+      event.target.value = "";
+    }
   };
   const commitDuelSnapshotName = (snapshotId: string, name: string): boolean => {
     try {
@@ -3453,6 +3959,75 @@ export function App() {
     );
   };
   const currentCannon = cannonByMonster[form.monsterId] ?? DEFAULT_CANNON_SETTINGS;
+  const closeShareSetupDialog = () => {
+    setShareDialog(null);
+    window.queueMicrotask(() => shareSetupButtonRef.current?.focus());
+  };
+  const openShareSetupDialog = () => {
+    try {
+      const envelope = buildShareableSetupEnvelope({
+        gameDataId: context.gameData.id,
+        form,
+        cannon: currentCannon,
+        lootPreferences: currentLootPrefs,
+        lootSettings: currentLootSettings
+      });
+      const url = createBrowserShareableSetupUrl(encodeShareableSetupEnvelope(envelope));
+      setShareCreateNotice(null);
+      setShareDialog({
+        url,
+        targetLabel: currentMonster?.name ?? form.monsterId,
+        combatStyle: form.combatStyle,
+        cannonEnabled: currentCannon.enabled === true,
+        lootPreferenceCount: Object.keys(currentLootPrefs).length,
+        copyStatus: "idle"
+      });
+    } catch (error) {
+      setShareCreateNotice(describeShareableSetupError(error));
+    }
+  };
+  const copyShareSetupUrl = async () => {
+    if (!shareDialog) return;
+    const copied = await writeShareableSetupToClipboard(shareDialog.url);
+    setShareDialog((current) =>
+      current ? { ...current, copyStatus: copied ? "copied" : "failed" } : null
+    );
+  };
+  const loadReceivedShareableSetup = () => {
+    if (receivedShareableSetupInspection?.status !== "ready") return;
+    const previousDefaultForm = defaultForm;
+    const previousSetupMode = setupMode;
+    const previousActiveTab = activeTab;
+    const applied = applyShareableSetup(
+      {
+        form,
+        cannonByMonster,
+        lootPrefsByMonster,
+        lootSettingsByMonster
+      },
+      receivedShareableSetupInspection.review
+    );
+    setForm(applied.state.form);
+    setDefaultForm(applied.state.form);
+    setSetupMode("default");
+    setCannonByMonster(applied.state.cannonByMonster);
+    setLootPrefsByMonster(applied.state.lootPrefsByMonster);
+    setLootSettingsByMonster(applied.state.lootSettingsByMonster);
+    setActiveTab(applied.state.form.combatStyle);
+    setShareReviewDismissed(true);
+    unblockReplacedLocalState(["rewrite-setup", "loot-prefs", "loot-settings"]);
+    const monsterName =
+      context.gameData.monsters[applied.state.form.monsterId]?.name ?? applied.state.form.monsterId;
+    setUndoableStatus(`Loaded shared setup for ${monsterName}`, "Restored pre-share setup", () => {
+      setForm(applied.undo.form);
+      setDefaultForm(previousDefaultForm);
+      setSetupMode(previousSetupMode);
+      setCannonByMonster(applied.undo.cannonByMonster);
+      setLootPrefsByMonster(applied.undo.lootPrefsByMonster);
+      setLootSettingsByMonster(applied.undo.lootSettingsByMonster);
+      setActiveTab(previousActiveTab);
+    });
+  };
   const currentCannonOutput = viewModel.trip.cannon;
   const cannonEnabled = currentCannon.enabled === true;
   const cannonTargets = currentCannon.targets ?? DEFAULT_CANNON_SETTINGS.targets ?? 3;
@@ -3549,12 +4124,11 @@ export function App() {
         : form.trip.prayerPotionSets != null
           ? `${formatNumber(form.trip.prayerPotionSets)} vials`
           : `Auto ${formatNumber(viewModel.trip.trip.prayerSlots)} vials`;
-  const scarceStatus =
-    !form.trip.scarceSpot
-      ? "Off"
-      : viewModel.trip.trip.scarce.respawnBound
-        ? "Respawn-bound"
-        : "Not bound";
+  const scarceStatus = !form.trip.scarceSpot
+    ? "Off"
+    : viewModel.trip.trip.scarce.respawnBound
+      ? "Respawn-bound"
+      : "Not bound";
   const cannonSparseSummary = !cannonEnabled
     ? "Off"
     : cannonTripSparseLinked
@@ -3743,10 +4317,7 @@ export function App() {
         }
       })
     );
-  const resetActiveAssumption = (
-    target: ActiveAssumptionResetTarget,
-    statusLabel: string
-  ) => {
+  const resetActiveAssumption = (target: ActiveAssumptionResetTarget, statusLabel: string) => {
     if (target === "manual-combat-overrides") {
       resetManualOverrides();
     } else if (target === "cannon-enabled") {
@@ -3852,7 +4423,7 @@ export function App() {
   const activePriceSetCreatedAtMs = activePriceSet ? Date.parse(activePriceSet.createdAt) : NaN;
   const activePriceSetAgeSeconds =
     activePriceSet && Number.isFinite(activePriceSetCreatedAtMs)
-      ? Math.max(0, Math.floor((Date.now() - activePriceSetCreatedAtMs) / 1000))
+      ? Math.max(0, Math.floor((priceAgeNowMs - activePriceSetCreatedAtMs) / 1000))
       : null;
   const activePriceSetItemCount = activePriceSet
     ? Object.keys(activePriceSet.itemPrices).length
@@ -3866,7 +4437,7 @@ export function App() {
     : NaN;
   const scheduledPriceSetAgeSeconds =
     scheduledPriceSet && Number.isFinite(scheduledPriceSetCreatedAtMs)
-      ? Math.max(0, Math.floor((Date.now() - scheduledPriceSetCreatedAtMs) / 1000))
+      ? Math.max(0, Math.floor((priceAgeNowMs - scheduledPriceSetCreatedAtMs) / 1000))
       : null;
   const scheduledPriceSetItemCount = scheduledPriceSet
     ? Object.keys(scheduledPriceSet.itemPrices).length
@@ -3992,6 +4563,9 @@ export function App() {
     );
   };
   const priceDataStatusMessage = marketNotice?.message ?? status;
+  const visibleShareableSetupInspection = shareReviewDismissed
+    ? null
+    : receivedShareableSetupInspection;
 
   return (
     <main className="app-shell">
@@ -4034,6 +4608,9 @@ export function App() {
           >
             Export setup
           </button>
+          <button ref={shareSetupButtonRef} type="button" onClick={openShareSetupDialog}>
+            Share setup
+          </button>
           {priceImportNotice?.surface === "topbar" && (
             <InlineImportNotice
               notice={priceImportNotice}
@@ -4048,8 +4625,102 @@ export function App() {
               className="topbar-import-notice setup-import-notice"
             />
           )}
+          {shareCreateNotice && (
+            <div
+              className="topbar-import-notice inline-status error"
+              role="alert"
+              aria-label="Share setup notice"
+            >
+              {shareCreateNotice}
+            </div>
+          )}
         </div>
       </header>
+
+      {shareDialog && (
+        <ShareSetupDialog
+          state={shareDialog}
+          onCopy={() => void copyShareSetupUrl()}
+          onClose={closeShareSetupDialog}
+        />
+      )}
+
+      {visibleShareableSetupInspection && (
+        <section
+          className={`shared-setup-strip ${
+            visibleShareableSetupInspection.status === "error"
+              ? "error"
+              : visibleShareableSetupInspection.review.gameDataMismatch ||
+                  visibleShareableSetupInspection.review.droppedLootRowCount > 0
+                ? "warning"
+                : "ready"
+          }`}
+          aria-label="Shared setup review"
+        >
+          <div className="section-title-row">
+            <h2>Shared setup</h2>
+            <span
+              className={`status-pill ${
+                visibleShareableSetupInspection.status === "error" ? "" : "ready"
+              }`}
+            >
+              {visibleShareableSetupInspection.status === "error" ? "Invalid" : "Ready to load"}
+            </span>
+          </div>
+          {visibleShareableSetupInspection.status === "error" ? (
+            <p role="alert">{visibleShareableSetupInspection.message}</p>
+          ) : (
+            <>
+              <p>
+                {context.gameData.monsters[
+                  visibleShareableSetupInspection.review.envelope.data.form.monsterId
+                ]?.name ?? visibleShareableSetupInspection.review.envelope.data.form.monsterId}
+                {" · "}
+                {visibleShareableSetupInspection.review.envelope.data.form.combatStyle}
+              </p>
+              <div className="shared-setup-summary" aria-label="Shared setup summary">
+                <span>Player levels included</span>
+                <span>
+                  Cannon{" "}
+                  {visibleShareableSetupInspection.review.envelope.data.cannon.enabled
+                    ? "on"
+                    : "off"}
+                </span>
+                <span>
+                  {formatNumber(
+                    Object.keys(
+                      visibleShareableSetupInspection.review.envelope.data.lootPreferences
+                    ).length
+                  )}{" "}
+                  loot choices
+                </span>
+                <span>Uses your current prices</span>
+              </div>
+              {visibleShareableSetupInspection.review.gameDataMismatch && (
+                <p className="inline-status warning" role="status">
+                  Different game-data version. Available ids were validated before loading.
+                </p>
+              )}
+              {visibleShareableSetupInspection.review.droppedLootRowCount > 0 && (
+                <p className="inline-status warning" role="status">
+                  {formatNumber(visibleShareableSetupInspection.review.droppedLootRowCount)} stale
+                  loot choices will be skipped.
+                </p>
+              )}
+            </>
+          )}
+          <div className="shared-setup-actions">
+            {visibleShareableSetupInspection.status === "ready" && (
+              <button type="button" onClick={loadReceivedShareableSetup}>
+                Load setup
+              </button>
+            )}
+            <button type="button" onClick={() => setShareReviewDismissed(true)}>
+              Dismiss
+            </button>
+          </div>
+        </section>
+      )}
 
       <PendingUndoStatus pendingUndo={pendingUndo} onUndo={undoPendingAction} />
 
@@ -4622,11 +5293,7 @@ export function App() {
                     <h3>Source details</h3>
                     <span>Special attack and cannon</span>
                   </div>
-                  <div
-                    className="source-detail-grid"
-                    role="list"
-                    aria-label="Source detail panels"
-                  >
+                  <div className="source-detail-grid" role="list" aria-label="Source detail panels">
                     {viewModel.statsSourceBreakdown.details
                       .filter((detail) => detail.id === "special-attack" || detail.id === "cannon")
                       .map((detail) => (
@@ -4648,11 +5315,7 @@ export function App() {
                         {viewModel.xpRouting.effectiveXpPerHourLabel} XP/hr
                       </span>
                     </div>
-                    <div
-                      className="xp-routing-chip-list"
-                      role="list"
-                      aria-label="XP routing chips"
-                    >
+                    <div className="xp-routing-chip-list" role="list" aria-label="XP routing chips">
                       {viewModel.xpRouting.rows.map((row) => (
                         <div
                           className={`xp-routing-chip ${row.status}`}
@@ -4680,10 +5343,7 @@ export function App() {
                       </span>
                     </div>
                     <div className="stats-summary-table-wrap">
-                      <table
-                        className="stats-summary-table"
-                        aria-label="Trip and banking metrics"
-                      >
+                      <table className="stats-summary-table" aria-label="Trip and banking metrics">
                         <tbody>
                           {viewModel.tripBankingSummary.rows.map((row) => (
                             <tr className={row.tone} key={row.id}>
@@ -4729,11 +5389,7 @@ export function App() {
                       }
                     ])}
                   </div>
-                  <div
-                    className="hit-histogram"
-                    role="list"
-                    aria-label="Hit distribution buckets"
-                  >
+                  <div className="hit-histogram" role="list" aria-label="Hit distribution buckets">
                     {viewModel.hitDistribution.buckets.map((bucket) => (
                       <div
                         className={`hit-bucket ${bucket.isMiss ? "miss" : ""} ${
@@ -5192,7 +5848,10 @@ export function App() {
                 <section className="loot-composition" aria-label="Loot value composition">
                   <div className="loot-section-heading">
                     <h3>Loot value composition</h3>
-                    <span>{formatNumber(viewModel.lootSummary.valueComposition.displayedGpPerKill, 1)} GP/kill</span>
+                    <span>
+                      {formatNumber(viewModel.lootSummary.valueComposition.displayedGpPerKill, 1)}{" "}
+                      GP/kill
+                    </span>
                   </div>
                   <table className="loot-composition-table">
                     <thead>
@@ -5214,7 +5873,9 @@ export function App() {
                           <tr key={row.rowId ?? "other-drops"}>
                             <td>
                               <span>{row.name}</span>
-                              {row.childCount > 0 && <small>{formatNumber(row.childCount)} nested rows</small>}
+                              {row.childCount > 0 && (
+                                <small>{formatNumber(row.childCount)} nested rows</small>
+                              )}
                             </td>
                             <td>{row.actionLabel}</td>
                             <td className="numeric">{formatNumber(row.gpPerKill, 1)}</td>
@@ -5230,7 +5891,9 @@ export function App() {
                     </tbody>
                   </table>
                   {viewModel.lootSummary.valueComposition.note && (
-                    <p className="loot-composition-note">{viewModel.lootSummary.valueComposition.note}</p>
+                    <p className="loot-composition-note">
+                      {viewModel.lootSummary.valueComposition.note}
+                    </p>
                   )}
                 </section>
                 <div className="loot-table-wrap">
@@ -5267,7 +5930,9 @@ export function App() {
                             <td className="loot-name-cell">
                               <span>{row.name}</span>
                               <small>{row.key ?? row.tag ?? row.rowId}</small>
-                              {row.stateLabel && <small className="loot-state">{row.stateLabel}</small>}
+                              {row.stateLabel && (
+                                <small className="loot-state">{row.stateLabel}</small>
+                              )}
                             </td>
                             <td>
                               <select
@@ -5291,7 +5956,10 @@ export function App() {
                             <td className="loot-impact-cell">
                               <details className="loot-row-disclosure">
                                 <summary>Compare actions</summary>
-                                <table className="loot-impact-table" aria-label={`Action impact for ${row.name}`}>
+                                <table
+                                  className="loot-impact-table"
+                                  aria-label={`Action impact for ${row.name}`}
+                                >
                                   <thead>
                                     <tr>
                                       <th>Action</th>
@@ -5318,7 +5986,9 @@ export function App() {
                                         <td className="numeric">
                                           {formatNumber(impact.effectiveNetGpPerHour)}
                                         </td>
-                                        <td className="numeric">{formatDelta(impact.deltaNetGpPerHour)}</td>
+                                        <td className="numeric">
+                                          {formatDelta(impact.deltaNetGpPerHour)}
+                                        </td>
                                         <td className="numeric">
                                           {formatNumber(impact.gpPerKillContribution, 1)}
                                         </td>
@@ -5347,7 +6017,10 @@ export function App() {
                                 <div className="loot-row-detail-panel">
                                   <dl className="loot-value-facts">
                                     {row.valueDetails.map((detail) => (
-                                      <div className={detail.tone} key={`${row.rowId}-${detail.label}`}>
+                                      <div
+                                        className={detail.tone}
+                                        key={`${row.rowId}-${detail.label}`}
+                                      >
                                         <dt>{detail.label}</dt>
                                         <dd>{detail.value}</dd>
                                       </div>
@@ -5382,7 +6055,9 @@ export function App() {
                                         </div>
                                         <div>
                                           <dt>Percent</dt>
-                                          <dd>{optionalPercent(row.historyContext.percentDelta)}</dd>
+                                          <dd>
+                                            {optionalPercent(row.historyContext.percentDelta)}
+                                          </dd>
                                         </div>
                                       </dl>
                                     ) : (
@@ -5394,7 +6069,10 @@ export function App() {
                                     )}
                                   </div>
                                   {row.expandedRows.length > 0 && (
-                                    <table className="loot-nested-table" aria-label={`Nested rows for ${row.name}`}>
+                                    <table
+                                      className="loot-nested-table"
+                                      aria-label={`Nested rows for ${row.name}`}
+                                    >
                                       <thead>
                                         <tr>
                                           <th>Child</th>
@@ -5420,7 +6098,9 @@ export function App() {
                                             </td>
                                             <td className="numeric">{detail.qtyLabel ?? "-"}</td>
                                             <td className="numeric">
-                                              {detail.price === null ? "-" : formatNumber(detail.price)}
+                                              {detail.price === null
+                                                ? "-"
+                                                : formatNumber(detail.price)}
                                             </td>
                                             <td className="numeric">
                                               {detail.evGp === null
@@ -6264,7 +6944,10 @@ export function App() {
                           { label: "Cannon DPS", value: "0.00" },
                           { label: "Balls/hr", value: "0" },
                           { label: "Cannon Ranged XP/hr", value: "0" },
-                          { label: "Effective XP/hr", value: formatNumber(viewModel.effectiveXpPerHour) },
+                          {
+                            label: "Effective XP/hr",
+                            value: formatNumber(viewModel.effectiveXpPerHour)
+                          },
                           {
                             label: "Effective net GP/hr",
                             value: formatNumber(viewModel.trip.effectiveNetGpPerHour),
@@ -6290,8 +6973,8 @@ export function App() {
                     <h2>Setup duel</h2>
                     <span>
                       {duelComparison?.monsterName ?? currentMonster?.name ?? form.monsterId} -{" "}
-                      {duelSnapshots.snapshots.length} /{" "}
-                      {duelComparison?.snapshotLimit ?? 12} snapshots
+                      {duelSnapshots.snapshots.length} / {duelComparison?.snapshotLimit ?? 12}{" "}
+                      snapshots
                     </span>
                   </div>
                   <div className="duel-controls" aria-label="Duel snapshot controls">
@@ -6299,120 +6982,285 @@ export function App() {
                       label="Current target"
                       value={duelComparison?.monsterName ?? currentMonster?.name ?? form.monsterId}
                     />
-                    <button
-                      type="button"
-                      onClick={snapshotCurrentSetup}
-                      disabled={
-                        duelComparison != null &&
-                        duelSnapshots.snapshots.length >= duelComparison.snapshotLimit
-                      }
-                    >
-                      Snapshot current setup
-                    </button>
+                    <div className="duel-control-actions">
+                      <button
+                        type="button"
+                        onClick={snapshotCurrentSetup}
+                        disabled={
+                          duelComparison != null &&
+                          duelSnapshots.snapshots.length >= duelComparison.snapshotLimit
+                        }
+                      >
+                        Snapshot current setup
+                      </button>
+                      <label className="file-button">
+                        Import snapshots
+                        <input
+                          type="file"
+                          accept="application/json,.json"
+                          onChange={importDuelSnapshots}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={exportDuelSnapshots}
+                        disabled={duelSnapshots.snapshots.length === 0}
+                      >
+                        Export snapshots
+                      </button>
+                    </div>
                   </div>
                 </div>
 
-                <div className="duel-table-wrap">
-                  <table className="duel-table" aria-label="Duel comparison">
-                    <thead>
-                      <tr>
-                        <th>Setup</th>
-                        <th>Loadout</th>
-                        <th className="numeric">Max</th>
-                        <th className="numeric">DPS</th>
-                        <th className="numeric">XP/hr</th>
-                        <th className="numeric">Net GP/hr</th>
-                        <th className="numeric">GP/XP</th>
-                        <th className="numeric">K/hr</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {duelComparison?.rows.map((row) => (
-                        <tr key={row.id} className={duelRowClass(row)}>
-                          <td className="duel-setup-cell">
-                            {row.source === "live" ? (
-                              <strong>Live setup</strong>
-                            ) : (
-                              <input
-                                aria-label={`Rename snapshot ${row.name}`}
-                                defaultValue={row.name}
-                                maxLength={80}
-                                onBlur={(event) => {
-                                  if (!row.snapshotId) return;
-                                  const accepted = commitDuelSnapshotName(
-                                    row.snapshotId,
-                                    event.currentTarget.value
-                                  );
-                                  if (!accepted) event.currentTarget.value = row.name;
-                                }}
-                                onKeyDown={(event) => {
-                                  if (event.key === "Enter") event.currentTarget.blur();
-                                  if (event.key === "Escape") {
-                                    event.currentTarget.value = row.name;
-                                    event.currentTarget.blur();
-                                  }
-                                }}
-                              />
-                            )}
-                            <span>{row.combatStyle}</span>
-                          </td>
-                          <td className="duel-loadout-cell" title={row.loadoutLabel}>
-                            {row.loadoutLabel}
-                          </td>
-                          <td className="numeric">{formatNumber(row.maxHit, 1)}</td>
-                          <td className="numeric">{formatNumber(row.dps, 2)}</td>
-                          <td className={`numeric ${row.best.effectiveXpPerHour ? "best" : ""}`}>
-                            <span>{formatNumber(row.effectiveXpPerHour)}</span>
-                            {row.best.effectiveXpPerHour && <em>best</em>}
-                            <small>{duelDeltaDisplay(row.deltas.effectiveXpPerHour)}</small>
-                          </td>
-                          <td
-                            className={`numeric ${row.best.effectiveNetGpPerHour ? "best" : ""}`}
-                          >
-                            <span>{formatNumber(row.effectiveNetGpPerHour)}</span>
-                            {row.best.effectiveNetGpPerHour && <em>best</em>}
-                            <small>{duelDeltaDisplay(row.deltas.effectiveNetGpPerHour)}</small>
-                          </td>
-                          <td className={`numeric ${row.best.gpPerXp ? "best" : ""}`}>
-                            <span>{gpPerXpDisplay(row.gpPerXp)}</span>
-                            {row.best.gpPerXp && <em>best</em>}
-                            <small>{duelDeltaDisplay(row.deltas.gpPerXp, 2)}</small>
-                          </td>
-                          <td className="numeric">{formatNumber(row.killsPerHour)}</td>
-                          <td>
-                            {row.snapshotId ? (
-                              <div className="duel-row-actions">
-                                <button
-                                  type="button"
-                                  onClick={() => loadDuelSnapshot(row.snapshotId!)}
-                                >
-                                  Load
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => deleteDuelSnapshot(row.snapshotId!)}
-                                >
-                                  Delete
-                                </button>
-                              </div>
-                            ) : (
-                              <span className="duel-live-marker">Active</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                      {duelComparison?.snapshotRows.length === 0 && (
-                        <tr className="duel-empty-row">
-                          <td colSpan={9}>No snapshots</td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
+                <div className="segmented duel-view-toggle" aria-label="Duel view">
+                  <button
+                    type="button"
+                    className={duelViewMode === "current-target" ? "active" : undefined}
+                    aria-pressed={duelViewMode === "current-target"}
+                    onClick={() => setDuelViewMode("current-target")}
+                  >
+                    Current target
+                  </button>
+                  <button
+                    type="button"
+                    className={duelViewMode === "monster-matrix" ? "active" : undefined}
+                    aria-pressed={duelViewMode === "monster-matrix"}
+                    onClick={() => {
+                      if (duelMatrix) setDuelViewMode("monster-matrix");
+                      else buildDuelMatrix();
+                    }}
+                    disabled={duelSnapshots.snapshots.length === 0 || duelMatrixBusy}
+                  >
+                    Monster matrix
+                  </button>
                 </div>
+
+                {duelImportNotice && (
+                  <InlineImportNotice
+                    notice={duelImportNotice}
+                    ariaLabel="Duel snapshot import notice"
+                    className="duel-import-notice"
+                  />
+                )}
+
+                {duelViewMode === "current-target" ? (
+                  <div className="duel-table-wrap">
+                    <table className="duel-table" aria-label="Duel comparison">
+                      <thead>
+                        <tr>
+                          <th>Setup</th>
+                          <th>Loadout</th>
+                          <th className="numeric">Max</th>
+                          <th className="numeric">DPS</th>
+                          <th className="numeric">XP/hr</th>
+                          <th className="numeric">Net GP/hr</th>
+                          <th className="numeric">GP/XP</th>
+                          <th className="numeric">K/hr</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {duelComparison?.rows.map((row) => (
+                          <tr key={row.id} className={duelRowClass(row)}>
+                            <td className="duel-setup-cell">
+                              {row.source === "live" ? (
+                                <strong>Live setup</strong>
+                              ) : (
+                                <input
+                                  aria-label={`Rename snapshot ${row.name}`}
+                                  defaultValue={row.name}
+                                  maxLength={80}
+                                  onBlur={(event) => {
+                                    if (!row.snapshotId) return;
+                                    const accepted = commitDuelSnapshotName(
+                                      row.snapshotId,
+                                      event.currentTarget.value
+                                    );
+                                    if (!accepted) event.currentTarget.value = row.name;
+                                  }}
+                                  onKeyDown={(event) => {
+                                    if (event.key === "Enter") event.currentTarget.blur();
+                                    if (event.key === "Escape") {
+                                      event.currentTarget.value = row.name;
+                                      event.currentTarget.blur();
+                                    }
+                                  }}
+                                />
+                              )}
+                              <span>{row.combatStyle}</span>
+                            </td>
+                            <td className="duel-loadout-cell" title={row.loadoutLabel}>
+                              {row.loadoutLabel}
+                            </td>
+                            <td className="numeric">{formatNumber(row.maxHit, 1)}</td>
+                            <td className="numeric">{formatNumber(row.dps, 2)}</td>
+                            <td className={`numeric ${row.best.effectiveXpPerHour ? "best" : ""}`}>
+                              <span>{formatNumber(row.effectiveXpPerHour)}</span>
+                              {row.best.effectiveXpPerHour && <em>best</em>}
+                              <small>{duelDeltaDisplay(row.deltas.effectiveXpPerHour)}</small>
+                            </td>
+                            <td
+                              className={`numeric ${row.best.effectiveNetGpPerHour ? "best" : ""}`}
+                            >
+                              <span>{formatNumber(row.effectiveNetGpPerHour)}</span>
+                              {row.best.effectiveNetGpPerHour && <em>best</em>}
+                              <small>{duelDeltaDisplay(row.deltas.effectiveNetGpPerHour)}</small>
+                            </td>
+                            <td className={`numeric ${row.best.gpPerXp ? "best" : ""}`}>
+                              <span>{gpPerXpDisplay(row.gpPerXp)}</span>
+                              {row.best.gpPerXp && <em>best</em>}
+                              <small>{duelDeltaDisplay(row.deltas.gpPerXp, 2)}</small>
+                            </td>
+                            <td className="numeric">{formatNumber(row.killsPerHour)}</td>
+                            <td>
+                              {row.snapshotId ? (
+                                <div className="duel-row-actions">
+                                  <button
+                                    type="button"
+                                    onClick={() => loadDuelSnapshot(row.snapshotId!)}
+                                  >
+                                    Load
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => deleteDuelSnapshot(row.snapshotId!)}
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              ) : (
+                                <span className="duel-live-marker">Active</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                        {duelComparison?.snapshotRows.length === 0 && (
+                          <tr className="duel-empty-row">
+                            <td colSpan={9}>No snapshots</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <section className="duel-matrix-panel" aria-label="Duel monster matrix">
+                    <div className="duel-matrix-controls">
+                      <label className="field">
+                        <span>Find monster</span>
+                        <input
+                          aria-label="Find matrix monster"
+                          type="search"
+                          value={duelMatrixFilter}
+                          onChange={(event) => setDuelMatrixFilter(event.target.value)}
+                        />
+                      </label>
+                      <div
+                        className="segmented duel-matrix-metrics"
+                        aria-label="Duel matrix metric"
+                      >
+                        {DUEL_MATRIX_METRICS.map((metric) => (
+                          <button
+                            type="button"
+                            className={duelMatrixMetric === metric.id ? "active" : undefined}
+                            aria-pressed={duelMatrixMetric === metric.id}
+                            onClick={() => setDuelMatrixMetric(metric.id)}
+                            key={metric.id}
+                          >
+                            {metric.label}
+                          </button>
+                        ))}
+                      </div>
+                      <button type="button" onClick={buildDuelMatrix} disabled={duelMatrixBusy}>
+                        Refresh matrix
+                      </button>
+                      <span className={`status-pill ${duelMatrix ? "ready" : "pending"}`}>
+                        {duelMatrix
+                          ? `${duelMatrix.monsterCount} monsters - ${duelMatrix.setupCount} setups`
+                          : duelMatrixBusy
+                            ? "building"
+                            : "refresh required"}
+                      </span>
+                    </div>
+
+                    {duelMatrix ? (
+                      <div className="duel-table-wrap duel-matrix-wrap">
+                        <table className="duel-matrix-table" aria-label="All-monster setup matrix">
+                          <thead>
+                            <tr>
+                              <th scope="col">Monster</th>
+                              {duelMatrix.setups.map((setup) => (
+                                <th scope="col" title={setup.loadoutLabel} key={setup.id}>
+                                  <strong>{setup.name}</strong>
+                                  <span>{setup.combatStyle}</span>
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filteredDuelMatrixRows.map((row) => (
+                              <tr
+                                className={row.isCurrentTarget ? "current-target" : undefined}
+                                aria-current={row.isCurrentTarget ? "true" : undefined}
+                                key={row.monsterId}
+                              >
+                                <th scope="row">
+                                  <strong>{row.monsterName}</strong>
+                                  <span>
+                                    {row.monsterLevel == null
+                                      ? row.monsterId
+                                      : `lvl ${row.monsterLevel}`}
+                                  </span>
+                                </th>
+                                {row.cells.map((cell) => {
+                                  const value = cell.values[duelMatrixMetric];
+                                  const displayValue = duelMatrixMetricDisplay(
+                                    duelMatrixMetric,
+                                    value
+                                  );
+                                  const setup = duelMatrix.setups.find(
+                                    (candidate) => candidate.id === cell.setupId
+                                  );
+                                  const isBest = cell.best[duelMatrixMetric];
+                                  return (
+                                    <td
+                                      className={`numeric ${isBest ? "best" : ""}`}
+                                      aria-label={`${row.monsterName}, ${setup?.name ?? cell.setupId}, ${duelMatrixMetricLabel(duelMatrixMetric)}: ${displayValue}${isBest ? ", best" : ""}`}
+                                      key={cell.setupId}
+                                    >
+                                      <span>{displayValue}</span>
+                                      {isBest && <em>best</em>}
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            ))}
+                            {filteredDuelMatrixRows.length === 0 && (
+                              <tr className="duel-empty-row">
+                                <td colSpan={duelMatrix.setupCount + 1}>No matching monsters</td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="duel-matrix-empty" aria-label="Duel monster matrix status">
+                        <span>{duelMatrixBusy ? "Building matrix" : "Matrix inputs changed"}</span>
+                        {!duelMatrixBusy && (
+                          <button type="button" onClick={buildDuelMatrix}>
+                            Build matrix
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </section>
+                )}
               </section>
 
-              <section className="planner-pane" aria-label="Planner" hidden={activeTab !== "planner"}>
+              <section
+                className="planner-pane"
+                aria-label="Planner"
+                hidden={activeTab !== "planner"}
+              >
                 <div className="section-title-row">
                   <h2>Planner</h2>
                   <span className={`status-pill ${plannerStatus === "ready" ? "ready" : ""}`}>
@@ -6429,10 +7277,7 @@ export function App() {
                       onChange={updatePlannerMetric}
                     />
                     <ReadOnlyField label="Combat style" value={form.combatStyle} />
-                    <ReadOnlyField
-                      label="Target"
-                      value={currentMonster?.name ?? form.monsterId}
-                    />
+                    <ReadOnlyField label="Target" value={currentMonster?.name ?? form.monsterId} />
                     <button type="button" className="planner-recompute" onClick={recomputePlanner}>
                       Recompute plan
                     </button>
@@ -6508,8 +7353,7 @@ export function App() {
                             <div className="planner-gear-slot-header">
                               <h4>{slot.label}</h4>
                               <span>
-                                {formatNumber(slot.selectedCount)} /{" "}
-                                {formatNumber(slot.totalCount)}
+                                {formatNumber(slot.selectedCount)} / {formatNumber(slot.totalCount)}
                               </span>
                               <button
                                 type="button"
@@ -6627,7 +7471,10 @@ export function App() {
                         )}
                       </section>
 
-                      <section className="planner-output-section" aria-label="Planner gear timeline">
+                      <section
+                        className="planner-output-section"
+                        aria-label="Planner gear timeline"
+                      >
                         <div className="section-title-row">
                           <h3>Gear timeline</h3>
                           <span className="status-pill">
@@ -6643,9 +7490,8 @@ export function App() {
                                 <span>{formatNumber(event.cumXp)} XP</span>
                                 <strong>{event.itemName}</strong>
                                 <small>
-                                  {event.slotLabel} - {event.skillLabel}{" "}
-                                  {formatNumber(event.level)} - {signedDecimal(event.dpsDelta, 2)}{" "}
-                                  DPS
+                                  {event.slotLabel} - {event.skillLabel} {formatNumber(event.level)}{" "}
+                                  - {signedDecimal(event.dpsDelta, 2)} DPS
                                 </small>
                               </li>
                             ))}
@@ -6794,7 +7640,9 @@ export function App() {
                     </p>
                     <div className="price-history-summary" aria-label="Local state health summary">
                       <span>Known states {formatNumber(localStateHealthReport.itemCount)}</span>
-                      <span>Needs attention {formatNumber(localStateHealthReport.attentionCount)}</span>
+                      <span>
+                        Needs attention {formatNumber(localStateHealthReport.attentionCount)}
+                      </span>
                       <span>Report {localStateHealthReport.generatedAt}</span>
                     </div>
                     <div className="market-sync-bar">
@@ -6892,13 +7740,14 @@ export function App() {
                   </section>
                 )}
                 {activeTab === "settings" && (
-                  <section className="service-group price-data-panel" aria-label="Price data settings">
+                  <section
+                    className="service-group price-data-panel"
+                    aria-label="Price data settings"
+                  >
                     <div className="section-title-row">
                       <h2>Price data</h2>
                       <span className={`status-pill ${activePriceSet ? "ready" : ""}`}>
-                        {activePriceSet
-                          ? activePriceSetOriginLabel(activePriceSetOrigin)
-                          : "empty"}
+                        {activePriceSet ? activePriceSetOriginLabel(activePriceSetOrigin) : "empty"}
                       </span>
                     </div>
                     {renderScheduledSnapshotSummary()}
@@ -6939,7 +7788,10 @@ export function App() {
                   </section>
                 )}
                 {activeTab === "settings" && (
-                  <section className="service-group hidden-tier-panel" aria-label="Hidden gear tiers">
+                  <section
+                    className="service-group hidden-tier-panel"
+                    aria-label="Hidden gear tiers"
+                  >
                     <div className="section-title-row">
                       <h2>Gear menu</h2>
                       <span
@@ -7125,6 +7977,17 @@ export function App() {
                           onChange={(event) => setEconomyItemFilter(event.target.value)}
                         />
                       </div>
+                      <SelectField
+                        label="Trend item"
+                        value={effectiveEconomyTrendItemId}
+                        options={
+                          priceHistoryTrendItemOptions.length
+                            ? priceHistoryTrendItemOptions
+                            : [{ id: "", label: "No tracked items" }]
+                        }
+                        disabled={priceHistoryTrendItemOptions.length === 0}
+                        onChange={setEconomyTrendItemId}
+                      />
                     </div>
                     <div className="movers-grid" aria-label="Top movers">
                       <div className="mover-list" aria-label="Top gainers">
@@ -7158,6 +8021,7 @@ export function App() {
                         )}
                       </div>
                     </div>
+                    <PriceTrendChart trend={priceHistoryTrend} />
                     <div className="dense-table-wrap economy-table-wrap">
                       <table className="dense-table" aria-label="Price movers">
                         <thead>
@@ -7219,6 +8083,7 @@ export function App() {
                                 Percent delta
                               </button>
                             </th>
+                            <th>Trend</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -7237,11 +8102,14 @@ export function App() {
                                 <td className={`numeric ${moverTone(row) ?? ""}`}>
                                   {optionalPercent(row.percentDelta)}
                                 </td>
+                                <td>
+                                  <PriceTrendSparkline row={row} />
+                                </td>
                               </tr>
                             ))
                           ) : (
                             <tr>
-                              <td colSpan={5}>No matching price movement rows</td>
+                              <td colSpan={6}>No matching price movement rows</td>
                             </tr>
                           )}
                         </tbody>

@@ -12,9 +12,12 @@ import {
 export const SELECTED_PRICE_SET_STORAGE_KEY = "index-sim:price-set:selected";
 export const SELECTED_PRICE_SET_VERSION = 1;
 
-const IsoTimestampSchema = z.string().min(1).refine((value) => Number.isFinite(Date.parse(value)), {
-  message: "Expected an ISO timestamp"
-});
+const IsoTimestampSchema = z
+  .string()
+  .min(1)
+  .refine((value) => Number.isFinite(Date.parse(value)), {
+    message: "Expected an ISO timestamp"
+  });
 
 export const SelectedPriceSetStateSchema = z
   .object({

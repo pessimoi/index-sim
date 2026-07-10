@@ -170,6 +170,91 @@ th {
   padding: 0.35rem 0.65rem;
 }
 
+.share-setup-dialog {
+  background: #171b21;
+  border: 1px solid #40526a;
+  border-radius: 6px;
+  color: #eef2f7;
+  display: grid;
+  gap: 0.8rem;
+  margin: auto;
+  max-height: calc(100vh - 2rem);
+  max-width: calc(100vw - 2rem);
+  overflow: auto;
+  padding: 1rem;
+  width: 42rem;
+}
+
+.share-setup-dialog::backdrop {
+  background: rgb(5 7 10 / 78%);
+}
+
+.share-setup-dialog h2,
+.share-setup-dialog p {
+  margin: 0;
+}
+
+.share-setup-dialog-header,
+.share-setup-dialog-actions,
+.shared-setup-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  justify-content: space-between;
+}
+
+.share-setup-summary,
+.shared-setup-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.share-setup-summary span,
+.shared-setup-summary span {
+  border: 1px solid #344050;
+  border-radius: 999px;
+  color: #cbd5e1;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.28rem 0.5rem;
+  text-transform: uppercase;
+}
+
+.share-setup-url-field input {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  min-width: 0;
+  width: 100%;
+}
+
+.share-setup-privacy-note {
+  color: #aeb9c8;
+  font-size: 0.78rem;
+}
+
+.shared-setup-strip {
+  border: 1px solid #4f8c7a;
+  border-radius: 6px;
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.75rem;
+}
+
+.shared-setup-strip.warning {
+  border-color: #9a7635;
+}
+
+.shared-setup-strip.error {
+  border-color: #9b4f57;
+}
+
+.shared-setup-strip p {
+  color: #cbd5e1;
+  font-size: 0.82rem;
+  margin: 0;
+}
+
 .legacy-migration-strip {
   border: 1px solid #344050;
   border-radius: 6px;
@@ -1958,7 +2043,7 @@ th {
 
 .duel-pane {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   min-height: 0;
   min-width: 0;
 }
@@ -1979,9 +2064,27 @@ th {
   min-width: 0;
 }
 
-.duel-controls button {
+.duel-control-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.duel-controls button,
+.duel-controls .file-button {
   min-height: 2.15rem;
   white-space: nowrap;
+}
+
+.duel-import-notice {
+  margin: 0.5rem 0;
+}
+
+.duel-view-toggle {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0.35rem 0 0.5rem;
+  max-width: 24rem;
 }
 
 .duel-table-wrap {
@@ -2091,6 +2194,120 @@ th {
 .duel-empty-row td {
   color: #7f8b9a;
   text-align: center;
+}
+
+.duel-matrix-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 16rem;
+  min-width: 0;
+}
+
+.duel-matrix-controls {
+  align-items: end;
+  border-bottom: 1px solid #26303d;
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: minmax(10rem, 0.8fr) minmax(24rem, 2fr) auto auto;
+  min-width: 0;
+  padding: 0.45rem 0 0.65rem;
+}
+
+.duel-matrix-controls > button {
+  min-height: 2.35rem;
+  white-space: nowrap;
+}
+
+.duel-matrix-controls .status-pill {
+  align-self: center;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.duel-matrix-metrics {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+}
+
+.duel-matrix-wrap {
+  min-height: 16rem;
+}
+
+.duel-matrix-table {
+  font-variant-numeric: tabular-nums;
+  min-width: 780px;
+}
+
+.duel-matrix-table thead th {
+  background: #111317;
+  min-width: 9rem;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.duel-matrix-table thead th:first-child,
+.duel-matrix-table tbody th {
+  left: 0;
+  min-width: 12rem;
+  position: sticky;
+}
+
+.duel-matrix-table thead th:first-child {
+  z-index: 3;
+}
+
+.duel-matrix-table tbody th {
+  background: #111317;
+  z-index: 1;
+}
+
+.duel-matrix-table th strong,
+.duel-matrix-table th span {
+  display: block;
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.duel-matrix-table th span {
+  color: #7f8b9a;
+  font-size: 0.66rem;
+  margin-top: 0.14rem;
+}
+
+.duel-matrix-table td.numeric {
+  min-width: 9rem;
+  text-align: right;
+}
+
+.duel-matrix-table td.best {
+  color: #f1c45b;
+  font-weight: 700;
+}
+
+.duel-matrix-table td.best em {
+  color: #ffd58a;
+  display: block;
+  font-size: 0.62rem;
+  font-style: normal;
+  margin-top: 0.12rem;
+  text-transform: uppercase;
+}
+
+.duel-matrix-table tr.current-target,
+.duel-matrix-table tr.current-target th {
+  background: #152820;
+}
+
+.duel-matrix-empty {
+  align-content: center;
+  color: #aeb9c8;
+  display: grid;
+  gap: 0.65rem;
+  justify-items: start;
+  min-height: 16rem;
 }
 
 .planner-pane {
@@ -3195,9 +3412,142 @@ th {
   margin: 0;
 }
 
+.economy-trend {
+  border-top: 1px solid #26303d;
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 0.9rem;
+  min-width: 0;
+  padding-top: 0.9rem;
+}
+
+.economy-trend.empty p {
+  color: #7f8b9a;
+  margin: 0;
+}
+
+.economy-trend-summary {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+}
+
+.economy-trend-summary > div {
+  background: #151b24;
+  min-width: 0;
+  padding: 0.55rem 0.65rem;
+}
+
+.economy-trend-summary dt {
+  color: #7f8b9a;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+}
+
+.economy-trend-summary dd {
+  color: #eef2f7;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  margin: 0.2rem 0 0;
+  overflow-wrap: anywhere;
+}
+
+.economy-trend .gain {
+  color: #93e8c8;
+}
+
+.economy-trend .loss {
+  color: #ffb4a9;
+}
+
+.economy-trend-chart {
+  aspect-ratio: 45 / 11;
+  background: #111720;
+  display: block;
+  inline-size: 100%;
+  max-block-size: 13rem;
+}
+
+.economy-trend-axis {
+  stroke: #354151;
+  stroke-width: 1;
+}
+
+.economy-trend-line {
+  fill: none;
+  stroke: #55c7a1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3;
+}
+
+.economy-trend-point {
+  fill: #eef2f7;
+  stroke: #278b6b;
+  stroke-width: 2;
+}
+
+.economy-sparkline {
+  block-size: 1.75rem;
+  display: block;
+  inline-size: 6rem;
+}
+
+.economy-sparkline polyline {
+  fill: none;
+  stroke: #55c7a1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.economy-sparkline circle {
+  fill: #eef2f7;
+  stroke: #278b6b;
+  stroke-width: 1;
+}
+
+.economy-trend-points {
+  display: grid;
+  gap: 0.4rem;
+  grid-auto-columns: minmax(7.5rem, 1fr);
+  grid-auto-flow: column;
+  list-style: none;
+  margin: 0;
+  overflow-x: auto;
+  padding: 0 0 0.25rem;
+}
+
+.economy-trend-points li {
+  border-left: 2px solid #354151;
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+  padding-left: 0.45rem;
+}
+
+.economy-trend-points time,
+.economy-trend-points span {
+  color: #7f8b9a;
+  font-size: 0.68rem;
+}
+
+.economy-trend-points strong {
+  color: #dce4ed;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+}
+
 .economy-table-wrap {
   margin-top: 0.85rem;
   max-height: 26rem;
+}
+
+@media (max-width: 680px) {
+  .economy-trend-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .toggle-grid {
@@ -3335,6 +3685,7 @@ th {
   .economy-pane,
   .movers-grid,
   .table-toolbar,
+  .duel-matrix-controls,
   .planner-control-grid,
   .planner-visual-grid,
   .planner-output-grid,
@@ -3347,6 +3698,10 @@ th {
 
   .dense-filter-bar {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .duel-matrix-metrics {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .trip-output,
@@ -3391,6 +3746,10 @@ th {
     padding: 0.75rem;
   }
 
+  .active-pane {
+    max-height: none;
+  }
+
   .topbar {
     align-items: flex-start;
     flex-direction: column;
@@ -3432,18 +3791,22 @@ th {
     grid-template-columns: 1fr;
   }
 
-	  .level-grid,
-	  .gear-grid,
-	  .toggle-grid,
-	  .monster-stat-grid,
-	  .monster-setup-grid,
-	  .active-assumption-row,
-	  .planner-targets,
-	  .planner-skill-row,
-	  .planner-toggle-row,
+  .duel-matrix-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .level-grid,
+  .gear-grid,
+  .toggle-grid,
+  .monster-stat-grid,
+  .monster-setup-grid,
+  .active-assumption-row,
+  .planner-targets,
+  .planner-skill-row,
+  .planner-toggle-row,
   .planner-gear-slot-header,
   .detail-list,
-	  .phase-list li {
+  .phase-list li {
     grid-template-columns: 1fr;
   }
 

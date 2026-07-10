@@ -9,12 +9,17 @@ import {
 } from "../app/state/dense-compare";
 import {
   DEFAULT_DUEL_SNAPSHOTS_STATE,
+  DUEL_SNAPSHOTS_IMPORT_MAX_BYTES,
   DUEL_SNAPSHOTS_STORAGE_KEY,
   DUEL_SNAPSHOTS_VERSION,
+  DuelSnapshotsImportError,
   DuelSnapshotsStateSchema,
   MAX_DUEL_SNAPSHOTS,
   appendDuelSnapshot,
   createDuelSnapshot,
+  createDuelSnapshotsExport,
+  mergeDuelSnapshots,
+  parseDuelSnapshotsExportText,
   removeDuelSnapshot,
   renameDuelSnapshot
 } from "../app/state/duel-snapshots";
@@ -281,6 +286,88 @@ describe("versioned rewrite persistence", () => {
     expect(state.snapshots.at(-1)?.id).toBe("snap-13");
     expect(renamed.snapshots.at(-1)?.name).toBe("Fire Wave");
     expect(removed.snapshots.map((snapshot) => snapshot.id)).not.toContain("snap-13");
+  });
+
+  it("exports, validates and safely merges Duel snapshot files", () => {
+    const current = {
+      snapshots: [createDuelSnapshot("snap-1", "Current", DEFAULT_FORM_STATE)]
+    };
+    const importedState = {
+      snapshots: [
+        createDuelSnapshot("snap-1", "Updated", {
+          ...DEFAULT_FORM_STATE,
+          combatStyle: "ranged",
+          weaponId: "magic_shortbow",
+          ammoId: "rune_arrow"
+        }),
+        createDuelSnapshot("snap-2", "Added", DEFAULT_FORM_STATE)
+      ]
+    };
+    const exported = createDuelSnapshotsExport(importedState, new Date("2026-07-10T12:00:00Z"));
+    const parsed = parseDuelSnapshotsExportText(JSON.stringify(exported));
+    const merged = mergeDuelSnapshots(current, parsed.data);
+
+    expect(exported).toMatchObject({
+      version: DUEL_SNAPSHOTS_VERSION,
+      exportedAt: "2026-07-10T12:00:00.000Z"
+    });
+    expect(merged).toMatchObject({ addedCount: 1, updatedCount: 1, skippedCount: 0 });
+    expect(merged.state.snapshots.map((snapshot) => [snapshot.id, snapshot.name])).toEqual([
+      ["snap-1", "Updated"],
+      ["snap-2", "Added"]
+    ]);
+    expect(merged.state.snapshots[0]?.form).toMatchObject({
+      combatStyle: "ranged",
+      weaponId: "magic_shortbow",
+      ammoId: "rune_arrow"
+    });
+  });
+
+  it("rejects unsafe Duel snapshot imports and preserves a full current list", () => {
+    const full = {
+      snapshots: Array.from({ length: MAX_DUEL_SNAPSHOTS }, (_, index) =>
+        createDuelSnapshot(`current-${index}`, `Current ${index}`, DEFAULT_FORM_STATE)
+      )
+    };
+    const imported = {
+      snapshots: [createDuelSnapshot("new-snapshot", "New", DEFAULT_FORM_STATE)]
+    };
+    const merged = mergeDuelSnapshots(full, imported);
+
+    expect(merged).toMatchObject({ addedCount: 0, updatedCount: 0, skippedCount: 1 });
+    expect(merged.state).toEqual(full);
+
+    const invalidCases: Array<[DuelSnapshotsImportError["code"], string, number?]> = [
+      ["invalid_json", "{bad"],
+      ["unsupported_version", JSON.stringify({ version: 2, exportedAt: "now", data: imported })],
+      [
+        "invalid_data",
+        JSON.stringify({
+          version: DUEL_SNAPSHOTS_VERSION,
+          exportedAt: "now",
+          data: {
+            snapshots: [
+              {
+                ...imported.snapshots[0],
+                result: { effectiveXpPerHour: 123 }
+              }
+            ]
+          }
+        })
+      ],
+      ["body_too_large", "{}", 1]
+    ];
+
+    for (const [code, text, maxBytes] of invalidCases) {
+      try {
+        parseDuelSnapshotsExportText(text, maxBytes);
+        throw new Error(`Expected Duel import error ${code}`);
+      } catch (caught) {
+        expect(caught).toBeInstanceOf(DuelSnapshotsImportError);
+        expect((caught as DuelSnapshotsImportError).code).toBe(code);
+      }
+    }
+    expect(DUEL_SNAPSHOTS_IMPORT_MAX_BYTES).toBeGreaterThan(0);
   });
 
   it("keeps derived potion recommendations out of persisted setup state", () => {

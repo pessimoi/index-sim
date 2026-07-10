@@ -60,12 +60,7 @@ const PlannerTargetLevelsSchema = z
 const PlannerCurrentXpSchema = z
   .object({
     attack: z.number().int().min(0).max(MAX_SKILL_XP).catch(DEFAULT_PLANNER_CURRENT_XP.attack),
-    strength: z
-      .number()
-      .int()
-      .min(0)
-      .max(MAX_SKILL_XP)
-      .catch(DEFAULT_PLANNER_CURRENT_XP.strength),
+    strength: z.number().int().min(0).max(MAX_SKILL_XP).catch(DEFAULT_PLANNER_CURRENT_XP.strength),
     defence: z.number().int().min(0).max(MAX_SKILL_XP).catch(DEFAULT_PLANNER_CURRENT_XP.defence),
     ranged: z.number().int().min(0).max(MAX_SKILL_XP).catch(DEFAULT_PLANNER_CURRENT_XP.ranged),
     magic: z.number().int().min(0).max(MAX_SKILL_XP).catch(DEFAULT_PLANNER_CURRENT_XP.magic)
@@ -158,7 +153,9 @@ export function createDefaultPlannerUiState(
   const targetLevels: Record<PlannerSkill, number> = { ...DEFAULT_PLANNER_TARGET_LEVELS };
   for (const skill of PLANNER_SKILLS) {
     targetLevels[skill] =
-      form?.plannerTargets?.[skill] ?? form?.levels?.[skill] ?? DEFAULT_PLANNER_TARGET_LEVELS[skill];
+      form?.plannerTargets?.[skill] ??
+      form?.levels?.[skill] ??
+      DEFAULT_PLANNER_TARGET_LEVELS[skill];
   }
   return PlannerUiStateSchema.parse({
     ...DEFAULT_PLANNER_UI_STATE,
