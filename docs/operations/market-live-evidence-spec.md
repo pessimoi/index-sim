@@ -1,6 +1,6 @@
 # Scheduled market live-evidence specification
 
-- Status: live contract, crawler policy and full dry-run evidenced; repository variable and first scheduled run pending
+- Status: live contract, crawler policy, full dry-run and repository variable evidenced; first configured scheduled run pending
 - Date: 2026-07-10
 - Owner: operations docs
 - Source: conditional backlog work and accepted decisions D-021, D-033, D-034 and D-053
@@ -44,8 +44,8 @@ offer containing one `coins` item carries the per-item GP amount. The adapter sk
 swaps, mixed offers and ambiguous multiple offers. Both buy and sell rows are realized
 trades, and usernames are discarded at the adapter boundary. Public `robots.txt` currently
 allows `/` for the general `User-agent: *` group and sets no crawl delay; this supports the
-accepted sequential twice-daily read policy but does not configure the repository variable
-or prove a first scheduled run.
+accepted sequential twice-daily read policy. Repository configuration and scheduled-run
+evidence are tracked separately below.
 
 Sanitized live evidence from 2026-07-10:
 
@@ -55,6 +55,14 @@ Sanitized live evidence from 2026-07-10:
 - candidate review found 9 new market prices and 52 changed existing prices; the largest relative delta was 33.6%, with no order-of-magnitude mapping/unit outlier
 - the candidate diff remained limited to `prices.json` and `price-history.json`
 - no raw page, username, session cookie or local absolute path was stored or committed
+
+Repository configuration evidence from 2026-07-10:
+
+- at 20:36 UTC, the Actions variable readback returned exactly `MARKET_PRICES_UPSTREAM_URL=https://markets.lostcity.rs/`
+- the value is a non-secret fixed root with no path suffix, credentials, query or fragment
+- scheduled runs `29068486016` and `29101381705` occurred before configuration and failed at the explicit empty-variable guard before any upstream read or file write
+- the newer failed run checked out `95aa0df`, which predates the final item-page/catalog/history hardening, so it must not be rerun or promoted as current evidence
+- the first cron against the current `master` after configuration remains pending; no manual dispatch or user-triggered refresh was added
 
 ## Preconditions
 
@@ -151,6 +159,10 @@ Configuration checks:
 
 Do not duplicate the URL in browser code or public runtime configuration.
 
+Completed 2026-07-10: repository-variable readback matched the exact approved root. The
+workflow still has only scheduled triggers, `contents: write` permission and the two-file
+output allowlist. This completes configuration but does not substitute for Phase 4.
+
 ### Phase 4: Observe the first scheduled run
 
 Wait for the existing cron rather than adding a manual upstream-refresh trigger. For the first successful run, verify:
@@ -241,7 +253,7 @@ Live checks are opt-in and must not run in the default unit suite. The GitHub cr
 - [x] Sanitized live-contract evidence recorded without raw payload
 - [x] `--dry-run` succeeds against the verified endpoint with no writes
 - [x] Candidate counts and value changes reviewed
-- [ ] Repository variable contains the exact safe endpoint and no secret
+- [x] Repository variable contains the exact safe endpoint and no secret
 - [ ] First cron completes validation and changes only approved files, or produces a verified no-op
 - [ ] Workflow logs and commit contain no sensitive/raw source material
 - [ ] Freshness evidence records run, commit/no-op, `_scraped_at` and checks

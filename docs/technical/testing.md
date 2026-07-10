@@ -230,7 +230,7 @@ Focused writer tests validate the normalized fixture contract and first-page Ine
 npm run prices:write-scheduled -- --input src/tests/fixtures/market-writer/upstream-valid.json --item-ids lobster,rune_scimitar,dragon_bones --now 2026-07-08T00:15:00.000Z --dry-run
 ```
 
-The scheduled workflow runs only at 00:15 and 12:15 UTC, has no `workflow_dispatch`, requires `MARKET_PRICES_UPSTREAM_URL` to be the exact reviewed root, validates focused tests/JSON/diffs, rejects changes outside `prices.json` and `price-history.json`, and commits only real two-file diffs. The opt-in 2026-07-10 live dry-run passed for all 80 mappings with 69 updated plus 11 retained/skipped rows and no writes. Repository-variable and scheduled-run evidence belong in the operations evidence phase.
+The scheduled workflow runs only at 00:15 and 12:15 UTC, has no `workflow_dispatch`, requires `MARKET_PRICES_UPSTREAM_URL` to be the exact reviewed root, validates focused tests/JSON/diffs, rejects changes outside `prices.json` and `price-history.json`, and commits only real two-file diffs. The opt-in 2026-07-10 live dry-run passed for all 80 mappings with 69 updated plus 11 retained/skipped rows and no writes. The exact repository variable was configured and read back on 2026-07-10; first-successful-run evidence remains in the operations evidence phase.
 
 Freshness and release-evidence checks for the scheduled market path:
 

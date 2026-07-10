@@ -280,7 +280,7 @@ Accepted target source:
 - Market refresh is scheduled-only repo automation. It writes `prices.json` and `price-history.json`, validates them and commits only real diffs. Generated game data owns high alch.
 - The scheduler is GitHub Actions cron at 00:15 and 12:15 UTC, using the repository `GITHUB_TOKEN` with `contents: write` and no `workflow_dispatch` manual trigger.
 - Do not add databases, user-triggered upstream refresh or deploy-specific shared storage for market prices.
-- The local writer, normalized fixture contract, D-062 item-page adapter/estimator, catalog-audited mapping, public crawler-policy review, full 80-mapping live dry-run and scheduled workflow are present. Exact root variable configuration and first successful scheduled-run evidence are not present yet.
+- The local writer, normalized fixture contract, D-062 item-page adapter/estimator, catalog-audited mapping, public crawler-policy review, full 80-mapping live dry-run, exact root Actions variable and scheduled workflow are present. First successful configured scheduled-run evidence is not present yet.
 
 Core model:
 
