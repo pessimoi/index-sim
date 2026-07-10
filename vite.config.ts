@@ -4,6 +4,7 @@ import { join } from "node:path";
 import react from "@vitejs/plugin-react";
 import { defineConfig, type Plugin, type PreviewServer, type ViteDevServer } from "vite";
 import { hiscoresApiPlugin } from "./src/server/vite-hiscores-middleware";
+import { createLostCityHiscoresProvider } from "./src/server/lostcity-hiscores-provider";
 import { marketApiPlugin } from "./src/server/vite-market-middleware";
 
 const projectRoot = fileURLToPath(new URL(".", import.meta.url));
@@ -11,6 +12,7 @@ const publicDir = fileURLToPath(new URL("./public", import.meta.url));
 const outDir = fileURLToPath(new URL("./dist", import.meta.url));
 const cacheDir = fileURLToPath(new URL("./node_modules/.vite", import.meta.url));
 const scheduledPriceAssetFiles = ["prices.json", "alch.json", "price-history.json"] as const;
+const hiscoresProvider = createLostCityHiscoresProvider();
 
 function scheduledPriceAssetsPlugin(): Plugin {
   const assetFileSet = new Set<string>(scheduledPriceAssetFiles);
@@ -55,7 +57,12 @@ export default defineConfig({
   root: projectRoot,
   publicDir,
   cacheDir,
-  plugins: [scheduledPriceAssetsPlugin(), hiscoresApiPlugin(), marketApiPlugin(), react()],
+  plugins: [
+    scheduledPriceAssetsPlugin(),
+    hiscoresApiPlugin({ provider: hiscoresProvider }),
+    marketApiPlugin(),
+    react()
+  ],
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url))

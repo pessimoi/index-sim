@@ -1,11 +1,11 @@
 # Hiscores live implementation specification
 
-- Status: decision-ready; implementation blocked on the prerequisites below
+- Status: provider implemented; production runtime and live evidence blocked on hosting/log decisions
 - Date: 2026-07-10
 - Owner: technical docs
 - Source: conditional backlog work and the remaining `Hiscores` feature-inventory gap
 - Contract owner: [live-integrations-spec.md](live-integrations-spec.md)
-- Related decisions: [D-015, D-022 and D-044](../project/decisions.md)
+- Related decisions: [D-015, D-022, D-044 and D-061](../project/decisions.md)
 
 ## Purpose
 
@@ -17,8 +17,8 @@ Finish the existing rewrite Hiscores workflow by connecting the repo-owned same-
 
 This work covers only the missing final slice:
 
-- select and document the authoritative source contract
-- implement the server-side provider adapter
+- select and document the authoritative source contract (completed by D-061)
+- implement the server-side provider adapter (completed)
 - inject it into a production-capable same-origin runtime
 - validate privacy, failure and live-operation behavior
 
@@ -30,29 +30,29 @@ The existing code owns these stable contracts:
 
 - `src/adapters/hiscores` owns browser-side status and lookup parsing.
 - `src/server/hiscores-core.ts` owns `GET /api/hiscores/status`, `GET /api/hiscores?player=...`, input/output validation, sanitized errors, request timeout and memory rate limiting.
+- `src/server/lostcity-hiscores-provider.ts` owns the fixed-origin D-061 upstream request, strict JSON mapping, XP normalization, redirect refusal, response bounds and sanitized provider failures.
 - `src/server/vite-hiscores-middleware.ts` adapts that core handler to local Vite dev and preview.
-- `vite.config.ts` currently injects no live provider, so the status is intentionally disabled.
+- `vite.config.ts` injects the source-backed provider for local dev and preview; a static `dist` build does not itself provide the same-origin API.
 - the UI applies only the seven returned combat skills after user review and retains manual level editing as the fallback.
 
 The live implementation must conform to those contracts. It must not make the browser call or parse the upstream directly.
 
-## Required decisions before implementation
+## Resolved source decision
 
-The following boundaries remain open and require explicit human acceptance. Recording this specification does not accept them.
+D-061 accepts the first-party 2004Scape [Hiscores API](https://2004.lostcity.rs/news/199):
 
-### 1. Authoritative source
+- endpoint: `GET https://2004.lostcity.rs/api/hiscores/player/:username`
+- response: strict JSON rows with category `type`, `level`, stored XP `value`, update `date` and `rank`
+- accepted mapping: type 1 Attack, 2 Defence, 3 Strength, 4 Hitpoints, 5 Ranged, 6 Prayer and 7 Magic
+- stored XP is divided by 10 and truncated according to the source documentation
+- partial skill rows remain usable with sanitized warnings; no supported rows map to hiscores not-found
+- upstream rate limits are respected through the existing same-origin 30/minute guard and provider rate-limit mapping
 
-Decide:
+HTML parsing and a parser-dependency decision are no longer needed.
 
-- exact upstream URL and response format
-- whether the source is a documented API, HTML page or another stable server-readable representation
-- source terms, acceptable request rate and attribution requirements
-- whether a player-not-found result is distinguishable from upstream failure
-- whether all seven required skills are authoritative and how missing skills are represented
+## Remaining decisions before production
 
-Known candidate evidence includes the LostCity player hiscores HTML page. It is not accepted as the final source merely by being listed here.
-
-### 2. Production runtime and host
+### 1. Production runtime and host
 
 Choose a host/runtime that can expose the existing same-origin API contract with:
 
@@ -65,7 +65,7 @@ Choose a host/runtime that can expose the existing same-origin API contract with
 
 Static-only hosting is insufficient for a live Hiscores claim unless it also provides an accepted same-origin function, edge runtime or reverse proxy. `vite preview` is not a production server.
 
-### 3. Player-name logging and retention
+### 2. Player-name logging and retention
 
 The current lookup uses a GET query parameter. Player names can therefore appear in host, proxy or observability access logs even though the application does not persist them server-side.
 
@@ -76,10 +76,6 @@ Decide:
 - whether the selected provider has additional logging or privacy constraints
 
 No persistent player-name log may be introduced until this decision is accepted.
-
-### 4. Parser dependency, if needed
-
-If the accepted source is HTML, choose whether the parser uses a reviewed dependency or a narrowly scoped repo-owned parser. The choice must be recorded because upstream markup changes become an operational dependency.
 
 ## Target architecture
 
@@ -158,7 +154,7 @@ Provider branding or attribution may be added only when required by the accepted
 
 ## Delivery goals
 
-### Goal 1: Accept and fixture the source contract
+### Goal 1: Accept and fixture the source contract (completed)
 
 - record the accepted source and terms in `docs/project/decisions.md`
 - capture minimal, sanitized fixtures for success, missing skill, not found, rate limited and malformed response cases
@@ -167,7 +163,7 @@ Provider branding or attribution may be added only when required by the accepted
 
 Done when the parser can be implemented without guessing the upstream shape.
 
-### Goal 2: Implement the provider adapter
+### Goal 2: Implement the provider adapter (completed)
 
 - add the server-only adapter and structural parser if required
 - map upstream outcomes to the existing `HiscoresProvider` contract
@@ -176,7 +172,7 @@ Done when the parser can be implemented without guessing the upstream shape.
 
 Done when fixture-backed provider tests pass without changing browser/domain contracts.
 
-### Goal 3: Wire the production runtime
+### Goal 3: Wire the production runtime (blocked on host/log decisions)
 
 - inject the provider into the selected host's same-origin function/server adapter
 - configure server-only source settings
@@ -185,7 +181,7 @@ Done when fixture-backed provider tests pass without changing browser/domain con
 
 Done when the deployed status endpoint reports the intended configured state and the browser still uses only same-origin calls.
 
-### Goal 4: Collect live evidence and close documentation
+### Goal 4: Collect live evidence and close documentation (blocked on deployment)
 
 - run an opt-in, sanitized live smoke against the deployed same-origin endpoint
 - verify success plus not-found/unavailable behavior without committing raw responses
@@ -214,7 +210,7 @@ At minimum, keep the existing API, adapter, UI and browser coverage passing. Add
 Representative commands after implementation:
 
 ```sh
-npm run test -- src/tests/hiscores-server.test.ts src/tests/hiscores-adapter.test.ts src/tests/hiscores-ui-state.test.ts src/tests/ui-view-model.test.ts
+npm run test -- src/tests/lostcity-hiscores-provider.test.ts src/tests/hiscores-server.test.ts src/tests/hiscores-adapter.test.ts src/tests/hiscores-ui-state.test.ts src/tests/ui-view-model.test.ts
 npm run typecheck
 npm run test:e2e
 npm run build

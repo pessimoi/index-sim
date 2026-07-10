@@ -557,6 +557,7 @@ Market price freshness is now scheduled-only GitHub Actions automation by decisi
 The hiscores same-origin implementation tests live in:
 
 - `src/tests/hiscores-server.test.ts`
+- `src/tests/lostcity-hiscores-provider.test.ts`
 - `src/tests/hiscores-adapter.test.ts`
 - `src/tests/hiscores-ui-state.test.ts`
 - `src/tests/e2e/scaffold.spec.ts`
@@ -564,12 +565,15 @@ The hiscores same-origin implementation tests live in:
 Run focused coverage with:
 
 ```sh
-npm run test -- src/tests/hiscores-server.test.ts src/tests/hiscores-adapter.test.ts src/tests/hiscores-ui-state.test.ts
+npm run test -- src/tests/lostcity-hiscores-provider.test.ts src/tests/hiscores-server.test.ts src/tests/hiscores-adapter.test.ts src/tests/hiscores-ui-state.test.ts
 ```
 
 They cover:
 
-- disabled-provider status and lookup behavior
+- disabled-provider status and lookup behavior at the runtime-neutral handler boundary
+- first-party JSON type 1-7 mapping, stored-XP normalization and partial-skill warnings
+- fixed HTTPS origin, redirect refusal, abort propagation and sanitized fetch/stream failures
+- content-type, duplicate-row, level-range, declared-size and streamed-size rejection
 - validated same-origin lookup success
 - bad player input, not-found, rate-limited, upstream-unavailable and upstream-invalid failures
 - per-process rate-limit and provider-timeout guards

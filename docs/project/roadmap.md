@@ -39,7 +39,7 @@ Implementation requirements for the rewrite live in [../technical/rewrite-spec.m
 
 5. Add accepted live integrations.
    - Hiscores lookup and market price refresh should follow [../technical/live-integrations-spec.md](../technical/live-integrations-spec.md).
-   - Hiscores has a safe provider-disabled/manual-level fallback for the current trusted-tester target; live availability still needs an authoritative API and hosting answer.
+   - Hiscores has a safe manual-level fallback plus the D-061 first-party JSON provider wired for Vite dev/preview; public live availability still needs a production same-origin runtime and player-query log policy.
    - Market prices target `markets.lostcity.rs`; scheduled-only GitHub Actions automation writes `prices.json`, `alch.json` and retained 12-hour `price-history.json` snapshots. Live response verification, repository variable setup and the first successful scheduled run remain evidence boundaries before scheduled-current claims.
    - Shared setups, accounts and database storage remain open decisions.
 
