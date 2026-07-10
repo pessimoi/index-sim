@@ -52,13 +52,14 @@ The legacy `views.jsx` `ArchitectureBoard` is only a docs-link panel. Treat the 
 - Generated runtime commands: `scripts/report-generated-runtime-readiness.ts`, `scripts/write-legacy-derived-runtime-snapshot.ts`, `npm run runtime:readiness`, `npm run runtime:coverage-plan`, `npm run runtime:write-legacy-derived`
 - Scheduled market price workflow: `.github/workflows/update-market-prices.yml`
 - Provider-neutral deployment validation: `scripts/deployment-readiness-core.ts`, `scripts/verify-public-deployment.ts`, `npm run deploy:verify-artifact`, `npm run deploy:smoke`
+- Production deployment target: Cloudflare Worker + Static Assets through `src/server/cloudflare-worker.ts`, `wrangler.jsonc`, `public/_headers`, `npm run deploy:cloudflare:build`, `npm run deploy:cloudflare:preview`, `npm run deploy:cloudflare`
 - Styling: `styles.css`
 - Rewrite implementation: `src/app`, `src/domain`, `src/data`, `src/adapters`, `src/tests`
 - Documentation map: `docs/README.md`
 
 The root app path is now the Vite rewrite and boots from the validated source-backed generated Revision 274 snapshot. The legacy-derived static bridge and legacy browser runtime files remain regression/reference, fixture and rollback evidence, not the production entrypoint.
 
-No general CI config, database schema or backend source is present in this checkout. The only GitHub Actions workflow is the scheduled market price writer, which is not a deploy or general test pipeline.
+No general GitHub Actions CI config, database schema or stateful backend exists in this checkout. The only GitHub Actions workflow is the scheduled market price writer. D-066 selects Cloudflare Workers Builds as the production build/deploy integration once the external Cloudflare account is connected.
 
 ## Change recipes
 
@@ -113,7 +114,7 @@ No general CI config, database schema or backend source is present in this check
 ### Release or deploy change
 
 - Read first: [docs/operations/README.md](docs/operations/README.md).
-- Current state: the Vite rewrite has `dev`, `build` and `preview` scripts. There is no deploy script. `.gitignore` excludes `deploy`.
+- Current state: D-066 selects a root-path Cloudflare Worker + Static Assets deployment. Repository-owned Worker/config/header/build/deploy commands exist; external account connection, preview/production smoke and any custom domain remain unverified.
 - Ask a human before changing hosting, public URLs or release process.
 - Update operations and decisions.
 

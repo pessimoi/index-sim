@@ -1,18 +1,18 @@
 # Live integrations specification
 
-- Status: implementation target specification
-- Date: 2026-07-08
+- Status: implemented provider/runtime contracts with deployed evidence pending
+- Date: 2026-07-11
 - Owner: technical docs
-- Related decisions: [D-015](../project/decisions.md), [D-021](../project/decisions.md), [D-033](../project/decisions.md)
+- Related decisions: [D-015](../project/decisions.md), [D-021](../project/decisions.md), [D-033](../project/decisions.md), [D-061](../project/decisions.md), [D-062](../project/decisions.md), [D-065](../project/decisions.md), [D-066](../project/decisions.md)
 - Legacy evidence: `views.jsx` `HiscoresLookup`, `views.jsx` `SettingsPane`, `market.js`
 
 ## Execution specifications
 
 This document owns the product and API contracts. The remaining implementation and operations phases are split into:
 
-- [hiscores-live-implementation-spec.md](hiscores-live-implementation-spec.md): authoritative provider, production runtime, privacy and live-evidence work for Hiscores.
+- [hiscores-live-implementation-spec.md](hiscores-live-implementation-spec.md): authoritative provider, D-066 Cloudflare runtime, privacy and deployed-evidence work for Hiscores.
 - [../operations/market-live-evidence-spec.md](../operations/market-live-evidence-spec.md): live response verification, network hardening, cron configuration and scheduled-current evidence for market prices.
-- [../operations/public-deployment-spec.md](../operations/public-deployment-spec.md): provider-neutral public hosting, release and rollback work.
+- [../operations/public-deployment-spec.md](../operations/public-deployment-spec.md): Cloudflare public hosting, release and rollback work.
 
 ## Purpose
 
@@ -32,7 +32,7 @@ The implementation must preserve the useful legacy workflows while replacing the
 
 Users can enter a player name, fetch combat-relevant stats from an approved hiscores source and apply the returned levels to the simulator setup.
 
-Product decision: hiscores is required for v1 replacement. D-061 accepts the first-party 2004Scape JSON API as the authoritative V1 source, and D-065 accepts a no-player-name/query persistence policy with at most seven days for unavoidable provider metadata. The final production hosting model and deployed policy verification remain open.
+Product decision: hiscores is required for v1 replacement. D-061 accepts the first-party 2004Scape JSON API, D-065 accepts no player-name/query persistence and D-066 selects one root-path Cloudflare Worker + Static Assets deployment with enabled Hiscores and disabled Workers Logs/Logpush. Account connection and deployed verification remain open.
 
 Accepted source evidence:
 
@@ -98,13 +98,13 @@ The accepted market refresh target is scheduled repo automation that writes stat
 
 ## Live Integration Gap Buckets
 
-Status date: 2026-07-10. This table buckets the remaining live-integration
+Status date: 2026-07-11. This table buckets the remaining live-integration
 parity gaps for the current `Market price sync` and `Hiscores` feature
 inventory rows. `Market price sync` is `Valmis` for the accepted visible
 scheduled-static UI slice; `Hiscores` remains `Osittainen` because the accepted
-provider is wired only to Vite dev/preview and production runtime/hosting is
-still open. D-061 resolves the authoritative source boundary without changing
-the public-release claim or feature status.
+provider is wired to Vite dev/preview and the D-066 Cloudflare production
+Worker, but deployed evidence is still open. D-061/D-066 resolve the source and
+runtime boundaries without changing the public-release claim or feature status.
 [D-044](../project/decisions.md) keeps archived legacy `run_sim.py` and
 legacy `/api/*` shims archive-only for the current rewrite path.
 
@@ -123,20 +123,22 @@ unless their dependency is accepted and implemented.
 | Market price sync | Same-origin market status/sync API, browser adapter and mocked tests remain compatibility scaffolding.                                                                                                                                                                       | Temporary `/api/prices` or `/api/scrape` shims for archived parity testing.                                                       | `legacy-only`      | D-044 accepts archive-only for legacy shims in the current rewrite path. The existing typed compatibility scaffolding may stay mocked/test-local, but no legacy shim routes should be added by default.                                                                                                        | Reopen only through an explicit legacy-runtime re-promotion decision.                                          |
 | Hiscores          | Rewrite UI shows player input, same-origin status/lookup, validated adapter, preview/apply for combat skills and disabled/unavailable manual fallback copy without `run_sim.py` instructions.                                                                                | Preserve input validation, same-origin calls, timeout, rate-limit and sanitized-error boundaries for every provider runtime.      | `release-required` | These are required safety boundaries for the accepted hiscores workflow and current provider-enabled Vite implementation.                                                                                                                                                                                      | Keep provider wiring behind the existing contract; do not bypass validation in UI code.                        |
 | Hiscores          | D-061 accepts the first-party 2004Scape JSON API and the server-only provider maps its type 1-7 rows. The parser accepts both the documented `date` field and the observed live shape that omits it.                                                                         | Keep the authoritative source contract fixture-backed and out of browser code.                                                    | `release-required` | The source/provider slice is implemented with fixed-origin, redirect, response-bound, schema and sanitized-error guards. The optional source timestamp is not used by the app.                                                                                                                                 | Keep provider tests mocked and update fixtures only against reviewed first-party contract evidence.            |
-| Hiscores          | Same current hiscores UI/API scaffold.                                                                                                                                                                                                                                       | Production runtime/hosting model for the same-origin hiscores API.                                                                | `decision-needed`  | The repo has Vite dev/preview middleware, but no production backend/runtime/deploy target is accepted.                                                                                                                                                                                                         | Choose hosting/runtime before claiming live hiscores availability.                                             |
-| Hiscores          | The source-backed provider is implemented and injected into Vite dev/preview behind the existing same-origin handler.                                                                                                                                                        | Production runtime wiring and deployed live evidence.                                                                             | `blocked`          | Static `dist` cannot expose the API. D-065 resolves the access-log policy, but no selected host has proved it can enforce that policy.                                                                                                                                                                         | Choose the production runtime, configure D-065 controls and collect sanitized deployed evidence.               |
-| Hiscores          | Local last-player persistence uses `index-sim:hiscores:last-player`; UI preview names the returned player/source/timestamp. D-065 forbids persistent player-name/query logs and caps unavoidable provider metadata at seven days.                                            | Verify the selected production host strips/redacts query data and meets the retention/access boundary.                            | `blocked`          | The provider-neutral policy is accepted, but effective host/proxy/observability behavior cannot be proved before deployment.                                                                                                                                                                                   | Verify D-065 on preview before enabling public lookup traffic.                                                 |
+| Hiscores          | D-066 implements the same-origin production runtime as one Cloudflare Worker + Static Assets deployment with Worker-first `/api/*` and exact root paths.                                                                                                                     | Connect the Cloudflare account/repository and verify preview/production routing.                                                  | `blocked`          | Repository runtime/config/tests are complete, but no Cloudflare version URL or effective deployed response exists yet.                                                                                                                                                                                         | Run the exact Cloudflare build/upload commands and deployed smoke before claiming live availability.           |
+| Hiscores          | The source-backed provider is injected into Vite dev/preview and the Cloudflare Worker behind the same handler.                                                                                                                                                              | Deployed live lookup and upstream failure evidence.                                                                               | `blocked`          | Local fixture and opt-in upstream evidence pass, but deployed behavior cannot be inferred from repository code alone.                                                                                                                                                                                          | Collect sanitized Cloudflare preview evidence without committing player data.                                  |
+| Hiscores          | D-065 forbids persistent player/query logs; D-066 disables Workers Logs observability and Logpush and emits no custom logs. Client address is only an ephemeral bounded rate-limit key.                                                                                      | Verify account-side observability, Tail Workers and external drains remain off.                                                   | `blocked`          | Repository configuration closes the implementation gap, while account/dashboard state requires deployed evidence.                                                                                                                                                                                              | Verify D-065 on the version preview before public lookup traffic.                                              |
 | Hiscores          | Legacy `sim_hiscore_player` compatible import can seed the rewrite-owned last-player key.                                                                                                                                                                                    | Legacy `run_sim.py` `/api/hiscores` UI instructions and missing-backend assumptions.                                              | `legacy-only`      | Archived `views.jsx` evidence can mention this path, but production rewrite copy must use service-aware status/manual fallback.                                                                                                                                                                                | Keep classified through release-copy audit; do not add legacy copy to `src/app`.                               |
 
 ## Architecture decision boundary
 
-The product decision accepts repo-owned integration boundaries. It does not yet choose a backend framework or hosting model for hiscores. Market price refresh does not use a database or cache provider; it uses scheduled repo automation plus static JSON artifacts.
+The product decision accepts repo-owned integration boundaries and D-066 chooses
+Cloudflare Workers + Static Assets for production Hiscores. Market price refresh
+does not use a database or cache provider; it uses scheduled repo automation plus
+static JSON artifacts.
 
 Acceptable implementation shapes for the first pass:
 
-- a small same-origin development/preview service owned by this repo
-- Vite dev middleware plus equivalent production adapter once hosting is selected
-- serverless functions if deployment chooses a serverless host
+- Vite middleware for local development/preview
+- the D-066 Cloudflare Worker fetch adapter for production
 - scheduled CI/repo automation for market price files
 
 The browser app should depend on typed adapters, not on the concrete server framework.
@@ -558,7 +560,10 @@ Hiscores is acceptable when:
 - UI copy no longer points users to missing `run_sim.py`
 - unit and UI tests cover success, not-found and failure paths
 
-Current status: the same-origin API, browser adapter and UI apply flow meet the validation and mutation-safety parts with mocked/provider tests. Full acceptance still requires the approved hiscores upstream source and production runtime/hosting decision.
+Current status: the same-origin API, browser adapter, UI apply flow, approved
+provider and Cloudflare production runtime meet the repository implementation
+criteria with mocked/provider/Worker tests. Full acceptance still requires
+Cloudflare account connection and deployed privacy/routing/live evidence.
 
 Market sync is acceptable when:
 
@@ -573,9 +578,8 @@ Current status: the same-origin compatibility API, scheduled-only UI, imported-p
 
 ## Open questions
 
-- Which concrete backend/runtime should host the hiscores same-origin API?
-- What is the production deployment target?
-- Which production runtime can enforce D-065 query redaction/no-persistence and retention controls?
+- Which custom domain, if any, should be added after the D-066 provider preview passes?
+- Does the connected Cloudflare account show Workers Logs, Logpush, Tail Workers and external drains disabled as configured?
 - What is the authoritative market API or scrape contract for `markets.lostcity.rs`?
 - What exact live `markets.lostcity.rs` API/scrape response contract should the scheduled writer rely on in GitHub Actions?
 - Should remaining legacy market localStorage keys, especially full price history and unsupported metadata keys, be migrated or intentionally ignored?

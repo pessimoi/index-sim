@@ -65,7 +65,7 @@ Do not add these unless a human explicitly accepts the decision:
 - shared cloud state
 - marketplace/hiscores backend behavior beyond the accepted [live integrations spec](live-integrations-spec.md)
 
-The first rewrite should be static-first and provider-agnostic. Do not lock the app to GitHub Pages, Netlify or another host until the live integration constraints are known. Add services only when the product requirement and hosting/runtime decision are confirmed.
+The first rewrite remains static-first. D-066 later selected Cloudflare Workers + Static Assets after the live Hiscores constraints were known; the only dynamic service is the narrow same-origin provider adapter, with no database or simulation backend.
 
 ## 5. Recommended technology stack
 
@@ -428,7 +428,7 @@ The rewrite should preserve or intentionally replace these current capabilities 
 - planner training recommendations
 - saved local setup behavior, if migration is accepted
 
-Hiscores lookup is also a v1 product requirement, but its final upstream API, direct-fetch/proxy model and production hosting remain open. Keep hiscores behind the adapter/API boundary in [live-integrations-spec.md](live-integrations-spec.md) until the upstream answer is known.
+Hiscores lookup is a v1 product requirement. D-061 resolves the upstream/proxy model and D-066 implements production hosting while preserving the adapter/API boundary in [live-integrations-spec.md](live-integrations-spec.md). Deployed Cloudflare evidence remains open.
 
 Known bugs from `PROJECT_REVIEW_NOTES.md` should be triaged before golden fixtures are captured. Decide whether each bug is:
 
@@ -554,7 +554,7 @@ Tests or instrumentation should cover the level-input path that previously cause
 - Capture representative fixtures.
 - Commit fixtures and tolerance rules.
 
-Current checkout status: Phase 2 baseline exists for `SimEngine.simulate()` fixtures, and planner-domain golden summaries exist for three rewrite unlock paths. New rewrite setup persistence has version tests. Market sync and hiscores same-origin contracts, disabled-provider boundaries, adapters and mocked UI tests exist; production runtime/upstream choices, legacy planner UI state and legacy `localStorage` migration fixtures are still open decisions.
+Current checkout status: the rewrite root, generated runtime, Planner, migration and visible V1 workflows are implemented with unit/golden/browser evidence. Market scheduled-static and Hiscores same-origin contracts exist; D-061/D-066 implement the production provider/runtime. Cloudflare account/deployed evidence and the configured market cron remain operations work, while deeper legacy planner numeric parity remains outside V1.
 
 ### Phase 3: domain extraction
 

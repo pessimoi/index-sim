@@ -39,8 +39,8 @@ Implementation requirements for the rewrite live in [../technical/rewrite-spec.m
 
 5. Add accepted live integrations.
    - Hiscores lookup and market price refresh should follow [../technical/live-integrations-spec.md](../technical/live-integrations-spec.md).
-   - Hiscores has a safe manual-level fallback plus the D-061 first-party JSON provider wired for Vite dev/preview. D-065 fixes the player-query log policy; public live availability still needs a production same-origin runtime and deployed policy verification.
-   - Market prices target catalog-audited `markets.lostcity.rs/items/{slug}` pages; scheduled-only GitHub Actions writes `prices.json` and compacted shared `price-history.json`. Generated Revision 274 data owns high alch. Public crawler policy and a full live dry-run are evidenced; exact root variable setup and the first successful scheduled run remain boundaries before scheduled-current claims.
+   - Hiscores has a safe manual-level fallback, the D-061 first-party JSON provider and the D-066 Cloudflare same-origin production Worker. D-065/D-066 disable request collection; public live availability still needs Cloudflare account connection and deployed routing/privacy/live evidence.
+   - Market prices target catalog-audited `markets.lostcity.rs/items/{slug}` pages; scheduled-only GitHub Actions writes `prices.json` and compacted shared `price-history.json`. Generated Revision 274 data owns high alch. Public crawler policy, full live dry-run and exact root variable are evidenced; the first successful configured run remains the boundary before scheduled-current claims.
    - Shared setups, accounts and database storage remain open decisions.
 
 ## Not in scope yet

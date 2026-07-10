@@ -427,7 +427,7 @@ Required controls and displays:
 
 - Combat type segmented control.
 - Levels, with fields filtered by combat type plus Defence, HP and Prayer.
-- Hiscores lookup with service-aware `available`, `unavailable` or disabled-runtime state from the same-origin API. Full live acceptance still needs a production runtime and authoritative upstream decision.
+- Hiscores lookup with service-aware `available`, `unavailable` or disabled-runtime state from the same-origin API. D-061/D-066 provide the source and production runtime; full live acceptance still needs Cloudflare deployed evidence.
 - Stance/style control, including weapon-specific melee stance names and attack type.
 - Effective trip rates: XP/hr, net GP/hr and XP/hr by skill.
 

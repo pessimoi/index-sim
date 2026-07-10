@@ -27,7 +27,7 @@ The rewrite can replace the current app for users only when these workflows are 
 - trip calculation
 - planner
 
-Hiscores is also a required v1 product capability, but the final upstream API and hosting model remain open while an authoritative API answer is pending.
+Hiscores is a required v1 product capability. D-061 accepts the first-party API and D-066 implements the Cloudflare Worker hosting model; account connection and deployed evidence remain pending.
 
 ## Domain areas
 
@@ -72,7 +72,7 @@ Target data direction: use the current accepted LostCityRS/Content game revision
 
 - Which v1 workflows need exact legacy UI parity versus improved UI with the same end-user capability?
 - Which known bugs should become documented intentional deltas instead of parity targets?
-- Which concrete backend/runtime and deploy target should host hiscores lookup and live market sync once upstream constraints are known?
+- Which custom domain, if any, should be added after the Cloudflare provider preview and live Hiscores evidence pass?
 - Should saved setups survive the rewrite through migration?
 - Should future/hypothetical planner gear be exposed at all before it exists in canonical data?
 - Should legacy browser setup keys be migrated into the rewrite UI, or left as legacy-only state?

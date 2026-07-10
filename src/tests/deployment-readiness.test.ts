@@ -25,6 +25,7 @@ function write(path: string, value: string): void {
 function createArtifact(): void {
   rmSync(TEST_ROOT, { recursive: true, force: true });
   write("index.html", INDEX_HTML);
+  write("_headers", readFileSync(resolve("public/_headers"), "utf8"));
   write("assets/index-12345678.css", "body { color: black; }");
   write("assets/index-abcdefgh.js", 'document.querySelector("#root");');
   for (const fileName of ["prices.json", "alch.json", "price-history.json"]) {
@@ -99,7 +100,7 @@ describe("deployment readiness", () => {
     expect(first).toMatchObject({
       status: "ready",
       outDir: ".vite/deployment-readiness-test",
-      fileCount: 6,
+      fileCount: 7,
       assetCount: 2,
       historySnapshots: expect.any(Number),
       marketScrapedAt: expect.stringMatching(/^\d{4}-/)
@@ -156,6 +157,26 @@ describe("deployment readiness", () => {
     write("prices.json", '{"_scraped_at":1,"lobster":1,"lobster":2}');
     expect(() => verifyDeploymentArtifact({ outDir: TEST_ROOT })).toThrow(
       "invalid JSON in prices.json"
+    );
+  });
+
+  it("requires the Cloudflare static security and cache header contract", () => {
+    createArtifact();
+    write(
+      "_headers",
+      readFileSync(resolve("public/_headers"), "utf8").replace("no-referrer", "origin")
+    );
+    expect(() => verifyDeploymentArtifact({ outDir: TEST_ROOT })).toThrow(
+      "Deployment _headers does not satisfy the security and cache contract"
+    );
+
+    createArtifact();
+    write(
+      "_headers",
+      readFileSync(resolve("public/_headers"), "utf8").replace("/assets/*", "/static/*")
+    );
+    expect(() => verifyDeploymentArtifact({ outDir: TEST_ROOT })).toThrow(
+      "Deployment _headers does not satisfy the security and cache contract"
     );
   });
 

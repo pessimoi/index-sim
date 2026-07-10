@@ -1,14 +1,14 @@
 # Public deployment specification
 
-- Status: provider-neutral validation implemented; deployment blocked on host/runtime decisions
-- Date: 2026-07-10
+- Status: Cloudflare Worker implementation ready; account connection and deployed evidence pending
+- Date: 2026-07-11
 - Owner: operations docs
 - Source: conditional public-release and deploy-hardening backlog work
 - Related documents: [README.md](README.md), [../technical/architecture.md](../technical/architecture.md), [../technical/testing.md](../technical/testing.md), [../technical/live-integrations-spec.md](../technical/live-integrations-spec.md), [../technical/hiscores-live-implementation-spec.md](../technical/hiscores-live-implementation-spec.md)
 
 ## Purpose
 
-Define the provider-neutral work needed to deploy the Vite rewrite publicly with reproducible build, security headers, same-origin live-integration routing, release evidence and rollback. The specification is intentionally ready before a real domain exists, but deployment cannot begin until the decision packet below is accepted.
+Define the D-066 Cloudflare work needed to deploy the Vite rewrite publicly with reproducible build, security headers, same-origin Hiscores routing, release evidence and rollback. A provider-assigned version/production URL is sufficient; a real domain remains optional later work.
 
 This is operations/release work. It does not add a user-facing feature or change feature-inventory statuses by itself.
 
@@ -19,23 +19,25 @@ The repository currently has:
 - a root Vite/React application built with `npm run build`
 - static runtime data emitted to `dist`, including the three market JSON files
 - local `npm run dev` and `npm run preview` commands
-- same-origin Hiscores middleware with the D-061 provider in local dev/preview, but no production runtime
+- same-origin Hiscores middleware with the D-061 provider in local dev/preview plus the D-066 Cloudflare Worker production entrypoint
 - a narrow scheduled market-price workflow, not a general CI/CD pipeline
 - Node 22/npm 10 alignment through `.nvmrc`, package engines and the current workflow
 - `npm run deploy:verify-artifact` for deterministic root-path artifact, market-contract and hygiene checks
 - `npm run deploy:smoke` for bounded provider-preview HTTPS route/header/cache/status checks
-- no deploy script, public hosting configuration or accepted public domain
+- exact Cloudflare Worker build/preview/deploy commands, `wrangler.jsonc` and static `_headers`, but no connected Cloudflare account or accepted custom domain
 - no database, auth, account, tenant, payment or admin service
 
 `npm run preview` is a local build-verification server and must not be used as the public production server.
 
-## Decision packet
+## Accepted deployment decisions
 
-The following choices require explicit acceptance. This specification does not record any of them as accepted decisions.
+D-066 accepts one Cloudflare Worker + Static Assets release unit, root-path URLs,
+provider preview URLs before a custom domain and automatic deployment of validated
+`master` commits. The Git commit SHA remains the minimum release identifier.
 
 ### Hosting and runtime
 
-Choose a platform that can provide:
+The selected Cloudflare target provides:
 
 - immutable static asset hosting for the Vite build
 - root document and SPA fallback control
@@ -46,40 +48,43 @@ Choose a platform that can provide:
 - access-log query redaction or an accepted retention policy
 - immediate rollback to a known-good release
 
-Recommendation: prefer one host that serves both static files and the same-origin Hiscores function. This minimizes CORS, cookie, routing and operational boundaries. The recommendation does not select a vendor.
+The repository entrypoint is `src/server/cloudflare-worker.ts`. `wrangler.jsonc`
+routes `/api/*` Worker-first and serves `dist` through the `ASSETS` binding with
+SPA fallback. Unknown API paths return sanitized JSON 404 responses before asset
+fallback.
 
 ### Public URL shape
 
-Decide whether the application is deployed at an origin root or under a sub-path.
-
-Recommendation: use a root-path V1 deployment. Current Vite asset URLs, static price paths, same-origin API paths and permalink tests are naturally aligned with it. A sub-path deployment requires an accepted Vite `base`, route-prefix and shareable-link contract plus browser coverage before release.
+D-066 accepts the root path. Current Vite asset URLs, static price paths,
+same-origin API paths and permalink tests align with it. A later sub-path change
+requires a new decision, Vite `base`, route-prefix/shareable-link changes and
+browser coverage.
 
 The real domain may be selected later. A provider-assigned preview domain is sufficient for pre-production validation if it has the same HTTPS, routing and header behavior.
 
 ### Hiscores release state
 
-Choose one of these explicit release claims:
-
-1. public core application with Hiscores disabled and manual level fallback
-2. public core application with production Hiscores completed under [hiscores-live-implementation-spec.md](../technical/hiscores-live-implementation-spec.md)
+D-066 targets enabled production Hiscores under
+[hiscores-live-implementation-spec.md](../technical/hiscores-live-implementation-spec.md).
+Manual level fallback remains available for upstream/runtime failures.
 
 Do not describe Hiscores as live when only Vite middleware or a disabled provider exists.
 
 ### Deployment trigger policy
 
-Decide how commits made by the scheduled market workflow reach the public site:
-
-1. automatically deploy every accepted `master` commit, including market bot commits
-2. use a provider-specific market artifact/update path
-3. deploy only curated releases
-
-Recommendation: after the market workflow has passed [market-live-evidence-spec.md](market-live-evidence-spec.md), automatically deploy validated `master` commits. It preserves the accepted repository-static price model with the least extra coupling.
-
-Curated-release-only deployment is valid, but it cannot support a twice-daily scheduled-current public claim unless releases occur with equivalent freshness. A provider-specific artifact path is new architecture and requires separate review.
+D-066 accepts automatic Workers Builds deployment for every validated `master`
+commit, including market bot commits. This preserves the repository-static price
+model. Cloudflare account setup must use the repository-owned build/deploy commands
+below; it must not bypass the validation gate.
 
 ### Logs and player names
 
-If live Hiscores is enabled, enforce D-065 before public traffic: strip query strings or redact `player`, do not persist player names/raw URLs/bodies/headers/IPs/upstream payloads in application telemetry, and keep unavoidable provider metadata for at most seven days with operator-only access. See [hiscores-live-implementation-spec.md](../technical/hiscores-live-implementation-spec.md). Static-only deployment with Hiscores disabled does not remove the need to avoid logging secrets or unsafe query data elsewhere.
+`wrangler.jsonc` explicitly disables Workers Logs observability and Logpush. The
+Worker contains no `console` telemetry and persists no request data. The bounded
+`CF-Connecting-IP` value is used only as an ephemeral in-isolate rate-limit key.
+Before public traffic, verify the deployed settings still show observability off
+and no Tail Worker, Logpush job or external log drain captures request URLs. See
+[hiscores-live-implementation-spec.md](../technical/hiscores-live-implementation-spec.md).
 
 ### Release identifier and ownership
 
@@ -199,9 +204,30 @@ npm run test:e2e:visual
 
 If visual baselines are platform-specific, use the reviewed baseline platform or explicitly record why a different environment cannot act as the visual authority.
 
+## Cloudflare Builds configuration
+
+Connect the Cloudflare Worker project with these exact settings:
+
+| Setting                       | Value                               |
+| ----------------------------- | ----------------------------------- |
+| Worker name                   | `index-sim`                         |
+| Git repository                | `pessimoi/index-sim`                |
+| Production branch             | `master`                            |
+| Root directory                | repository root                     |
+| Build command                 | `npm run deploy:cloudflare:build`   |
+| Deploy command                | `npm run deploy:cloudflare`         |
+| Non-production deploy command | `npm run deploy:cloudflare:preview` |
+| Runtime variables/secrets     | none                                |
+
+The deploy commands rebuild and revalidate `dist`, then fetch exact Wrangler
+`4.109.0`; they do not float to the latest release. `wrangler.jsonc` owns the Worker name, current compatibility
+date, static binding, Worker-first API routes, SPA fallback, preview URLs and
+disabled observability/Logpush. Cloudflare's account connection and generated
+build token remain provider-managed and must not enter this repository.
+
 ## Deployment smoke checks
 
-The provider-neutral HTTP smoke is implemented and can be run after a preview
+The HTTP smoke is implemented and can be run after a Cloudflare preview
 origin exists:
 
 ```sh
@@ -246,9 +272,9 @@ If deployment intentionally lags market commits, UI/release wording must use the
 
 ### Stage 1: Provider preview
 
-- deploy the selected commit to a non-public or hard-to-discover preview URL
+- connect the repository and upload the selected commit to a Cloudflare version preview URL
 - verify artifact, paths, headers, caches and browser tests
-- keep Hiscores disabled unless its production runtime is ready in the preview environment
+- verify Workers Logs observability and Logpush remain disabled, then validate enabled Hiscores status and one bounded browser lookup without retaining request data
 
 ### Stage 2: Limited public release
 
@@ -265,7 +291,8 @@ If deployment intentionally lags market commits, UI/release wording must use the
 
 ## Rollback
 
-Rollback target: the immediately preceding known-good immutable commit/artifact.
+Rollback target: the immediately preceding known-good Cloudflare Worker version,
+which includes Worker code, static assets, bindings and compatibility settings.
 
 Requirements:
 
@@ -285,7 +312,7 @@ Do not use force push as deployment rollback. A source correction after a bad re
 - Browser-local setups, collections, history and player name remain local; deployment must not add telemetry for their contents.
 - Server-side configuration stays outside the client bundle and repository.
 - Hiscores upstream requests remain allowlisted and same-origin to the browser.
-- Access logs redact player query values or follow an explicitly accepted retention policy.
+- Workers Logs observability, invocation logs, Logpush, Tail Workers and external drains remain disabled for the Hiscores Worker unless a later policy-compliant telemetry decision replaces D-066's no-collection configuration.
 - CSP and static response headers are verified on the deployed host, not merely documented.
 - Build/deploy credentials use least privilege and are never available to pull-request browser code.
 - Public release does not expose raw generated sources, local paths, workflow tokens or provider errors.
@@ -294,22 +321,22 @@ Do not use force push as deployment rollback. A source correction after a bad re
 
 ### Goal 1: Accept deployment decisions
 
-- choose host/runtime, root or sub-path, public Hiscores state and deploy trigger; verify the host can enforce D-065
-- record only accepted decisions in `docs/project/decisions.md`
-- define release and rollback ownership
+- D-066 accepts Cloudflare Workers + Static Assets, root-path URLs, enabled Hiscores and automatic validated `master` deployment
+- D-066 records the decision in `docs/project/decisions.md`
+- Git SHA plus Cloudflare version id identify a release; the repository owner controls promotion and rollback until a later ownership decision
 
 ### Goal 2: Add provider configuration
 
-- encode build command, artifact directory, routing, cache and headers
-- add server-only runtime configuration for Hiscores only if enabled
-- document preview and production environment differences
-- keep provider-specific files narrowly scoped
+- implemented exact build/deploy commands, artifact directory, API-first routing, SPA fallback, cache and headers
+- implemented the server-only LostCity provider without runtime secrets
+- preview URLs and production branch deploy the same root-path contract; custom domain remains later
+- provider-specific files are limited to the Worker entrypoint, Wrangler config and static header file
 
 ### Goal 3: Implement release validation
 
-- implemented provider-neutral artifact validation and focused tests
+- implemented Cloudflare-aware artifact validation and focused tests
 - implemented bounded post-deploy HTTP smoke for routes, caches, headers, market files, API fallback and Hiscores status mode
-- still requires the selected provider path to connect the full quality gate, deploy an immutable preview and prevent failed promotion
+- full quality gate is encoded in `npm run deploy:cloudflare:build`; external account connection and immutable preview execution remain pending
 
 ### Goal 4: Validate and hand over production
 
@@ -320,11 +347,11 @@ Do not use force push as deployment rollback. A source correction after a bad re
 
 ## Explicitly out of scope
 
-- selecting a host, domain or provider in this document
+- selecting a custom domain or changing the accepted Cloudflare provider
 - adding auth, accounts, database, payments, admin or tenant infrastructure
 - analytics, advertising, public setup discovery or user tracking
 - user-triggered market refresh
-- provider-specific artifact architecture unless separately accepted
+- adding Cloudflare KV, D1, Durable Objects, Queues, R2 or other stateful provider services
 - adding a backend for simulation calculations
 - deleting the archived legacy implementation
 - claiming full legacy parity or legacy deletion readiness
@@ -332,10 +359,10 @@ Do not use force push as deployment rollback. A source correction after a bad re
 
 ## Acceptance checklist
 
-- [ ] Host/runtime, URL shape, Hiscores release state and deploy trigger are accepted
+- [x] Host/runtime, URL shape, Hiscores release state and deploy trigger are accepted under D-066
 - [x] Current root-path build passes the reproducible artifact hygiene/schema/checksum gate
-- [ ] Route order prevents SPA fallback from masking API failures
-- [ ] Cache policy distinguishes index, hashed assets, market JSON and player API responses
+- [x] Route order prevents SPA fallback from masking API failures in config and focused Worker tests
+- [x] Cache policy distinguishes index, hashed assets, market JSON and player API responses in `_headers`/Worker tests
 - [ ] CSP and security headers are verified on preview and production
 - [ ] Release gate and browser smokes pass for the exact promoted artifact
 - [ ] Hiscores status and copy match the actual configured production state

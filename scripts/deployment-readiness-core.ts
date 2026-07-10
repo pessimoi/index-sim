@@ -4,18 +4,19 @@ import { relative, resolve, sep } from "node:path";
 import { parseHiscoresStatusResponseJson } from "../src/data/schemas/live-integrations";
 import { PriceHistorySchema, createPriceSetFromLegacyRecords } from "../src/data/schemas/price-set";
 import { parseJsonWithDuplicateKeyCheck } from "../src/data/reliability";
+import { DEPLOYMENT_CSP } from "../src/server/deployment-security";
 
 const MARKET_FILES = ["prices.json", "alch.json", "price-history.json"] as const;
-const REQUIRED_ROOT_FILES = new Set(["index.html", ...MARKET_FILES]);
+const CLOUDFLARE_HEADERS_FILE = "_headers";
+const REQUIRED_ROOT_FILES = new Set(["index.html", CLOUDFLARE_HEADERS_FILE, ...MARKET_FILES]);
 const HASHED_ASSET_PATTERN =
   /^assets\/[A-Za-z0-9_.-]+-[A-Za-z0-9_-]{8,}\.(?:avif|css|gif|ico|jpe?g|js|png|svg|webp|woff2?)$/;
-const TEXT_FILE_PATTERN = /\.(?:css|html|js|json|txt)$/i;
+const TEXT_FILE_PATTERN = /(?:^_headers$|\.(?:css|html|js|json|txt)$)/i;
 const MAX_HTTP_BODY_BYTES = 5_000_000;
 const MAX_API_BODY_BYTES = 100_000;
 
 export const DEPLOYMENT_SMOKE_TIMEOUT_MS = 15_000;
-export const DEPLOYMENT_CSP =
-  "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'";
+export { DEPLOYMENT_CSP };
 
 export type DeploymentReadinessErrorCode =
   "artifact_invalid" | "network_failed" | "origin_invalid" | "response_invalid";
@@ -181,6 +182,65 @@ function assertArtifactTextHygiene(files: readonly ArtifactFile[]): void {
   }
 }
 
+function parseCloudflareHeadersFile(text: string): Map<string, Map<string, string>> {
+  const rules = new Map<string, Map<string, string>>();
+  let currentRule: Map<string, string> | undefined;
+
+  for (const rawLine of text.split(/\r?\n/)) {
+    if (!rawLine.trim() || rawLine.trimStart().startsWith("#")) continue;
+    if (!/^\s/.test(rawLine)) {
+      const path = rawLine.trim();
+      if (!path.startsWith("/") || rules.has(path)) {
+        failArtifact("Deployment _headers contains an invalid or duplicate route rule");
+      }
+      currentRule = new Map<string, string>();
+      rules.set(path, currentRule);
+      continue;
+    }
+
+    if (!currentRule) failArtifact("Deployment _headers contains a header without a route");
+    const match = /^\s+([^:]+):\s*(.+)$/.exec(rawLine);
+    if (!match) failArtifact("Deployment _headers contains an invalid header line");
+    const name = match[1].trim().toLowerCase();
+    const value = match[2].trim();
+    if (!name || !value || currentRule.has(name)) {
+      failArtifact("Deployment _headers contains an invalid or duplicate header");
+    }
+    currentRule.set(name, value);
+  }
+
+  return rules;
+}
+
+function assertCloudflareHeadersContract(filesByPath: Map<string, ArtifactFile>): void {
+  const file = filesByPath.get(CLOUDFLARE_HEADERS_FILE);
+  if (!file) failArtifact(`Deployment artifact is missing ${CLOUDFLARE_HEADERS_FILE}`);
+  const rules = parseCloudflareHeadersFile(new TextDecoder().decode(file.bytes));
+  const requiredRule = (path: string): Map<string, string> => {
+    const rule = rules.get(path);
+    if (!rule) failArtifact(`Deployment _headers is missing the ${path} route rule`);
+    return rule;
+  };
+  const headerView = (headers: Map<string, string>) => ({
+    get: (name: string) => headers.get(name.toLowerCase()) ?? null
+  });
+
+  try {
+    assertSecurityHeaders(headerView(requiredRule("/*")), "/*");
+    assertShortCache(headerView(requiredRule("/")), "/");
+    assertShortCache(headerView(requiredRule("/index.html")), "/index.html");
+    assertImmutableCache(headerView(requiredRule("/assets/*")), "/assets/*");
+    for (const fileName of MARKET_FILES) {
+      assertShortCache(headerView(requiredRule(`/${fileName}`)), `/${fileName}`);
+    }
+  } catch (error) {
+    if (error instanceof DeploymentReadinessError) {
+      failArtifact("Deployment _headers does not satisfy the security and cache contract");
+    }
+    throw error;
+  }
+}
+
 function parseArtifactJson(filesByPath: Map<string, ArtifactFile>, path: string): unknown {
   const file = filesByPath.get(path);
   if (!file) failArtifact(`Deployment artifact is missing ${path}`);
@@ -280,6 +340,7 @@ export function verifyDeploymentArtifact(
   }
   assertArtifactPathPolicy(files);
   assertArtifactTextHygiene(files);
+  assertCloudflareHeadersContract(filesByPath);
 
   const indexFile = filesByPath.get("index.html");
   if (!indexFile) failArtifact("Deployment artifact is missing index.html");

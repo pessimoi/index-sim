@@ -8,6 +8,7 @@ PROJECT_REVIEW_NOTES.md
 SECURITY_AUDIT.md
 /index.html
 /styles.css
+/public/_headers
 engine.js
 equipment.js
 gamedata.js

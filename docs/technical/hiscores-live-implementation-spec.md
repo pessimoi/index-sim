@@ -1,11 +1,11 @@
 # Hiscores live implementation specification
 
-- Status: provider and log policy complete; production runtime and deployed evidence blocked on hosting
-- Date: 2026-07-10
+- Status: Cloudflare production runtime implemented; account connection and deployed evidence pending
+- Date: 2026-07-11
 - Owner: technical docs
 - Source: conditional backlog work and the remaining `Hiscores` feature-inventory gap
 - Contract owner: [live-integrations-spec.md](live-integrations-spec.md)
-- Related decisions: [D-015, D-022, D-044, D-061 and D-065](../project/decisions.md)
+- Related decisions: [D-015, D-022, D-044, D-061, D-065 and D-066](../project/decisions.md)
 
 ## Purpose
 
@@ -19,7 +19,7 @@ This work covers only the missing final slice:
 
 - select and document the authoritative source contract (completed by D-061)
 - implement the server-side provider adapter (completed)
-- inject it into a production-capable same-origin runtime
+- inject it into a production-capable same-origin runtime (implemented by D-066)
 - validate privacy, failure and live-operation behavior
 
 The row must remain `Osittainen` until that production path is configured and evidenced. It may move to `Valmis` only when the done criteria in this document pass.
@@ -32,7 +32,9 @@ The existing code owns these stable contracts:
 - `src/server/hiscores-core.ts` owns `GET /api/hiscores/status`, `GET /api/hiscores?player=...`, input/output validation, sanitized errors, request timeout and memory rate limiting.
 - `src/server/lostcity-hiscores-provider.ts` owns the fixed-origin D-061 upstream request, allowlisted JSON mapping, XP normalization, redirect refusal, response bounds and sanitized provider failures. The upstream announcement documents `date`, but the observed player endpoint may omit it; the parser accepts both forms and does not expose or depend on that field.
 - `src/server/vite-hiscores-middleware.ts` adapts that core handler to local Vite dev and preview.
-- `vite.config.ts` injects the source-backed provider for local dev and preview; a static `dist` build does not itself provide the same-origin API.
+- `vite.config.ts` injects the source-backed provider for local dev and preview.
+- `src/server/cloudflare-worker.ts` injects the same provider into the D-066 production runtime, routes API requests before static SPA fallback, adds API security headers and returns sanitized JSON for unknown/error paths.
+- `wrangler.jsonc` deploys the `dist` artifact and Worker as one root-path unit, routes `/api/*` Worker-first and disables Workers Logs observability plus Logpush.
 - the UI applies only the seven returned combat skills after user review and retains manual level editing as the fallback.
 
 The live implementation must conform to those contracts. It must not make the browser call or parse the upstream directly.
@@ -50,20 +52,20 @@ D-061 accepts the first-party 2004Scape [Hiscores API](https://2004.lostcity.rs/
 
 HTML parsing and a parser-dependency decision are no longer needed.
 
-## Remaining decision before production
+## Accepted production runtime
 
-### 1. Production runtime and host
-
-Choose a host/runtime that can expose the existing same-origin API contract with:
+D-066 selects Cloudflare Workers + Static Assets. The implementation provides:
 
 - server-side outbound HTTPS
-- server-only configuration
+- no runtime secret or user-controlled upstream configuration
 - request timeout and cancellation
-- rate limiting suitable for more than one process or instance, if the selected runtime needs it
+- bounded in-isolate rate limiting keyed by the trusted Cloudflare client-address header plus upstream 429 handling
 - response headers and routing before SPA fallback
-- privacy-compatible request logs
+- disabled provider observability/Logpush under D-065
 
-Static-only hosting is insufficient for a live Hiscores claim unless it also provides an accepted same-origin function, edge runtime or reverse proxy. `vite preview` is not a production server.
+External work remains: connect the Cloudflare account/repository, run the full
+Cloudflare build, validate a version preview URL, verify account-side log settings
+and run production smoke. `vite preview` remains a local verification server.
 
 ## Resolved player-name logging and retention
 
@@ -77,7 +79,10 @@ D-065 requires production infrastructure to:
 - disable provider access-log retention where possible; otherwise use the shortest configurable retention, no longer than seven days, with operator-only access
 - reject a host/configuration that cannot meet these constraints before enabling live Hiscores
 
-This resolves the policy decision without claiming deployed compliance. Production evidence must still verify the selected host's effective configuration.
+D-066 implements the strict no-collection option: Workers Logs observability and
+Logpush are off and the Worker emits no custom logs. This resolves repository-side
+configuration without claiming deployed compliance; preview evidence must still
+verify account-side settings, Tail Workers and external drains.
 
 ## Target architecture
 
@@ -125,7 +130,7 @@ Production configuration must:
 ### Rate limiting and caching
 
 - Preserve the existing application-level limit as a minimum behavioral contract.
-- Re-evaluate the implementation if the selected host uses multiple instances, because the current in-memory limiter is process-local.
+- Treat the current Cloudflare in-isolate limiter as a bounded best-effort guard; verify upstream 429 behavior on preview and add a separately accepted provider rate-limit binding only if deployed evidence shows the distributed edge needs it.
 - Do not add a database solely for rate limiting or cache in this slice.
 - Do not share cached player lookups between users unless an explicit privacy and freshness policy is accepted.
 - A short provider-safe status cache may be added only when it cannot disclose player data and is covered by tests.
@@ -174,9 +179,9 @@ Done when the parser can be implemented without guessing the upstream shape.
 
 Done when fixture-backed provider tests pass without changing browser/domain contracts.
 
-### Goal 3: Wire the production runtime (blocked on host/log decisions)
+### Goal 3: Wire the production runtime (implemented; deployed evidence pending)
 
-- inject the provider into the selected host's same-origin function/server adapter
+- inject the provider into the D-066 Cloudflare Worker same-origin adapter
 - configure server-only source settings
 - apply route ordering, no-store, rate-limit and query-log redaction policy
 - document local emulation and production configuration without committing secrets
@@ -244,17 +249,18 @@ Do not record raw upstream payloads, real player profiles, credentials, local ab
 - public player search/discovery
 - non-combat skills beyond the accepted seven-skill response
 - changing simulation formulas or Planner behavior
-- choosing the provider, host or domain inside this specification
+- changing the accepted provider/host or selecting a custom domain
 
 ## Final acceptance criteria
 
 - [x] Authoritative source and source terms are accepted and documented
-- [ ] Production runtime/hosting is accepted and documented
+- [x] Production runtime/hosting is accepted and documented
 - [x] Player-query logging and retention policy is accepted and documented
 - [x] Provider adapter is server-only, allowlisted, bounded and fixture-tested
 - [x] Existing same-origin API and browser contracts remain stable
 - [x] Missing configuration fails to a sanitized manual-fallback state
-- [ ] Production routing, no-store and rate limiting are verified
+- [x] Production routing, no-store and bounded in-isolate rate limiting are verified in focused Worker tests
+- [ ] The same routing, headers and rate-limit behavior are verified on Cloudflare preview/production
 - [ ] No player name, raw payload or credential leaks through logs, API errors or UI copy
 - [x] Opt-in live smoke evidence is recorded without raw personal data
 - [ ] Operations, testing, backlog and feature inventory reflect the deployed state

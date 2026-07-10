@@ -1,0 +1,17 @@
+{
+  "name": "index-sim",
+  "main": "src/server/cloudflare-worker.ts",
+  "compatibility_date": "2026-07-11",
+  "workers_dev": true,
+  "preview_urls": true,
+  "logpush": false,
+  "observability": {
+    "enabled": false
+  },
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api", "/api/*"]
+  }
+}
