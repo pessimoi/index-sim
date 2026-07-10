@@ -79,7 +79,7 @@ Curated-release-only deployment is valid, but it cannot support a twice-daily sc
 
 ### Logs and player names
 
-If live Hiscores is enabled, decide query-string redaction and access-log retention before public traffic. See [hiscores-live-implementation-spec.md](../technical/hiscores-live-implementation-spec.md). Static-only deployment with Hiscores disabled does not remove the need to avoid logging secrets or unsafe query data elsewhere.
+If live Hiscores is enabled, enforce D-065 before public traffic: strip query strings or redact `player`, do not persist player names/raw URLs/bodies/headers/IPs/upstream payloads in application telemetry, and keep unavoidable provider metadata for at most seven days with operator-only access. See [hiscores-live-implementation-spec.md](../technical/hiscores-live-implementation-spec.md). Static-only deployment with Hiscores disabled does not remove the need to avoid logging secrets or unsafe query data elsewhere.
 
 ### Release identifier and ownership
 
@@ -294,7 +294,7 @@ Do not use force push as deployment rollback. A source correction after a bad re
 
 ### Goal 1: Accept deployment decisions
 
-- choose host/runtime, root or sub-path, public Hiscores state, deploy trigger and log policy
+- choose host/runtime, root or sub-path, public Hiscores state and deploy trigger; verify the host can enforce D-065
 - record only accepted decisions in `docs/project/decisions.md`
 - define release and rollback ownership
 
@@ -332,7 +332,7 @@ Do not use force push as deployment rollback. A source correction after a bad re
 
 ## Acceptance checklist
 
-- [ ] Host/runtime, URL shape, Hiscores release state, deploy trigger and log policy are accepted
+- [ ] Host/runtime, URL shape, Hiscores release state and deploy trigger are accepted
 - [x] Current root-path build passes the reproducible artifact hygiene/schema/checksum gate
 - [ ] Route order prevents SPA fallback from masking API failures
 - [ ] Cache policy distinguishes index, hashed assets, market JSON and player API responses

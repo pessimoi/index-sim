@@ -1,11 +1,11 @@
 # Hiscores live implementation specification
 
-- Status: provider implemented; production runtime and live evidence blocked on hosting/log decisions
+- Status: provider and log policy complete; production runtime and deployed evidence blocked on hosting
 - Date: 2026-07-10
 - Owner: technical docs
 - Source: conditional backlog work and the remaining `Hiscores` feature-inventory gap
 - Contract owner: [live-integrations-spec.md](live-integrations-spec.md)
-- Related decisions: [D-015, D-022, D-044 and D-061](../project/decisions.md)
+- Related decisions: [D-015, D-022, D-044, D-061 and D-065](../project/decisions.md)
 
 ## Purpose
 
@@ -50,7 +50,7 @@ D-061 accepts the first-party 2004Scape [Hiscores API](https://2004.lostcity.rs/
 
 HTML parsing and a parser-dependency decision are no longer needed.
 
-## Remaining decisions before production
+## Remaining decision before production
 
 ### 1. Production runtime and host
 
@@ -65,17 +65,19 @@ Choose a host/runtime that can expose the existing same-origin API contract with
 
 Static-only hosting is insufficient for a live Hiscores claim unless it also provides an accepted same-origin function, edge runtime or reverse proxy. `vite preview` is not a production server.
 
-### 2. Player-name logging and retention
+## Resolved player-name logging and retention
 
 The current lookup uses a GET query parameter. Player names can therefore appear in host, proxy or observability access logs even though the application does not persist them server-side.
 
-Decide:
+D-065 requires production infrastructure to:
 
-- whether query strings are stripped or player parameters are redacted
-- retention duration and access boundary for unavoidable operational logs
-- whether the selected provider has additional logging or privacy constraints
+- strip the complete query string before persistent access logging or redact the `player` value before it reaches log storage
+- keep application/observability telemetry to route template, response status/error category, latency class and a generated request id
+- never persist player names, raw URLs, request bodies, headers, IP addresses or upstream payloads in application logs
+- disable provider access-log retention where possible; otherwise use the shortest configurable retention, no longer than seven days, with operator-only access
+- reject a host/configuration that cannot meet these constraints before enabling live Hiscores
 
-No persistent player-name log may be introduced until this decision is accepted.
+This resolves the policy decision without claiming deployed compliance. Production evidence must still verify the selected host's effective configuration.
 
 ## Target architecture
 
@@ -242,12 +244,13 @@ Do not record raw upstream payloads, real player profiles, credentials, local ab
 - public player search/discovery
 - non-combat skills beyond the accepted seven-skill response
 - changing simulation formulas or Planner behavior
-- choosing the provider, host, domain or logging policy inside this specification
+- choosing the provider, host or domain inside this specification
 
 ## Final acceptance criteria
 
 - [x] Authoritative source and source terms are accepted and documented
-- [ ] Production runtime/hosting and log policy are accepted and documented
+- [ ] Production runtime/hosting is accepted and documented
+- [x] Player-query logging and retention policy is accepted and documented
 - [x] Provider adapter is server-only, allowlisted, bounded and fixture-tested
 - [x] Existing same-origin API and browser contracts remain stable
 - [x] Missing configuration fails to a sanitized manual-fallback state
