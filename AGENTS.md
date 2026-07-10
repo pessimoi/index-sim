@@ -59,7 +59,7 @@ The legacy `views.jsx` `ArchitectureBoard` is only a docs-link panel. Treat the 
 
 The root app path is now the Vite rewrite and boots from the validated source-backed generated Revision 274 snapshot. The legacy-derived static bridge and legacy browser runtime files remain regression/reference, fixture and rollback evidence, not the production entrypoint.
 
-No general GitHub Actions CI config, database schema or stateful backend exists in this checkout. The only GitHub Actions workflow is the scheduled market price writer. D-066 selects Cloudflare Workers Builds as the production build/deploy integration once the external Cloudflare account is connected.
+No general GitHub Actions CI config, database schema or stateful backend exists in this checkout. The only GitHub Actions workflow is the scheduled market price writer. D-066 selects Cloudflare Workers Builds as the optional production build/deploy integration; D-067 leaves account connection and live-operation evidence to a future adopter.
 
 ## Change recipes
 
@@ -114,7 +114,7 @@ No general GitHub Actions CI config, database schema or stateful backend exists 
 ### Release or deploy change
 
 - Read first: [docs/operations/README.md](docs/operations/README.md).
-- Current state: D-066 selects a root-path Cloudflare Worker + Static Assets deployment. Repository-owned Worker/config/header/build/deploy commands exist; external account connection, preview/production smoke and any custom domain remain unverified.
+- Current state: D-066 selects a root-path Cloudflare Worker + Static Assets deployment. Repository-owned Worker/config/header/build/deploy commands are handoff-ready. Under D-067, external account connection, preview/production smoke and any custom domain are adopter operations rather than repository backlog.
 - Ask a human before changing hosting, public URLs or release process.
 - Update operations and decisions.
 

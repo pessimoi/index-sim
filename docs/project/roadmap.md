@@ -12,7 +12,7 @@ The current root app is the source-backed Vite/React rewrite of the 2004scape co
 - documented intentional deltas when LostCityRS/Content or accepted decisions supersede legacy behavior
 - reviewed game revision bumps through a manual `npm run data:generate` workflow that update only the current accepted normalized snapshot after validation and calculation-impact evidence, without committing raw upstream dumps or historical snapshot archives
 
-Immediate delivery target: trusted-tester handoff to one known friend for functional feedback. This is not a public release track and does not require full CI/CD, final hosting or a complete deploy pipeline yet.
+The repository delivery target is complete, adopter-ready rewrite handoff. Running a public instance, owning a Cloudflare account and collecting environment-specific live evidence are optional adopter operations under D-067, not repository implementation phases.
 
 Implementation requirements for the rewrite live in [../technical/rewrite-spec.md](../technical/rewrite-spec.md).
 
@@ -37,10 +37,10 @@ Implementation requirements for the rewrite live in [../technical/rewrite-spec.m
    - V1 replacement scope is combat, result summary, monster compare, loot/economy, trip and planner.
    - Use lightweight warning/info markers for uncertain or approximated results.
 
-5. Add accepted live integrations.
+5. Add accepted live integrations. Repository implementation complete.
    - Hiscores lookup and market price refresh should follow [../technical/live-integrations-spec.md](../technical/live-integrations-spec.md).
-   - Hiscores has a safe manual-level fallback, the D-061 first-party JSON provider and the D-066 Cloudflare same-origin production Worker. D-065/D-066 disable request collection; public live availability still needs Cloudflare account connection and deployed routing/privacy/live evidence.
-   - Market prices target catalog-audited `markets.lostcity.rs/items/{slug}` pages; scheduled-only GitHub Actions writes `prices.json` and compacted shared `price-history.json`. Generated Revision 274 data owns high alch. Public crawler policy, full live dry-run and exact root variable are evidenced; the first successful configured run remains the boundary before scheduled-current claims.
+   - Hiscores has a safe manual-level fallback, the D-061 first-party JSON provider and the D-066 Cloudflare same-origin production Worker. D-065/D-066 disable request collection. A future adopter verifies deployed routing/privacy/live behavior before claiming public availability.
+   - Market prices target catalog-audited `markets.lostcity.rs/items/{slug}` pages; scheduled-only GitHub Actions writes `prices.json` and compacted shared `price-history.json`. Generated Revision 274 data owns high alch. Public crawler policy, full live dry-run and exact root variable are evidenced. A future adopter verifies its first successful cron before claiming scheduled-current prices.
    - Shared setups, accounts and database storage remain open decisions.
 
 ## Not in scope yet

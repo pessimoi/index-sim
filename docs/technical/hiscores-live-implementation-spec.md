@@ -1,6 +1,6 @@
 # Hiscores live implementation specification
 
-- Status: Cloudflare production runtime implemented; account connection and deployed evidence pending
+- Status: repository implementation complete; adopter deployment evidence gated
 - Date: 2026-07-11
 - Owner: technical docs
 - Source: conditional backlog work and the remaining `Hiscores` feature-inventory gap
@@ -13,16 +13,16 @@ Finish the existing rewrite Hiscores workflow by connecting the repo-owned same-
 
 ## Feature-inventory check
 
-`Hiscores` is `Osittainen` in [feature-inventory.md](../product/feature-inventory.md). The UI, browser adapter, same-origin API contract, status/lookup states, preview/apply flow, stale-response protection, local last-player handling and manual level fallback already exist.
+`Hiscores` is `Valmis` in [feature-inventory.md](../product/feature-inventory.md) at the D-067 repository-handoff boundary. The UI, browser adapter, same-origin API contract, status/lookup states, preview/apply flow, stale-response protection, local last-player handling, manual level fallback and production adapter already exist.
 
-This work covers only the missing final slice:
+The completed implementation covers:
 
 - select and document the authoritative source contract (completed by D-061)
 - implement the server-side provider adapter (completed)
 - inject it into a production-capable same-origin runtime (implemented by D-066)
-- validate privacy, failure and live-operation behavior
+- validate privacy and failure behavior in fixtures and provide an adopter checklist for live-operation evidence
 
-The row must remain `Osittainen` until that production path is configured and evidenced. It may move to `Valmis` only when the done criteria in this document pass.
+D-067 does not require the current maintainer to own or operate a Cloudflare account. A future adopter must complete the deployment checklist before claiming its instance is live; that environment evidence does not reopen the repository feature status.
 
 ## Current implementation boundary
 
@@ -63,9 +63,10 @@ D-066 selects Cloudflare Workers + Static Assets. The implementation provides:
 - response headers and routing before SPA fallback
 - disabled provider observability/Logpush under D-065
 
-External work remains: connect the Cloudflare account/repository, run the full
-Cloudflare build, validate a version preview URL, verify account-side log settings
-and run production smoke. `vite preview` remains a local verification server.
+The repository handoff is complete. An adopting operator may connect a Cloudflare
+account/repository, run the full Cloudflare build, validate a version preview URL,
+verify account-side log settings and run production smoke. `vite preview` remains
+a local verification server and does not prove a public instance.
 
 ## Resolved player-name logging and retention
 
@@ -81,8 +82,9 @@ D-065 requires production infrastructure to:
 
 D-066 implements the strict no-collection option: Workers Logs observability and
 Logpush are off and the Worker emits no custom logs. This resolves repository-side
-configuration without claiming deployed compliance; preview evidence must still
-verify account-side settings, Tail Workers and external drains.
+configuration without claiming deployed compliance. An adopter claiming public
+availability must still verify account-side settings, Tail Workers and external
+drains.
 
 ## Target architecture
 
@@ -179,16 +181,16 @@ Done when the parser can be implemented without guessing the upstream shape.
 
 Done when fixture-backed provider tests pass without changing browser/domain contracts.
 
-### Goal 3: Wire the production runtime (implemented; deployed evidence pending)
+### Goal 3: Wire the production runtime (complete)
 
 - inject the provider into the D-066 Cloudflare Worker same-origin adapter
 - configure server-only source settings
 - apply route ordering, no-store, rate-limit and query-log redaction policy
 - document local emulation and production configuration without committing secrets
 
-Done when the deployed status endpoint reports the intended configured state and the browser still uses only same-origin calls.
+Repository done when the Worker/configuration and focused routing/security tests pass. An adopter additionally verifies the deployed status endpoint before a live claim.
 
-### Goal 4: Collect live evidence and close documentation (blocked on deployment)
+### Goal 4: Adopter live-evidence runbook (not repository backlog)
 
 - run an opt-in, sanitized live smoke against the deployed same-origin endpoint
 - verify success plus not-found/unavailable behavior without committing raw responses
@@ -196,7 +198,7 @@ Done when the deployed status endpoint reports the intended configured state and
 - update architecture, operations, testing, backlog and feature inventory
 - retain the manual fallback and known failure copy
 
-Done when production evidence supports moving `Hiscores` from `Osittainen` to `Valmis`.
+Done for a specific public instance when production evidence supports its live-availability claim. The repository feature remains `Valmis` under D-067 independently of whether anyone currently operates that instance.
 
 ## Validation plan
 

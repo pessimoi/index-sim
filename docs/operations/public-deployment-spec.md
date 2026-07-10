@@ -1,6 +1,6 @@
 # Public deployment specification
 
-- Status: Cloudflare Worker implementation ready; account connection and deployed evidence pending
+- Status: repository handoff ready; adopter deployment checklist not executed
 - Date: 2026-07-11
 - Owner: operations docs
 - Source: conditional public-release and deploy-hardening backlog work
@@ -8,9 +8,9 @@
 
 ## Purpose
 
-Define the D-066 Cloudflare work needed to deploy the Vite rewrite publicly with reproducible build, security headers, same-origin Hiscores routing, release evidence and rollback. A provider-assigned version/production URL is sufficient; a real domain remains optional later work.
+Define the D-066 Cloudflare runbook a future adopter can use to deploy the Vite rewrite publicly with reproducible build, security headers, same-origin Hiscores routing, release evidence and rollback. A provider-assigned version/production URL is sufficient; a real domain remains optional.
 
-This is operations/release work. It does not add a user-facing feature or change feature-inventory statuses by itself.
+This is an adopter operations/release runbook. D-067 does not require the current maintainer to create an account or operate an instance, and unchecked environment evidence below is not repository backlog.
 
 ## Current boundary
 
@@ -24,7 +24,7 @@ The repository currently has:
 - Node 22/npm 10 alignment through `.nvmrc`, package engines and the current workflow
 - `npm run deploy:verify-artifact` for deterministic root-path artifact, market-contract and hygiene checks
 - `npm run deploy:smoke` for bounded provider-preview HTTPS route/header/cache/status checks
-- exact Cloudflare Worker build/preview/deploy commands, `wrangler.jsonc` and static `_headers`, but no connected Cloudflare account or accepted custom domain
+- exact Cloudflare Worker build/preview/deploy commands, `wrangler.jsonc` and static `_headers`; account ownership and any custom domain belong to the adopter
 - no database, auth, account, tenant, payment or admin service
 
 `npm run preview` is a local build-verification server and must not be used as the public production server.
@@ -332,13 +332,13 @@ Do not use force push as deployment rollback. A source correction after a bad re
 - preview URLs and production branch deploy the same root-path contract; custom domain remains later
 - provider-specific files are limited to the Worker entrypoint, Wrangler config and static header file
 
-### Goal 3: Implement release validation
+### Goal 3: Implement release validation (complete)
 
 - implemented Cloudflare-aware artifact validation and focused tests
 - implemented bounded post-deploy HTTP smoke for routes, caches, headers, market files, API fallback and Hiscores status mode
-- full quality gate is encoded in `npm run deploy:cloudflare:build`; external account connection and immutable preview execution remain pending
+- full quality gate is encoded in `npm run deploy:cloudflare:build`; immutable preview execution is an adopter environment check
 
-### Goal 4: Validate and hand over production
+### Goal 4: Adopter production activation
 
 - promote and verify the tested release
 - confirm market commit propagation under the accepted trigger policy
@@ -358,6 +358,10 @@ Do not use force push as deployment rollback. A source correction after a bad re
 - adding HSTS before domain/HTTPS policy is accepted
 
 ## Acceptance checklist
+
+Repository-owned items are checked. Remaining items are intentionally performed by
+the operator of a concrete public instance and do not represent unfinished project
+implementation under D-067.
 
 - [x] Host/runtime, URL shape, Hiscores release state and deploy trigger are accepted under D-066
 - [x] Current root-path build passes the reproducible artifact hygiene/schema/checksum gate

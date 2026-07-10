@@ -301,7 +301,7 @@ Rules:
 - Simulation must receive a `PriceSet`; it must not discover one from browser state.
 - Imported prices must be validated before use.
 - Missing prices must produce structured warnings, not silent global fallback mutation.
-- Shared price history snapshots are file-backed in `price-history.json`; the local scheduled writer, fixture-evidenced raw upstream adapter and GitHub Actions commit-if-diff workflow are present. Live response verification, repository upstream URL configuration and first successful scheduled run remain operational evidence.
+- Shared price history snapshots are file-backed in `price-history.json`; the local scheduled writer, fixture-evidenced raw upstream adapter and GitHub Actions commit-if-diff workflow are present. Live response verification and repository upstream URL configuration are evidenced; a future operator verifies its first scheduled run before a scheduled-current claim.
 
 Current implementation note: `src/data/schemas` validates `GameDataSnapshot`, item/drop/equipment data, `PriceSet` imports and committed price history. `src/data/legacy-adapter.ts` can adapt the current legacy runtime objects into a validated snapshot. `src/domain/economy` provides pure lookup helpers that return structured missing-price or missing-alch warnings without mutating the `PriceSet`.
 
@@ -428,7 +428,7 @@ The rewrite should preserve or intentionally replace these current capabilities 
 - planner training recommendations
 - saved local setup behavior, if migration is accepted
 
-Hiscores lookup is a v1 product requirement. D-061 resolves the upstream/proxy model and D-066 implements production hosting while preserving the adapter/API boundary in [live-integrations-spec.md](live-integrations-spec.md). Deployed Cloudflare evidence remains open.
+Hiscores lookup is a v1 product requirement. D-061 resolves the upstream/proxy model and D-066 implements production hosting while preserving the adapter/API boundary in [live-integrations-spec.md](live-integrations-spec.md). D-067 accepts repository readiness; deployed Cloudflare evidence belongs to an adopting operator before a live claim.
 
 Known bugs from `PROJECT_REVIEW_NOTES.md` should be triaged before golden fixtures are captured. Decide whether each bug is:
 
@@ -554,7 +554,7 @@ Tests or instrumentation should cover the level-input path that previously cause
 - Capture representative fixtures.
 - Commit fixtures and tolerance rules.
 
-Current checkout status: the rewrite root, generated runtime, Planner, migration and visible V1 workflows are implemented with unit/golden/browser evidence. Market scheduled-static and Hiscores same-origin contracts exist; D-061/D-066 implement the production provider/runtime. Cloudflare account/deployed evidence and the configured market cron remain operations work, while deeper legacy planner numeric parity remains outside V1.
+Current checkout status: the rewrite root, generated runtime, Planner, migration, visible V1 workflows and adopter-ready live integration packages are implemented with unit/golden/browser evidence. D-061/D-066 implement the Hiscores provider/runtime, and D-062-D-064 implement scheduled-static market ownership. D-067 leaves Cloudflare account/deployed evidence and concrete cron observation to an adopter, while deeper legacy planner numeric parity remains outside V1.
 
 ### Phase 3: domain extraction
 
@@ -617,7 +617,7 @@ Current acceptance status: the 2026-07-06 consolidated release-evidence pass is 
 - Backend/runtime: still required for accepted hiscores if direct browser APIs are not viable, but concrete framework, hosting, cache and deployment shape remain undecided. Market price refresh uses scheduled static JSON instead of a user-triggered backend sync path.
 - Database: no database for market price refresh; broader database use is still undecided.
 - Live integrations: implement hiscores and market price refresh according to [live-integrations-spec.md](live-integrations-spec.md); hiscores waits for the authoritative API answer.
-- Price history: `price-history.json` keeps 12-hour points for 90 days and one latest point per older UTC day; Economy loads it read-only beside local comparisons. The item-page writer, catalog audit, crawler-policy review and live dry-run exist, while root URL configuration and the first successful scheduled run remain operations evidence.
+- Price history: `price-history.json` keeps 12-hour points for 90 days and one latest point per older UTC day; Economy loads it read-only beside local comparisons. The item-page writer, catalog audit, crawler-policy review, live dry-run and root URL configuration are evidenced. A concrete first successful scheduled run is adopter evidence before a scheduled-current claim.
 - Data generator implementation: `npm run data:generate` reads the pinned raw Revision 274 checkout and writes the active schema-valid source pin, game-data snapshot and revision-impact report. Every expected runtime identity and all 63 core-loot tables resolve, and runtime readiness has zero blockers. Normalized `index-sim-source-slice` inputs remain fixture-only parser/schema tests.
 - Game revision updates: the PR/review policy, 10-case representative report and 189-evaluation all-monster scan are accepted. D-055 through D-059 record reviewed combat, loot, equipment, catalog, canonical-identity and runtime-switch decisions. Four quest-gated and 21 clue-scroll tertiary rows remain explicit exclusions until their domain policy is separately accepted.
 - Planner item requirements: generated snapshot data is consumed when present with a manual fallback; which authoritative upstream fields and fallback-removal policy should close this?

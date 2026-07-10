@@ -1,6 +1,6 @@
 # Scheduled market live-evidence specification
 
-- Status: live contract, crawler policy, full dry-run and repository variable evidenced; first configured scheduled run pending
+- Status: repository handoff ready; adopter scheduled-current evidence gated
 - Date: 2026-07-10
 - Owner: operations docs
 - Source: conditional backlog work and accepted decisions D-021, D-033, D-034 and D-053
@@ -9,7 +9,7 @@
 
 ## Purpose
 
-Verify the real `markets.lostcity.rs` response contract, safely configure the scheduled writer and collect evidence from its first successful GitHub Actions cron run. This work is required before the product or release notes claim that shared market prices are scheduled-current.
+Verify the real `markets.lostcity.rs` response contract, safely configure the scheduled writer and define the evidence an adopter collects from its first successful GitHub Actions cron run. The runtime, writer and repository configuration are complete under D-067; the observed run is required only before a concrete deployment claims that shared market prices are scheduled-current.
 
 This specification does not change the accepted architecture: twice-daily GitHub Actions writes validated static JSON to the same repository, and browser users never trigger the upstream fetch.
 
@@ -17,7 +17,7 @@ This specification does not change the accepted architecture: twice-daily GitHub
 
 `Market price sync` is `Valmis` in [feature-inventory.md](../product/feature-inventory.md) for the accepted visible workflow: scheduled-static status, imported-price fallback, explicit selected `PriceSet`, local history and sanitized failure behavior.
 
-The remaining work is release/operations evidence, not a duplicate feature implementation. The feature status stays `Valmis`; only the allowed freshness claim changes after this specification passes.
+The remaining checklist is adopter release/operations evidence, not a duplicate feature implementation or repository backlog. The feature status stays `Valmis`; only the allowed freshness claim changes after a specific deployment collects it.
 
 ## Existing implementation
 
@@ -62,7 +62,7 @@ Repository configuration evidence from 2026-07-10:
 - the value is a non-secret fixed root with no path suffix, credentials, query or fragment
 - scheduled runs `29068486016` and `29101381705` occurred before configuration and failed at the explicit empty-variable guard before any upstream read or file write
 - the newer failed run checked out `95aa0df`, which predates the final item-page/catalog/history hardening, so it must not be rerun or promoted as current evidence
-- the first cron against the current `master` after configuration remains pending; no manual dispatch or user-triggered refresh was added
+- no successful configured cron had been observed at repository handoff; no manual dispatch or user-triggered refresh was added, and a future adopter verifies its own run before a scheduled-current claim
 
 ## Preconditions
 
@@ -163,7 +163,7 @@ Completed 2026-07-10: repository-variable readback matched the exact approved ro
 workflow still has only scheduled triggers, `contents: write` permission and the two-file
 output allowlist. This completes configuration but does not substitute for Phase 4.
 
-### Phase 4: Observe the first scheduled run
+### Phase 4: Adopter observes the first scheduled run
 
 Wait for the existing cron rather than adding a manual upstream-refresh trigger. For the first successful run, verify:
 

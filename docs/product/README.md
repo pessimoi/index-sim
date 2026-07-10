@@ -27,7 +27,7 @@ The rewrite can replace the current app for users only when these workflows are 
 - trip calculation
 - planner
 
-Hiscores is a required v1 product capability. D-061 accepts the first-party API and D-066 implements the Cloudflare Worker hosting model; account connection and deployed evidence remain pending.
+Hiscores is a required v1 product capability. D-061 accepts the first-party API and D-066 implements the Cloudflare Worker hosting model. D-067 accepts this repository implementation and its deployment runbook as complete; a future adopter must still collect deployed evidence before describing a specific instance as live.
 
 ## Domain areas
 
@@ -45,12 +45,12 @@ Current app does not provide:
 - user accounts or auth
 - database-backed saves
 - authoritative server API
-- repo-owned backend or deploy process
+- stateful simulation backend
 
-Accepted future product features:
+Implemented optional integrations:
 
-- repo-owned hiscores lookup integration
-- repo-owned live market sync integration
+- repo-owned Hiscores lookup with local Vite and Cloudflare production adapters
+- repo-owned scheduled market sync with static snapshot/history outputs
 
 The implementation target for those live integrations is [../technical/live-integrations-spec.md](../technical/live-integrations-spec.md).
 
