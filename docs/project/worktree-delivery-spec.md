@@ -1,6 +1,6 @@
 # Current worktree delivery specification
 
-- Status: implementation-ready delivery specification
+- Status: completed
 - Date: 2026-07-10
 - Owner: project delivery
 - Source: current repository worktree and backlog delivery work
@@ -24,6 +24,30 @@ On 2026-07-10:
 - the worktree contains several completed backlog slices, tests, generated-data work and documentation changes accumulated across earlier goals
 
 These counts are expected to change when this specification is executed. A changed count is not itself an error.
+
+## Delivery evidence
+
+Completed on 2026-07-10 and delivered to `origin/master` as four reviewable commits:
+
+- `bc7aa84` - Harden generated data and economy foundations
+- `2ee932d` - Complete rewrite workflows and setup sharing
+- `f728cf1` - Add planner parity and visual regression evidence
+- `c6ac684` - Document completed rewrite and delivery boundaries
+
+Validation evidence:
+
+- `npm run typecheck`: pass
+- `npm run test`: pass, 31 files and 497 tests
+- `npm run test:golden`: pass, 19 tests
+- `npm run build`: pass with the known Vite chunk-size advisory
+- `npm run lint`: pass
+- `npm run format:check`: pass
+- `npm run planner:parity`: pass, 16 cases, 32 comparisons, no review or rewrite-gap rows
+- `npm audit`: pass, zero vulnerabilities
+- `git diff --check`: pass
+- functional and visual Playwright commands reached their production builds but the managed sandbox rejected localhost preview binds with `listen EPERM` on `127.0.0.1:5173` and `127.0.0.1:5174`; the last recorded functional gate remains 53/53 and all 23 Darwin visual baselines were reviewed during delivery
+
+After the push, local `HEAD` and `origin/master` both resolved to `c6ac6845a8458650a6913f3c9d45c09efc8933ff`, divergence was `0/0` and `git status --short` was clean. No force push, history rewrite or user-change removal was used.
 
 ## Delivery outcome
 
@@ -216,14 +240,14 @@ The two revisions must match. Record the delivered commit list and final remote 
 
 ## Review checklist
 
-- [ ] Starting branch, upstream, commit and path inventory recorded
-- [ ] All untracked files classified
-- [ ] No pre-existing staged change overwritten
-- [ ] Remote divergence checked before staging and before push
-- [ ] Every commit has a path manifest and focused validation evidence
-- [ ] Generated reports and screenshot baselines reviewed
-- [ ] No raw source payload, credential, absolute local path or player data committed
-- [ ] Combined release-quality gate recorded
-- [ ] Push used `origin master` with no force
-- [ ] Local and remote final SHAs match
-- [ ] Final worktree state reported
+- [x] Starting branch, upstream, commit and path inventory recorded
+- [x] All untracked files classified
+- [x] No pre-existing staged change overwritten
+- [x] Remote divergence checked before staging and before push
+- [x] Every commit has a path manifest and focused validation evidence
+- [x] Generated reports and screenshot baselines reviewed
+- [x] No raw source payload, credential, absolute local path or player data committed
+- [x] Combined release-quality gate recorded, with the sandbox-only browser limitation explicit
+- [x] Push used `origin master` with no force
+- [x] Local and remote final SHAs match
+- [x] Final worktree state reported
