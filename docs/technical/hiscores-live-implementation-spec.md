@@ -30,7 +30,7 @@ The existing code owns these stable contracts:
 
 - `src/adapters/hiscores` owns browser-side status and lookup parsing.
 - `src/server/hiscores-core.ts` owns `GET /api/hiscores/status`, `GET /api/hiscores?player=...`, input/output validation, sanitized errors, request timeout and memory rate limiting.
-- `src/server/lostcity-hiscores-provider.ts` owns the fixed-origin D-061 upstream request, strict JSON mapping, XP normalization, redirect refusal, response bounds and sanitized provider failures.
+- `src/server/lostcity-hiscores-provider.ts` owns the fixed-origin D-061 upstream request, allowlisted JSON mapping, XP normalization, redirect refusal, response bounds and sanitized provider failures. The upstream announcement documents `date`, but the observed player endpoint may omit it; the parser accepts both forms and does not expose or depend on that field.
 - `src/server/vite-hiscores-middleware.ts` adapts that core handler to local Vite dev and preview.
 - `vite.config.ts` injects the source-backed provider for local dev and preview; a static `dist` build does not itself provide the same-origin API.
 - the UI applies only the seven returned combat skills after user review and retains manual level editing as the fallback.
@@ -42,7 +42,7 @@ The live implementation must conform to those contracts. It must not make the br
 D-061 accepts the first-party 2004Scape [Hiscores API](https://2004.lostcity.rs/news/199):
 
 - endpoint: `GET https://2004.lostcity.rs/api/hiscores/player/:username`
-- response: strict JSON rows with category `type`, `level`, stored XP `value`, update `date` and `rank`
+- response: JSON rows with category `type`, `level`, stored XP `value`, `rank` and an optional update `date`; the announcement documents `date`, while the observed player response may omit it
 - accepted mapping: type 1 Attack, 2 Defence, 3 Strength, 4 Hitpoints, 5 Ranged, 6 Prayer and 7 Magic
 - stored XP is divided by 10 and truncated according to the source documentation
 - partial skill rows remain usable with sanitized warnings; no supported rows map to hiscores not-found

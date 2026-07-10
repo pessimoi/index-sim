@@ -21,7 +21,7 @@ const LostCityHiscoresRowSchema = z
     type: z.number().int().nonnegative(),
     level: z.number().int(),
     value: z.number().int().nonnegative(),
-    date: z.string().min(1),
+    date: z.string().min(1).optional(),
     rank: z.number().int().nonnegative()
   })
   .strict();

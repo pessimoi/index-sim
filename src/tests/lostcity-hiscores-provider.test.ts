@@ -71,6 +71,25 @@ describe("LostCity hiscores provider", () => {
     });
   });
 
+  it("accepts the current live row shape when the documented date is omitted", async () => {
+    const rows = JSON.parse(FIXTURE) as Array<Record<string, unknown>>;
+    const rowsWithoutDate = rows.map((row) => {
+      const copy = { ...row };
+      delete copy.date;
+      return copy;
+    });
+    const liveShape = [{ type: 0, level: 1578, value: 962_884_055, rank: 51 }, ...rowsWithoutDate];
+    const provider = createLostCityHiscoresProvider({
+      fetcher: async () => jsonResponse(JSON.stringify(liveShape))
+    });
+
+    const result = await provider.lookup({ player: "Fixture" }, lookupContext());
+
+    expect(Object.keys(result.skills)).toHaveLength(7);
+    expect(result.skills.attack).toEqual({ level: 61, xp: 333804, rank: 1200 });
+    expect(result.warnings).toEqual([]);
+  });
+
   it("keeps partial skill data usable with sanitized missing-skill warnings", async () => {
     const rows = JSON.parse(FIXTURE) as Array<Record<string, unknown>>;
     const provider = createLostCityHiscoresProvider({
