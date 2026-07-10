@@ -387,10 +387,13 @@ describe("scheduled market writer", () => {
     try {
       writeFixtureFiles(outputDir);
       const before = readOutputFiles(outputDir);
-      const fetchMock = vi.fn(async () => ({
-        ok: true,
-        text: async () => readFixture("raw-valid.json")
-      }));
+      const fetchMock = vi.fn(
+        async () =>
+          new Response(readFixture("raw-valid.json"), {
+            status: 200,
+            headers: { "Content-Type": "application/json; charset=utf-8" }
+          })
+      );
 
       const result = await runScheduledMarketWriter(
         [
@@ -409,10 +412,12 @@ describe("scheduled market writer", () => {
 
       expect(fetchMock).toHaveBeenCalledWith(
         "https://markets.lostcity.rs/api/sanitized-market-fixture",
-        {
+        expect.objectContaining({
           method: "GET",
-          headers: { Accept: "application/json" }
-        }
+          headers: { Accept: "application/json" },
+          redirect: "error",
+          signal: expect.any(AbortSignal)
+        })
       );
       expect(result.changedFiles.sort()).toEqual([
         "alch.json",
@@ -427,15 +432,19 @@ describe("scheduled market writer", () => {
   });
 
   it("rejects unapproved or malformed --upstream-url values before fetch", async () => {
-    const fetchMock = vi.fn(async () => ({
-      ok: true,
-      text: async () => readFixture("raw-valid.json")
-    }));
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(readFixture("raw-valid.json"), {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        })
+    );
 
     for (const upstreamUrl of [
       "https://example.test/api/sanitized-market-fixture",
       "not-a-url",
-      "https://user:pass@markets.lostcity.rs/api/sanitized-market-fixture"
+      "https://user:pass@markets.lostcity.rs/api/sanitized-market-fixture",
+      "https://markets.lostcity.rs/api/sanitized-market-fixture#fragment"
     ]) {
       await expect(
         runScheduledMarketWriter(
@@ -453,5 +462,163 @@ describe("scheduled market writer", () => {
       });
     }
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects redirects and sanitizes fetch failures", async () => {
+    const fetchMock = vi.fn(async (_url: string, init: { redirect: "error" }) => {
+      expect(init.redirect).toBe("error");
+      throw new TypeError("Raw redirect target or local path must stay private");
+    });
+
+    await expect(
+      runScheduledMarketWriter(
+        [
+          "--upstream-url",
+          "https://markets.lostcity.rs/api/sanitized-market-fixture",
+          "--item-ids",
+          "lobster,rune_scimitar,dragon_bones",
+          "--dry-run"
+        ],
+        { fetchImpl: fetchMock }
+      )
+    ).rejects.toMatchObject({
+      code: "invalid_upstream",
+      message: "Scheduled market upstream request failed"
+    });
+  });
+
+  it("times out fetch and body reads through the same abort boundary", async () => {
+    const fetchMock = vi.fn(
+      async (_url: string, init: { signal: AbortSignal }) =>
+        new Promise<Response>((_resolve, reject) => {
+          init.signal.addEventListener("abort", () => reject(new Error("raw timeout")), {
+            once: true
+          });
+        })
+    );
+
+    await expect(
+      runScheduledMarketWriter(
+        [
+          "--upstream-url",
+          "https://markets.lostcity.rs/api/sanitized-market-fixture",
+          "--item-ids",
+          "lobster,rune_scimitar,dragon_bones",
+          "--dry-run"
+        ],
+        { fetchImpl: fetchMock, upstreamTimeoutMs: 1 }
+      )
+    ).rejects.toMatchObject({
+      code: "invalid_upstream",
+      message: "Scheduled market upstream request timed out"
+    });
+    expect(fetchMock.mock.calls[0]?.[1].signal.aborted).toBe(true);
+  });
+
+  it("aborts a response body that stalls after the fetch resolves", async () => {
+    let requestSignal: AbortSignal | undefined;
+    const fetchMock = vi.fn(async (_url: string, init: { signal: AbortSignal }) => {
+      requestSignal = init.signal;
+      return new Response(
+        new ReadableStream({
+          start(controller) {
+            init.signal.addEventListener(
+              "abort",
+              () => controller.error(new Error("raw body timeout")),
+              { once: true }
+            );
+          }
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    });
+
+    await expect(
+      runScheduledMarketWriter(
+        [
+          "--upstream-url",
+          "https://markets.lostcity.rs/api/sanitized-market-fixture",
+          "--item-ids",
+          "lobster,rune_scimitar,dragon_bones",
+          "--dry-run"
+        ],
+        { fetchImpl: fetchMock, upstreamTimeoutMs: 1 }
+      )
+    ).rejects.toMatchObject({
+      code: "invalid_upstream",
+      message: "Scheduled market upstream request timed out"
+    });
+    expect(requestSignal?.aborted).toBe(true);
+  });
+
+  it("rejects non-JSON, declared oversized and streamed oversized responses", async () => {
+    const cases: Array<{ response: Response; maxBytes: number; message: string }> = [
+      {
+        response: new Response("<html>unexpected</html>", {
+          status: 200,
+          headers: { "Content-Type": "text/html" }
+        }),
+        maxBytes: 1_000,
+        message: "Scheduled market upstream response is not JSON"
+      },
+      {
+        response: new Response("[]", {
+          status: 200,
+          headers: { "Content-Type": "application/json", "Content-Length": "101" }
+        }),
+        maxBytes: 100,
+        message: "Scheduled market upstream response exceeds safe size limit"
+      },
+      {
+        response: new Response("[" + " ".repeat(100) + "]", {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        }),
+        maxBytes: 100,
+        message: "Scheduled market upstream response exceeds safe size limit"
+      }
+    ];
+
+    for (const testCase of cases) {
+      await expect(
+        runScheduledMarketWriter(
+          [
+            "--upstream-url",
+            "https://markets.lostcity.rs/api/sanitized-market-fixture",
+            "--item-ids",
+            "lobster,rune_scimitar,dragon_bones",
+            "--dry-run"
+          ],
+          { fetchImpl: async () => testCase.response, maxUpstreamBytes: testCase.maxBytes }
+        )
+      ).rejects.toMatchObject({ code: "invalid_upstream", message: testCase.message });
+    }
+  });
+
+  it("sanitizes streamed body failures", async () => {
+    const response = new Response(
+      new ReadableStream({
+        start(controller) {
+          controller.error(new Error("Raw stream failure must stay private"));
+        }
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } }
+    );
+
+    await expect(
+      runScheduledMarketWriter(
+        [
+          "--upstream-url",
+          "https://markets.lostcity.rs/api/sanitized-market-fixture",
+          "--item-ids",
+          "lobster,rune_scimitar,dragon_bones",
+          "--dry-run"
+        ],
+        { fetchImpl: async () => response }
+      )
+    ).rejects.toMatchObject({
+      code: "invalid_upstream",
+      message: "Scheduled market upstream request failed"
+    });
   });
 });

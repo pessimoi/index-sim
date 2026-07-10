@@ -1,6 +1,6 @@
 # Scheduled market live-evidence specification
 
-- Status: implementation-ready conditional operations work
+- Status: fetch hardening complete; live contract and scheduled-run evidence pending
 - Date: 2026-07-10
 - Owner: operations docs
 - Source: conditional backlog work and accepted decisions D-021, D-033, D-034 and D-053
@@ -33,8 +33,14 @@ The repository already has:
 - same-repo commit-if-diff with `GITHUB_TOKEN` and `contents: write`
 - a repository variable boundary named `MARKET_PRICES_UPSTREAM_URL`
 - workflow guards that allow only the three approved market files to change
+- fixed-origin fetch hardening with redirect rejection, one 15-second fetch/body timeout,
+  JSON content-type enforcement and a one-megabyte pre-parse response limit
 
-The repo does not yet have verified evidence for the exact live endpoint/shape, configured repository variable or first successful scheduled run.
+The first-party site manifest exposes a `GET /api/items` route, but this environment has
+not produced a bounded response-contract sample that proves the route matches the writer
+adapter. The repo therefore does not yet have verified evidence for the exact live
+endpoint/shape, acceptable automated-use terms, configured repository variable or first
+successful scheduled run. The route must not be configured from manifest evidence alone.
 
 ## Preconditions
 
@@ -43,36 +49,35 @@ Before any live fetch:
 1. verify the exact HTTPS endpoint path owned by `markets.lostcity.rs`
 2. confirm the endpoint may be used by the twice-daily repository automation
 3. confirm the response contains no credentials, player information or other data that must not enter the workflow
-4. implement the fetch hardening requirements below
+4. retain the completed fetch hardening requirements below
 5. ensure the repository and target branch permit the workflow's same-repo commit with `GITHUB_TOKEN`
 
 The endpoint variable is configuration, not a secret, but it must contain no username, password, token or signed query value.
 
 ## Required fetch hardening
 
-These are newly observed code-level gaps, not changes to the accepted market architecture. Complete them before the first trusted live request or cron claim.
+These are code-level safety requirements, not changes to the accepted market architecture.
+They are implemented in `scripts/write-scheduled-market-prices.ts` and covered by focused
+mocked tests. Keep them in place for the first trusted live request and later cron runs.
 
 ### Redirect boundary
 
-The writer currently validates the initial URL origin, while platform `fetch` may follow redirects. Prevent a validated `markets.lostcity.rs` URL from redirecting the workflow to another origin.
+The writer validates the initial URL origin and sets `redirect: "error"`, so a validated
+`markets.lostcity.rs` URL cannot silently redirect the workflow to another origin.
 
-Acceptable implementation:
-
-- set `redirect: "error"`; or
-- validate every redirect/final response URL against the exact approved HTTPS origin
-
-Add focused tests for same-origin behavior, cross-origin redirect rejection and sanitized errors. Never log a redirect target containing credentials or query secrets.
+Focused tests cover approved-origin success, redirect/fetch rejection, fragment and
+credential rejection, and sanitized errors. A redirect target containing credentials or
+query secrets is never included in the surfaced error.
 
 ### Timeout and pre-read size boundary
 
-The adapter enforces the import byte policy after text is available, but the current network path can wait indefinitely or read the entire response first.
+The network path now enforces:
 
-Add:
-
-- an explicit bounded fetch timeout using `AbortSignal`
+- one 15-second `AbortSignal` timeout spanning fetch and response-body consumption
 - early `Content-Length` rejection when the declared size exceeds the accepted one-megabyte import policy
 - a bounded streaming read that aborts once the actual body crosses the same limit, including when `Content-Length` is absent or false
-- sanitized timeout and oversized-response errors
+- JSON content-type validation before body parsing
+- sanitized timeout, stream, non-JSON and oversized-response errors
 
 The raw live body must remain memory-only and must never be written as an artifact, cache, log attachment or committed fixture by the workflow.
 
@@ -215,7 +220,7 @@ Live checks are opt-in and must not run in the default unit suite. The GitHub cr
 ## Acceptance checklist
 
 - [ ] Exact endpoint and acceptable automated use verified
-- [ ] Redirect, timeout and pre-read size hardening implemented and tested
+- [x] Redirect, timeout, content-type and pre-read size hardening implemented and tested
 - [ ] Sanitized live-contract evidence recorded without raw payload
 - [ ] `--dry-run` succeeds against the verified endpoint with no writes
 - [ ] Candidate counts and value changes reviewed

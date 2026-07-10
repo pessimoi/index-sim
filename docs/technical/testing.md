@@ -185,7 +185,7 @@ npm run test -- src/tests/data-economy.test.ts src/tests/market-adapter.test.ts 
 npm run test:e2e -- src/tests/e2e/scaffold.spec.ts
 ```
 
-The focused writer tests validate the normalized scheduled `markets.lostcity.rs` fixture/input contract, the sanitized raw-response adapter used by `--upstream-url`, approved-origin enforcement with mocked fetch, invalid numeric rejection, missing approved item rejection, unknown item/source-slug rejection, duplicate raw item rejection, skipped-item fallback to previous output values, 12-hour shared history bucket retention, no-op idempotence and the rule that invalid upstream data is rejected before output files are written. A local dry-run fixture check can be run without live upstream calls:
+The focused writer tests validate the normalized scheduled `markets.lostcity.rs` fixture/input contract, the sanitized raw-response adapter used by `--upstream-url`, approved-origin and no-fragment enforcement with mocked fetch, redirect rejection, one abort boundary across fetch and body reads, JSON content-type validation, declared and streamed one-megabyte response limits, sanitized network/stream failures, invalid numeric rejection, missing approved item rejection, unknown item/source-slug rejection, duplicate raw item rejection, skipped-item fallback to previous output values, 12-hour shared history bucket retention, no-op idempotence and the rule that invalid upstream data is rejected before output files are written. A local dry-run fixture check can be run without live upstream calls:
 
 ```sh
 npm run prices:write-scheduled -- --input src/tests/fixtures/market-writer/upstream-valid.json --item-ids lobster,rune_scimitar,dragon_bones --now 2026-07-08T00:15:00.000Z --dry-run

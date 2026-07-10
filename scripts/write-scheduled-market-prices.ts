@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { MARKET_SOURCE_MAPPINGS } from "../src/data/market-source-mapping";
 import { parseJsonWithDuplicateKeyCheck } from "../src/data/reliability";
-import { MARKET_SOURCE_ID } from "../src/data/schemas";
+import { MARKET_SOURCE_ID, PRICE_SET_IMPORT_MAX_BYTES } from "../src/data/schemas";
 import type { MarketSourceMapping } from "../src/domain/shared";
 import { parseMarketsLostcityRawResponseJson } from "./markets-lostcity-raw-adapter";
 import {
@@ -16,6 +16,7 @@ import {
 } from "./scheduled-market-writer-core";
 
 type PriceFileName = "prices.json" | "alch.json" | "price-history.json";
+export const SCHEDULED_MARKET_UPSTREAM_TIMEOUT_MS = 15_000;
 
 export interface CliOptions {
   input?: string;
@@ -28,16 +29,24 @@ export interface CliOptions {
 
 interface FetchResponseLike {
   ok: boolean;
-  text(): Promise<string>;
+  headers: { get(name: string): string | null };
+  body: ReadableStream<Uint8Array> | null;
 }
 
 type FetchLike = (
   url: string,
-  init: { method: "GET"; headers: { Accept: "application/json" } }
+  init: {
+    method: "GET";
+    headers: { Accept: "application/json" };
+    redirect: "error";
+    signal: AbortSignal;
+  }
 ) => Promise<FetchResponseLike>;
 
 export interface RunScheduledMarketWriterDependencies {
   fetchImpl?: FetchLike;
+  maxUpstreamBytes?: number;
+  upstreamTimeoutMs?: number;
 }
 
 export interface RunScheduledMarketWriterResult {
@@ -131,23 +140,126 @@ export function parseArgs(argv: string[]): CliOptions {
   return options;
 }
 
-async function readUpstreamText(options: CliOptions, fetchImpl: FetchLike): Promise<string> {
+function declaredContentLength(response: FetchResponseLike): number | null {
+  const raw = response.headers.get("Content-Length");
+  if (!raw || !/^\d+$/.test(raw)) return null;
+  const bytes = Number(raw);
+  return Number.isSafeInteger(bytes) && bytes >= 0 ? bytes : null;
+}
+
+function assertJsonResponse(response: FetchResponseLike): void {
+  const contentType = response.headers.get("Content-Type")?.toLowerCase() ?? "";
+  if (!contentType.startsWith("application/json")) {
+    throw new ScheduledMarketWriterError(
+      "invalid_upstream",
+      "Scheduled market upstream response is not JSON"
+    );
+  }
+}
+
+async function readBoundedResponseText(
+  response: FetchResponseLike,
+  maxBytes: number,
+  signal: AbortSignal
+): Promise<string> {
+  const declaredBytes = declaredContentLength(response);
+  if (declaredBytes !== null && declaredBytes > maxBytes) {
+    throw new ScheduledMarketWriterError(
+      "invalid_upstream",
+      "Scheduled market upstream response exceeds safe size limit"
+    );
+  }
+
+  if (!response.body) return "";
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let byteCount = 0;
+
+  try {
+    while (true) {
+      if (signal.aborted) {
+        throw new ScheduledMarketWriterError(
+          "invalid_upstream",
+          "Scheduled market upstream request timed out"
+        );
+      }
+      const { done, value } = await reader.read();
+      if (done) break;
+      byteCount += value.byteLength;
+      if (byteCount > maxBytes) {
+        await reader.cancel();
+        throw new ScheduledMarketWriterError(
+          "invalid_upstream",
+          "Scheduled market upstream response exceeds safe size limit"
+        );
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const bytes = new Uint8Array(byteCount);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(bytes);
+}
+
+async function readUpstreamText(
+  options: CliOptions,
+  fetchImpl: FetchLike,
+  networkOptions: { maxBytes: number; timeoutMs: number }
+): Promise<string> {
   if (options.input) {
     return readFileSync(resolve(options.input), "utf8");
   }
 
   const target = parseApprovedUpstreamUrl(options.upstreamUrl);
-  const response = await fetchImpl(target.href, {
-    method: "GET",
-    headers: { Accept: "application/json" }
+  const controller = new AbortController();
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      controller.abort();
+      reject(
+        new ScheduledMarketWriterError(
+          "invalid_upstream",
+          "Scheduled market upstream request timed out"
+        )
+      );
+    }, networkOptions.timeoutMs);
   });
-  if (!response.ok) {
+
+  const fetchAndRead = async () => {
+    const response = await fetchImpl(target.href, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      redirect: "error",
+      signal: controller.signal
+    });
+    if (!response.ok) {
+      throw new ScheduledMarketWriterError(
+        "invalid_upstream",
+        "Scheduled market upstream request failed"
+      );
+    }
+    assertJsonResponse(response);
+    return readBoundedResponseText(response, networkOptions.maxBytes, controller.signal);
+  };
+
+  try {
+    return await Promise.race([fetchAndRead(), timeout]);
+  } catch (error) {
+    if (error instanceof ScheduledMarketWriterError) throw error;
     throw new ScheduledMarketWriterError(
       "invalid_upstream",
       "Scheduled market upstream request failed"
     );
+  } finally {
+    if (timeoutId !== undefined) clearTimeout(timeoutId);
   }
-  return response.text();
 }
 
 function parseApprovedUpstreamUrl(upstreamUrl: string | undefined): URL {
@@ -165,7 +277,8 @@ function parseApprovedUpstreamUrl(upstreamUrl: string | undefined): URL {
   if (
     target.origin !== `https://${MARKET_SOURCE_ID}` ||
     target.username !== "" ||
-    target.password !== ""
+    target.password !== "" ||
+    target.hash !== ""
   ) {
     throw new ScheduledMarketWriterError(
       "invalid_upstream",
@@ -178,9 +291,10 @@ function parseApprovedUpstreamUrl(upstreamUrl: string | undefined): URL {
 async function readUpstream(
   options: CliOptions,
   mappings: readonly MarketSourceMapping[],
-  fetchImpl: FetchLike
+  fetchImpl: FetchLike,
+  networkOptions: { maxBytes: number; timeoutMs: number }
 ): Promise<ScheduledMarketUpstreamResponse> {
-  const upstreamText = await readUpstreamText(options, fetchImpl);
+  const upstreamText = await readUpstreamText(options, fetchImpl, networkOptions);
   if (options.input) return parseScheduledMarketUpstreamResponseJson(upstreamText);
   return parseMarketsLostcityRawResponseJson(upstreamText, { mappings });
 }
@@ -224,7 +338,10 @@ export async function runScheduledMarketWriter(
   const options = parseArgs(argv);
   const outputDir = resolve(options.outputDir);
   const mappings = selectMappings(options.itemIds);
-  const upstream = await readUpstream(options, mappings, dependencies.fetchImpl ?? fetch);
+  const upstream = await readUpstream(options, mappings, dependencies.fetchImpl ?? fetch, {
+    maxBytes: dependencies.maxUpstreamBytes ?? PRICE_SET_IMPORT_MAX_BYTES,
+    timeoutMs: dependencies.upstreamTimeoutMs ?? SCHEDULED_MARKET_UPSTREAM_TIMEOUT_MS
+  });
   const outputs = createScheduledMarketSnapshotOutputs({
     upstream,
     previousPrices: readJsonFile(outputDir, "prices.json"),
