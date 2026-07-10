@@ -2602,9 +2602,9 @@ describe("rewrite UI view models", () => {
       baselinePrice: 500,
       gpDelta: -150,
       percentDelta: -30,
-      statusLabel: "Tracked locally"
+      statusLabel: "Tracked"
     });
-    expect(untracked?.historyContext.statusLabel).toBe("No local history");
+    expect(untracked?.historyContext.statusLabel).toBe("No history");
     expect(parentOnly?.historyContext.statusLabel).toBe("No item key");
   });
 

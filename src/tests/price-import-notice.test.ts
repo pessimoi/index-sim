@@ -91,7 +91,8 @@ describe("price import notices", () => {
   it("formats import success consistently", () => {
     expect(createPriceImportSuccessNotice("Imported fixture prices")).toEqual({
       tone: "success",
-      message: "Imported price set: Imported fixture prices"
+      message:
+        "Imported market prices: Imported fixture prices. High alch values use current generated game data."
     });
   });
 });

@@ -188,11 +188,12 @@ function loadGeneratedCandidateContext(candidate: CliOptions["candidate"]): Simu
     label: "Runtime readiness static prices",
     source: "scraped",
     itemPrices: readRepoJson("prices.json"),
-    alchValues: readRepoJson("alch.json"),
+    alchValues: {},
     provenance: {
-      source: "scraped",
-      sourceRef: "prices.json and alch.json",
-      notes: "Repo-local static price files used only for generated runtime readiness coverage."
+      source: "generated",
+      sourceRef: "prices.json + generated game data",
+      notes:
+        "Repo-local market prices plus authoritative generated high-alch values are used for runtime readiness coverage."
     }
   });
   return {

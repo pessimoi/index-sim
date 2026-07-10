@@ -18,10 +18,12 @@ import {
   analyzePriceHistoryTrend,
   appendAcceptedPriceSetToHistory,
   BrowserPriceHistoryStateSchema,
+  createSharedPriceHistoryAnalysis,
   DEFAULT_PRICE_HISTORY_STATE,
   keepPriceHistoryOnFailure,
   PRICE_HISTORY_MAX_SNAPSHOTS,
   PRICE_HISTORY_STORAGE_KEY,
+  mergePriceHistoryForAnalysis,
   priceHistorySnapshotKey,
   summarizePriceHistory
 } from "../app/state/price-history";
@@ -229,7 +231,7 @@ describe("market sync UI state helpers", () => {
     expect(details.counts).toEqual({ all: 2, updated: 1, skipped: 0, failed: 1 });
   });
 
-  it("keeps scheduled values authoritative while filling missing generated item values", () => {
+  it("keeps scheduled prices authoritative while generated high-alch values win", () => {
     const context = fixtureContext();
     context.gameData.items = {
       lobster: { id: "lobster", name: "Lobster", price: 190, alch: 12 },
@@ -247,7 +249,7 @@ describe("market sync UI state helpers", () => {
       lobster: 210,
       rune_sword: 12_345
     });
-    expect(composed.scheduledPriceSet?.alchValues).toEqual({ lobster: 15, rune_sword: 8_320 });
+    expect(composed.scheduledPriceSet?.alchValues).toEqual({ lobster: 12, rune_sword: 8_320 });
     expect(scheduledStatus.scheduledPriceSet?.itemPrices).toEqual({ lobster: 210 });
   });
 
@@ -368,6 +370,27 @@ describe("market sync UI state helpers", () => {
       latestLabel: "Manual prices",
       activeMatchesLatest: true
     });
+  });
+
+  it("merges shared scheduled history with local comparisons without mutating local state", () => {
+    const local = appendAcceptedPriceSetToHistory(
+      DEFAULT_PRICE_HISTORY_STATE,
+      importedPriceSet(),
+      new Date("2026-07-05T13:00:00.000Z")
+    );
+    const shared = createSharedPriceHistoryAnalysis([
+      { t: 1751716800, prices: { lobster: 190 } },
+      { t: 1751720400, prices: { lobster: 200 } }
+    ]);
+    const merged = mergePriceHistoryForAnalysis({ shared, local });
+
+    expect(local.snapshots).toHaveLength(1);
+    expect(shared.snapshots).toHaveLength(2);
+    expect(merged.snapshots).toHaveLength(3);
+    expect(merged.snapshots[0].label).toBe("Manual prices");
+    expect(analyzePriceHistoryTrend(merged, "lobster").points.map((point) => point.price)).toEqual([
+      190, 200, 205
+    ]);
   });
 
   it("accepted market sync PriceSet adds a browser-local history snapshot", () => {

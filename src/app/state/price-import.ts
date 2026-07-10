@@ -96,5 +96,8 @@ export function describePriceImportError(error: unknown): PriceImportNotice {
 }
 
 export function createPriceImportSuccessNotice(label: string): PriceImportNotice {
-  return { tone: "success", message: `Imported price set: ${label}` };
+  return {
+    tone: "success",
+    message: `Imported market prices: ${label}. High alch values use current generated game data.`
+  };
 }

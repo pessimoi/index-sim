@@ -1046,9 +1046,13 @@ describe("legacy storage migration foundation", () => {
       label: "Legacy browser prices",
       source: "imported",
       createdAt: "2023-11-14T22:13:20.000Z",
-      itemPrices: { lobster: 224, big_bones: 390 },
-      alchValues: { lobster: 90, big_bones: 0 }
+      itemPrices: { lobster: 224, big_bones: 390 }
     });
+    expect(report.priceSet?.alchValues.lobster).toBe(gameData.items.lobster.alch);
+    expect(report.priceSet?.alchValues.big_bones).toBe(gameData.items.big_bones.alch);
+    expect(report.warnings).toContain(
+      "Legacy high-alch overrides were replaced with current generated game data."
+    );
     expect(report.importedFields).toContain("prices.priceSet");
   });
 

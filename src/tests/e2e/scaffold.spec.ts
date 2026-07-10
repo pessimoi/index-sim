@@ -260,7 +260,7 @@ test("loads the dense combat spreadsheet root", async ({ page }) => {
   await expect(page.getByRole("table", { name: "All monsters" })).toBeVisible();
   await expect(page.getByText("All monsters")).toBeVisible();
   await expect(page.getByText("DPS").first()).toBeVisible();
-  await expect(page.getByText("Live hiscores lookup is not configured in this run.")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Hiscores" })).toBeVisible();
   await page.getByLabel("Workbench tabs").getByRole("button", { name: "Economy" }).click();
   const market = page.locator('section[aria-label="Market price data"]');
   await expect(
@@ -321,6 +321,9 @@ test("keeps hiscores disabled fallback focused on manual Player levels", async (
 test("renders scheduled price status and keeps local PriceSet overrides separate", async ({
   page
 }) => {
+  await page.route("**/price-history.json", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+  });
   let refreshRequested = false;
   await page.route("**/api/market/status", async (route) => {
     await route.fulfill({
@@ -379,12 +382,12 @@ test("renders scheduled price status and keeps local PriceSet overrides separate
       buffer: Buffer.from(JSON.stringify(importedPriceSet))
     });
 
-  await expect(market.getByLabel("Price import notice")).toContainText("Imported price set");
+  await expect(market.getByLabel("Price import notice")).toContainText("Imported market prices");
   await expect(activePriceSetSummary).toContainText("Label Disabled market imported prices");
   await expect(activePriceSetSummary).toContainText("Active source Local override");
   await expect(activePriceSetSummary).toContainText("Source manual");
   await expect(activePriceSetSummary).toContainText("Item prices 2");
-  await expect(activePriceSetSummary).toContainText("Alch values 2");
+  await expect(activePriceSetSummary).toContainText(/Alch values [1-9][0-9,]*/);
   await expect(page.getByLabel("Price history summary")).toContainText("Snapshots 1");
   await expect(market.getByRole("button", { name: /Sync/ })).toHaveCount(0);
 
@@ -414,11 +417,11 @@ test("renders scheduled price status and keeps local PriceSet overrides separate
         id: "manual-disabled-market",
         label: "Disabled market imported prices",
         source: "manual",
-        itemPrices: { big_bones: 910, lobster: 90 },
-        alchValues: { big_bones: 0, lobster: 0 }
+        itemPrices: { big_bones: 910, lobster: 90 }
       }
     }
   });
+  expect(persistedSelected.data.priceSet.alchValues.lobster).not.toBe(0);
   await page.reload();
   await page.getByLabel("Workbench tabs").getByRole("button", { name: "Economy" }).click();
   const reloadedMarket = page.locator('section[aria-label="Market price data"]');
@@ -1204,9 +1207,9 @@ test("reviews and imports compatible legacy setup data", async ({ page }) => {
       "MAX HIT": "14.0",
       "HIT %": "78.7%",
       "XP/HR": "17,756",
-      "GP/HR NET": "-266,358",
+      "GP/HR NET": "-263,827",
       "KILLS/HR": "109",
-      "GP/KILL": "72",
+      "GP/KILL": "122",
       "SUPPLY/KILL": "5,292"
     }
   });
@@ -1528,6 +1531,9 @@ test("keeps setup import failures non-fatal and retryable", async ({ page }) => 
 });
 
 test("keeps PriceSet import failures non-fatal and recoverable", async ({ page }) => {
+  await page.route("**/price-history.json", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+  });
   await page.goto("/");
   await page.getByLabel("Workbench tabs").getByRole("button", { name: "Settings" }).click();
   const settings = page.locator('[aria-label="Price data settings"]');
@@ -1606,7 +1612,7 @@ test("keeps PriceSet import failures non-fatal and recoverable", async ({ page }
       buffer: Buffer.from(JSON.stringify(importedPriceSet))
     });
 
-  await expect(settings.getByLabel("Price import notice")).toContainText("Imported price set");
+  await expect(settings.getByLabel("Price import notice")).toContainText("Imported market prices");
   await expect(priceSetSummary).toContainText("Label Imported after error prices");
   await expect(historySummary).toContainText("Snapshots 1");
 });
@@ -3144,9 +3150,7 @@ test("shows loot value composition, nested detail and action impact detail", asy
     "prayer XP/kill"
   );
   await bigBonesRow.locator("details").last().locator("summary").click();
-  await expect(page.getByLabel("Local price history for Big bones")).toContainText(
-    "No local history"
-  );
+  await expect(page.getByLabel("Price history for Big bones")).toContainText("Tracked");
 
   await page
     .getByLabel(/Action for Big bones/)
@@ -3256,6 +3260,9 @@ test("matches browser-rendered numeric snapshots for loot action and trip overri
 });
 
 test("matches browser-rendered numeric snapshots for imported price sets", async ({ page }) => {
+  await page.route("**/price-history.json", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+  });
   await page.goto("/");
   await page.getByLabel("Workbench tabs").getByRole("button", { name: "Settings" }).click();
   const settings = page.locator('[aria-label="Price data settings"]');
@@ -3290,7 +3297,7 @@ test("matches browser-rendered numeric snapshots for imported price sets", async
   await expect(priceSetSummary).toContainText("Label Imported fixture prices");
   await expect(priceSetSummary).toContainText("Source manual");
   await expect(priceSetSummary).toContainText("Item prices 2");
-  await expect(priceSetSummary).toContainText("Alch values 2");
+  await expect(priceSetSummary).toContainText(/Alch values [1-9][0-9,]*/);
   await expect(priceSetSummary).toContainText("Status Imported price set");
   await expect(settings).toContainText("Imported price set: Imported fixture prices");
   await expect(page.locator(".topbar")).toContainText("Imported fixture prices");
@@ -3478,6 +3485,9 @@ test("keeps market UI scheduled-only when the compatibility sync API exists", as
 });
 
 test("analyzes and manages browser-local price history in Economy", async ({ page }) => {
+  await page.route("**/price-history.json", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+  });
   await page.addInitScript(() => {
     window.localStorage.setItem("index-sim:unrelated-test", "keep-me");
     window.localStorage.setItem(
@@ -3528,7 +3538,7 @@ test("analyzes and manages browser-local price history in Economy", async ({ pag
   await expect(itemTrend).toContainText("Minimum300");
   await expect(itemTrend).toContainText("Maximum500");
   await expect(itemTrend).toContainText("+50 / +16.7%");
-  await expect(page.getByRole("img", { name: "Big bones local price trend" })).toBeVisible();
+  await expect(page.getByRole("img", { name: "Big bones price trend", exact: true })).toBeVisible();
   await expect(page.getByLabel("Price points for Big bones")).toContainText("2026-07-04");
 
   await page.getByLabel("Workbench tabs").getByRole("button", { name: "Loot" }).click();
@@ -3536,8 +3546,8 @@ test("analyzes and manages browser-local price history in Economy", async ({ pag
     name: /Big bones/
   });
   await bigBonesRow.locator("details").last().locator("summary").click();
-  const localHistory = page.getByLabel("Local price history for Big bones");
-  await expect(localHistory).toContainText("Tracked locally");
+  const localHistory = page.getByLabel("Price history for Big bones");
+  await expect(localHistory).toContainText("Tracked");
   await expect(localHistory).toContainText("350");
   await expect(localHistory).toContainText("500");
   await expect(localHistory).toContainText("-150");
@@ -3550,21 +3560,21 @@ test("analyzes and manages browser-local price history in Economy", async ({ pag
   await page.getByLabel("Baseline").selectOption("first");
   await expect(page.getByLabel("Price history summary")).toContainText("First test prices");
 
-  await page.getByRole("button", { name: "Snapshot now" }).click();
+  await page.getByRole("button", { name: "Save local comparison" }).click();
   await expect(page.getByLabel("Price history summary")).toContainText("Snapshots 4");
   const afterSnapshot = await page.evaluate(() =>
     JSON.parse(window.localStorage.getItem("index-sim:price-history") ?? "null")
   );
   expect(afterSnapshot.data.snapshots).toHaveLength(4);
 
-  await page.getByRole("button", { name: "Clear history" }).click();
+  await page.getByRole("button", { name: "Clear local history" }).click();
   expect(
     await page.evaluate(() => window.localStorage.getItem("index-sim:price-history"))
   ).not.toBe(null);
-  await page.getByRole("button", { name: "Confirm clear history" }).click();
+  await page.getByRole("button", { name: "Confirm clear local history" }).click();
   await expect(page.getByLabel("Price history summary")).toContainText("Snapshots 0");
   await expect(page.getByLabel("Trend item")).toBeDisabled();
-  await expect(page.getByLabel("Item price trend")).toContainText("No local price points");
+  await expect(page.getByLabel("Item price trend")).toContainText("No price points");
   expect(await page.evaluate(() => window.localStorage.getItem("index-sim:price-history"))).toBe(
     null
   );
@@ -3572,4 +3582,49 @@ test("analyzes and manages browser-local price history in Economy", async ({ pag
     "keep-me"
   );
   await expect(page.locator(".topbar")).toContainText(/scheduled static prices/i);
+});
+
+test("keeps shared scheduled price history read-only beside local comparisons", async ({
+  page
+}) => {
+  await page.route("**/price-history.json", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([
+        { t: 1783339200, prices: { lobster: 180, big_bones: 420 } },
+        { t: 1783425600, prices: { lobster: 200, big_bones: 400 } },
+        { t: 1783512000, prices: { lobster: 220, big_bones: 380 } }
+      ])
+    });
+  });
+
+  await page.goto("/");
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Economy" }).click();
+  const summary = page.getByLabel("Price history summary");
+
+  await expect(summary).toContainText("Snapshots 3");
+  await expect(summary).toContainText("Shared 3");
+  await expect(summary).toContainText("Local 0");
+  await page.getByLabel("Trend item").selectOption("big_bones");
+  await expect(page.getByRole("img", { name: "Big bones price trend", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Clear local history" })).toBeDisabled();
+  expect(await page.evaluate(() => window.localStorage.getItem("index-sim:price-history"))).toBe(
+    null
+  );
+
+  await page.getByRole("button", { name: "Save local comparison" }).click();
+  await expect(summary).toContainText("Snapshots 4");
+  await expect(summary).toContainText("Shared 3");
+  await expect(summary).toContainText("Local 1");
+
+  await page.getByRole("button", { name: "Clear local history" }).click();
+  await page.getByRole("button", { name: "Confirm clear local history" }).click();
+  await expect(summary).toContainText("Snapshots 3");
+  await expect(summary).toContainText("Shared 3");
+  await expect(summary).toContainText("Local 0");
+  await expect(page.getByLabel("Trend item")).toBeEnabled();
+  expect(await page.evaluate(() => window.localStorage.getItem("index-sim:price-history"))).toBe(
+    null
+  );
 });

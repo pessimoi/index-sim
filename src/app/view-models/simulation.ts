@@ -1172,7 +1172,7 @@ function lootPriceHistoryContext(
       percentDelta: null,
       latestLabel: null,
       baselineLabel: null,
-      statusLabel: "No local history"
+      statusLabel: "No history"
     };
   }
 
@@ -1186,7 +1186,7 @@ function lootPriceHistoryContext(
     percentDelta: cleanNullableNumber(history.percentDelta),
     latestLabel: history.latestLabel,
     baselineLabel: history.baselineLabel,
-    statusLabel: "Tracked locally"
+    statusLabel: "Tracked"
   };
 }
 

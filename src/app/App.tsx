@@ -46,7 +46,11 @@ import {
   type LegacySetupMigrationReport,
   type LegacyStorageKey
 } from "@/adapters/storage/legacy-migration";
-import { loadGeneratedRuntimeContext } from "@/adapters/generated";
+import {
+  generatedItemValues,
+  loadGeneratedRuntimeContext,
+  withGeneratedAlchAuthority
+} from "@/adapters/generated";
 import { supportedSpecialAttacksForCombatStyle } from "@/domain/combat";
 import { loadoutToCombatBonuses } from "@/domain/equipment";
 import {
@@ -159,7 +163,9 @@ import {
   analyzePriceHistoryTrend,
   appendAcceptedPriceSetToHistory,
   BrowserPriceHistoryStateSchema,
+  createSharedPriceHistoryAnalysis,
   DEFAULT_PRICE_HISTORY_STATE,
+  mergePriceHistoryForAnalysis,
   PRICE_HISTORY_STORAGE_KEY,
   PRICE_HISTORY_VERSION,
   priceHistorySnapshotKey,
@@ -1069,7 +1075,7 @@ function PriceTrendChart({ trend }: { trend: PriceHistoryTrendAnalysis }) {
           <h3>Item trend</h3>
           <span className="status-pill">empty</span>
         </div>
-        <p>No local price points</p>
+        <p>No price points</p>
       </div>
     );
   }
@@ -1130,9 +1136,9 @@ function PriceTrendChart({ trend }: { trend: PriceHistoryTrendAnalysis }) {
         className="economy-trend-chart"
         viewBox={`0 0 ${width} ${height}`}
         role="img"
-        aria-label={`${trend.itemLabel} local price trend`}
+        aria-label={`${trend.itemLabel} price trend`}
       >
-        <title>{`${trend.itemLabel} local price trend from ${optionalPrice(
+        <title>{`${trend.itemLabel} price trend from ${optionalPrice(
           trend.firstPrice
         )} to ${optionalPrice(trend.latestPrice)}`}</title>
         <line
@@ -2558,9 +2564,12 @@ export function App() {
         const bundledContext = result.context;
         const selectedPriceSet = loadSelectedPriceSet(storage);
         const restoredPriceSet =
-          selectedPriceSet.status === "loaded" ? selectedPriceSet.value.priceSet : null;
+          selectedPriceSet.status === "loaded"
+            ? withGeneratedAlchAuthority(selectedPriceSet.value.priceSet, bundledContext.gameData)
+            : null;
         const scheduledStatus = await loadScheduledStaticPriceSnapshot({
-          fallbackPriceSet: restoredPriceSet ?? bundledContext.priceSet
+          fallbackPriceSet: restoredPriceSet ?? bundledContext.priceSet,
+          canonicalAlchValues: generatedItemValues(bundledContext.gameData, "alch")
         });
         if (cancelled) return;
         const runtimeScheduledStatus = withGeneratedScheduledPriceFallbacks(
@@ -2744,17 +2753,25 @@ export function App() {
       return { status: "error", message: describeShareableSetupError(error) };
     }
   }, [context, receivedShareableSetupPayload]);
+  const sharedPriceHistory = useMemo(
+    () => createSharedPriceHistoryAnalysis(scheduledSnapshotStatus?.sharedPriceHistory ?? []),
+    [scheduledSnapshotStatus?.sharedPriceHistory]
+  );
+  const analysisPriceHistory = useMemo(
+    () => mergePriceHistoryForAnalysis({ shared: sharedPriceHistory, local: priceHistory }),
+    [priceHistory, sharedPriceHistory]
+  );
   const priceHistorySummary = useMemo(
-    () => summarizePriceHistory(priceHistory, context?.priceSet ?? null),
-    [context?.priceSet, priceHistory]
+    () => summarizePriceHistory(analysisPriceHistory, context?.priceSet ?? null),
+    [analysisPriceHistory, context?.priceSet]
   );
   const priceHistorySnapshotOptions = useMemo<SelectOption[]>(
     () =>
-      priceHistory.snapshots.map((snapshot) => ({
+      analysisPriceHistory.snapshots.map((snapshot) => ({
         id: priceHistorySnapshotKey(snapshot),
         label: `${snapshot.label} - ${snapshot.capturedAt}`
       })),
-    [priceHistory]
+    [analysisPriceHistory]
   );
   const priceHistoryItemLabels = useMemo<Record<string, string>>(() => {
     if (!context) return {};
@@ -2769,7 +2786,7 @@ export function App() {
     : (priceHistorySnapshotOptions[0]?.id ?? "");
   const priceHistoryMovers = useMemo(
     () =>
-      analyzePriceHistoryMovers(priceHistory, {
+      analyzePriceHistoryMovers(analysisPriceHistory, {
         baselineMode: economyBaselineMode,
         baselineSnapshotKey: effectiveEconomySnapshotKey,
         itemFilter: economyItemFilter,
@@ -2781,18 +2798,18 @@ export function App() {
       economyItemFilter,
       effectiveEconomySnapshotKey,
       economySort,
-      priceHistory,
+      analysisPriceHistory,
       priceHistoryItemLabels
     ]
   );
   const priceHistoryTrendItemOptions = useMemo<SelectOption[]>(() => {
     const itemIds = new Set(
-      priceHistory.snapshots.flatMap((snapshot) => Object.keys(snapshot.itemPrices))
+      analysisPriceHistory.snapshots.flatMap((snapshot) => Object.keys(snapshot.itemPrices))
     );
     return [...itemIds]
       .map((itemId) => ({ id: itemId, label: priceHistoryItemLabels[itemId] ?? itemId }))
       .sort((left, right) => left.label.localeCompare(right.label));
-  }, [priceHistory, priceHistoryItemLabels]);
+  }, [analysisPriceHistory, priceHistoryItemLabels]);
   const effectiveEconomyTrendItemId = priceHistoryTrendItemOptions.some(
     (option) => option.id === economyTrendItemId
   )
@@ -2800,18 +2817,22 @@ export function App() {
     : (priceHistoryMovers.rows[0]?.itemId ?? priceHistoryTrendItemOptions[0]?.id ?? "");
   const priceHistoryTrend = useMemo(
     () =>
-      analyzePriceHistoryTrend(priceHistory, effectiveEconomyTrendItemId, priceHistoryItemLabels),
-    [effectiveEconomyTrendItemId, priceHistory, priceHistoryItemLabels]
+      analyzePriceHistoryTrend(
+        analysisPriceHistory,
+        effectiveEconomyTrendItemId,
+        priceHistoryItemLabels
+      ),
+    [analysisPriceHistory, effectiveEconomyTrendItemId, priceHistoryItemLabels]
   );
   const lootPriceHistoryMovers = useMemo(
     () =>
-      analyzePriceHistoryMovers(priceHistory, {
+      analyzePriceHistoryMovers(analysisPriceHistory, {
         baselineMode: economyBaselineMode,
         baselineSnapshotKey: effectiveEconomySnapshotKey,
         itemLabels: priceHistoryItemLabels,
         sort: { key: "item", direction: "asc" }
       }),
-    [economyBaselineMode, effectiveEconomySnapshotKey, priceHistory, priceHistoryItemLabels]
+    [analysisPriceHistory, economyBaselineMode, effectiveEconomySnapshotKey, priceHistoryItemLabels]
   );
   const lootPriceHistoryByItem = useMemo<Record<string, LootPriceHistoryItemContext>>(() => {
     const latestLabel = lootPriceHistoryMovers.latest?.label ?? null;
@@ -3246,18 +3267,22 @@ export function App() {
   };
 
   const acceptPriceSet = (priceSet: PriceSet, acceptedAt: Date, nextStatus: string) => {
-    const selectedPersisted = persistSelectedActivePriceSet(priceSet, acceptedAt);
+    if (!context) return;
+    const canonicalPriceSet = withGeneratedAlchAuthority(priceSet, context.gameData);
+    const selectedPersisted = persistSelectedActivePriceSet(canonicalPriceSet, acceptedAt);
     unblockReplacedLocalState(["price-history", "selected-price-set"]);
-    setContext((current) => (current ? { ...current, priceSet } : current));
-    setPriceHistory((current) => appendAcceptedPriceSetToHistory(current, priceSet, acceptedAt));
-    setPriceLabel(priceSet.label);
+    setContext((current) => (current ? { ...current, priceSet: canonicalPriceSet } : current));
+    setPriceHistory((current) =>
+      appendAcceptedPriceSetToHistory(current, canonicalPriceSet, acceptedAt)
+    );
+    setPriceLabel(canonicalPriceSet.label);
     setActivePriceSetOrigin("selected");
     setStatus(nextStatus);
     setMarketNotice({
       tone: selectedPersisted ? "success" : "neutral",
       message: selectedPersisted
-        ? `${nextStatus}: ${priceSet.label}`
-        : `${nextStatus}: ${priceSet.label}. Local restore was not saved.`
+        ? `${nextStatus}: ${canonicalPriceSet.label}. High alch uses current generated game data.`
+        : `${nextStatus}: ${canonicalPriceSet.label}. High alch uses current generated game data. Local restore was not saved.`
     });
     setFatalError(null);
   };
@@ -3608,20 +3633,20 @@ export function App() {
     });
   };
 
-  const snapshotCurrentPriceSet = () => {
+  const saveLocalPriceComparison = () => {
     if (!context) return;
     const capturedAt = new Date();
     setPriceHistory((current) =>
       appendAcceptedPriceSetToHistory(current, context.priceSet, capturedAt)
     );
     setPriceHistoryClearPending(false);
-    setStatus("Captured price snapshot");
-    setMarketNotice({ tone: "success", message: "Captured active price set snapshot" });
+    setStatus("Saved local price comparison");
+    setMarketNotice({ tone: "success", message: "Saved active prices as a local comparison" });
   };
 
   const requestClearPriceHistory = () => {
     setPriceHistoryClearPending(true);
-    setMarketNotice({ tone: "neutral", message: "Confirm clearing local price history" });
+    setMarketNotice({ tone: "neutral", message: "Confirm clearing local comparison history" });
   };
 
   const confirmClearPriceHistory = () => {
@@ -3641,7 +3666,7 @@ export function App() {
       tone: !persistedClear ? "neutral" : "success",
       message: !persistedClear
         ? "Cleared price history for this session. Local storage is unavailable, so reload may restore it."
-        : "Cleared local price history"
+        : "Cleared local comparison history"
     });
   };
 
@@ -6033,7 +6058,7 @@ export function App() {
                                     ]
                                       .filter((item): item is string => item !== null)
                                       .join(" ")}
-                                    aria-label={`Local price history for ${row.name}`}
+                                    aria-label={`Price history for ${row.name}`}
                                   >
                                     <div className="loot-history-heading">
                                       <strong>Local history</strong>
@@ -7854,7 +7879,8 @@ export function App() {
                   {renderScheduledSnapshotSummary()}
                   <p className="inline-status neutral">
                     Market upstream refresh is scheduled, not user-triggered. Import a PriceSet file
-                    to override prices locally.
+                    to override market prices locally. High alch always uses current generated game
+                    data.
                   </p>
                   <div className="market-sync-bar">
                     <label className="file-button">
@@ -7866,13 +7892,13 @@ export function App() {
                       />
                     </label>
                     {activeTab === "economy" && renderPriceSetControls()}
-                    <button type="button" disabled={!context} onClick={snapshotCurrentPriceSet}>
-                      Snapshot now
+                    <button type="button" disabled={!context} onClick={saveLocalPriceComparison}>
+                      Save local comparison
                     </button>
                     {priceHistoryClearPending ? (
                       <>
                         <button type="button" onClick={confirmClearPriceHistory}>
-                          Confirm clear history
+                          Confirm clear local history
                         </button>
                         <button type="button" onClick={() => setPriceHistoryClearPending(false)}>
                           Cancel
@@ -7884,7 +7910,7 @@ export function App() {
                         disabled={priceHistory.snapshots.length === 0}
                         onClick={requestClearPriceHistory}
                       >
-                        Clear history
+                        Clear local history
                       </button>
                     )}
                   </div>
@@ -7903,6 +7929,8 @@ export function App() {
                   </div>
                   <div className="price-history-summary" aria-label="Price history summary">
                     <span>Snapshots {formatNumber(priceHistorySummary.snapshotCount)}</span>
+                    <span>Shared {formatNumber(sharedPriceHistory.snapshots.length)}</span>
+                    <span>Local {formatNumber(priceHistory.snapshots.length)}</span>
                     <span>Items {formatNumber(priceHistorySummary.trackedItemCount)}</span>
                     <span>Moved {formatNumber(priceHistoryMovers.movedItemCount)}</span>
                     <span>Latest age {formatAge(priceHistorySummary.latestAgeSeconds)}</span>
@@ -7941,7 +7969,13 @@ export function App() {
                     <div className="section-title-row">
                       <h2>Price history</h2>
                       <span className="status-pill">
-                        {priceHistoryMovers.latest ? "local" : "empty"}
+                        {sharedPriceHistory.snapshots.length
+                          ? priceHistory.snapshots.length
+                            ? "shared + local"
+                            : "shared"
+                          : priceHistory.snapshots.length
+                            ? "local"
+                            : "empty"}
                       </span>
                     </div>
                     <div className="economy-controls">

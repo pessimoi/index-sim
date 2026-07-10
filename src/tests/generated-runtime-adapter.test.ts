@@ -1,7 +1,8 @@
 import { loadBundledLegacyContext } from "../adapters/browser";
 import {
   createGeneratedRuntimeContext,
-  createGeneratedRuntimeReadinessReport
+  createGeneratedRuntimeReadinessReport,
+  withGeneratedAlchAuthority
 } from "../adapters/generated";
 import { createLegacyDerivedStaticRuntimeContext } from "../adapters/static-runtime";
 import {
@@ -11,6 +12,26 @@ import {
 } from "../../scripts/report-generated-runtime-readiness";
 
 describe("generated runtime adapter", () => {
+  it("keeps imported market prices but replaces imported high-alch overrides", () => {
+    const runtime = createGeneratedRuntimeContext();
+    const imported = {
+      id: "imported-prices",
+      label: "Imported prices",
+      source: "imported" as const,
+      createdAt: "2026-07-10T00:00:00.000Z",
+      itemPrices: { rune_scimitar: 99_999 },
+      alchValues: { rune_scimitar: 1 }
+    };
+
+    const composed = withGeneratedAlchAuthority(imported, runtime.context.gameData);
+
+    expect(composed.itemPrices.rune_scimitar).toBe(99_999);
+    expect(composed.alchValues.rune_scimitar).toBe(
+      runtime.context.gameData.items.rune_scimitar.alch
+    );
+    expect(composed.alchValues.rune_scimitar).not.toBe(1);
+  });
+
   it("creates a validated SimulationContext from committed generated data and static prices", () => {
     const result = createGeneratedRuntimeContext({
       loadedAt: "2026-07-09T00:00:00.000Z"
@@ -37,7 +58,7 @@ describe("generated runtime adapter", () => {
     expect(result.context.priceSet.itemPrices["1dose2defense"]).toBe(132);
     expect(result.context.priceSet.alchValues.adamant_spear).toBe(1248);
     expect(result.context.priceSet.provenance?.notes).toContain(
-      "Scheduled item and alch values take precedence"
+      "high-alch values are authoritative generated game data"
     );
   });
 

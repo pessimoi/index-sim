@@ -1092,10 +1092,15 @@ function inspectLegacyPriceSet(
       source: "imported",
       createdAt,
       itemPrices: parsedPrices.value,
-      alchValues: parsedAlch.value,
+      alchValues: Object.fromEntries(
+        Object.entries(options.gameData.items).flatMap(([itemId, item]) =>
+          item.alch === undefined ? [] : [[itemId, item.alch]]
+        )
+      ),
       provenance: {
-        source: "manual",
-        notes: "Imported from legacy browser localStorage keys."
+        source: "generated",
+        notes:
+          "Market prices were imported from legacy browser storage; high-alch values use current generated game data."
       }
     });
   } catch {
@@ -1116,6 +1121,7 @@ function inspectLegacyPriceSet(
 
   report.priceSet = priceSet;
   importField(report, "prices.priceSet");
+  warn(report, "Legacy high-alch overrides were replaced with current generated game data.");
 }
 
 function inspectLegacyPriceHistory(
@@ -1732,8 +1738,7 @@ function createdAtFromLegacyScrapedAt(
 
 function unknownPriceKeys(priceSet: PriceSet, gameData: GameDataSnapshot): string[] {
   const itemIds = new Set(Object.keys(gameData.items));
-  const keys = new Set([...Object.keys(priceSet.itemPrices), ...Object.keys(priceSet.alchValues)]);
-  return [...keys]
+  return Object.keys(priceSet.itemPrices)
     .filter((key) => !itemIds.has(key))
     .sort((left, right) => left.localeCompare(right));
 }

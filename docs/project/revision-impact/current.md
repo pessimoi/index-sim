@@ -70,22 +70,22 @@ Status: raw LostCity source report.
 - Representative suite: pass
 - Cases: 10 run, 10 pass, 0 needs-review, 0 failed
 - Case filter: none
-- Price set: Current prices.json + alch.json + generated item fallbacks
+- Price set: Current prices.json + generated item fallbacks
 - Metrics: DPS, kills/hr, XP/hr, GP/hr and GP/XP deltas only.
 - Accepted changed cases: 10; each accepted delta cites its owning decision in the case notes.
 
 | Case | Tags | Status | DPS Δ | Kills/hr Δ | XP/hr Δ | GP/hr Δ | GP/XP Δ | Notes |
 | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | --- |
-| `raw_melee_giant` | `raw-source`, `melee`, `giant` | pass | 0 (0%) | 0 (0%) | 0 (0%) | -8.57648 (-0.006908%) | -0.00018 (-0.006908%) | Accepted source-backed monster combat and core-loot delta under D-055. |
-| `raw_ranged_giant` | `raw-source`, `ranged`, `giant` | pass | 0 (0%) | 0 (0%) | 0 (0%) | -7.159877 (-0.007393%) | -0.00018 (-0.007393%) | Accepted source-backed monster combat and core-loot delta under D-055. |
-| `raw_magic_giant` | `raw-source`, `magic`, `giant` | pass | 0 (0%) | 0 (0%) | 0 (0%) | -1.157202 (+0.009605%) | -0.000108 (+0.009605%) | Accepted source-backed monster combat and core-loot delta under D-055. |
-| `raw_melee_black_dragon` | `raw-source`, `melee`, `black_dragon` | pass | 0 (0%) | 0 (0%) | 0 (0%) | -1384.33 (-1.994062%) | -0.165968 (-1.994062%) | Accepted source-backed monster combat and core-loot delta under D-055. |
-| `raw_ranged_black_dragon` | `raw-source`, `ranged`, `black_dragon` | pass | 0 (0%) | 0 (0%) | 0 (0%) | -1017.43 (-2.300681%) | -0.165968 (-2.300681%) | Accepted source-backed monster combat and core-loot delta under D-055. |
-| `raw_magic_black_dragon` | `raw-source`, `magic`, `black_dragon` | pass | -0.225848 (-75.805749%) | -4.268003 (-75.805749%) | -2700.37 (-26.617975%) | -36203.2 (-194.058333%) | -4.19602 (-228.176258%) | Accepted source-backed monster combat and core-loot delta under D-055. |
-| `raw_melee_dark_wizard_20` | `raw-source`, `melee`, `dark_wizard_20` | pass | 0 (0%) | 0 (0%) | 0 (0%) | -9.215031 (-0.011755%) | -0.0002 (-0.011755%) | Accepted source-backed monster combat and core-loot delta under D-055. |
-| `raw_ranged_dark_wizard_20` | `raw-source`, `ranged`, `dark_wizard_20` | pass | 0 (0%) | 0 (0%) | 0 (0%) | -7.976563 (-0.013065%) | -0.0002 (-0.013065%) | Accepted source-backed monster combat and core-loot delta under D-055. |
-| `raw_magic_dark_wizard_20` | `raw-source`, `magic`, `dark_wizard_20` | pass | -0.040106 (-12.765378%) | -5.893132 (-12.765378%) | -497.498204 (-4.800924%) | -1325.79 (+7.196605%) | -0.224048 (+12.602568%) | Accepted source-backed monster combat and core-loot delta under D-055. |
-| `raw_thrown_rune_knife_black_dragon` | `raw-source`, `ranged`, `thrown`, `high-tier` | pass | +0.18755 (+28.409091%) | +3.502876 (+28.409091%) | +3547.36 (+28.409091%) | +26863.98 (-2.450933%) | +21.095563 (-24.032585%) | Accepted source-backed thrown-weapon accuracy delta under D-057. |
+| `raw_melee_giant` | `raw-source`, `melee`, `giant` | pass | 0 (0%) | 0 (0%) | 0 (0%) | -8.57648 (-0.006908%) | -0.00018 (-0.006908%) | Accepted source-backed monster combat and core-loot delta under D-055; economy metrics use generated high alch under D-063. |
+| `raw_ranged_giant` | `raw-source`, `ranged`, `giant` | pass | 0 (0%) | 0 (0%) | 0 (0%) | -7.159877 (-0.007393%) | -0.00018 (-0.007393%) | Accepted source-backed monster combat and core-loot delta under D-055; economy metrics use generated high alch under D-063. |
+| `raw_magic_giant` | `raw-source`, `magic`, `giant` | pass | 0 (0%) | 0 (0%) | 0 (0%) | -1.157202 (+0.009605%) | -0.000108 (+0.009605%) | Accepted source-backed monster combat and core-loot delta under D-055; economy metrics use generated high alch under D-063. |
+| `raw_melee_black_dragon` | `raw-source`, `melee`, `black_dragon` | pass | 0 (0%) | 0 (0%) | 0 (0%) | -830.41245 (-1.196173%) | -0.099559 (-1.196173%) | Accepted source-backed monster combat and core-loot delta under D-055; economy metrics use generated high alch under D-063. |
+| `raw_ranged_black_dragon` | `raw-source`, `ranged`, `black_dragon` | pass | 0 (0%) | 0 (0%) | 0 (0%) | -610.322671 (-1.380104%) | -0.099559 (-1.380104%) | Accepted source-backed monster combat and core-loot delta under D-055; economy metrics use generated high alch under D-063. |
+| `raw_magic_black_dragon` | `raw-source`, `magic`, `black_dragon` | pass | -0.225848 (-75.805749%) | -4.268003 (-75.805749%) | -2700.37 (-26.617975%) | -36111.59 (-193.567279%) | -4.183715 (-227.507083%) | Accepted source-backed monster combat and core-loot delta under D-055; economy metrics use generated high alch under D-063. |
+| `raw_melee_dark_wizard_20` | `raw-source`, `melee`, `dark_wizard_20` | pass | 0 (0%) | 0 (0%) | 0 (0%) | -9.215031 (-0.011755%) | -0.0002 (-0.011755%) | Accepted source-backed monster combat and core-loot delta under D-055; economy metrics use generated high alch under D-063. |
+| `raw_ranged_dark_wizard_20` | `raw-source`, `ranged`, `dark_wizard_20` | pass | 0 (0%) | 0 (0%) | 0 (0%) | -7.976563 (-0.013065%) | -0.0002 (-0.013065%) | Accepted source-backed monster combat and core-loot delta under D-055; economy metrics use generated high alch under D-063. |
+| `raw_magic_dark_wizard_20` | `raw-source`, `magic`, `dark_wizard_20` | pass | -0.040106 (-12.765378%) | -5.893132 (-12.765378%) | -497.498204 (-4.800924%) | -1325.79 (+7.196605%) | -0.224048 (+12.602568%) | Accepted source-backed monster combat and core-loot delta under D-055; economy metrics use generated high alch under D-063. |
+| `raw_thrown_rune_knife_black_dragon` | `raw-source`, `ranged`, `thrown`, `high-tier` | pass | +0.18755 (+28.409091%) | +3.502876 (+28.409091%) | +3547.36 (+28.409091%) | +27928.8 (-2.548081%) | +21.161972 (-24.10824%) | Accepted source-backed thrown-weapon accuracy delta under D-057; economy metrics use generated high alch under D-063. |
 
 ### Informational All-Monster Scan
 
@@ -95,17 +95,17 @@ Status: raw LostCity source report.
 - Evaluations: 189
 - Outliers: 22 found, 22 shown
 - Outlier limit: 25
-- Price set: Current prices.json + alch.json + generated item fallbacks
+- Price set: Current prices.json + generated item fallbacks
 - Thresholds: DPS/kills/hr/XP/hr over 10%; GP/hr/GP/XP over 25%.
 - This scan is informational and does not change representative merge-blocking status.
 
 | Baseline | Monster | Kind | Reasons | DPS Δ | Kills/hr Δ | XP/hr Δ | GP/hr Δ | GP/XP Δ | Warnings |
 | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Raw magic (magic) | `black_dragon` / Black Dragon | threshold-outlier | DPS changed -75.805749% over 10%; kills/hr changed -75.805749% over 10%; XP/hr changed -26.617975% over 10%; GP/hr changed -194.058333% over 25%; GP/XP changed -228.176258% over 25% | -0.225848 (-75.805749%) | -4.268003 (-75.805749%) | -2700.37 (-26.617975%) | -36203.2 (-194.058333%) | -4.19602 (-228.176258%) | 3 -> 3 |
+| Raw magic (magic) | `black_dragon` / Black Dragon | threshold-outlier | DPS changed -75.805749% over 10%; kills/hr changed -75.805749% over 10%; XP/hr changed -26.617975% over 10%; GP/hr changed -193.567279% over 25%; GP/XP changed -227.507083% over 25% | -0.225848 (-75.805749%) | -4.268003 (-75.805749%) | -2700.37 (-26.617975%) | -36111.59 (-193.567279%) | -4.183715 (-227.507083%) | 3 -> 3 |
 | Raw magic (magic) | `dark_wizard_20` / Dark Wizard (lvl 20) | threshold-outlier | DPS changed -12.765378% over 10%; kills/hr changed -12.765378% over 10% | -0.040106 (-12.765378%) | -5.893132 (-12.765378%) | -497.498204 (-4.800924%) | -1325.79 (+7.196605%) | -0.224048 (+12.602568%) | 0 -> 0 |
 | Raw magic (magic) | `deadly_red_spider` / Deadly red spider | threshold-outlier | kills/hr changed -42.880519% over 10% | -0.003421 (-1.085776%) | -23.722759 (-42.880519%) | +66.510614 (+0.65699%) | 0 (0%) | +0.018568 (-0.652702%) | 0 -> 0 |
 | Raw magic (magic) | `druid` / Druid | threshold-outlier | DPS changed -13.897937% over 10%; kills/hr changed -13.897937% over 10%; GP/hr changed +26.269515% over 25%; GP/XP changed +33.19682% over 25% | -0.043783 (-13.897937%) | -5.167846 (-13.897937%) | -539.523085 (-5.200804%) | -2618.13 (+26.269515%) | -0.31893 (+33.19682%) | 0 -> 0 |
-| Raw magic (magic) | `green_dragon` / Green Dragon | threshold-outlier | DPS changed -56.083869% over 10%; kills/hr changed -56.083869% over 10%; XP/hr changed -20.056058% over 10%; GP/hr changed -85.768804% over 25%; GP/XP changed -82.198531% over 25% | -0.171887 (-56.083869%) | -8.195934 (-56.083869%) | -2046.93 (-20.056058%) | -50973.95 (-85.768804%) | -4.786573 (-82.198531%) | 2 -> 2 |
+| Raw magic (magic) | `green_dragon` / Green Dragon | threshold-outlier | DPS changed -56.083869% over 10%; kills/hr changed -56.083869% over 10%; XP/hr changed -20.056058% over 10%; GP/hr changed -83.261225% over 25%; GP/XP changed -79.061859% over 25% | -0.171887 (-56.083869%) | -8.195934 (-56.083869%) | -2046.93 (-20.056058%) | -49483.65 (-83.261225%) | -4.603918 (-79.061859%) | 2 -> 2 |
 | Raw magic (magic) | `jungle_spider` / Jungle spider | threshold-outlier | kills/hr changed -44.43244% over 10% | -0.004846 (-1.538183%) | -17.681306 (-44.43244%) | +21.790984 (+0.213751%) | 0 (0%) | +0.006026 (-0.213295%) | 0 -> 0 |
 | Raw magic (magic) | `mountain_troll` / Mountain Troll | threshold-outlier | DPS changed -15.707564% over 10%; kills/hr changed -25.021646% over 10% | -0.049484 (-15.707564%) | -3.525162 (-25.021646%) | -635.69331 (-6.040705%) | -1550.52 (+7.063263%) | -0.290922 (+13.946431%) | 0 -> 0 |
 | Raw magic (magic) | `poison_spider` / Poison spider | threshold-outlier | kills/hr changed -60.96592% over 10% | -0.003991 (-1.266739%) | -27.114774 (-60.96592%) | +75.555154 (+0.742691%) | 0 (0%) | +0.02087 (-0.737216%) | 0 -> 0 |

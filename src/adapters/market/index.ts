@@ -8,6 +8,7 @@ import {
   parseMarketStatusResponseJson,
   parseMarketSyncRequest,
   parseMarketSyncResponseJson,
+  PriceMapSchema,
   parsePriceHistory,
   parsePriceSetJson
 } from "@/data/schemas";
@@ -23,6 +24,8 @@ import type {
 export interface PriceSetImportOptions {
   maxBytes?: number;
 }
+
+export const SCHEDULED_PRICE_HISTORY_MAX_BYTES = 5_000_000;
 
 type Fetcher = typeof fetch;
 
@@ -59,6 +62,7 @@ export interface ScheduledStaticPriceSnapshotStatus {
   itemCount: number | null;
   alchCount: number | null;
   latestHistoryAt: string | null;
+  sharedPriceHistory: Array<{ t: number; prices: Record<string, number> }> | null;
   warnings: string[];
 }
 
@@ -70,8 +74,10 @@ export interface ScheduledStaticPriceSnapshotContent {
 
 export interface ScheduledStaticPriceSnapshotOptions {
   fallbackPriceSet?: PriceSet | null;
+  canonicalAlchValues?: Record<string, number>;
   loadedAt?: string;
   maxBytes?: number;
+  maxHistoryBytes?: number;
 }
 
 export interface ScheduledStaticPriceSnapshotLoadOptions
@@ -197,6 +203,7 @@ function invalidStatus(
       itemCount: null,
       alchCount: null,
       latestHistoryAt: null,
+      sharedPriceHistory: null,
       warnings
     };
   }
@@ -211,6 +218,7 @@ function invalidStatus(
     itemCount: null,
     alchCount: null,
     latestHistoryAt: null,
+    sharedPriceHistory: null,
     warnings
   };
 }
@@ -230,6 +238,7 @@ function missingStatus(
       itemCount: null,
       alchCount: null,
       latestHistoryAt: null,
+      sharedPriceHistory: null,
       warnings: []
     };
   }
@@ -243,6 +252,7 @@ function missingStatus(
     itemCount: null,
     alchCount: null,
     latestHistoryAt: null,
+    sharedPriceHistory: null,
     warnings: []
   };
 }
@@ -278,7 +288,11 @@ export function createScheduledStaticPriceSnapshotStatus(
   const maxBytes = options.maxBytes ?? PRICE_SET_IMPORT_MAX_BYTES;
   const files: ScheduledStaticPriceSnapshotFiles = {
     prices: content.pricesText == null ? "missing" : "loaded",
-    alch: content.alchText == null ? "missing" : "loaded",
+    alch: options.canonicalAlchValues
+      ? "not-requested"
+      : content.alchText == null
+        ? "missing"
+        : "loaded",
     priceHistory:
       content.priceHistoryText === undefined
         ? "not-requested"
@@ -287,7 +301,7 @@ export function createScheduledStaticPriceSnapshotStatus(
           : "loaded"
   };
 
-  if (content.pricesText == null || content.alchText == null) {
+  if (content.pricesText == null || (!options.canonicalAlchValues && content.alchText == null)) {
     return missingStatus(files, options.fallbackPriceSet);
   }
 
@@ -298,24 +312,46 @@ export function createScheduledStaticPriceSnapshotStatus(
     return invalidStatus(files, prices.code, warnings, options.fallbackPriceSet);
   }
 
-  const alch = parseStaticJson(content.alchText, "Scheduled alch values", maxBytes);
-  if (alch.status === "invalid") {
-    files.alch = "invalid";
-    return invalidStatus(files, alch.code, warnings, options.fallbackPriceSet);
+  let alchValues: Record<string, number>;
+  if (options.canonicalAlchValues) {
+    try {
+      alchValues = PriceMapSchema.parse(options.canonicalAlchValues);
+    } catch {
+      return invalidStatus(files, "validation_failed", warnings, options.fallbackPriceSet);
+    }
+  } else {
+    const alch = parseStaticJson(content.alchText as string, "Compatibility alch values", maxBytes);
+    if (alch.status === "invalid") {
+      files.alch = "invalid";
+      return invalidStatus(files, alch.code, warnings, options.fallbackPriceSet);
+    }
+    try {
+      alchValues = PriceMapSchema.parse(alch.value);
+    } catch {
+      files.alch = "invalid";
+      return invalidStatus(files, "validation_failed", warnings, options.fallbackPriceSet);
+    }
   }
 
   let latestHistoryAt: string | null = null;
+  let sharedPriceHistory: Array<{ t: number; prices: Record<string, number> }> | null = null;
   if (content.priceHistoryText !== undefined && content.priceHistoryText !== null) {
-    const history = parseStaticJson(content.priceHistoryText, "Scheduled price history", maxBytes);
+    const history = parseStaticJson(
+      content.priceHistoryText,
+      "Scheduled price history",
+      options.maxHistoryBytes ?? SCHEDULED_PRICE_HISTORY_MAX_BYTES
+    );
     if (history.status === "invalid") {
       files.priceHistory = "invalid";
       warnings.push("Scheduled price history metadata was ignored.");
     } else {
       try {
-        latestHistoryAt = latestHistoryTimestamp(history.value);
+        sharedPriceHistory = parsePriceHistory(history.value);
+        latestHistoryAt = latestHistoryTimestamp(sharedPriceHistory);
       } catch {
         files.priceHistory = "invalid";
         latestHistoryAt = null;
+        sharedPriceHistory = null;
         warnings.push("Scheduled price history metadata was ignored.");
       }
     }
@@ -334,10 +370,12 @@ export function createScheduledStaticPriceSnapshotStatus(
       source: "scraped",
       createdAt,
       itemPrices: prices.value,
-      alchValues: alch.value,
+      alchValues,
       provenance: {
-        source: "scraped",
-        sourceRef: "prices.json and alch.json",
+        source: options.canonicalAlchValues ? "generated" : "scraped",
+        sourceRef: options.canonicalAlchValues
+          ? "prices.json + generated game-data high-alch values"
+          : "prices.json + compatibility alch values",
         verifiedAt: createdAt,
         notes:
           "Read-only scheduled static snapshot candidate validated by the current PriceSet schema."
@@ -353,6 +391,7 @@ export function createScheduledStaticPriceSnapshotStatus(
       itemCount: Object.keys(scheduledPriceSet.itemPrices).length,
       alchCount: Object.keys(scheduledPriceSet.alchValues).length,
       latestHistoryAt,
+      sharedPriceHistory,
       warnings
     };
   } catch {
@@ -387,7 +426,12 @@ export async function loadScheduledStaticPriceSnapshot(
 ): Promise<ScheduledStaticPriceSnapshotStatus> {
   const paths = {
     prices: options.paths?.prices ?? "/prices.json",
-    alch: options.paths?.alch ?? "/alch.json",
+    alch:
+      options.paths?.alch === undefined
+        ? options.canonicalAlchValues
+          ? null
+          : "/alch.json"
+        : options.paths.alch,
     priceHistory:
       options.paths?.priceHistory === undefined ? "/price-history.json" : options.paths.priceHistory
   };

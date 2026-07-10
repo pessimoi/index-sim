@@ -750,8 +750,8 @@ const RAW_LOSTCITY_ACCEPTED_CALCULATION_CHANGES: Readonly<Record<string, string>
     RAW_LOSTCITY_REPRESENTATIVE_CALCULATION_IMPACT_CASES.map((testCase) => [
       testCase.id,
       testCase.id === "raw_thrown_rune_knife_black_dragon"
-        ? "Accepted source-backed thrown-weapon accuracy delta under D-057."
-        : "Accepted source-backed monster combat and core-loot delta under D-055."
+        ? "Accepted source-backed thrown-weapon accuracy delta under D-057; economy metrics use generated high alch under D-063."
+        : "Accepted source-backed monster combat and core-loot delta under D-055; economy metrics use generated high alch under D-063."
     ])
   );
 
@@ -1827,29 +1827,25 @@ function readCurrentCalculationPriceSet(plan: GameDataGenerationPlan): {
   label: string;
   error?: string;
 } {
-  const label = "Current prices.json + alch.json";
+  const label = "Current prices.json";
   try {
     const itemPrices = parseJsonWithDuplicateKeyCheck(
       readFileSync(join(plan.repoRoot, "prices.json"), "utf8"),
       { source: "prices.json" }
     );
-    const alchValues = parseJsonWithDuplicateKeyCheck(
-      readFileSync(join(plan.repoRoot, "alch.json"), "utf8"),
-      { source: "alch.json" }
-    );
     return {
       label,
       priceSet: createPriceSetFromLegacyRecords({
-        id: "current-prices-json-alch-json",
+        id: "current-prices-json",
         label,
         source: "bundled",
         itemPrices,
-        alchValues,
+        alchValues: {},
         provenance: {
           source: "manual",
-          sourceRef: "prices.json + alch.json",
+          sourceRef: "prices.json",
           notes:
-            "Calculation-impact suite reads current prices and alch values only; price-history.json is intentionally excluded."
+            "Calculation-impact suite reads current market prices; generated game data supplies authoritative high-alch values and price-history.json is intentionally excluded."
         }
       })
     };
@@ -1857,7 +1853,7 @@ function readCurrentCalculationPriceSet(plan: GameDataGenerationPlan): {
     const message = error instanceof Error ? sanitizeMessage(error.message) : "unknown error";
     return {
       label,
-      error: `current price set could not be loaded from prices.json + alch.json: ${message}`
+      error: `current price set could not be loaded from prices.json: ${message}`
     };
   }
 }

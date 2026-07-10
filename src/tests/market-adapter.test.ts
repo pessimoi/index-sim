@@ -162,13 +162,12 @@ describe("market browser adapter", () => {
     ).rejects.toMatchObject({ code: "bad-request" });
   });
 
-  it("builds scheduled static PriceSet candidates from same-origin price files", async () => {
+  it("builds scheduled price candidates from prices plus canonical generated alch", async () => {
     const seenPaths: string[] = [];
     const fetcher: typeof fetch = async (input) => {
       const path = new URL(String(input)).pathname;
       seenPaths.push(path);
       if (path === "/prices.json") return new Response(scheduledPricesJson());
-      if (path === "/alch.json") return new Response(scheduledAlchJson());
       if (path === "/price-history.json") {
         return new Response(
           JSON.stringify([{ t: 1783512900, prices: { lobster: 205, big_bones: 400 } }])
@@ -179,12 +178,11 @@ describe("market browser adapter", () => {
 
     const status = await loadScheduledStaticPriceSnapshot({
       fetcher,
-      baseUrl: "http://app.local/"
+      baseUrl: "http://app.local/",
+      canonicalAlchValues: { lobster: 12, big_bones: 1 }
     });
 
-    expect(new Set(seenPaths)).toEqual(
-      new Set(["/prices.json", "/alch.json", "/price-history.json"])
-    );
+    expect(new Set(seenPaths)).toEqual(new Set(["/prices.json", "/price-history.json"]));
     expect(status.status).toBe("loaded");
     expect(status.reason).toBe("Scheduled price snapshot loaded.");
     expect(status.scheduledPriceSet).toMatchObject({
@@ -193,9 +191,13 @@ describe("market browser adapter", () => {
       source: "scraped",
       createdAt: "2026-07-08T12:15:00.000Z",
       itemPrices: { lobster: 210, big_bones: 390 },
-      alchValues: { lobster: 0, big_bones: 0 }
+      alchValues: { lobster: 12, big_bones: 1 }
     });
+    expect(status.files.alch).toBe("not-requested");
     expect(status.latestHistoryAt).toBe("2026-07-08T12:15:00.000Z");
+    expect(status.sharedPriceHistory).toEqual([
+      { t: 1783512900, prices: { lobster: 205, big_bones: 400 } }
+    ]);
   });
 
   it("classifies missing scheduled static files without exposing paths", () => {

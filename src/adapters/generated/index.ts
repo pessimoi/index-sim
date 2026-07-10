@@ -2,8 +2,7 @@ import { createScheduledStaticPriceSnapshotStatus } from "../market";
 import generatedGameData from "../../data/generated/game-data.json";
 import { parseGameDataSnapshot } from "../../data/schemas/game-data";
 import type { SimulationContext } from "../../domain/shared";
-import { createGeneratedRuntimePriceSet } from "./price-fallback";
-import alchText from "../../../alch.json?raw";
+import { createGeneratedRuntimePriceSet, generatedItemValues } from "./price-fallback";
 import priceHistoryText from "../../../price-history.json?raw";
 import pricesText from "../../../prices.json?raw";
 export {
@@ -13,7 +12,11 @@ export {
   type RuntimeCoverageSection,
   type RuntimeCoverageSummary
 } from "./readiness";
-export { createGeneratedRuntimePriceSet } from "./price-fallback";
+export {
+  createGeneratedRuntimePriceSet,
+  generatedItemValues,
+  withGeneratedAlchAuthority
+} from "./price-fallback";
 
 export interface GeneratedRuntimeContextOptions {
   gameData?: unknown;
@@ -35,10 +38,11 @@ export function createGeneratedRuntimeContext(
   const priceStatus = createScheduledStaticPriceSnapshotStatus(
     {
       pricesText: options.pricesText ?? pricesText,
-      alchText: options.alchText ?? alchText,
+      alchText: options.alchText,
       priceHistoryText: options.priceHistoryText ?? priceHistoryText
     },
     {
+      canonicalAlchValues: generatedItemValues(gameData, "alch"),
       loadedAt: options.loadedAt
     }
   );

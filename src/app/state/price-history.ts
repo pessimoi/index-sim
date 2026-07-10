@@ -1,11 +1,12 @@
 import { z } from "zod";
-import { PriceMapSchema, PriceSetSchema } from "@/data/schemas";
+import { PriceMapSchema, PriceSetSchema, parsePriceHistory } from "@/data/schemas";
 import type { PriceSet } from "@/domain/shared";
 
 export const PRICE_HISTORY_STORAGE_KEY = "index-sim:price-history";
 export const PRICE_HISTORY_VERSION = 1;
 export const PRICE_HISTORY_MAX_SNAPSHOTS = 20;
 export const PRICE_HISTORY_MAX_ITEMS_PER_SNAPSHOT = 2_000;
+export const PRICE_HISTORY_ANALYSIS_MAX_SNAPSHOTS = 10_000;
 
 const IsoTimestampSchema = z
   .string()
@@ -34,6 +35,14 @@ export const BrowserPriceHistoryStateSchema = z
 
 export type BrowserPriceHistorySnapshot = z.infer<typeof BrowserPriceHistorySnapshotSchema>;
 export type BrowserPriceHistoryState = z.infer<typeof BrowserPriceHistoryStateSchema>;
+
+export const PriceHistoryAnalysisStateSchema = z
+  .object({
+    snapshots: z.array(BrowserPriceHistorySnapshotSchema).max(PRICE_HISTORY_ANALYSIS_MAX_SNAPSHOTS)
+  })
+  .strict();
+
+export type PriceHistoryAnalysisState = z.infer<typeof PriceHistoryAnalysisStateSchema>;
 
 export const DEFAULT_PRICE_HISTORY_STATE: BrowserPriceHistoryState = {
   snapshots: []
@@ -156,12 +165,38 @@ export function keepPriceHistoryOnFailure(
   return current;
 }
 
+export function createSharedPriceHistoryAnalysis(input: unknown): PriceHistoryAnalysisState {
+  const snapshots = parsePriceHistory(input)
+    .map((snapshot) =>
+      BrowserPriceHistorySnapshotSchema.parse({
+        capturedAt: new Date(snapshot.t * 1000).toISOString(),
+        sourcePriceSetId: `scheduled-market-${snapshot.t}`,
+        label: "Scheduled market",
+        itemPrices: capItemPrices(snapshot.prices)
+      })
+    )
+    .sort((left, right) => Date.parse(right.capturedAt) - Date.parse(left.capturedAt));
+  return PriceHistoryAnalysisStateSchema.parse({ snapshots });
+}
+
+export function mergePriceHistoryForAnalysis(input: {
+  shared: PriceHistoryAnalysisState;
+  local: BrowserPriceHistoryState;
+}): PriceHistoryAnalysisState {
+  const shared = PriceHistoryAnalysisStateSchema.parse(input.shared);
+  const local = BrowserPriceHistoryStateSchema.parse(input.local);
+  const snapshots = [...shared.snapshots, ...local.snapshots]
+    .sort((left, right) => Date.parse(right.capturedAt) - Date.parse(left.capturedAt))
+    .slice(0, PRICE_HISTORY_ANALYSIS_MAX_SNAPSHOTS);
+  return PriceHistoryAnalysisStateSchema.parse({ snapshots });
+}
+
 export function summarizePriceHistory(
-  history: BrowserPriceHistoryState,
+  history: PriceHistoryAnalysisState,
   activePriceSet: PriceSet | null,
   now: Date = new Date()
 ): PriceHistorySummary {
-  const validatedHistory = BrowserPriceHistoryStateSchema.parse(history);
+  const validatedHistory = PriceHistoryAnalysisStateSchema.parse(history);
   const latest = validatedHistory.snapshots[0] ?? null;
   const latestAgeSeconds = latest
     ? Math.max(0, Math.floor((now.getTime() - Date.parse(latest.capturedAt)) / 1000))
@@ -213,11 +248,11 @@ function percentDelta(latestPrice: number | null, baselinePrice: number | null):
 }
 
 export function analyzePriceHistoryTrend(
-  history: BrowserPriceHistoryState,
+  history: PriceHistoryAnalysisState,
   itemId: string,
   itemLabels: Record<string, string> = {}
 ): PriceHistoryTrendAnalysis {
-  const validatedHistory = BrowserPriceHistoryStateSchema.parse(history);
+  const validatedHistory = PriceHistoryAnalysisStateSchema.parse(history);
   const normalizedItemId = itemId.trim();
   const points = [...validatedHistory.snapshots]
     .reverse()
@@ -285,10 +320,10 @@ function compareMoverRows(
 }
 
 export function analyzePriceHistoryMovers(
-  history: BrowserPriceHistoryState,
+  history: PriceHistoryAnalysisState,
   options: AnalyzePriceHistoryMoversOptions = {}
 ): PriceHistoryMoversAnalysis {
-  const validatedHistory = BrowserPriceHistoryStateSchema.parse(history);
+  const validatedHistory = PriceHistoryAnalysisStateSchema.parse(history);
   const snapshots = validatedHistory.snapshots;
   const latest = snapshots[0] ?? null;
   const baseline = resolveBaselineSnapshot(

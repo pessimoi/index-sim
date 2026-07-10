@@ -94,7 +94,7 @@ Public HTTPS origin
   /                         -> current index document
   /assets/<hash>.*          -> immutable Vite assets
   /prices.json              -> scheduled static market data
-  /alch.json                -> scheduled static alch data
+  /alch.json                -> compatibility/regression alch artifact (not runtime authority)
   /price-history.json       -> scheduled static shared history
   /api/hiscores/status      -> same-origin runtime, if enabled
   /api/hiscores             -> same-origin runtime, if enabled
@@ -218,7 +218,7 @@ Against preview and production, verify:
 
 - `/` returns the intended release and application shell
 - all referenced hashed assets load with correct content types
-- `prices.json`, `alch.json` and `price-history.json` parse and expose the expected snapshot metadata
+- `prices.json` and `price-history.json` parse as active market artifacts; compatibility `alch.json` also parses but does not override generated runtime alch
 - hard refresh and a representative SPA/fallback path do not 404
 - shareable setup fragments open to review without a server round trip or fragment leakage
 - required CSP and security headers are present on representative routes

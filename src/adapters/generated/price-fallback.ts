@@ -1,7 +1,7 @@
 import { PriceSetSchema } from "../../data/schemas/price-set";
 import type { GameDataSnapshot, PriceSet } from "../../domain/shared";
 
-function embeddedItemValues(
+export function generatedItemValues(
   gameData: GameDataSnapshot,
   field: "price" | "alch"
 ): Record<string, number> {
@@ -12,30 +12,38 @@ function embeddedItemValues(
   );
 }
 
+export function withGeneratedAlchAuthority(
+  priceSet: PriceSet,
+  gameData: GameDataSnapshot,
+  options: { fillMissingItemPrices?: boolean; label?: string } = {}
+): PriceSet {
+  return PriceSetSchema.parse({
+    ...priceSet,
+    label: options.label ?? priceSet.label,
+    itemPrices: options.fillMissingItemPrices
+      ? {
+          ...generatedItemValues(gameData, "price"),
+          ...priceSet.itemPrices
+        }
+      : priceSet.itemPrices,
+    alchValues: generatedItemValues(gameData, "alch"),
+    provenance: {
+      source: "generated",
+      sourceRef: "active item prices + generated game-data high-alch values",
+      verifiedAt:
+        gameData.provenance?.verifiedAt ?? priceSet.provenance?.verifiedAt ?? priceSet.createdAt,
+      notes:
+        "Item prices keep the active PriceSet source; high-alch values are authoritative generated game data for the current revision."
+    }
+  }) as PriceSet;
+}
+
 export function createGeneratedRuntimePriceSet(
   scheduledPriceSet: PriceSet,
   gameData: GameDataSnapshot
 ): PriceSet {
-  return PriceSetSchema.parse({
-    ...scheduledPriceSet,
-    label: `${scheduledPriceSet.label} + generated item fallbacks`,
-    itemPrices: {
-      ...embeddedItemValues(gameData, "price"),
-      ...scheduledPriceSet.itemPrices
-    },
-    alchValues: {
-      ...embeddedItemValues(gameData, "alch"),
-      ...scheduledPriceSet.alchValues
-    },
-    provenance: {
-      source: "generated",
-      sourceRef: "scheduled static prices + generated game-data item fallbacks",
-      verifiedAt:
-        gameData.provenance?.verifiedAt ??
-        scheduledPriceSet.provenance?.verifiedAt ??
-        scheduledPriceSet.createdAt,
-      notes:
-        "Scheduled item and alch values take precedence; generated item values fill only missing ids in the staged runtime candidate."
-    }
-  }) as PriceSet;
+  return withGeneratedAlchAuthority(scheduledPriceSet, gameData, {
+    fillMissingItemPrices: true,
+    label: `${scheduledPriceSet.label} + generated item fallbacks`
+  });
 }

@@ -586,7 +586,7 @@ Required content:
 - Prayer XP from burying.
 - Loot value composition section.
 
-Current implementation note: the root rewrite UI exposes a full current-target drop table with stable row-id based action overrides, versioned rewrite-owned loot preference persistence, reset current monster, deterministic bounded optimize for net GP/hr, readable per-action net GP/hr detail, a loot value composition section, full nested drop detail for `_expand` rows, browser-local accepted price-history context in Loot row detail, rewrite-owned per-monster loot settings and a browser-local accepted-price history summary. Available actions are restricted to meaningful row/action pairs: bones can bury, herbs can unid/value, gem rows can value and alch is exposed only when the current monster's high-alch setting is enabled and profitable. Per-monster loot settings persist separately from row preferences and currently cover high-alch enablement, auto/manual kill overhead seconds and underground/overground talisman spot. The Loot UI labels trip-layer eaten-food and inventory-displaced rows instead of silently presenting pre-trip values. The Economy tab now owns full browser-local price-history analysis, Snapshot now and confirmed Clear history; D-049 keeps full legacy price-history migration out of V1, while live market provider work and shared/server history remain separate decision-boundary steps.
+Current implementation note: the root rewrite UI exposes the full current-target loot workflow, meaningful action controls, per-monster settings, composition/nested/action-impact detail and price-history context from the same merged shared/local analysis used by Economy. Generated high alch controls alch profitability. Economy owns the read-only shared plus local comparison workflow; D-049 still keeps full legacy history migration out of V1, while acceptable automated-use and scheduled-run evidence remain operations work.
 
 #### Loot/Economy nested workflow parity slice
 
@@ -603,10 +603,9 @@ Source and status:
   visible V1 replacement workflow.
 - Current state: the drop table, action selection, per-action net GP/hr impact,
   full nested drop detail, loot value composition, trip-state row labels,
-  browser-local history context in Loot row detail and Economy price-history tab
-  exist. This visible slice is closed; remaining work in this area is outside
-  the slice unless a later goal accepts live provider, shared history or full
-  legacy price-history migration decisions.
+  merged shared/local history context in Loot row detail and Economy exist. This
+  visible slice is closed; acceptable automated-use/run evidence, backend/account
+  history and full legacy history migration remain outside the slice.
 
 In scope:
 
@@ -808,30 +807,23 @@ Required content if price history remains a product feature:
 - Price age badge.
 - Snapshot count, items tracked, moved count and latest snapshot age.
 - Latest-vs-previous / latest-vs-first selector.
-- Snapshot now and clear history controls.
+- Shared/local snapshot counts plus `Save local comparison` and `Clear local history` controls.
 - Top gainers and fallers.
 - Item filter.
 - Movers table with item, trend sparkline, price, baseline, GP delta and percent delta.
 - Item-selectable chronological trend with latest, minimum, maximum, net change
-  and exact local snapshot points.
+  and exact shared/local snapshot points.
 
-Current implementation note: the Economy tab is complete for the accepted V1
-browser-local Loot/Economy slice. It shows the scheduled static price snapshot
-status, active `PriceSet` source/label/created age/counts and browser-local
-history summary. It records capped browser-local history snapshots only after
-validated imported/compatible legacy `PriceSet` values are accepted active or
-when `Snapshot now` captures the current active `PriceSet`; scheduled restore
-itself does not append history. The tab uses valid selected local override,
-valid scheduled static snapshot, then bundled prices as its fallback order. It
-shows active/latest price-set labels, latest snapshot age, tracked item count,
-snapshot count, moved item count, Previous/First/Snapshot baseline selection,
-item filter, top gainers/fallers and a movers table with latest price, baseline
-price, GP delta, percent delta and a chronological per-row sparkline. The item
-trend selector exposes a larger local timeline with latest/minimum/maximum/net
-change metrics and exact points. Missing items and zero baseline prices render
-without `Infinity`/`NaN`. `Clear history` requires confirmation and removes
-only the rewrite-owned `index-sim:price-history` key. Shared/server history and
-live-provider workflows remain separate decision boundaries.
+Current implementation note: Economy is complete for the accepted slice. It
+loads committed `price-history.json` into a read-only shared analysis source and
+merges capped `index-sim:price-history` comparisons only in memory. The UI shows
+shared/local/total counts, movers, sparklines and exact item trend points across
+both sources. `Save local comparison` records the active composed PriceSet;
+`Clear local history` requires confirmation and removes only the local key, so
+shared points remain visible. Selected local market prices still win over
+scheduled then bundled prices, while generated high alch wins in every source.
+Missing values and zero baselines remain finite. Backend/account history and
+live scheduled-run evidence remain separate boundaries.
 
 ### Loot/Economy Release Classification
 
@@ -839,12 +831,12 @@ Status date: 2026-07-08. This classification applies to the visible
 Loot/Economy V1 replacement workflow in the root Vite rewrite, not to
 production market automation or full legacy storage migration.
 
-| Classification     | Items                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | Release impact                                                                                                |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `release-required` | Current-monster loot action table; per-drop action selection for loot, skip, bury, alch, unid and value where applicable; per-monster high-alch, kill-overhead and talisman settings; current-monster reset and optimize actions with one-step Undo; loot value composition with top contributors and tail grouping; nested `_expand` drop detail; readable per-action net GP/hr impact detail; local price-history context in Loot row detail; structured missing, alias and fallback price warnings near Loot/Economy money values; active/latest price context; local PriceSet import override; reset-to-scheduled fallback; Snapshot now; confirmed Clear history for only `index-sim:price-history`; browser-local Economy movers analysis with per-row sparklines and an item-selectable chronological trend. | Complete for this slice.                                                                                      |
-| `later`            | Further Economy analysis beyond the local movers/trend workflow, visual scenarios beyond the implemented repository-local matrix and remote merge-gate promotion.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Not required unless a later release makes one of these evidence areas a blocker.                              |
-| `legacy-only`      | Archived `market.js` current-monster nested sync behavior, legacy script-order globals, legacy `/api/prices` or `/api/scrape` production copy and legacy runtime internals.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Not ported by design for the rewrite V1 path.                                                                 |
-| `decision-needed`  | Full legacy price-history migration, server-managed/shared price history, live provider evidence, live `markets.lostcity.rs` response verification, `MARKET_PRICES_UPSTREAM_URL` configuration and verified scheduled-run evidence.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Keep as explicit future decisions or blocked production work, not blockers for the accepted visible V1 slice. |
+| Classification     | Items                                                                                                                                                                                                                                                                                                                                                      | Release impact                                                                                    |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `release-required` | Current-monster loot actions/settings; reset/optimize with Undo; loot composition/nested detail; structured price warnings; active market-price context; generated high alch; local PriceSet override/reset; shared read-only plus local comparison history; `Save local comparison`; confirmed `Clear local history`; movers, sparklines and item trends. | Complete for this slice.                                                                          |
+| `later`            | Further Economy analysis beyond the local movers/trend workflow, visual scenarios beyond the implemented repository-local matrix and remote merge-gate promotion.                                                                                                                                                                                          | Not required unless a later release makes one of these evidence areas a blocker.                  |
+| `legacy-only`      | Archived `market.js` current-monster nested sync behavior, legacy script-order globals, legacy `/api/prices` or `/api/scrape` production copy and legacy runtime internals.                                                                                                                                                                                | Not ported by design for the rewrite V1 path.                                                     |
+| `decision-needed`  | Full legacy history migration, backend/account history, acceptable automated-use evidence, `MARKET_PRICES_UPSTREAM_URL` configuration and verified scheduled-run evidence.                                                                                                                                                                                 | Keep as explicit future or external production work, not blockers for the accepted visible slice. |
 
 ### Settings
 
@@ -856,7 +848,7 @@ Required content:
 - Scheduled static price snapshot status following [live-integrations-spec.md](live-integrations-spec.md).
 - Service-aware scheduled/unavailable/fallback state for market prices. Production copy must not point users to `run_sim.py` or imply user-triggered upstream refresh.
 
-Current implementation note: Settings now has a Price data panel that shows scheduled static snapshot status plus the active `PriceSet` label, source, created timestamp, age, item price count, alch value count, active source and current import/status notice. Its import control uses the same validated `parsePriceSetFileText` path as the existing topbar shortcut, accepts only the current `PriceSet` schema and updates the active price set, browser-local accepted price history, topbar price label/status and visible notice. Reset clears only the selected local override and returns to scheduled static prices when valid, otherwise bundled prices, while preserving browser-local history. The topbar import remains a shortcut. Economy remains the owner of browser-local price-history analysis. Settings also has a Gear menu panel backed by the rewrite-owned versioned `index-sim:hidden-gear-tiers` state. It can hide the accepted metal, d-hide, leather, low-bow and 1 defence magic tier groups from weapon, ammo, special-attack and equipment pickers while preserving `None` and the current selected item. Compatible legacy `sim_hidden_tiers_v1` flags can be imported into the rewrite-owned state through the explicit migration UX.
+Current implementation note: Settings Price data shows scheduled status and active PriceSet metadata. Imports use the validated parser, keep imported market prices, replace imported alch with generated Revision 274 values, persist the selected override and add a local comparison. Reset clears only the selected key, preserves shared/local history and returns to scheduled or bundled prices. Economy owns merged read-only shared plus local comparison analysis. Settings Gear controls remain separately backed by `index-sim:hidden-gear-tiers` and preserve current/None selections.
 
 ## Implementation Phases
 

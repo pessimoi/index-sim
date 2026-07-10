@@ -1,4 +1,7 @@
-import { createGeneratedRuntimePriceSet } from "@/adapters/generated/price-fallback";
+import {
+  createGeneratedRuntimePriceSet,
+  withGeneratedAlchAuthority
+} from "@/adapters/generated/price-fallback";
 import type { ScheduledStaticPriceSnapshotStatus } from "@/adapters/market";
 import type {
   GameDataSnapshot,
@@ -30,7 +33,7 @@ export function applyMarketSyncResponse(
 ): SimulationContext {
   return {
     ...context,
-    priceSet: response.priceSet
+    priceSet: withGeneratedAlchAuthority(response.priceSet, context.gameData)
   };
 }
 
