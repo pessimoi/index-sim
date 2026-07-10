@@ -52,7 +52,9 @@ const FIXTURE_SOURCE = "src/tests/fixtures/lostcity-source";
 const TEST_ROOT = join(process.cwd(), ".vite", "lostcity-source-parser-test");
 
 function emptyEquipment(): GameDataSnapshot["equipment"] {
-  return Object.fromEntries(EQUIPMENT_SLOTS.map((slot) => [slot, {}])) as GameDataSnapshot["equipment"];
+  return Object.fromEntries(
+    EQUIPMENT_SLOTS.map((slot) => [slot, {}])
+  ) as GameDataSnapshot["equipment"];
 }
 
 function referenceSnapshot(): GameDataSnapshot {
@@ -240,10 +242,12 @@ describe("LostCity content source parser", () => {
     expect(createLostCitySpellCandidate(reference, dbrows).spells.water_strike).toEqual(
       reference.spells.water_strike
     );
-    expect(createLostCityItemCandidate(reference, obj, "fixture-274").items.rune_scimitar)
-      .toMatchObject({ price: 25600, alch: 15360 });
-    expect(createLostCityCombatCatalogCandidate(reference, obj, params, dbrows).weapons.bronze_dart_w)
-      .toMatchObject({ accBonus: 3, speed: 3 });
+    expect(
+      createLostCityItemCandidate(reference, obj, "fixture-274").items.rune_scimitar
+    ).toMatchObject({ price: 25600, alch: 15360 });
+    expect(
+      createLostCityCombatCatalogCandidate(reference, obj, params, dbrows).weapons.bronze_dart_w
+    ).toMatchObject({ accBonus: 3, speed: 3 });
   });
 
   it("rejects duplicate config ids with repository-relative sanitized evidence", () => {
@@ -276,7 +280,9 @@ describe("LostCity content source parser", () => {
       sourceRef: "scripts/drop tables/scripts/giant.rs2:1#giant"
     });
     const npc = readLostCityConfigCatalog({ sourceDir: FIXTURE_SOURCE, extension: ".npc" });
-    expect(resolveLostCityLootHandler("darkbear", npc.entries.get("darkbear"), catalog)).toMatchObject({
+    expect(
+      resolveLostCityLootHandler("darkbear", npc.entries.get("darkbear"), catalog)
+    ).toMatchObject({
       kind: "category",
       handler: { npcId: "_bear" }
     });
@@ -468,9 +474,7 @@ describe("LostCity content source parser", () => {
     expect(LOSTCITY_EQUIPMENT_SOURCE_MAPPINGS["helm:green_hat"]?.sourceItemId).toBe(
       "gnome_hat_green"
     );
-    expect(LOSTCITY_EQUIPMENT_SOURCE_MAPPINGS["cape:god_cape"]?.sourceItemId).toBe(
-      "guthix_cape"
-    );
+    expect(LOSTCITY_EQUIPMENT_SOURCE_MAPPINGS["cape:god_cape"]?.sourceItemId).toBe("guthix_cape");
   });
 
   it("parses CLI options without selecting source fields", () => {
@@ -522,9 +526,7 @@ describe("LostCity content source parser", () => {
     expect(result.snapshot.id).toBe("lostcity-fixture-274-runtime");
     expect(result.snapshot.monsters.giant).toMatchObject({
       hp: 35,
-      loot: expect.arrayContaining([
-        expect.objectContaining({ key: "big_bones", chance: 1 })
-      ]),
+      loot: expect.arrayContaining([expect.objectContaining({ key: "big_bones", chance: 1 })]),
       provenance: { source: "generated" }
     });
     expect(result.snapshot.weapons.bronze_dart_w).toMatchObject({

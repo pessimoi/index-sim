@@ -13,10 +13,7 @@ import {
   type LostCityConfigCatalog,
   type LostCityConfigEntry
 } from "./lostcity-content-config";
-import {
-  lostCityAmmoSourceId,
-  lostCityWeaponSourceId
-} from "./lostcity-content-runtime-mapping";
+import { lostCityAmmoSourceId, lostCityWeaponSourceId } from "./lostcity-content-runtime-mapping";
 import { createLostCitySpellCandidate } from "./lostcity-content-spells";
 
 export const LOSTCITY_WEAPON_COMPARISON_FIELDS = [
@@ -119,11 +116,12 @@ export function extractLostCityWeaponSource(input: {
     resolvedConfigParamValue(entry, input.params, "attackrate"),
     4
   );
-  const accBonus = input.runtime.type === "melee"
-    ? meleePrimaryAccuracy(input.runtime.wclass, accuracy)
-    : input.runtime.type === "ranged"
-      ? sourceParamInteger(entry, "rangeattack")
-      : sourceParamInteger(entry, "magicattack");
+  const accBonus =
+    input.runtime.type === "melee"
+      ? meleePrimaryAccuracy(input.runtime.wclass, accuracy)
+      : input.runtime.type === "ranged"
+        ? sourceParamInteger(entry, "rangeattack")
+        : sourceParamInteger(entry, "magicattack");
   const poisonSeverity = sourceParamInteger(entry, "poison_severity");
 
   return {

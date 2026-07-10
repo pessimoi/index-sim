@@ -15,7 +15,7 @@ import {
   type ScheduledMarketUpstreamResponse
 } from "./scheduled-market-writer-core";
 
-const PRICE_FILE_NAMES = ["prices.json", "alch.json", "price-history.json"] as const;
+type PriceFileName = "prices.json" | "alch.json" | "price-history.json";
 
 export interface CliOptions {
   input?: string;
@@ -185,7 +185,7 @@ async function readUpstream(
   return parseMarketsLostcityRawResponseJson(upstreamText, { mappings });
 }
 
-function readJsonFile(outputDir: string, fileName: (typeof PRICE_FILE_NAMES)[number]): unknown {
+function readJsonFile(outputDir: string, fileName: PriceFileName): unknown {
   return parseJsonWithDuplicateKeyCheck(readFileSync(resolve(outputDir, fileName), "utf8"), {
     source: fileName
   });
@@ -205,12 +205,13 @@ function selectMappings(itemIds: string[] | undefined) {
 }
 
 function writeIfChanged(filePath: string, nextText: string, dryRun: boolean): boolean {
-  let currentText = "";
-  try {
-    currentText = readFileSync(filePath, "utf8");
-  } catch {
-    currentText = "";
-  }
+  const currentText = (() => {
+    try {
+      return readFileSync(filePath, "utf8");
+    } catch {
+      return null;
+    }
+  })();
   if (currentText === nextText) return false;
   if (!dryRun) writeFileSync(filePath, nextText);
   return true;
@@ -258,9 +259,7 @@ export async function main(): Promise<void> {
 
   const mode = options.dryRun ? "Dry run" : "Writer";
   const changedLabel = changedFiles.length ? changedFiles.join(", ") : "no changes";
-  console.log(
-    `${mode}: ${changedLabel}. Updated ${report.updated}; skipped ${report.skipped}.`
-  );
+  console.log(`${mode}: ${changedLabel}. Updated ${report.updated}; skipped ${report.skipped}.`);
 }
 
 function isDirectCliRun(): boolean {

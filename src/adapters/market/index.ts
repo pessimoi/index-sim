@@ -34,23 +34,13 @@ export interface MarketFetchOptions {
   maxBytes?: number;
 }
 
-export type ScheduledStaticPriceSnapshotStatusCode =
-  | "loaded"
-  | "missing"
-  | "invalid"
-  | "fallback";
+export type ScheduledStaticPriceSnapshotStatusCode = "loaded" | "missing" | "invalid" | "fallback";
 
 export type ScheduledStaticPriceSnapshotFileStatus =
-  | "loaded"
-  | "missing"
-  | "invalid"
-  | "not-requested";
+  "loaded" | "missing" | "invalid" | "not-requested";
 
 export type ScheduledStaticPriceSnapshotValidationCode =
-  | "body_too_large"
-  | "duplicate_keys"
-  | "invalid_json"
-  | "validation_failed";
+  "body_too_large" | "duplicate_keys" | "invalid_json" | "validation_failed";
 
 export interface ScheduledStaticPriceSnapshotFiles {
   prices: ScheduledStaticPriceSnapshotFileStatus;
@@ -85,8 +75,7 @@ export interface ScheduledStaticPriceSnapshotOptions {
 }
 
 export interface ScheduledStaticPriceSnapshotLoadOptions
-  extends Omit<MarketFetchOptions, "endpoint">,
-    ScheduledStaticPriceSnapshotOptions {
+  extends Omit<MarketFetchOptions, "endpoint">, ScheduledStaticPriceSnapshotOptions {
   paths?: {
     prices?: string;
     alch?: string;

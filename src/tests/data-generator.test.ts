@@ -852,7 +852,9 @@ describe("game data generator foundation", () => {
     });
     const reportText = readFileSync(outputs.plan.outputs.revisionImpact.absolutePath, "utf8");
 
-    expect(reportText).toContain("Calculation-impact suite: pass (9 pass, 0 needs-review, 0 failed)");
+    expect(reportText).toContain(
+      "Calculation-impact suite: pass (9 pass, 0 needs-review, 0 failed)"
+    );
     expect(reportText).toContain("Informational all-monster scan: clean (0 outliers, 0 shown)");
     expect(reportText).toContain("Representative suite: pass");
     expect(reportText).toContain("Cases: 9 run, 9 pass, 0 needs-review, 0 failed");
@@ -862,12 +864,24 @@ describe("game data generator foundation", () => {
     expect(reportText).toContain("| `fixture_melee_source_giant` |");
     expect(reportText).toContain("| `fixture_ranged_source_giant` |");
     expect(reportText).toContain("| `fixture_magic_source_giant` |");
-    expect(reportText).toContain("| `fixture_cannon_source_giant` | `fixture`, `combat`, `ranged`, `cannon`, `supply` | pass |");
-    expect(reportText).toContain("| `fixture_recoil_training_dummy` | `fixture`, `combat`, `melee`, `recoil`, `low-level` | pass |");
-    expect(reportText).toContain("| `fixture_alch_policy_source_giant` | `fixture`, `economy`, `alch`, `loot` | pass |");
-    expect(reportText).toContain("| `fixture_loot_heavy_source_giant` | `fixture`, `economy`, `loot-heavy`, `nested-loot` | pass |");
-    expect(reportText).toContain("| `fixture_high_defence_pressure_source_giant` | `fixture`, `combat`, `melee`, `high-defence` | pass |");
-    expect(reportText).toContain("| `fixture_low_level_training_dummy` | `fixture`, `combat`, `melee`, `low-level` | pass |");
+    expect(reportText).toContain(
+      "| `fixture_cannon_source_giant` | `fixture`, `combat`, `ranged`, `cannon`, `supply` | pass |"
+    );
+    expect(reportText).toContain(
+      "| `fixture_recoil_training_dummy` | `fixture`, `combat`, `melee`, `recoil`, `low-level` | pass |"
+    );
+    expect(reportText).toContain(
+      "| `fixture_alch_policy_source_giant` | `fixture`, `economy`, `alch`, `loot` | pass |"
+    );
+    expect(reportText).toContain(
+      "| `fixture_loot_heavy_source_giant` | `fixture`, `economy`, `loot-heavy`, `nested-loot` | pass |"
+    );
+    expect(reportText).toContain(
+      "| `fixture_high_defence_pressure_source_giant` | `fixture`, `combat`, `melee`, `high-defence` | pass |"
+    );
+    expect(reportText).toContain(
+      "| `fixture_low_level_training_dummy` | `fixture`, `combat`, `melee`, `low-level` | pass |"
+    );
     expect(reportText).toContain(
       "| `fixture_melee_source_giant` | `fixture`, `combat`, `melee`, `gear`, `loot` | pass | 0 (0%) | 0 (0%) | 0 (0%) | 0 (0%) | 0 (0%) | - |"
     );
@@ -895,7 +909,9 @@ describe("game data generator foundation", () => {
     const reportText = readFileSync(outputs.plan.outputs.revisionImpact.absolutePath, "utf8");
 
     expect(reportText).toContain("Informational all-monster scan: outliers-found");
-    expect(reportText).toContain("This scan is informational and does not change representative merge-blocking status.");
+    expect(reportText).toContain(
+      "This scan is informational and does not change representative merge-blocking status."
+    );
     expect(reportText).toContain("threshold-outlier");
     expect(reportText).toContain("`source_giant` / Source Giant");
     expect(reportText).toMatch(/DPS changed|kills\/hr changed|XP\/hr changed/);
@@ -910,7 +926,8 @@ describe("game data generator foundation", () => {
       monsters: Array<{
         id: string;
         loot?: Array<
-          { key?: string; price?: number; qtyAvg?: number } | Array<{ key?: string; price?: number }>
+          | { key?: string; price?: number; qtyAvg?: number }
+          | Array<{ key?: string; price?: number }>
         >;
       }>;
     }>(sourceDir, "monsters.json");
@@ -1044,9 +1061,13 @@ describe("game data generator foundation", () => {
     const reportText = readFileSync(outputs.plan.outputs.revisionImpact.absolutePath, "utf8");
 
     expect(reportText).toContain("Calculation-impact suite: needs-review");
-    expect(reportText).toContain("| `fixture_melee_source_giant` | `fixture`, `combat`, `melee`, `gear`, `loot` | needs-review |");
+    expect(reportText).toContain(
+      "| `fixture_melee_source_giant` | `fixture`, `combat`, `melee`, `gear`, `loot` | needs-review |"
+    );
     expect(reportText).toMatch(/\| `fixture_melee_source_giant` \| .* \| needs-review \| \+[0-9]/);
-    expect(reportText).toContain("No changed calculation outputs are accepted as intentional deltas");
+    expect(reportText).toContain(
+      "No changed calculation outputs are accepted as intentional deltas"
+    );
   });
 
   it("marks representative calculation-impact cases failed when required entities are missing", () => {
@@ -1067,7 +1088,9 @@ describe("game data generator foundation", () => {
     const reportText = readFileSync(outputs.plan.outputs.revisionImpact.absolutePath, "utf8");
 
     expect(reportText).toContain("Calculation-impact suite: failed");
-    expect(reportText).toContain("| `fixture_ranged_source_giant` | `fixture`, `combat`, `ranged`, `ammo`, `supply` | failed |");
+    expect(reportText).toContain(
+      "| `fixture_ranged_source_giant` | `fixture`, `combat`, `ranged`, `ammo`, `supply` | failed |"
+    );
     expect(reportText).toContain("candidate missing ammo `bronze_arrow`");
   });
 
@@ -1103,7 +1126,9 @@ describe("game data generator foundation", () => {
 
     expect(outputs.sourcePin.generator.command).toContain("--skip-calculation-impact");
     expect(reportText).toContain("Calculation-impact suite: skipped (--skip-calculation-impact)");
-    expect(reportText).toContain("Informational all-monster scan: skipped (--skip-calculation-impact)");
+    expect(reportText).toContain(
+      "Informational all-monster scan: skipped (--skip-calculation-impact)"
+    );
     expect(reportText).toContain("Representative suite: skipped");
     expect(reportText).toContain("Skipped by: `--skip-calculation-impact`");
     expect(reportText).toContain("No representative calculation-impact cases were evaluated.");
@@ -1121,7 +1146,9 @@ describe("game data generator foundation", () => {
     });
 
     expect(tagOutputs.sourcePin.generator.command).toContain("--impact-case-filter cannon");
-    expect(tagOutputs.revisionImpactText).toContain("Cases: 1 run, 1 pass, 0 needs-review, 0 failed");
+    expect(tagOutputs.revisionImpactText).toContain(
+      "Cases: 1 run, 1 pass, 0 needs-review, 0 failed"
+    );
     expect(tagOutputs.revisionImpactText).toContain("| `fixture_cannon_source_giant` |");
     expect(tagOutputs.revisionImpactText).not.toContain("| `fixture_melee_source_giant` |");
 

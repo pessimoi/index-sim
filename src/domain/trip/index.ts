@@ -19,12 +19,7 @@ export type LootAction = "skip" | "bury" | "alch" | "loot" | "unid" | "value";
 export type TripBound = "loot" | "food" | "overfull" | "prayer" | "recoil" | "respawn" | "none";
 export type JewelSpot = "underground" | "overground";
 export type PotionCarryRecommendationStatus =
-  | "inactive"
-  | "no-boost"
-  | "manual"
-  | "under"
-  | "over"
-  | "matched";
+  "inactive" | "no-boost" | "manual" | "under" | "over" | "matched";
 
 export interface PotionCarryRecommendation {
   active: boolean;
@@ -1002,7 +997,7 @@ function herbStats(priceSet: PriceSet, warnings?: SimulationWarning[]) {
     128;
   const keepFrac =
     rows.reduce((sum, row) => sum + (row.price > VALUE_THRESHOLD ? row.weight : 0), 0) / 128;
-  return { ev, highEv, keepFrac };
+  return { ev, highEv, keepFrac, rows };
 }
 
 function megaEv(priceSet: PriceSet, warnings?: SimulationWarning[]): number {
@@ -1085,7 +1080,8 @@ function jewelStats(
     rowHighEv: highEv(65),
     baseKeepFrac: keepFrac(128),
     rowKeepFrac: keepFrac(65),
-    mega
+    mega,
+    rows
   };
 }
 
@@ -1180,11 +1176,29 @@ function adjustDropPrices(
       options.legendsComplete !== false,
       warnings
     );
-    return { ...drop, price: options.ringOfWealth ? jewels.rowEv : jewels.baseEv };
+    return {
+      ...drop,
+      price: options.ringOfWealth ? jewels.rowEv : jewels.baseEv,
+      _expand:
+        drop._expand ??
+        jewels.rows.map((row) => ({
+          name: row.name,
+          weight: Math.max(0, row.hi - row.lo),
+          price: row.price,
+          talisman: row.name.endsWith("talisman"),
+          mega: row.name.startsWith("Mega-rare")
+        }))
+    };
   }
   if (drop.tag === "herb") {
     const herbs = herbStats(priceSet, warnings);
-    return { ...drop, price: herbs.ev };
+    return {
+      ...drop,
+      price: herbs.ev,
+      _expand:
+        drop._expand ??
+        herbs.rows.map((row) => ({ name: row.name, weight: row.weight, price: row.price }))
+    };
   }
   if (drop.tag === "ultrarare") {
     const jewels = jewelStats(

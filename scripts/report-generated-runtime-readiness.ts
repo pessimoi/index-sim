@@ -184,18 +184,17 @@ function loadGeneratedCandidateContext(candidate: CliOptions["candidate"]): Simu
 
   const gameData = parseGameDataSnapshot(readRepoJson("src/data/generated/game-data.json"));
   const scheduledPriceSet = createPriceSetFromLegacyRecords({
-      id: "runtime-readiness-static-prices",
-      label: "Runtime readiness static prices",
+    id: "runtime-readiness-static-prices",
+    label: "Runtime readiness static prices",
+    source: "scraped",
+    itemPrices: readRepoJson("prices.json"),
+    alchValues: readRepoJson("alch.json"),
+    provenance: {
       source: "scraped",
-      itemPrices: readRepoJson("prices.json"),
-      alchValues: readRepoJson("alch.json"),
-      provenance: {
-        source: "scraped",
-        sourceRef: "prices.json and alch.json",
-        notes:
-          "Repo-local static price files used only for generated runtime readiness coverage."
-      }
-    });
+      sourceRef: "prices.json and alch.json",
+      notes: "Repo-local static price files used only for generated runtime readiness coverage."
+    }
+  });
   return {
     gameData,
     priceSet: createGeneratedRuntimePriceSet(scheduledPriceSet, gameData)
@@ -247,9 +246,7 @@ export function formatGeneratedRuntimeReadinessMarkdown(
     ),
     "",
     "## Blockers",
-    ...(report.blockers.length
-      ? report.blockers.map((blocker) => `- ${blocker}`)
-      : ["- none"])
+    ...(report.blockers.length ? report.blockers.map((blocker) => `- ${blocker}`) : ["- none"])
   ];
 
   return `${lines.join("\n")}\n`;
@@ -262,9 +259,10 @@ function percent(value: number, total: number): string {
 
 function coveragePlanExamples(section: RuntimeCoverageSummary): string {
   if (!section.missingExamples.length) return "-";
-  const suffix = section.missingIds.length > section.missingExamples.length
-    ? `, +${section.missingIds.length - section.missingExamples.length} more`
-    : "";
+  const suffix =
+    section.missingIds.length > section.missingExamples.length
+      ? `, +${section.missingIds.length - section.missingExamples.length} more`
+      : "";
   return `${section.missingExamples.join(", ")}${suffix}`;
 }
 
@@ -284,7 +282,9 @@ function coveragePlanRows(sections: RuntimeCoverageSummary[]): string[] {
 export function formatSourceSliceCoveragePlanMarkdown(
   report: GeneratedRuntimeReadinessReport
 ): string {
-  const blocking = report.sections.filter((section) => section.blocking && section.missingCount > 0);
+  const blocking = report.sections.filter(
+    (section) => section.blocking && section.missingCount > 0
+  );
   const nonBlocking = report.sections.filter(
     (section) => !section.blocking && section.missingCount > 0
   );

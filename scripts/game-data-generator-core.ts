@@ -101,11 +101,7 @@ export interface GameDataGenerationOutputPath {
 
 export interface GameDataGenerationPlan {
   generatorVersion: typeof GAME_DATA_GENERATOR_VERSION;
-  parserStatus:
-    | "raw-lostcity"
-    | "source-backed-slice"
-    | "foundation-manifest"
-    | "foundation-empty";
+  parserStatus: "raw-lostcity" | "source-backed-slice" | "foundation-manifest" | "foundation-empty";
   repoRoot: string;
   sourceDir: string;
   sourceDirLabel: string;
@@ -138,9 +134,7 @@ export interface GeneratedGameDataSourcePin {
     status: "source-backed-raw" | "source-backed-slice" | "foundation";
     parser: GameDataGenerationPlan["parserStatus"];
     runtimeBootstrap:
-      | "legacy-adapter"
-      | "legacy-derived-static-bridge"
-      | "source-backed-generated-snapshot";
+      "legacy-adapter" | "legacy-derived-static-bridge" | "source-backed-generated-snapshot";
     notes: string[];
   };
 }
@@ -199,7 +193,8 @@ interface RevisionImpactSummary {
 export type CalculationImpactCaseStatus = "pass" | "needs-review" | "failed";
 export type CalculationImpactSuiteStatus = CalculationImpactCaseStatus | "skipped";
 
-export type CalculationImpactMetricId = "dps" | "killsPerHour" | "xpPerHour" | "gpPerHour" | "gpPerXp";
+export type CalculationImpactMetricId =
+  "dps" | "killsPerHour" | "xpPerHour" | "gpPerHour" | "gpPerXp";
 
 export interface CalculationImpactMetricDelta {
   id: CalculationImpactMetricId;
@@ -251,11 +246,7 @@ export interface CalculationImpactSummary {
 
 export type AllMonsterScanStatus = "clean" | "outliers-found" | "skipped";
 export type AllMonsterScanFindingKind =
-  | "threshold-outlier"
-  | "warning-count-increase"
-  | "monster-added"
-  | "monster-removed"
-  | "failed";
+  "threshold-outlier" | "warning-count-increase" | "monster-added" | "monster-removed" | "failed";
 
 export interface AllMonsterScanBaseline {
   id: string;
@@ -364,13 +355,7 @@ export const REPRESENTATIVE_CALCULATION_IMPACT_CASES = [
       sustained: false,
       repotThreshold: null
     }),
-    requiredItems: [
-      "bronze_sword",
-      "bronze_med_helm",
-      "bronze_sq_shield",
-      "big_bones",
-      "coins"
-    ],
+    requiredItems: ["bronze_sword", "bronze_med_helm", "bronze_sq_shield", "big_bones", "coins"],
     requiredGear: [
       { slot: "helm", itemId: "bronze_med_helm" },
       { slot: "shield", itemId: "bronze_sq_shield" }
@@ -699,7 +684,8 @@ function rawRuntimeImpactInput(
       prayer: 43
     },
     loadout: { weaponId, ...(ammoId ? { ammoId } : {}), gear: {} },
-    styleId: combatStyle === "ranged" ? "rapid" : combatStyle === "magic" ? "accurate" : "aggressive",
+    styleId:
+      combatStyle === "ranged" ? "rapid" : combatStyle === "magic" ? "accurate" : "aggressive",
     prayers: { keys: ["none"] },
     boosts: { keys: ["none"] },
     ...(combatStyle === "magic" ? { spellId: "wind_strike", charge: false } : {}),
@@ -1270,11 +1256,7 @@ function sourceSliceLabel(fileName: string): string {
   return `${SOURCE_BACKED_SLICE_DIR}/${fileName}`;
 }
 
-function readSourceSliceFile<T>(
-  sourceDir: string,
-  fileName: string,
-  schema: z.ZodType<T>
-): T {
+function readSourceSliceFile<T>(sourceDir: string, fileName: string, schema: z.ZodType<T>): T {
   const path = join(sourceDir, SOURCE_BACKED_SLICE_DIR, fileName);
   const label = sourceSliceLabel(fileName);
 
@@ -1435,11 +1417,7 @@ function toItemDefinition(entry: SourceItem): ItemDefinition {
     ...(entry.price !== undefined ? { price: entry.price } : {}),
     ...(entry.alch !== undefined ? { alch: entry.alch } : {}),
     ...(entry.stackable !== undefined ? { stackable: entry.stackable } : {}),
-    provenance: sourceBackedProvenance(
-      SOURCE_BACKED_SLICE_FILES.items,
-      entry.id,
-      entry.sourceRef
-    ),
+    provenance: sourceBackedProvenance(SOURCE_BACKED_SLICE_FILES.items, entry.id, entry.sourceRef),
     ...(entry.notes ? { notes: entry.notes } : {})
   };
 }
@@ -1500,7 +1478,11 @@ function toEquipmentItemDefinition(entry: SourceEquipmentItem): EquipmentItemDef
   };
 }
 
-function toDropDefinition(entry: SourceDrop, monsterId: string, sourcePath: string): DropDefinition {
+function toDropDefinition(
+  entry: SourceDrop,
+  monsterId: string,
+  sourcePath: string
+): DropDefinition {
   return {
     name: entry.name,
     ...(entry.key ? { key: entry.key } : {}),
@@ -1556,7 +1538,9 @@ function toMonsterDefinition(entry: SourceMonster): MonsterDefinition {
     ...(entry.defCrush !== undefined ? { defCrush: entry.defCrush } : {}),
     ...(entry.defRange !== undefined ? { defRange: entry.defRange } : {}),
     ...(entry.defMagic !== undefined ? { defMagic: entry.defMagic } : {}),
-    ...(entry.loot ? { loot: entry.loot.map((drop, index) => toDropEntry(drop, entry.id, index)) } : {}),
+    ...(entry.loot
+      ? { loot: entry.loot.map((drop, index) => toDropEntry(drop, entry.id, index)) }
+      : {}),
     provenance: sourceBackedProvenance(
       SOURCE_BACKED_SLICE_FILES.monsters,
       entry.id,
@@ -1648,7 +1632,11 @@ function parseSourceBackedSlice(sourceDir: string): SourceBackedSlice {
       sourceSliceLabel(SOURCE_BACKED_SLICE_FILES.weapons),
       toWeaponDefinition
     ),
-    ammo: recordById(ammoFile.ammo, sourceSliceLabel(SOURCE_BACKED_SLICE_FILES.ammo), toAmmoDefinition),
+    ammo: recordById(
+      ammoFile.ammo,
+      sourceSliceLabel(SOURCE_BACKED_SLICE_FILES.ammo),
+      toAmmoDefinition
+    ),
     spells: recordById(
       spellsFile.spells,
       sourceSliceLabel(SOURCE_BACKED_SLICE_FILES.spells),
@@ -1661,7 +1649,9 @@ function parseSourceBackedSlice(sourceDir: string): SourceBackedSlice {
 }
 
 function emptyEquipment(): GameDataSnapshot["equipment"] {
-  return Object.fromEntries(EQUIPMENT_SLOTS.map((slot) => [slot, {}])) as GameDataSnapshot["equipment"];
+  return Object.fromEntries(
+    EQUIPMENT_SLOTS.map((slot) => [slot, {}])
+  ) as GameDataSnapshot["equipment"];
 }
 
 function createEmptyFoundationSnapshot(provenance: DataProvenance): GameDataSnapshot {
@@ -1740,7 +1730,10 @@ function createRawLostCityGameData(input: Parameters<typeof createLostCityRawSna
         `Raw LostCity snapshot failed schema validation${paths ? ` at ${paths}` : ""}.`
       );
     }
-    if (error instanceof Error && /^LostCity loot extraction is incomplete for /.test(error.message)) {
+    if (
+      error instanceof Error &&
+      /^LostCity loot extraction is incomplete for /.test(error.message)
+    ) {
       throw new GameDataGeneratorError("source_slice_invalid", error.message);
     }
     throw error;
@@ -1855,7 +1848,8 @@ function readCurrentCalculationPriceSet(plan: GameDataGenerationPlan): {
         provenance: {
           source: "manual",
           sourceRef: "prices.json + alch.json",
-          notes: "Calculation-impact suite reads current prices and alch values only; price-history.json is intentionally excluded."
+          notes:
+            "Calculation-impact suite reads current prices and alch values only; price-history.json is intentionally excluded."
         }
       })
     };
@@ -1917,9 +1911,7 @@ function validateCalculationImpactRequirements(
   }
   for (const gear of testCase.requiredGear ?? []) {
     if (!snapshot.equipment[gear.slot]?.[gear.itemId]) {
-      notes.push(
-        `${snapshotLabel} missing ${gear.slot} gear ${inlineCode(gear.itemId)}`
-      );
+      notes.push(`${snapshotLabel} missing ${gear.slot} gear ${inlineCode(gear.itemId)}`);
     }
   }
 
@@ -2198,10 +2190,7 @@ function allMonsterIds(
   candidate: GameDataSnapshot
 ): string[] {
   return [
-    ...new Set([
-      ...Object.keys(baseline?.monsters ?? {}),
-      ...Object.keys(candidate.monsters)
-    ])
+    ...new Set([...Object.keys(baseline?.monsters ?? {}), ...Object.keys(candidate.monsters)])
   ].sort();
 }
 
@@ -2355,9 +2344,7 @@ function compareAllMonsterScanCase(input: {
     candidate.warningCount != null &&
     baseline.warningCount != null &&
     candidate.warningCount > baseline.warningCount
-      ? [
-          `warning count increased from ${baseline.warningCount} to ${candidate.warningCount}`
-        ]
+      ? [`warning count increased from ${baseline.warningCount} to ${candidate.warningCount}`]
       : [];
   const reasons = [...metricReasons, ...warningReasons];
   if (!reasons.length) return null;
@@ -2374,9 +2361,7 @@ function compareAllMonsterScanCase(input: {
   });
 }
 
-function sortAllMonsterScanFindings(
-  findings: AllMonsterScanFinding[]
-): AllMonsterScanFinding[] {
+function sortAllMonsterScanFindings(findings: AllMonsterScanFinding[]): AllMonsterScanFinding[] {
   return [...findings].sort(
     (left, right) =>
       left.baselineId.localeCompare(right.baselineId) ||
@@ -2579,8 +2564,9 @@ function createRevisionImpactSummary(
   }
 
   const sections: SnapshotDiffSection[] = [
-    ...(["items", "monsters", "weapons", "ammo", "spells", "requirements"] as SnapshotSectionKey[])
-      .map((key) => diffRecord(key, baseline.snapshot?.[key], gameData[key])),
+    ...(
+      ["items", "monsters", "weapons", "ammo", "spells", "requirements"] as SnapshotSectionKey[]
+    ).map((key) => diffRecord(key, baseline.snapshot?.[key], gameData[key])),
     diffRecord("equipment", flattenEquipment(baseline.snapshot), flattenEquipment(gameData)),
     diffRecord("drops", flattenDrops(baseline.snapshot), flattenDrops(gameData))
   ];
@@ -2666,7 +2652,10 @@ function diffSummaryLines(summary: RevisionImpactSummary): string[] {
       `- ${section.section} changed: ${formatList(section.changed)}`
     ]);
 
-  return [...table, ...(details.length ? details : ["", "No schema-level snapshot changes detected."])];
+  return [
+    ...table,
+    ...(details.length ? details : ["", "No schema-level snapshot changes detected."])
+  ];
 }
 
 function formatNumber(value: number): string {
@@ -2700,8 +2689,7 @@ function calculationImpactCaseMetric(
 
 function calculationImpactSummaryLines(summary: CalculationImpactSummary): string[] {
   const acceptedChangedCases = summary.cases.filter(
-    (testCase) =>
-      testCase.status === "pass" && testCase.metrics.some((metric) => metric.changed)
+    (testCase) => testCase.status === "pass" && testCase.metrics.some((metric) => metric.changed)
   ).length;
   const lines = [
     `- Representative suite: ${summary.status}`,
@@ -2741,7 +2729,10 @@ function calculationImpactSummaryLines(summary: CalculationImpactSummary): strin
         formatMetricDelta(calculationImpactCaseMetric(testCase, "gpPerHour")),
         formatMetricDelta(calculationImpactCaseMetric(testCase, "gpPerXp")),
         notes
-      ].join(" | ").replace(/^/, "| ").replace(/$/, " |");
+      ]
+        .join(" | ")
+        .replace(/^/, "| ")
+        .replace(/$/, " |");
     })
   ];
 }
@@ -2804,7 +2795,10 @@ function allMonsterScanSummaryLines(summary: AllMonsterScanSummary): string[] {
         formatMetricDelta(allMonsterScanMetric(finding, "gpPerHour")),
         formatMetricDelta(allMonsterScanMetric(finding, "gpPerXp")),
         formatWarningCounts(finding)
-      ].join(" | ").replace(/^/, "| ").replace(/$/, " |");
+      ]
+        .join(" | ")
+        .replace(/^/, "| ")
+        .replace(/$/, " |");
     })
   ];
 }
@@ -3116,12 +3110,13 @@ export function createGeneratedGameDataOutputs(
 }
 
 function writeIfChanged(filePath: string, text: string, dryRun: boolean): boolean {
-  let previous = "";
-  try {
-    previous = readFileSync(filePath, "utf8");
-  } catch {
-    previous = "";
-  }
+  const previous = (() => {
+    try {
+      return readFileSync(filePath, "utf8");
+    } catch {
+      return null;
+    }
+  })();
   if (previous === text) return false;
   if (!dryRun) {
     mkdirSync(dirname(filePath), { recursive: true });

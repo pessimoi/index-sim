@@ -932,8 +932,7 @@ export function simulateCombat(
     dps,
     dbaSelected
   );
-  const warnings =
-    specialAttack?.key === "dragon_halberd" ? [DRAGON_HALBERD_NPC_SIZE_WARNING] : [];
+  const warnings = specialAttack?.key === "dragon_halberd" ? [DRAGON_HALBERD_NPC_SIZE_WARNING] : [];
   const effectiveDps = specialAttack?.dpsWithSpec ?? dps;
   const weapon = context.gameData.weapons[request.loadout.weaponId];
   const poisonSeverity = weapon?.poisonSeverity ?? 0;

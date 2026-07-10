@@ -12,10 +12,7 @@ import {
   resolveLostCityLootHandler,
   type LostCityLootHandlerCatalog
 } from "./lostcity-content-loot";
-import {
-  lostCityMonsterSourceId,
-  lostCityRuntimeItemId
-} from "./lostcity-content-runtime-mapping";
+import { lostCityMonsterSourceId, lostCityRuntimeItemId } from "./lostcity-content-runtime-mapping";
 
 export type LostCityLootExtractionStatus = "complete" | "partial" | "unsupported";
 
@@ -219,12 +216,18 @@ interface ThresholdBranch {
 }
 
 function thresholdBranches(lines: string[], variable: string): ThresholdBranch[] {
-  const normalized = lines.flatMap((line) => line.replace(/}\s*else\s+if/g, "}\nelse if").split("\n"));
+  const normalized = lines.flatMap((line) =>
+    line.replace(/}\s*else\s+if/g, "}\nelse if").split("\n")
+  );
   const branches: ThresholdBranch[] = [];
   let current: ThresholdBranch | undefined;
   let depth = 0;
-  const startPattern = new RegExp(`^(?:else\\s+)?if\\s*\\(\\s*\\$${variable}\\s*<\\s*([0-9]+)(?:\\s*&\\s*([^)]*))?\\s*\\)\\s*\\{$`);
-  const inlinePattern = new RegExp(`^(?:else\\s+)?if\\s*\\(\\s*\\$${variable}\\s*<\\s*([0-9]+)(?:\\s*&\\s*([^)]*))?\\s*\\)\\s+(.+)$`);
+  const startPattern = new RegExp(
+    `^(?:else\\s+)?if\\s*\\(\\s*\\$${variable}\\s*<\\s*([0-9]+)(?:\\s*&\\s*([^)]*))?\\s*\\)\\s*\\{$`
+  );
+  const inlinePattern = new RegExp(
+    `^(?:else\\s+)?if\\s*\\(\\s*\\$${variable}\\s*<\\s*([0-9]+)(?:\\s*&\\s*([^)]*))?\\s*\\)\\s+(.+)$`
+  );
   for (const rawLine of normalized) {
     const line = rawLine.replace(/\/\/.*$/, "").trim();
     if (!current) {
@@ -437,7 +440,11 @@ export function extractLostCityMonsterLootSource(input: {
     runtimeId: input.runtimeId,
     sourceId,
     sourceRef: block.sourceRef,
-    status: issues.length ? (direct.length || random.length ? "partial" : "unsupported") : "complete",
+    status: issues.length
+      ? direct.length || random.length
+        ? "partial"
+        : "unsupported"
+      : "complete",
     loot: [...direct, ...random],
     issues,
     exclusions

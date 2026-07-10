@@ -304,8 +304,9 @@ describe("price file schemas", () => {
   });
 
   it("detects duplicate object keys in JavaScript source fixtures", () => {
-    expect(findDuplicateObjectLiteralKeys("const data = { lobster: 200, lobster: 250 };", "fixture"))
-      .toEqual(["fixture:1:30 duplicates object key 'lobster' first seen at property 1"]);
+    expect(
+      findDuplicateObjectLiteralKeys("const data = { lobster: 200, lobster: 250 };", "fixture")
+    ).toEqual(["fixture:1:30 duplicates object key 'lobster' first seen at property 1"]);
   });
 
   it("rejects malformed imported PriceSet JSON with sanitized errors", () => {

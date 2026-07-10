@@ -56,11 +56,7 @@ function integerValue(
   return Number(value);
 }
 
-function propertyInteger(
-  entry: LostCityConfigEntry,
-  key: string,
-  fallback?: number
-): number {
+function propertyInteger(entry: LostCityConfigEntry, key: string, fallback?: number): number {
   return integerValue(entry, key, lastConfigValue(entry, key), fallback);
 }
 

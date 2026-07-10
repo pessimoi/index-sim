@@ -220,7 +220,12 @@ describe("market browser adapter", () => {
 
   it.each([
     ["invalid JSON", "{bad", scheduledAlchJson(), "invalid_json"],
-    ["invalid schema data", scheduledPricesJson({ lobster: -1 }), scheduledAlchJson(), "validation_failed"],
+    [
+      "invalid schema data",
+      scheduledPricesJson({ lobster: -1 }),
+      scheduledAlchJson(),
+      "validation_failed"
+    ],
     ["duplicate keys", '{"lobster": 200, "lobster": 210}', scheduledAlchJson(), "duplicate_keys"]
   ] as const)(
     "classifies invalid scheduled static price snapshots: %s",

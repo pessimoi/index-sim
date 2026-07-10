@@ -14,9 +14,7 @@ import { parseArgs, runScheduledMarketWriter } from "../../scripts/write-schedul
 const CAPTURED_AT = new Date("2026-07-08T00:15:00.000Z");
 const CAPTURED_AT_SECONDS = Math.floor(CAPTURED_AT.getTime() / 1000);
 const TEST_ITEM_IDS = new Set(["lobster", "rune_scimitar", "dragon_bones"]);
-const TEST_MAPPINGS = MARKET_SOURCE_MAPPINGS.filter((mapping) =>
-  TEST_ITEM_IDS.has(mapping.itemId)
-);
+const TEST_MAPPINGS = MARKET_SOURCE_MAPPINGS.filter((mapping) => TEST_ITEM_IDS.has(mapping.itemId));
 
 const BASE_PRICES = {
   _randomherb_avg: 2500,

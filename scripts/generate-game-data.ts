@@ -1,9 +1,6 @@
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import {
-  GameDataGeneratorError,
-  writeGeneratedGameDataOutputs
-} from "./game-data-generator-core";
+import { GameDataGeneratorError, writeGeneratedGameDataOutputs } from "./game-data-generator-core";
 
 export interface CliOptions {
   sourceDir?: string;

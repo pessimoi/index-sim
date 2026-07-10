@@ -1,8 +1,4 @@
-import {
-  computeCombatXpBreakdown,
-  simulateCombat,
-  type CombatXpBreakdown
-} from "../combat";
+import { computeCombatXpBreakdown, simulateCombat, type CombatXpBreakdown } from "../combat";
 import {
   HIGH_ALCH_MAGIC_XP_PER_CAST,
   simulateTripLootSupply,
@@ -117,10 +113,7 @@ export function composeFullSimulationResult(parts: FullSimulationParts): FullSim
       prayerXpPerHour,
       magicAlchXpPerHour,
       totalXpPerHour:
-        combatSkillXpPerHourValue +
-        cannonEffectiveXpPerHour +
-        prayerXpPerHour +
-        magicAlchXpPerHour
+        combatSkillXpPerHourValue + cannonEffectiveXpPerHour + prayerXpPerHour + magicAlchXpPerHour
     },
     rates: {
       dps: combat.dps,

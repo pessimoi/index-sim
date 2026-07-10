@@ -223,37 +223,39 @@ export const EquipmentRegistrySchema = z.object(
   >
 );
 
-export const GameDataSnapshotSchema = z.object({
-  id: EntityIdSchema,
-  label: z.string().min(1),
-  items: z.record(EntityIdSchema, ItemDefinitionSchema),
-  monsters: z.record(EntityIdSchema, MonsterDefinitionSchema),
-  weapons: z.record(EntityIdSchema, WeaponDefinitionSchema),
-  ammo: z.record(EntityIdSchema, AmmoDefinitionSchema),
-  spells: z.record(EntityIdSchema, SpellDefinitionSchema),
-  equipment: EquipmentRegistrySchema,
-  requirements: z.record(EntityIdSchema, ItemRequirementDefinitionSchema).optional(),
-  provenance: DataProvenanceSchema.optional()
-}).superRefine((snapshot, ctx) => {
-  const requirements = snapshot.requirements;
-  if (!requirements) return;
-  for (const [itemId, requirement] of Object.entries(requirements)) {
-    if (requirement.itemId !== itemId) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["requirements", itemId, "itemId"],
-        message: "requirement itemId must match record key"
-      });
+export const GameDataSnapshotSchema = z
+  .object({
+    id: EntityIdSchema,
+    label: z.string().min(1),
+    items: z.record(EntityIdSchema, ItemDefinitionSchema),
+    monsters: z.record(EntityIdSchema, MonsterDefinitionSchema),
+    weapons: z.record(EntityIdSchema, WeaponDefinitionSchema),
+    ammo: z.record(EntityIdSchema, AmmoDefinitionSchema),
+    spells: z.record(EntityIdSchema, SpellDefinitionSchema),
+    equipment: EquipmentRegistrySchema,
+    requirements: z.record(EntityIdSchema, ItemRequirementDefinitionSchema).optional(),
+    provenance: DataProvenanceSchema.optional()
+  })
+  .superRefine((snapshot, ctx) => {
+    const requirements = snapshot.requirements;
+    if (!requirements) return;
+    for (const [itemId, requirement] of Object.entries(requirements)) {
+      if (requirement.itemId !== itemId) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["requirements", itemId, "itemId"],
+          message: "requirement itemId must match record key"
+        });
+      }
+      if (!snapshot.items[itemId]) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["requirements", itemId],
+          message: "requirement item must exist in items"
+        });
+      }
     }
-    if (!snapshot.items[itemId]) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["requirements", itemId],
-        message: "requirement item must exist in items"
-      });
-    }
-  }
-});
+  });
 
 export type ValidatedGameDataSnapshot = z.infer<typeof GameDataSnapshotSchema>;
 

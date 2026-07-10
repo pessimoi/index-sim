@@ -37,10 +37,7 @@ export type ValidatedPriceSet = z.infer<typeof PriceSetSchema>;
 export type ValidatedPriceHistory = z.infer<typeof PriceHistorySchema>;
 
 export type PriceSetValidationErrorCode =
-  | "body_too_large"
-  | "duplicate_keys"
-  | "invalid_json"
-  | "validation_failed";
+  "body_too_large" | "duplicate_keys" | "invalid_json" | "validation_failed";
 
 export class PriceSetValidationError extends Error {
   readonly code: PriceSetValidationErrorCode;

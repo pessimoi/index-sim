@@ -4,10 +4,7 @@ import { parseJsonWithDuplicateKeyCheck } from "../src/data/reliability";
 import { parseGameDataSnapshot } from "../src/data/schemas/game-data";
 import { PriceSetSchema } from "../src/data/schemas/price-set";
 import type { GameDataSnapshot, PriceSet } from "../src/domain/shared";
-import {
-  simulateFullSimulation,
-  type FullSimulationInput
-} from "../src/domain/simulation";
+import { simulateFullSimulation, type FullSimulationInput } from "../src/domain/simulation";
 import { createGeneratedRuntimePriceSet } from "../src/adapters/generated/price-fallback";
 import {
   type AllMonsterScanBaseline,
@@ -106,7 +103,8 @@ function sourceImpactInput(
       monsterId,
       levels: SOURCE_IMPACT_LEVELS,
       loadout,
-      styleId: combatStyle === "ranged" ? "rapid" : combatStyle === "magic" ? "accurate" : "aggressive",
+      styleId:
+        combatStyle === "ranged" ? "rapid" : combatStyle === "magic" ? "accurate" : "aggressive",
       prayers: { keys: ["none"] },
       boosts: { keys: ["none"] },
       ...(combatStyle === "magic" ? { spellId: "wind_strike", charge: false } : {}),
@@ -138,8 +136,8 @@ const SOURCE_IMPACT_STYLE_CONFIG = [
   { combatStyle: "magic", requiredItems: ["staff_of_air"] }
 ] as const;
 
-export const LOSTCITY_SOURCE_IMPACT_CASES = ["giant", "black_dragon", "dark_wizard_20"]
-  .flatMap((monsterId) =>
+export const LOSTCITY_SOURCE_IMPACT_CASES = ["giant", "black_dragon", "dark_wizard_20"].flatMap(
+  (monsterId) =>
     SOURCE_IMPACT_STYLE_CONFIG.map(({ combatStyle, requiredItems }) => ({
       id: `source_${combatStyle}_${monsterId}`,
       label: `Source ${combatStyle} ${monsterId}`,
@@ -147,7 +145,7 @@ export const LOSTCITY_SOURCE_IMPACT_CASES = ["giant", "black_dragon", "dark_wiza
       input: sourceImpactInput(monsterId, combatStyle),
       requiredItems
     }))
-  ) satisfies readonly RepresentativeCalculationImpactCase[];
+) satisfies readonly RepresentativeCalculationImpactCase[];
 
 function sourceEquipmentImpactInput(
   combatStyle: FullSimulationInput["request"]["combatStyle"],
@@ -164,9 +162,7 @@ function sourceEquipmentImpactInput(
     },
     trip: {
       ...input.trip,
-      ...(prayerDrain
-        ? { prayerMode: "potions" as const, prayerPotionDoses: 8 }
-        : {})
+      ...(prayerDrain ? { prayerMode: "potions" as const, prayerPotionDoses: 8 } : {})
     }
   };
 }
@@ -206,10 +202,7 @@ export const LOSTCITY_EQUIPMENT_IMPACT_CASES = [
   }
 ] satisfies readonly RepresentativeCalculationImpactCase[];
 
-function sourceThrownImpactInput(
-  monsterId: string,
-  weaponId: string
-): FullSimulationInput {
+function sourceThrownImpactInput(monsterId: string, weaponId: string): FullSimulationInput {
   const input = sourceImpactInput(monsterId, "ranged");
   return {
     ...input,
@@ -282,20 +275,22 @@ export function createLostCitySourceImpactReport(input: {
     : input.reference;
   const includeEquipment = input.includeEquipment ?? false;
   const includeCombatCatalog = input.includeCombatCatalog ?? false;
-  const objects = input.includeLoot || includeEquipment || includeCombatCatalog
-    ? readLostCityConfigCatalog({
-        repoRoot,
-        sourceDir: input.sourceDir,
-        extension: ".obj"
-      })
-    : undefined;
-  const params = input.includeLoot || includeCombatCatalog
-    ? readLostCityConfigCatalog({
-        repoRoot,
-        sourceDir: input.sourceDir,
-        extension: ".param"
-      })
-    : undefined;
+  const objects =
+    input.includeLoot || includeEquipment || includeCombatCatalog
+      ? readLostCityConfigCatalog({
+          repoRoot,
+          sourceDir: input.sourceDir,
+          extension: ".obj"
+        })
+      : undefined;
+  const params =
+    input.includeLoot || includeCombatCatalog
+      ? readLostCityConfigCatalog({
+          repoRoot,
+          sourceDir: input.sourceDir,
+          extension: ".param"
+        })
+      : undefined;
   const dbrows = includeCombatCatalog
     ? readLostCityConfigCatalog({
         repoRoot,
@@ -435,8 +430,7 @@ export function createLostCitySourceImpactReport(input: {
   return {
     sourceDir: npc.sourceDirLabel,
     sourceRevision:
-      input.sourceRevision ??
-      resolveLostCitySourceRevision(resolve(repoRoot, input.sourceDir)),
+      input.sourceRevision ?? resolveLostCitySourceRevision(resolve(repoRoot, input.sourceDir)),
     referenceSnapshotId: input.reference.id,
     candidateSnapshotId: candidate.id,
     monsterCount: Object.keys(candidate.monsters).length,
@@ -470,58 +464,56 @@ export function createLostCitySourceImpactReport(input: {
   };
 }
 
-export function formatLostCitySourceImpactMarkdown(
-  report: LostCitySourceImpactReport
-): string {
-  return [
-    "# LostCity source calculation impact",
-    "",
-    `Source: ${report.sourceDir}`,
-    `Revision: ${report.sourceRevision}`,
-    `Reference snapshot: ${report.referenceSnapshotId}`,
-    `Candidate snapshot: ${report.candidateSnapshotId}`,
-    `Monsters: ${report.monsterCount}`,
-    `Combat fields replaced: ${report.includeCombat ? report.fields.join(", ") : "no"}`,
-    `Equipment fields replaced: ${report.includeEquipment ? report.equipmentFields.join(", ") : "no"}`,
-    `Weapon fields replaced: ${report.includeCombatCatalog ? report.weaponFields.join(", ") : "no"}`,
-    `Ammo fields replaced: ${report.includeCombatCatalog ? report.ammoFields.join(", ") : "no"}`,
-    `Spell fields replaced: ${report.includeCombatCatalog ? report.spellFields.join(", ") : "no"}`,
-    `Loot replaced: ${report.includeLoot ? `yes (${report.lootExclusionCount} scoped exclusions)` : "no"}`,
-    "Scope: in-memory evidence only; sections not listed as replaced remain at reference values.",
-    "This read-only report neither accepts new source differences nor changes the committed runtime.",
-    "",
-    formatCalculationImpactEvidenceMarkdown(report.evidence),
-    ...(report.detail
-      ? [
-          "",
-          "## Monster Loot Detail",
-          "",
-          `Monster: ${report.detail.monsterId}`,
-          ...report.detail.styles.flatMap((style) => [
+export function formatLostCitySourceImpactMarkdown(report: LostCitySourceImpactReport): string {
+  return (
+    [
+      "# LostCity source calculation impact",
+      "",
+      `Source: ${report.sourceDir}`,
+      `Revision: ${report.sourceRevision}`,
+      `Reference snapshot: ${report.referenceSnapshotId}`,
+      `Candidate snapshot: ${report.candidateSnapshotId}`,
+      `Monsters: ${report.monsterCount}`,
+      `Combat fields replaced: ${report.includeCombat ? report.fields.join(", ") : "no"}`,
+      `Equipment fields replaced: ${report.includeEquipment ? report.equipmentFields.join(", ") : "no"}`,
+      `Weapon fields replaced: ${report.includeCombatCatalog ? report.weaponFields.join(", ") : "no"}`,
+      `Ammo fields replaced: ${report.includeCombatCatalog ? report.ammoFields.join(", ") : "no"}`,
+      `Spell fields replaced: ${report.includeCombatCatalog ? report.spellFields.join(", ") : "no"}`,
+      `Loot replaced: ${report.includeLoot ? `yes (${report.lootExclusionCount} scoped exclusions)` : "no"}`,
+      "Scope: in-memory evidence only; sections not listed as replaced remain at reference values.",
+      "This read-only report neither accepts new source differences nor changes the committed runtime.",
+      "",
+      formatCalculationImpactEvidenceMarkdown(report.evidence),
+      ...(report.detail
+        ? [
             "",
-            `### ${style.combatStyle}`,
-            `- GP/kill: ${style.baselineGpPerKill} -> ${style.candidateGpPerKill}`,
-            `- Changed rows: ${style.changedRows.length}`,
-            ...style.changedRows.map(
-              (row) =>
-                `- ${row.signature}: baseline=${row.baseline ?? "missing"}; candidate=${row.candidate ?? "missing"}`
-            )
-          ])
-        ]
-      : []),
-    "",
-    "## Decision Boundary",
-    "",
-    "- Revision 274 combat, core-loot, equipment and combat-catalog deltas are accepted by D-055, D-056 and D-057; future source changes require fresh review.",
-    "- The committed generator report, not this read-only diagnostic, owns accepted-delta notes for the active runtime.",
-    "- Requirement skill inference and quest/clue exclusions remain separate decision boundaries.",
-    "- Loot, equipment, weapon/ammo and monster-combat extraction remain independently selectable evidence slices."
-  ].join("\n") + "\n";
+            "## Monster Loot Detail",
+            "",
+            `Monster: ${report.detail.monsterId}`,
+            ...report.detail.styles.flatMap((style) => [
+              "",
+              `### ${style.combatStyle}`,
+              `- GP/kill: ${style.baselineGpPerKill} -> ${style.candidateGpPerKill}`,
+              `- Changed rows: ${style.changedRows.length}`,
+              ...style.changedRows.map(
+                (row) =>
+                  `- ${row.signature}: baseline=${row.baseline ?? "missing"}; candidate=${row.candidate ?? "missing"}`
+              )
+            ])
+          ]
+        : []),
+      "",
+      "## Decision Boundary",
+      "",
+      "- Revision 274 combat, core-loot, equipment and combat-catalog deltas are accepted by D-055, D-056 and D-057; future source changes require fresh review.",
+      "- The committed generator report, not this read-only diagnostic, owns accepted-delta notes for the active runtime.",
+      "- Requirement skill inference and quest/clue exclusions remain separate decision boundaries.",
+      "- Loot, equipment, weapon/ammo and monster-combat extraction remain independently selectable evidence slices."
+    ].join("\n") + "\n"
+  );
 }
 
-export function parseLostCitySourceImpactArgs(
-  argv: string[]
-): LostCitySourceImpactCliOptions {
+export function parseLostCitySourceImpactArgs(argv: string[]): LostCitySourceImpactCliOptions {
   const options: LostCitySourceImpactCliOptions = {
     sourceDir: DEFAULT_GAME_DATA_SOURCE_DIR,
     format: "markdown",

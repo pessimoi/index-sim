@@ -1,9 +1,6 @@
 import { LEGACY_GOLDEN_CASES } from "./fixtures/legacy-case-definitions";
 import { buildLegacyInput, createLegacyRuntime } from "./helpers/legacy-sim";
-import {
-  domainContextFromLegacy,
-  domainRequestFromLegacyInput
-} from "./helpers/domain-planner";
+import { domainContextFromLegacy, domainRequestFromLegacyInput } from "./helpers/domain-planner";
 import { computeCombatXpBreakdown, simulateCombat } from "../domain/combat";
 import {
   composeFullSimulationResult,
@@ -40,9 +37,7 @@ function fullSimulationInputFromFixture(caseId: string): {
       cannon: legacyInput.cannon as FullSimulationInput["cannon"],
       jewelSpot:
         (
-          legacyInput.jewelSpotByMonster as
-            | Record<string, "underground" | "overground">
-            | undefined
+          legacyInput.jewelSpotByMonster as Record<string, "underground" | "overground"> | undefined
         )?.[legacyInput.monster.id] ?? "underground",
       overheadSec: typeof legacyInput.overheadSec === "number" ? legacyInput.overheadSec : null
     }

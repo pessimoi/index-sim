@@ -84,11 +84,9 @@ type RuntimeFieldCoverageSection =
   | "spells.runtimeFields"
   | "equipment.runtimeFields";
 
-const ITEM_RUNTIME_FIELDS = [
-  "name",
-  "price",
-  "alch"
-] as const satisfies ReadonlyArray<keyof GameDataSnapshot["items"][string]>;
+const ITEM_RUNTIME_FIELDS = ["name", "price", "alch"] as const satisfies ReadonlyArray<
+  keyof GameDataSnapshot["items"][string]
+>;
 
 const MONSTER_COMBAT_STAT_FIELDS = [
   "level",
@@ -146,9 +144,9 @@ const SPELL_RUNTIME_FIELDS = [
   "runes"
 ] as const satisfies ReadonlyArray<keyof GameDataSnapshot["spells"][string]>;
 
-const EQUIPMENT_RUNTIME_FIELDS = [
-  "name"
-] as const satisfies ReadonlyArray<keyof EquipmentItemDefinition>;
+const EQUIPMENT_RUNTIME_FIELDS = ["name"] as const satisfies ReadonlyArray<
+  keyof EquipmentItemDefinition
+>;
 
 function sortedIds(record: Record<string, unknown> | undefined): EntityId[] {
   return Object.keys(record ?? {}).sort();
@@ -160,9 +158,7 @@ function equipmentIds(snapshot: GameDataSnapshot): EntityId[] {
     .sort();
 }
 
-function flattenedEquipment(
-  snapshot: GameDataSnapshot
-): Record<EntityId, EquipmentItemDefinition> {
+function flattenedEquipment(snapshot: GameDataSnapshot): Record<EntityId, EquipmentItemDefinition> {
   return Object.fromEntries(
     Object.entries(snapshot.equipment).flatMap(([slot, items]) =>
       Object.entries(items).map(([itemId, item]) => [`${slot}:${itemId}`, item])
@@ -204,10 +200,7 @@ function coverageForCanonicalIds(
   };
 }
 
-function idsForSection(
-  context: SimulationContext,
-  section: RuntimeCoverageSection
-): EntityId[] {
+function idsForSection(context: SimulationContext, section: RuntimeCoverageSection): EntityId[] {
   switch (section) {
     case "items":
     case "items.runtimeFields":
@@ -269,9 +262,7 @@ function runtimeFieldRecords(
   }
 }
 
-function runtimeFieldsForSection(
-  section: RuntimeFieldCoverageSection
-): readonly string[] {
+function runtimeFieldsForSection(section: RuntimeFieldCoverageSection): readonly string[] {
   switch (section) {
     case "items.runtimeFields":
       return ITEM_RUNTIME_FIELDS;

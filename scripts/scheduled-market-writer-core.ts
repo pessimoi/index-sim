@@ -288,11 +288,7 @@ function buildUpstreamItemMap(
   return items;
 }
 
-function existingValue(
-  record: Record<string, number>,
-  itemId: string,
-  outputName: string
-): number {
+function existingValue(record: Record<string, number>, itemId: string, outputName: string): number {
   const value = record[itemId];
   if (value !== undefined) return value;
   throw new ScheduledMarketWriterError(

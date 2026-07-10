@@ -29,12 +29,16 @@ describe("generated runtime adapter", () => {
       name: "Uncut sapphire",
       price: 25
     });
-    expect(result.context.priceSet.label).toBe("Scheduled static prices + generated item fallbacks");
+    expect(result.context.priceSet.label).toBe(
+      "Scheduled static prices + generated item fallbacks"
+    );
     expect(result.context.priceSet.source).toBe("scraped");
     expect(result.context.priceSet.itemPrices.rune_scimitar).toBe(23400);
     expect(result.context.priceSet.itemPrices["1dose2defense"]).toBe(132);
     expect(result.context.priceSet.alchValues.adamant_spear).toBe(1248);
-    expect(result.context.priceSet.provenance?.notes).toContain("Scheduled item and alch values take precedence");
+    expect(result.context.priceSet.provenance?.notes).toContain(
+      "Scheduled item and alch values take precedence"
+    );
   });
 
   it("reports the raw generated runtime catalog ready when ids and required fields are covered", async () => {
@@ -164,7 +168,9 @@ describe("generated runtime adapter", () => {
     expect(markdown).toContain("# Generated runtime readiness");
     expect(markdown).toContain("Status: ready");
     expect(markdown).toContain("Scope: coverage evidence only");
-    expect(markdown).toContain("| Section | Blocking | Reference | Candidate | Matched | Missing | Extra | Examples |");
+    expect(markdown).toContain(
+      "| Section | Blocking | Reference | Candidate | Matched | Missing | Extra | Examples |"
+    );
     expect(markdown).toContain("| monsters.combatStats | yes |");
     expect(markdown).toContain("| equipment.runtimeFields | yes |");
     expect(markdown).toContain("- none");
@@ -242,9 +248,7 @@ describe("generated runtime adapter", () => {
     });
     const weaponIds = report.sections.find((section) => section.section === "weapons");
     const itemIds = report.sections.find((section) => section.section === "items");
-    const itemFields = report.sections.find(
-      (section) => section.section === "items.runtimeFields"
-    );
+    const itemFields = report.sections.find((section) => section.section === "items.runtimeFields");
     const weaponFields = report.sections.find(
       (section) => section.section === "weapons.runtimeFields"
     );

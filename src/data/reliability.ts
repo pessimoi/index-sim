@@ -71,7 +71,7 @@ class JsonDuplicateKeyScanner {
       this.parseArray(path);
       return;
     }
-    if (char === "\"") {
+    if (char === '"') {
       this.readString();
       return;
     }
@@ -162,13 +162,13 @@ class JsonDuplicateKeyScanner {
   }
 
   private readString(): StringToken {
-    if (this.text[this.pos] !== "\"") this.syntaxError();
+    if (this.text[this.pos] !== '"') this.syntaxError();
     const start = this.pos;
     this.pos += 1;
 
     while (this.pos < this.text.length) {
       const char = this.text[this.pos];
-      if (char === "\"") {
+      if (char === '"') {
         this.pos += 1;
         try {
           return { value: JSON.parse(this.text.slice(start, this.pos)) as string, start };

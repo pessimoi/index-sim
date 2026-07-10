@@ -184,6 +184,28 @@ describe("trip/loot/supply unit rules", () => {
     expect(bonePrayerXp("Dragon bones")).toBe(72);
   });
 
+  it("materializes tagged herb and gem details from the same priced domain tables", () => {
+    const runtime = createLegacyRuntime();
+    const context = domainContextFromLegacy(runtime);
+    const result = evaluateLoot(
+      {
+        ...context.gameData.monsters.chicken,
+        loot: [
+          { name: "Random herb", tag: "herb", chance: 0.5, qtyAvg: 1 },
+          { name: "Random jewel", tag: "gem", chance: 0.5, qtyAvg: 1 }
+        ]
+      },
+      context
+    );
+
+    expect(result.lootBreakdown[0]?._expand).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: "Ranarr", weight: 11 })])
+    );
+    expect(result.lootBreakdown[1]?._expand).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: "Uncut sapphire", weight: 32 })])
+    );
+  });
+
   it("produces structured warnings for missing and approximate price data", () => {
     const runtime = createLegacyRuntime();
     const context = domainContextFromLegacy(runtime);
@@ -215,8 +237,8 @@ describe("trip/loot/supply unit rules", () => {
   it("surfaces structured warnings when jewel table prices use aliases or fallbacks", () => {
     const runtime = createLegacyRuntime();
     const context = domainContextFromLegacy(runtime);
-    const { uncut_sapphire: _uncutSapphire, ...withoutCanonicalSapphire } =
-      context.priceSet.itemPrices;
+    const withoutCanonicalSapphire = { ...context.priceSet.itemPrices };
+    delete withoutCanonicalSapphire.uncut_sapphire;
     const aliasContext: SimulationContext = {
       ...context,
       priceSet: {
@@ -231,7 +253,8 @@ describe("trip/loot/supply unit rules", () => {
       "uncut_sapphire"
     );
 
-    const { sapphire: _sapphire, ...withoutSapphireAlias } = withoutCanonicalSapphire;
+    const withoutSapphireAlias = { ...withoutCanonicalSapphire };
+    delete withoutSapphireAlias.sapphire;
     const fallbackContext: SimulationContext = {
       ...context,
       priceSet: {
@@ -247,7 +270,8 @@ describe("trip/loot/supply unit rules", () => {
   it("values direct loot keys through canonical prices without alias warnings", () => {
     const runtime = createLegacyRuntime();
     const context = domainContextFromLegacy(runtime);
-    const { sapphire: _sapphire, ...withoutAliasSapphire } = context.priceSet.itemPrices;
+    const withoutAliasSapphire = { ...context.priceSet.itemPrices };
+    delete withoutAliasSapphire.sapphire;
     const aliasKeyContext: SimulationContext = {
       ...context,
       priceSet: {
@@ -277,8 +301,8 @@ describe("trip/loot/supply unit rules", () => {
   it("keeps alias fallback warnings when direct loot canonical prices are missing", () => {
     const runtime = createLegacyRuntime();
     const context = domainContextFromLegacy(runtime);
-    const { uncut_sapphire: _uncutSapphire, ...withoutCanonicalSapphire } =
-      context.priceSet.itemPrices;
+    const withoutCanonicalSapphire = { ...context.priceSet.itemPrices };
+    delete withoutCanonicalSapphire.uncut_sapphire;
     const aliasFallbackContext: SimulationContext = {
       ...context,
       priceSet: {

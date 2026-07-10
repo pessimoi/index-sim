@@ -33,11 +33,7 @@ const BONUS_PARAM_BY_KEY: Readonly<Record<BonusKey, string>> = {
   prayer: "prayerbonus"
 };
 
-export const LOSTCITY_EQUIPMENT_COMPARISON_FIELDS = [
-  "alch",
-  "recoil",
-  ...BONUS_KEYS
-] as const;
+export const LOSTCITY_EQUIPMENT_COMPARISON_FIELDS = ["alch", "recoil", ...BONUS_KEYS] as const;
 
 export interface LostCityEquipmentSource {
   slot: EquipmentSlot;
@@ -80,7 +76,8 @@ function sourceEntryForEquipment(input: {
 } {
   const equipmentId = `${input.slot}:${input.runtimeId}`;
   const explicit = LOSTCITY_EQUIPMENT_SOURCE_MAPPINGS[equipmentId];
-  const sourceItemId = explicit?.sourceItemId ??
+  const sourceItemId =
+    explicit?.sourceItemId ??
     (input.objects.entries.has(input.runtimeId)
       ? input.runtimeId
       : uniqueNameSourceId(input.runtimeName, input.objects));
@@ -100,11 +97,7 @@ function sourceEntryForEquipment(input: {
   return {
     sourceItemId,
     entry,
-    resolution: explicit
-      ? "explicit"
-      : sourceItemId === input.runtimeId
-        ? "direct"
-        : "unique-name"
+    resolution: explicit ? "explicit" : sourceItemId === input.runtimeId ? "direct" : "unique-name"
   };
 }
 

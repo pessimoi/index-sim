@@ -155,8 +155,7 @@ function modeledXpRows(
   const prayerXpPerHour = trip.prayerXpPerKill * trip.effectiveKph;
   if (prayerXpPerHour > 0) rows.set("prayer", prayerXpPerHour);
 
-  const alchXpPerHour =
-    trip.alchCastsPerKill * HIGH_ALCH_MAGIC_XP_PER_CAST * trip.effectiveKph;
+  const alchXpPerHour = trip.alchCastsPerKill * HIGH_ALCH_MAGIC_XP_PER_CAST * trip.effectiveKph;
   if (alchXpPerHour > 0) rows.set("alch", alchXpPerHour);
 
   return rows;

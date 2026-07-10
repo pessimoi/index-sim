@@ -1261,8 +1261,8 @@ function requirementFallbackWarningsForPlanner(
 ): SimulationWarning[] {
   const itemIds = new Set<EntityId>([
     baseRequest.loadout.weaponId,
-    ...Object.values(baseRequest.loadout.gear).filter((itemId): itemId is EntityId =>
-      typeof itemId === "string"
+    ...Object.values(baseRequest.loadout.gear).filter(
+      (itemId): itemId is EntityId => typeof itemId === "string"
     ),
     ...(pool.weapon ?? []),
     ...(pool.helm ?? []),

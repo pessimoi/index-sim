@@ -256,7 +256,17 @@ function equipmentIds(snapshot: GameDataSnapshot): EntityId[] {
 function equipmentSourceIds(catalog: LostCityConfigCatalog): Set<EntityId> {
   const ids = new Set<EntityId>();
   for (const id of catalog.entries.keys()) {
-    for (const slot of ["helm", "amulet", "body", "legs", "shield", "gloves", "boots", "cape", "ring"] as const) {
+    for (const slot of [
+      "helm",
+      "amulet",
+      "body",
+      "legs",
+      "shield",
+      "gloves",
+      "boots",
+      "cape",
+      "ring"
+    ] as const) {
       ids.add(`${slot}:${id}`);
     }
   }
@@ -281,13 +291,11 @@ function comparableWeaponField(
   }
   if (field === "twoHand") return definition.twoHand ?? false;
   if (["accBonus", "dmgBonus", "speed", "poisonSeverity", "alch"].includes(field)) {
-    return (
-      (definition as unknown as Record<string, number | undefined>)[field] ?? 0
-    );
+    return (definition as unknown as Record<string, number | undefined>)[field] ?? 0;
   }
-  const value = (
-    definition as unknown as Record<string, string | number | boolean | undefined>
-  )[field];
+  const value = (definition as unknown as Record<string, string | number | boolean | undefined>)[
+    field
+  ];
   return value ?? null;
 }
 
@@ -308,9 +316,9 @@ function comparableSpellField(
 ): string | number | boolean | null {
   if (field === "runes") {
     return JSON.stringify(
-      Object.fromEntries(Object.entries(definition.runes ?? {}).sort(([left], [right]) =>
-        left.localeCompare(right)
-      ))
+      Object.fromEntries(
+        Object.entries(definition.runes ?? {}).sort(([left], [right]) => left.localeCompare(right))
+      )
     );
   }
   if (field === "god") return definition.god ?? false;
@@ -330,8 +338,7 @@ export function resolveLostCitySourceRevision(sourceDir: string): string {
 }
 
 type ComparableDrop =
-  | { key?: string; tag?: string; chance: number; qtyAvg: number }
-  | ComparableDrop[];
+  { key?: string; tag?: string; chance: number; qtyAvg: number } | ComparableDrop[];
 
 function comparableDrop(entry: DropEntry): ComparableDrop {
   if (Array.isArray(entry)) {
@@ -358,9 +365,9 @@ function firstLootMismatch(reference: ComparableDrop[], source: ComparableDrop[]
 }
 
 function comparableLoot(entries: DropEntry[]): ComparableDrop[] {
-  return entries.map(comparableDrop).sort((left, right) =>
-    JSON.stringify(left).localeCompare(JSON.stringify(right))
-  );
+  return entries
+    .map(comparableDrop)
+    .sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)));
 }
 
 function namedDrop(entry: DropEntry): unknown {
@@ -372,9 +379,9 @@ function namedDrop(entry: DropEntry): unknown {
 }
 
 function namedLoot(entries: DropEntry[]): unknown[] {
-  return entries.map(namedDrop).sort((left, right) =>
-    JSON.stringify(left).localeCompare(JSON.stringify(right))
-  );
+  return entries
+    .map(namedDrop)
+    .sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)));
 }
 
 function dropKeys(entry: DropEntry): EntityId[] {
@@ -435,7 +442,9 @@ export function createLostCitySourceCoverageReport(
     }
   }
   const syntheticItemIds = new Set(
-    [...LOSTCITY_SYNTHETIC_RUNTIME_ITEM_IDS].filter((runtimeId) => !!options.reference.items[runtimeId])
+    [...LOSTCITY_SYNTHETIC_RUNTIME_ITEM_IDS].filter(
+      (runtimeId) => !!options.reference.items[runtimeId]
+    )
   );
   const weaponNameMappings = uniqueObjectNameMappings(
     Object.keys(options.reference.weapons),
@@ -494,8 +503,7 @@ export function createLostCitySourceCoverageReport(
         params
       });
       const fields = LOSTCITY_WEAPON_COMPARISON_FIELDS.filter(
-        (field) =>
-          comparableWeaponField(reference, field) !== comparableWeaponField(source, field)
+        (field) => comparableWeaponField(reference, field) !== comparableWeaponField(source, field)
       );
       return fields.length ? [{ runtimeId, fields }] : [];
     }
@@ -573,7 +581,9 @@ export function createLostCitySourceCoverageReport(
     }
   }
   const monsterLootDifferences = monsterLootExtractions.flatMap((extraction) => {
-    const referenceLoot = comparableLoot(options.reference.monsters[extraction.runtimeId]?.loot ?? []);
+    const referenceLoot = comparableLoot(
+      options.reference.monsters[extraction.runtimeId]?.loot ?? []
+    );
     const sourceLoot = comparableLoot(extraction.loot);
     return JSON.stringify(referenceLoot) === JSON.stringify(sourceLoot)
       ? []
@@ -648,13 +658,10 @@ export function createLostCitySourceCoverageReport(
         { ...itemNameMappings, ...itemExplicitMappings },
         syntheticItemIds
       ),
-      directSection(
-        "weapons",
-        Object.keys(options.reference.weapons),
-        objIds,
-        exampleLimit,
-        { ...weaponNameMappings, ...LOSTCITY_WEAPON_SOURCE_MAPPINGS }
-      ),
+      directSection("weapons", Object.keys(options.reference.weapons), objIds, exampleLimit, {
+        ...weaponNameMappings,
+        ...LOSTCITY_WEAPON_SOURCE_MAPPINGS
+      }),
       directSection(
         "ammo",
         Object.keys(options.reference.ammo),
@@ -754,9 +761,8 @@ export function createLostCitySourceCoverageReport(
       dedicatedHandlerCount: monsterLootOwnership.filter((entry) => entry.hasHandler).length,
       directHandlerCount: monsterLootOwnership.filter((entry) => entry.handlerKind === "direct")
         .length,
-      categoryHandlerCount: monsterLootOwnership.filter(
-        (entry) => entry.handlerKind === "category"
-      ).length,
+      categoryHandlerCount: monsterLootOwnership.filter((entry) => entry.handlerKind === "category")
+        .length,
       defaultDropCount: monsterLootOwnership.filter((entry) => entry.hasDefaultDrop).length,
       handlerAndDefaultDropCount: monsterLootOwnership.filter(
         (entry) => entry.hasHandler && entry.hasDefaultDrop
@@ -781,11 +787,15 @@ export function createLostCitySourceCoverageReport(
       partialExamples: monsterLootExtractions
         .filter((entry) => entry.status === "partial")
         .slice(0, exampleLimit)
-        .map((entry) => `${entry.runtimeId} (${entry.issues.map((issue) => issue.code).join(", ")})`),
+        .map(
+          (entry) => `${entry.runtimeId} (${entry.issues.map((issue) => issue.code).join(", ")})`
+        ),
       unsupportedExamples: monsterLootExtractions
         .filter((entry) => entry.status === "unsupported")
         .slice(0, exampleLimit)
-        .map((entry) => `${entry.runtimeId} (${entry.issues.map((issue) => issue.code).join(", ")})`)
+        .map(
+          (entry) => `${entry.runtimeId} (${entry.issues.map((issue) => issue.code).join(", ")})`
+        )
     },
     monsterLootComparison: {
       exactCount: monsterLootExtractions.length - monsterLootDifferences.length,
@@ -830,162 +840,174 @@ function unresolvedExamples(section: LostCitySourceCoverageSection): string {
   return `${section.unresolvedExamples.join(", ")}${hidden > 0 ? `, +${hidden} more` : ""}`;
 }
 
-export function formatLostCitySourceCoverageMarkdown(
-  report: LostCitySourceCoverageReport
-): string {
-  return [
-    "# LostCity source coverage audit",
-    "",
-    `Source: ${report.sourceDir}`,
-    `Revision: ${report.sourceRevision}`,
-    "Scope: read-only direct, reviewed and simulator-synthetic identity evidence; committed generator output and accepted decisions own runtime truth.",
-    "",
-    "## Parsed Catalogs",
-    "",
-    `- NPC: ${report.catalogs.npcEntries} entries from ${report.catalogs.npcFiles} files`,
-    `- Obj: ${report.catalogs.objEntries} entries from ${report.catalogs.objFiles} files`,
-    `- DB row: ${report.catalogs.dbrowEntries} entries from ${report.catalogs.dbrowFiles} files`,
-    `- Param: ${report.catalogs.paramEntries} entries from ${report.catalogs.paramFiles} files`,
-    "",
-    "## Runtime Id Coverage",
-    "",
-    "| Section | Reference | Direct | Reviewed mapping | Synthetic | Unresolved | First unresolved ids |",
-    "| --- | ---: | ---: | ---: | ---: | ---: | --- |",
-    ...report.sections.map(
-      (section) =>
-        `| ${section.section} | ${section.referenceCount} | ${section.directCount} | ${section.mappedCount} | ${section.syntheticCount} | ${section.unresolvedCount} | ${unresolvedExamples(section)} |`
-    ),
-    ...report.sections
-      .filter((section) => section.mappedExamples.length)
-      .map(
+export function formatLostCitySourceCoverageMarkdown(report: LostCitySourceCoverageReport): string {
+  return (
+    [
+      "# LostCity source coverage audit",
+      "",
+      `Source: ${report.sourceDir}`,
+      `Revision: ${report.sourceRevision}`,
+      "Scope: read-only direct, reviewed and simulator-synthetic identity evidence; committed generator output and accepted decisions own runtime truth.",
+      "",
+      "## Parsed Catalogs",
+      "",
+      `- NPC: ${report.catalogs.npcEntries} entries from ${report.catalogs.npcFiles} files`,
+      `- Obj: ${report.catalogs.objEntries} entries from ${report.catalogs.objFiles} files`,
+      `- DB row: ${report.catalogs.dbrowEntries} entries from ${report.catalogs.dbrowFiles} files`,
+      `- Param: ${report.catalogs.paramEntries} entries from ${report.catalogs.paramFiles} files`,
+      "",
+      "## Runtime Id Coverage",
+      "",
+      "| Section | Reference | Direct | Reviewed mapping | Synthetic | Unresolved | First unresolved ids |",
+      "| --- | ---: | ---: | ---: | ---: | ---: | --- |",
+      ...report.sections.map(
         (section) =>
-          `- ${section.section} reviewed mappings: ${section.mappedExamples.join(", ")}`
+          `| ${section.section} | ${section.referenceCount} | ${section.directCount} | ${section.mappedCount} | ${section.syntheticCount} | ${section.unresolvedCount} | ${unresolvedExamples(section)} |`
       ),
-    ...report.sections
-      .filter((section) => section.syntheticExamples.length)
-      .map(
-        (section) =>
-          `- ${section.section} synthetic identities: ${section.syntheticExamples.join(", ")}`
+      ...report.sections
+        .filter((section) => section.mappedExamples.length)
+        .map(
+          (section) =>
+            `- ${section.section} reviewed mappings: ${section.mappedExamples.join(", ")}`
+        ),
+      ...report.sections
+        .filter((section) => section.syntheticExamples.length)
+        .map(
+          (section) =>
+            `- ${section.section} synthetic identities: ${section.syntheticExamples.join(", ")}`
+        ),
+      "",
+      "## Equipment Field Comparison",
+      "",
+      `- Reference equipment rows: ${report.equipmentFields.referenceCount}`,
+      `- Exact source-field matches: ${report.equipmentFields.exactCount}`,
+      `- Differing source-field rows: ${report.equipmentFields.differingCount}`,
+      `- Differences by field: ${
+        Object.entries(report.equipmentFields.differenceCounts)
+          .filter(([, count]) => count > 0)
+          .map(([field, count]) => `${field}=${count}`)
+          .join(", ") || "none"
+      }`,
+      `- First differences: ${report.equipmentFields.differingExamples.join("; ") || "none"}`,
+      "",
+      "## Weapon Field Comparison",
+      "",
+      `- Reference weapon rows: ${report.weaponFields.referenceCount}`,
+      `- Exact source-field matches: ${report.weaponFields.exactCount}`,
+      `- Differing source-field rows: ${report.weaponFields.differingCount}`,
+      `- Differences by field: ${
+        Object.entries(report.weaponFields.differenceCounts)
+          .filter(([, count]) => count > 0)
+          .map(([field, count]) => `${field}=${count}`)
+          .join(", ") || "none"
+      }`,
+      `- First differences: ${report.weaponFields.differingExamples.join("; ") || "none"}`,
+      "",
+      "## Ammo Field Comparison",
+      "",
+      `- Reference ammo rows: ${report.ammoFields.referenceCount}`,
+      `- Exact source-field matches: ${report.ammoFields.exactCount}`,
+      `- Differing source-field rows: ${report.ammoFields.differingCount}`,
+      `- Differences by field: ${
+        Object.entries(report.ammoFields.differenceCounts)
+          .filter(([, count]) => count > 0)
+          .map(([field, count]) => `${field}=${count}`)
+          .join(", ") || "none"
+      }`,
+      `- First differences: ${report.ammoFields.differingExamples.join("; ") || "none"}`,
+      "",
+      "## Spell Field Comparison",
+      "",
+      `- Reference spell rows: ${report.spellFields.referenceCount}`,
+      `- Exact source-field matches: ${report.spellFields.exactCount}`,
+      `- Differing source-field rows: ${report.spellFields.differingCount}`,
+      `- Differences by field: ${
+        Object.entries(report.spellFields.differenceCounts)
+          .filter(([, count]) => count > 0)
+          .map(([field, count]) => `${field}=${count}`)
+          .join(", ") || "none"
+      }`,
+      `- First differences: ${report.spellFields.differingExamples.join("; ") || "none"}`,
+      "",
+      "## Monster Combat Field Comparison",
+      "",
+      `- Reference monsters: ${report.monsterCombatFields.referenceCount}`,
+      `- Exact source-field matches: ${report.monsterCombatFields.exactCount}`,
+      `- Differing source-field rows: ${report.monsterCombatFields.differingCount}`,
+      `- Differences by field: ${
+        Object.entries(report.monsterCombatFields.differenceCounts)
+          .filter(([, count]) => count > 0)
+          .map(([field, count]) => `${field}=${count}`)
+          .join(", ") || "none"
+      }`,
+      `- First differences: ${report.monsterCombatFields.differingExamples.join("; ") || "none"}`,
+      "",
+      "## Monster Loot Ownership",
+      "",
+      `- RuneScript files: ${report.monsterLootOwnership.runeScriptFiles}`,
+      `- Parsed ai_queue3 handlers: ${report.monsterLootOwnership.handlers}`,
+      `- Runtime monsters: ${report.monsterLootOwnership.runtimeMonsters}`,
+      `- Dedicated handler: ${report.monsterLootOwnership.dedicatedHandlerCount}`,
+      `- Direct NPC handler: ${report.monsterLootOwnership.directHandlerCount}`,
+      `- NPC category handler: ${report.monsterLootOwnership.categoryHandlerCount}`,
+      `- NPC default death_drop: ${report.monsterLootOwnership.defaultDropCount}`,
+      `- Both handler and default drop: ${report.monsterLootOwnership.handlerAndDefaultDropCount}`,
+      `- No declared handler/default drop: ${report.monsterLootOwnership.noDeclaredDropCount}`,
+      `- First no-declaration ids: ${report.monsterLootOwnership.noDeclaredDropExamples.join(", ") || "none"}`,
+      "",
+      "## Monster Loot Extraction",
+      "",
+      `- Complete: ${report.monsterLootExtraction.completeCount}`,
+      `- Partial: ${report.monsterLootExtraction.partialCount}`,
+      `- Unsupported: ${report.monsterLootExtraction.unsupportedCount}`,
+      `- Extracted top-level drop entries: ${report.monsterLootExtraction.extractedDropEntryCount}`,
+      `- Issues: ${
+        Object.entries(report.monsterLootExtraction.issueCounts)
+          .map(([code, count]) => `${code}=${count}`)
+          .join(", ") || "none"
+      }`,
+      ...Object.entries(report.monsterLootExtraction.issueExamples).map(
+        ([code, examples]) => `- ${code} examples: ${examples.join("; ")}`
       ),
-    "",
-    "## Equipment Field Comparison",
-    "",
-    `- Reference equipment rows: ${report.equipmentFields.referenceCount}`,
-    `- Exact source-field matches: ${report.equipmentFields.exactCount}`,
-    `- Differing source-field rows: ${report.equipmentFields.differingCount}`,
-    `- Differences by field: ${Object.entries(report.equipmentFields.differenceCounts)
-      .filter(([, count]) => count > 0)
-      .map(([field, count]) => `${field}=${count}`)
-      .join(", ") || "none"}`,
-    `- First differences: ${report.equipmentFields.differingExamples.join("; ") || "none"}`,
-    "",
-    "## Weapon Field Comparison",
-    "",
-    `- Reference weapon rows: ${report.weaponFields.referenceCount}`,
-    `- Exact source-field matches: ${report.weaponFields.exactCount}`,
-    `- Differing source-field rows: ${report.weaponFields.differingCount}`,
-    `- Differences by field: ${Object.entries(report.weaponFields.differenceCounts)
-      .filter(([, count]) => count > 0)
-      .map(([field, count]) => `${field}=${count}`)
-      .join(", ") || "none"}`,
-    `- First differences: ${report.weaponFields.differingExamples.join("; ") || "none"}`,
-    "",
-    "## Ammo Field Comparison",
-    "",
-    `- Reference ammo rows: ${report.ammoFields.referenceCount}`,
-    `- Exact source-field matches: ${report.ammoFields.exactCount}`,
-    `- Differing source-field rows: ${report.ammoFields.differingCount}`,
-    `- Differences by field: ${Object.entries(report.ammoFields.differenceCounts)
-      .filter(([, count]) => count > 0)
-      .map(([field, count]) => `${field}=${count}`)
-      .join(", ") || "none"}`,
-    `- First differences: ${report.ammoFields.differingExamples.join("; ") || "none"}`,
-    "",
-    "## Spell Field Comparison",
-    "",
-    `- Reference spell rows: ${report.spellFields.referenceCount}`,
-    `- Exact source-field matches: ${report.spellFields.exactCount}`,
-    `- Differing source-field rows: ${report.spellFields.differingCount}`,
-    `- Differences by field: ${Object.entries(report.spellFields.differenceCounts)
-      .filter(([, count]) => count > 0)
-      .map(([field, count]) => `${field}=${count}`)
-      .join(", ") || "none"}`,
-    `- First differences: ${report.spellFields.differingExamples.join("; ") || "none"}`,
-    "",
-    "## Monster Combat Field Comparison",
-    "",
-    `- Reference monsters: ${report.monsterCombatFields.referenceCount}`,
-    `- Exact source-field matches: ${report.monsterCombatFields.exactCount}`,
-    `- Differing source-field rows: ${report.monsterCombatFields.differingCount}`,
-    `- Differences by field: ${Object.entries(report.monsterCombatFields.differenceCounts)
-      .filter(([, count]) => count > 0)
-      .map(([field, count]) => `${field}=${count}`)
-      .join(", ") || "none"}`,
-    `- First differences: ${report.monsterCombatFields.differingExamples.join("; ") || "none"}`,
-    "",
-    "## Monster Loot Ownership",
-    "",
-    `- RuneScript files: ${report.monsterLootOwnership.runeScriptFiles}`,
-    `- Parsed ai_queue3 handlers: ${report.monsterLootOwnership.handlers}`,
-    `- Runtime monsters: ${report.monsterLootOwnership.runtimeMonsters}`,
-    `- Dedicated handler: ${report.monsterLootOwnership.dedicatedHandlerCount}`,
-    `- Direct NPC handler: ${report.monsterLootOwnership.directHandlerCount}`,
-    `- NPC category handler: ${report.monsterLootOwnership.categoryHandlerCount}`,
-    `- NPC default death_drop: ${report.monsterLootOwnership.defaultDropCount}`,
-    `- Both handler and default drop: ${report.monsterLootOwnership.handlerAndDefaultDropCount}`,
-    `- No declared handler/default drop: ${report.monsterLootOwnership.noDeclaredDropCount}`,
-    `- First no-declaration ids: ${report.monsterLootOwnership.noDeclaredDropExamples.join(", ") || "none"}`,
-    "",
-    "## Monster Loot Extraction",
-    "",
-    `- Complete: ${report.monsterLootExtraction.completeCount}`,
-    `- Partial: ${report.monsterLootExtraction.partialCount}`,
-    `- Unsupported: ${report.monsterLootExtraction.unsupportedCount}`,
-    `- Extracted top-level drop entries: ${report.monsterLootExtraction.extractedDropEntryCount}`,
-    `- Issues: ${Object.entries(report.monsterLootExtraction.issueCounts)
-      .map(([code, count]) => `${code}=${count}`)
-      .join(", ") || "none"}`,
-    ...Object.entries(report.monsterLootExtraction.issueExamples).map(
-      ([code, examples]) => `- ${code} examples: ${examples.join("; ")}`
-    ),
-    `- Scoped exclusions: ${Object.entries(report.monsterLootExtraction.exclusionCounts)
-      .map(([code, count]) => `${code}=${count}`)
-      .join(", ") || "none"}`,
-    ...Object.entries(report.monsterLootExtraction.exclusionExamples).map(
-      ([code, examples]) => `- ${code} examples: ${examples.join("; ")}`
-    ),
-    `- First partial ids: ${report.monsterLootExtraction.partialExamples.join("; ") || "none"}`,
-    `- First unsupported ids: ${report.monsterLootExtraction.unsupportedExamples.join("; ") || "none"}`,
-    "",
-    "## Monster Loot Comparison",
-    "",
-    `- Exact reference matches: ${report.monsterLootComparison.exactCount}`,
-    `- Differing monsters: ${report.monsterLootComparison.differingCount}`,
-    `- Top-level entries: reference=${report.monsterLootComparison.referenceDropEntryCount}, source=${report.monsterLootComparison.sourceDropEntryCount}`,
-    `- First differences: ${report.monsterLootComparison.differingExamples.join("; ") || "none"}`,
-    `- Exact including display names: ${report.monsterLootComparison.displayNameExactCount}`,
-    `- Display-name differences: ${report.monsterLootComparison.displayNameDifferingCount}`,
-    `- First display-name differences: ${report.monsterLootComparison.displayNameDifferingExamples.join("; ") || "none"}`,
-    "",
-    "## Monster Loot Item Keys",
-    "",
-    `- Unique source keys: ${report.monsterLootItemKeys.sourceKeyCount}`,
-    `- Covered by reference item identity: ${report.monsterLootItemKeys.referenceCoveredCount}`,
-    `- Source-only with parsed object definition: ${report.monsterLootItemKeys.sourceOnlyDefinedCount}`,
-    `- First source-only keys: ${report.monsterLootItemKeys.sourceOnlyDefinedExamples.join(", ") || "none"}`,
-    `- Unresolved: ${report.monsterLootItemKeys.unresolvedCount}`,
-    `- First unresolved keys: ${report.monsterLootItemKeys.unresolvedExamples.join(", ") || "none"}`,
-    "",
-    "## Next Work",
-    "- Keep parser mappings and explicit exclusions in sync with reviewed source revisions.",
-    "- Run the generator, readiness and calculation-impact gates before accepting a revision bump.",
-    "- Treat requirement skill inference, quest/clue rows and legacy deletion as separate decision boundaries."
-  ].join("\n") + "\n";
+      `- Scoped exclusions: ${
+        Object.entries(report.monsterLootExtraction.exclusionCounts)
+          .map(([code, count]) => `${code}=${count}`)
+          .join(", ") || "none"
+      }`,
+      ...Object.entries(report.monsterLootExtraction.exclusionExamples).map(
+        ([code, examples]) => `- ${code} examples: ${examples.join("; ")}`
+      ),
+      `- First partial ids: ${report.monsterLootExtraction.partialExamples.join("; ") || "none"}`,
+      `- First unsupported ids: ${report.monsterLootExtraction.unsupportedExamples.join("; ") || "none"}`,
+      "",
+      "## Monster Loot Comparison",
+      "",
+      `- Exact reference matches: ${report.monsterLootComparison.exactCount}`,
+      `- Differing monsters: ${report.monsterLootComparison.differingCount}`,
+      `- Top-level entries: reference=${report.monsterLootComparison.referenceDropEntryCount}, source=${report.monsterLootComparison.sourceDropEntryCount}`,
+      `- First differences: ${report.monsterLootComparison.differingExamples.join("; ") || "none"}`,
+      `- Exact including display names: ${report.monsterLootComparison.displayNameExactCount}`,
+      `- Display-name differences: ${report.monsterLootComparison.displayNameDifferingCount}`,
+      `- First display-name differences: ${report.monsterLootComparison.displayNameDifferingExamples.join("; ") || "none"}`,
+      "",
+      "## Monster Loot Item Keys",
+      "",
+      `- Unique source keys: ${report.monsterLootItemKeys.sourceKeyCount}`,
+      `- Covered by reference item identity: ${report.monsterLootItemKeys.referenceCoveredCount}`,
+      `- Source-only with parsed object definition: ${report.monsterLootItemKeys.sourceOnlyDefinedCount}`,
+      `- First source-only keys: ${report.monsterLootItemKeys.sourceOnlyDefinedExamples.join(", ") || "none"}`,
+      `- Unresolved: ${report.monsterLootItemKeys.unresolvedCount}`,
+      `- First unresolved keys: ${report.monsterLootItemKeys.unresolvedExamples.join(", ") || "none"}`,
+      "",
+      "## Next Work",
+      "- Keep parser mappings and explicit exclusions in sync with reviewed source revisions.",
+      "- Run the generator, readiness and calculation-impact gates before accepting a revision bump.",
+      "- Treat requirement skill inference, quest/clue rows and legacy deletion as separate decision boundaries."
+    ].join("\n") + "\n"
+  );
 }
 
-export function parseLostCitySourceCoverageArgs(
-  argv: string[]
-): LostCitySourceCoverageCliOptions {
+export function parseLostCitySourceCoverageArgs(argv: string[]): LostCitySourceCoverageCliOptions {
   const options: LostCitySourceCoverageCliOptions = {
     sourceDir: ".sources/lostcity-content",
     format: "markdown",

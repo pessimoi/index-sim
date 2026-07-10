@@ -133,9 +133,7 @@ function isDirectCliRun(): boolean {
   const argvHasCurrentFile = process.argv.some((arg) => resolve(arg) === currentFile);
   const viteNodeScriptRun =
     process.env.VITEST !== "true" &&
-    currentFile
-      .replace(/\\/g, "/")
-      .endsWith("/scripts/write-legacy-derived-runtime-snapshot.ts");
+    currentFile.replace(/\\/g, "/").endsWith("/scripts/write-legacy-derived-runtime-snapshot.ts");
   return argvHasCurrentFile || viteNodeScriptRun;
 }
 

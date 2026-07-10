@@ -168,7 +168,8 @@ export function lostCityLootHandlerBlock(
 ): LostCityRuneScriptBlock {
   const target = resolution.handler.target?.replace(/^@/, "");
   if (!target) return resolution.handler.block;
-  const block = catalog.blocks.get(blockKey("label", target)) ?? catalog.blocks.get(blockKey("proc", target));
+  const block =
+    catalog.blocks.get(blockKey("label", target)) ?? catalog.blocks.get(blockKey("proc", target));
   if (!block) {
     throw new LostCityContentSourceError(
       "config_invalid",

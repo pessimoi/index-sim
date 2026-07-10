@@ -398,7 +398,8 @@ export const LOSTCITY_EQUIPMENT_SOURCE_MAPPINGS: Readonly<
   "boots:splitbark_boots": {
     sourceItemId: "splitbark_greaves",
     sourceRef: "scripts/_unpack/274/all.obj#splitbark_greaves",
-    reason: "Source greaves use the feet wear position and match the runtime Splitbark boots bonuses."
+    reason:
+      "Source greaves use the feet wear position and match the runtime Splitbark boots bonuses."
   },
   "boots:wizard_boots": {
     sourceItemId: "boots_wizard",
@@ -469,7 +470,8 @@ export const LOSTCITY_EQUIPMENT_SOURCE_MAPPINGS: Readonly<
   "shield:anti_dragon": {
     sourceItemId: "antidragonbreathshield",
     sourceRef: "scripts/skill_combat/configs/melee/shields.obj#antidragonbreathshield",
-    reason: "Dragonfire shield source row; cost and defence bonuses match the runtime anti-dragon shield."
+    reason:
+      "Dragonfire shield source row; cost and defence bonuses match the runtime anti-dragon shield."
   },
   "shield:balance_book": {
     sourceItemId: "guthixbook_complete",

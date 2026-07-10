@@ -12,10 +12,7 @@ import { createLostCityItemCandidate, extractLostCityItemSource } from "./lostci
 import { readLostCityLootHandlerCatalog } from "./lostcity-content-loot";
 import { extractLostCityMonsterLootSource } from "./lostcity-content-loot-extractor";
 import { createLostCityMonsterCombatCandidate } from "./lostcity-content-monsters";
-import {
-  lostCityMonsterSourceId,
-  lostCitySourceItemId
-} from "./lostcity-content-runtime-mapping";
+import { lostCityMonsterSourceId, lostCitySourceItemId } from "./lostcity-content-runtime-mapping";
 
 export interface LostCityRawSnapshotResult {
   snapshot: GameDataSnapshot;
