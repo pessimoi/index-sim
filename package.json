@@ -17,8 +17,12 @@
     "runtime:readiness": "$NODE node_modules/vite-node/vite-node.mjs --config vitest.config.ts scripts/report-generated-runtime-readiness.ts",
     "runtime:coverage-plan": "$NODE node_modules/vite-node/vite-node.mjs --config vitest.config.ts scripts/report-generated-runtime-readiness.ts --coverage-plan --allow-not-ready",
     "runtime:write-legacy-derived": "$NODE node_modules/vite-node/vite-node.mjs --config vitest.config.ts scripts/write-legacy-derived-runtime-snapshot.ts",
+    "planner:parity": "$NODE node_modules/vitest/vitest.mjs run --config vitest.config.ts src/tests/planner-parity.test.ts src/tests/planner-domain.test.ts && $NODE node_modules/vite-node/vite-node.mjs --config vitest.config.ts scripts/report-legacy-planner-parity.ts",
+    "planner:parity:report": "$NODE node_modules/vite-node/vite-node.mjs --config vitest.config.ts scripts/report-legacy-planner-parity.ts",
     "prices:write-scheduled": "$NODE node_modules/vite-node/vite-node.mjs --config vitest.config.ts scripts/write-scheduled-market-prices.ts",
     "test:e2e": "playwright test",
+    "test:e2e:visual": "playwright test --config playwright.visual.config.ts",
+    "test:e2e:visual:update": "playwright test --config playwright.visual.config.ts --update-snapshots",
     "typecheck": "tsc -b",
     "lint": "$NODE node_modules/eslint/bin/eslint.js .",
     "format:check": "$NODE node_modules/prettier/bin/prettier.cjs --check ."
