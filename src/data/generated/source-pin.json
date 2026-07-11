@@ -3,7 +3,7 @@
   "generator": {
     "command": "npm run data:generate -- --source-dir .sources/lostcity-content --output-root . --generated-at 2026-07-09T00:00:00.000Z --impact-outlier-limit 25",
     "name": "index-sim-data-generator",
-    "version": "raw-lostcity-runtime-catalog-2"
+    "version": "raw-lostcity-runtime-catalog-3"
   },
   "outputs": {
     "gameData": "src/data/generated/game-data.json",
@@ -16,7 +16,7 @@
       "Generated output is the committed root runtime game-data artifact.",
       "Runtime loads this committed source-backed generated snapshot with scheduled static prices and generated item fallbacks.",
       "Runtime monster combat/core-loot, item, weapon, ammo, spell and equipment fields are parsed directly from pinned LostCity config and RuneScript sources.",
-      "Simulator-only synthetic identities remain app-owned, and requirement skill classification remains outside the raw candidate.",
+      "Simulator-only synthetic identities remain app-owned; numeric item requirements and NPC size are parsed from pinned source, while quest completion clauses remain outside the runtime contract.",
       "Expected runtime identities are checked against src/data/generated/legacy-derived-runtime-game-data.json as a regression/reference baseline.",
       "Raw upstream file bodies, market price history and historical game-data snapshots are intentionally excluded."
     ],

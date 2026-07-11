@@ -1449,6 +1449,7 @@ function activeAssumptionValidLootOverrideCount(
 
 const SETUP_REQUIREMENT_SKILLS = [
   "attack",
+  "strength",
   "defence",
   "ranged",
   "magic"

@@ -7,7 +7,7 @@ Status: raw LostCity source report.
 - Source ref: LostCityRS/Content / 376072662e78a314bf35bb18815be39521491a6b
 - Source path: `.sources/lostcity-content`
 - Generated at: 2026-07-09T00:00:00.000Z
-- Generator version: raw-lostcity-runtime-catalog-2
+- Generator version: raw-lostcity-runtime-catalog-3
 - Generator command: `npm run data:generate -- --source-dir .sources/lostcity-content --output-root . --generated-at 2026-07-09T00:00:00.000Z --impact-outlier-limit 25`
 
 ## Runtime Status
@@ -25,7 +25,7 @@ Status: raw LostCity source report.
 - Output hygiene: pass
 - Source item id uniqueness and alias-map collision gates: pass
 - Diff baseline: valid at `src/data/generated/legacy-derived-runtime-game-data.json`
-- Calculation-impact suite: pass (10 pass, 0 needs-review, 0 failed)
+- Calculation-impact suite: pass (11 pass, 0 needs-review, 0 failed)
 - Informational all-monster scan: outliers-found (22 outliers, 22 shown)
 
 ## Snapshot Diff Summary
@@ -37,7 +37,7 @@ Status: raw LostCity source report.
 | weapons | 0 | 0 | 17 |
 | ammo | 0 | 0 | 10 |
 | spells | 0 | 0 | 0 |
-| requirements | 0 | 0 | 0 |
+| requirements | 94 | 0 | 0 |
 | equipment | 0 | 0 | 6 |
 | drops | 66 | 51 | 1048 |
 
@@ -57,6 +57,10 @@ Status: raw LostCity source report.
 - ammo removed: none
 - ammo changed: `addy_dart`, `addy_knife`, `bronze_knife`, `iron_knife`, `mith_dart`, `mith_knife`, `rune_dart`, `rune_knife`, +2 more
 
+- requirements added: `adamant_full_helm`, `adamant_kite`, `adamant_platebody`, `adamant_platelegs`, `adamant_scimitar`, `addy_dart_w`, `addy_knife_w`, `archer_helm`, +86 more
+- requirements removed: none
+- requirements changed: none
+
 - equipment added: none
 - equipment removed: none
 - equipment changed: `amulet.unholy_symbol`, `body.monk_robe_top`, `gloves.chaos_gauntlets`, `legs.monk_robe_bottom`, `ring.ring_of_recoil`, `ring.ring_of_wealth`
@@ -68,11 +72,11 @@ Status: raw LostCity source report.
 ## Calculation Impact
 
 - Representative suite: pass
-- Cases: 10 run, 10 pass, 0 needs-review, 0 failed
+- Cases: 11 run, 11 pass, 0 needs-review, 0 failed
 - Case filter: none
 - Price set: Current prices.json + generated item fallbacks
 - Metrics: DPS, kills/hr, XP/hr, GP/hr and GP/XP deltas only.
-- Accepted changed cases: 10; each accepted delta cites its owning decision in the case notes.
+- Accepted changed cases: 11; each accepted delta cites its owning decision in the case notes.
 
 | Case | Tags | Status | DPS Δ | Kills/hr Δ | XP/hr Δ | GP/hr Δ | GP/XP Δ | Notes |
 | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | --- |
@@ -86,6 +90,7 @@ Status: raw LostCity source report.
 | `raw_ranged_dark_wizard_20` | `raw-source`, `ranged`, `dark_wizard_20` | pass | 0 (0%) | 0 (0%) | 0 (0%) | -7.976563 (-0.013065%) | -0.0002 (-0.013065%) | Accepted source-backed monster combat and core-loot delta under D-055; economy metrics use generated high alch under D-063. |
 | `raw_magic_dark_wizard_20` | `raw-source`, `magic`, `dark_wizard_20` | pass | -0.040106 (-12.765378%) | -5.893132 (-12.765378%) | -497.498204 (-4.800924%) | -1325.79 (+7.196605%) | -0.224048 (+12.602568%) | Accepted source-backed monster combat and core-loot delta under D-055; economy metrics use generated high alch under D-063. |
 | `raw_thrown_rune_knife_black_dragon` | `raw-source`, `ranged`, `thrown`, `high-tier` | pass | +0.18755 (+28.409091%) | +3.502876 (+28.409091%) | +3547.36 (+28.409091%) | +27928.8 (-2.548081%) | +21.161972 (-24.10824%) | Accepted source-backed thrown-weapon accuracy delta under D-057; economy metrics use generated high alch under D-063. |
+| `raw_dragon_halberd_rock_crab_size` | `raw-source`, `melee`, `special-attack`, `npc-size` | pass | -0.108235 (-4.671338%) | -7.116852 (-4.671338%) | -1896.64 (-4.671338%) | -297.861106 (-4.666131%) | +0.000009 (+0.005462%) | Accepted source-backed dragon halberd selected-target hit-count delta under D-071. |
 
 ### Informational All-Monster Scan
 
@@ -128,16 +133,17 @@ Status: raw LostCity source report.
 
 - Runtime monster combat fields and reviewed core loot are parsed directly from pinned LostCity NPC config and RuneScript handlers.
 - Runtime item, weapon, ammo, spell and equipment calculation fields are parsed directly from pinned LostCity object, param and dbrow configs.
-- Simulator-only synthetic identities remain explicitly app-owned; quest-gated drops, clue tertiaries and generated requirement skill mapping remain outside the raw candidate.
+- Simulator-only synthetic identities remain explicitly app-owned; quest-gated drops and clue tertiaries remain outside the raw candidate.
+- Item skill requirements are parsed from pinned levelrequire triggers/definitions; quest completion clauses remain outside the generated contract, and NPC size comes from config with the source default of 1.
 - The root browser runtime consumes this committed source-backed generated snapshot; the legacy-derived static bridge remains reference and rollback evidence.
 - Source object costs provide item/alch fallbacks; scheduled PriceSet values remain outside this generator and take precedence in the staged generated runtime adapter.
 - The committed calculation-impact report and the focused direct-source impact commands remain separate evidence views over the same normalized domain contract.
-- Generated item requirements are consumed by Planner/setup checks and gear quick action reason copy when the runtime snapshot supplies them; the active raw snapshot has no authoritative requirement map, so those consumers use the D-051 manual fallback.
-- NPC-size, dragon halberd behavior and final special-case source truth are not decided here.
+- Generated item requirements are consumed by Planner/setup checks and gear quick action reason copy; D-051 manual fallback remains only for runtime items without a generated row and legacy snapshots.
+- Source-backed NPC size drives dragon halberd selected-target hit count; missing-size legacy snapshots retain the visible D-050 fallback.
 - Market prices and market price history are outside this game-data snapshot workflow.
 - Historical generated snapshot archives are intentionally not committed.
 
 ## Open Questions
 
-- Which authoritative source semantics should map object level requirements into attack, defence, ranged and magic requirement skills without relying on manual classification?
+- Which later product phase, if any, should model quest completion clauses that accompany some source-backed numeric item requirements?
 - When can the transitional legacy-derived runtime identity reference be replaced by an app-owned generated catalog manifest?

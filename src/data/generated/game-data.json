@@ -5530,6 +5530,7 @@
       },
       "respawn": 30,
       "respawnVerified": true,
+      "size": 1,
       "strBonus": 9,
       "strength": 5
     },
@@ -5570,6 +5571,7 @@
       },
       "respawn": 36,
       "respawnVerified": true,
+      "size": 2,
       "strBonus": 0,
       "strength": 40
     },
@@ -5838,6 +5840,7 @@
       },
       "respawn": 60,
       "respawnVerified": false,
+      "size": 1,
       "strBonus": 12,
       "strength": 17
     },
@@ -6109,6 +6112,7 @@
       },
       "respawn": 30,
       "respawnVerified": true,
+      "size": 1,
       "strBonus": 7,
       "strength": 6
     },
@@ -6173,6 +6177,7 @@
       },
       "respawn": 60,
       "respawnVerified": true,
+      "size": 2,
       "strBonus": 0,
       "strength": 16
     },
@@ -6477,6 +6482,7 @@
       },
       "respawn": 36,
       "respawnVerified": true,
+      "size": 3,
       "strBonus": 0,
       "strength": 148
     },
@@ -6773,6 +6779,7 @@
       },
       "respawn": 36,
       "respawnVerified": true,
+      "size": 4,
       "strBonus": 0,
       "strength": 200
     },
@@ -7089,6 +7096,7 @@
       },
       "respawn": 30,
       "respawnVerified": true,
+      "size": 1,
       "strBonus": 16,
       "strength": 25
     },
@@ -7385,6 +7393,7 @@
       },
       "respawn": 36,
       "respawnVerified": true,
+      "size": 4,
       "strBonus": 0,
       "strength": 95
     },
@@ -7631,6 +7640,7 @@
       },
       "respawn": 30,
       "respawnVerified": true,
+      "size": 1,
       "strBonus": 0,
       "strength": 8
     },
@@ -7913,6 +7923,7 @@
       },
       "respawn": 60,
       "respawnVerified": true,
+      "size": 1,
       "strBonus": 5,
       "strength": 34
     },
@@ -8229,6 +8240,7 @@
       },
       "respawn": 180,
       "respawnVerified": true,
+      "size": 1,
       "strBonus": 9,
       "strength": 42
     },
@@ -8305,6 +8317,7 @@
       },
       "respawn": 30,
       "respawnVerified": true,
+      "size": 1,
       "strBonus": -42,
       "strength": 1
     },
@@ -8369,6 +8382,7 @@
       },
       "respawn": 54,
       "respawnVerified": true,
+      "size": 2,
       "strBonus": -15,
       "strength": 1
     },
@@ -8702,6 +8716,7 @@
       },
       "respawn": 60,
       "respawnVerified": false,
+      "size": 1,
       "strBonus": 0,
       "strength": 70
     },
@@ -9035,6 +9050,7 @@
       },
       "respawn": 60,
       "respawnVerified": false,
+      "size": 2,
       "strBonus": 0,
       "strength": 70
     },
@@ -9303,6 +9319,7 @@
       },
       "respawn": 60,
       "respawnVerified": true,
+      "size": 1,
       "strBonus": 16,
       "strength": 5
     },
@@ -9693,6 +9710,7 @@
       },
       "respawn": 60,
       "respawnVerified": true,
+      "size": 1,
       "strBonus": 0,
       "strength": 2
     },
@@ -10083,6 +10101,7 @@
       },
       "respawn": 60,
       "respawnVerified": true,
+      "size": 1,
       "strBonus": 0,
       "strength": 17
     },
@@ -10110,6 +10129,7 @@
       },
       "respawn": 60,
       "respawnVerified": false,
+      "size": 1,
       "strBonus": 0,
       "strength": 25
     },
@@ -10366,6 +10386,7 @@
       },
       "respawn": 30,
       "respawnVerified": true,
+      "size": 1,
       "strBonus": 0,
       "strength": 28
     },
@@ -10622,6 +10643,7 @@
       },
       "respawn": 60,
       "respawnVerified": true,
+      "size": 1,
       "strBonus": 7,
       "strength": 8
     },
@@ -10794,6 +10816,7 @@
       },
       "respawn": 36,
       "respawnVerified": true,
+      "size": 1,
       "strBonus": 0,
       "strength": 42
     },
@@ -11053,6 +11076,7 @@
       },
       "respawn": 60,
       "respawnVerified": false,
+      "size": 1,
       "strBonus": 0,
       "strength": 95
     },
@@ -11313,6 +11337,7 @@
       "ranged": 80,
       "respawn": 60,
       "respawnVerified": false,
+      "size": 1,
       "strBonus": 0,
       "strength": 80
     },
@@ -11557,6 +11582,7 @@
       },
       "respawn": 30,
       "respawnVerified": true,
+      "size": 1,
       "strBonus": 6,
       "strength": 4
     },
@@ -11849,6 +11875,7 @@
       },
       "respawn": 36,
       "respawnVerified": true,
+      "size": 2,
       "strBonus": 31,
       "strength": 65
     },
@@ -11889,6 +11916,7 @@
       },
       "respawn": 60,
       "respawnVerified": false,
+      "size": 1,
       "strBonus": 0,
       "strength": 40
     },
@@ -12217,6 +12245,7 @@
       },
       "respawn": 36,
       "respawnVerified": true,
+      "size": 2,
       "strBonus": 16,
       "strength": 22
     },
@@ -12452,6 +12481,7 @@
       },
       "respawn": 84,
       "respawnVerified": true,
+      "size": 1,
       "strBonus": -15,
       "strength": 1
     },
@@ -12723,6 +12753,7 @@
       },
       "respawn": 18,
       "respawnVerified": true,
+      "size": 3,
       "strBonus": 0,
       "strength": 78
     },
@@ -13019,6 +13050,7 @@
       },
       "respawn": 36,
       "respawnVerified": true,
+      "size": 4,
       "strBonus": 0,
       "strength": 68
     },
@@ -13340,6 +13372,7 @@
       },
       "respawn": 60,
       "respawnVerified": true,
+      "size": 1,
       "strBonus": 5,
       "strength": 18
     },
@@ -13383,6 +13416,7 @@
       },
       "respawn": 106.8,
       "respawnVerified": true,
+      "size": 2,
       "strBonus": 0,
       "strength": 104
     },
@@ -13435,6 +13469,7 @@
       },
       "respawn": 60,
       "respawnVerified": false,
+      "size": 1,
       "strBonus": 7,
       "strength": 2
     },
@@ -13739,6 +13774,7 @@
       },
       "respawn": 60,
       "respawnVerified": false,
+      "size": 1,
       "strBonus": 10,
       "strength": 31
     },
@@ -14097,6 +14133,7 @@
       },
       "respawn": 60,
       "respawnVerified": false,
+      "size": 1,
       "strBonus": 0,
       "strength": 24
     },
@@ -14296,6 +14333,7 @@
       },
       "respawn": 36,
       "respawnVerified": true,
+      "size": 1,
       "strBonus": 0,
       "strength": 47
     },
@@ -14650,6 +14688,7 @@
       },
       "respawn": 36,
       "respawnVerified": true,
+      "size": 2,
       "strBonus": 31,
       "strength": 40
     },
@@ -14885,6 +14924,7 @@
       },
       "respawn": 36,
       "respawnVerified": true,
+      "size": 2,
       "strBonus": 20,
       "strength": 43
     },
@@ -14912,6 +14952,7 @@
       },
       "respawn": 60,
       "respawnVerified": false,
+      "size": 1,
       "strBonus": 0,
       "strength": 37
     },
@@ -15194,6 +15235,7 @@
       },
       "respawn": 36,
       "respawnVerified": true,
+      "size": 2,
       "strBonus": 0,
       "strength": 70
     },
@@ -15234,6 +15276,7 @@
       },
       "respawn": 36,
       "respawnVerified": true,
+      "size": 1,
       "strBonus": 0,
       "strength": 38
     },
@@ -15481,6 +15524,7 @@
       },
       "respawn": 30,
       "respawnVerified": true,
+      "size": 1,
       "strBonus": 0,
       "strength": 1
     },
@@ -15849,6 +15893,7 @@
       },
       "respawn": 36,
       "respawnVerified": true,
+      "size": 2,
       "strBonus": 31,
       "strength": 30
     },
@@ -16119,6 +16164,7 @@
       },
       "respawn": 60,
       "respawnVerified": false,
+      "size": 1,
       "strBonus": 20,
       "strength": 75
     },
@@ -16291,6 +16337,7 @@
       },
       "respawn": 24,
       "respawnVerified": true,
+      "size": 1,
       "strBonus": 0,
       "strength": 56
     },
@@ -16514,6 +16561,7 @@
       },
       "respawn": 60,
       "respawnVerified": true,
+      "size": 1,
       "strBonus": 22,
       "strength": 54
     },
@@ -16806,6 +16854,7 @@
       },
       "respawn": 30,
       "respawnVerified": true,
+      "size": 1,
       "strBonus": 9,
       "strength": 20
     },
@@ -16836,6 +16885,7 @@
       },
       "respawn": 60,
       "respawnVerified": false,
+      "size": 1,
       "strBonus": 0,
       "strength": 58
     },
@@ -17132,6 +17182,7 @@
       },
       "respawn": 36,
       "respawnVerified": true,
+      "size": 4,
       "strBonus": 0,
       "strength": 130
     },
@@ -17440,6 +17491,7 @@
       },
       "respawn": 60,
       "respawnVerified": false,
+      "size": 1,
       "strBonus": 0,
       "strength": 1
     },
@@ -17648,6 +17700,7 @@
       },
       "respawn": 36,
       "respawnVerified": true,
+      "size": 1,
       "strBonus": 26,
       "strength": 33
     },
@@ -17916,6 +17969,7 @@
       },
       "respawn": 42,
       "respawnVerified": true,
+      "size": 1,
       "strBonus": 14,
       "strength": 18
     },
@@ -18220,6 +18274,7 @@
       },
       "respawn": 84,
       "respawnVerified": true,
+      "size": 1,
       "strBonus": 0,
       "strength": 24
     },
@@ -18455,6 +18510,7 @@
       },
       "respawn": 60,
       "respawnVerified": true,
+      "size": 1,
       "strBonus": 5,
       "strength": 5
     },
@@ -18777,6 +18833,7 @@
       },
       "respawn": 60,
       "respawnVerified": true,
+      "size": 1,
       "strBonus": 5,
       "strength": 27
     },
@@ -19083,6 +19140,7 @@
       },
       "respawn": 60,
       "respawnVerified": false,
+      "size": 2,
       "strBonus": 100,
       "strength": 140
     },
@@ -19267,6 +19325,7 @@
       },
       "respawn": 60,
       "respawnVerified": false,
+      "size": 1,
       "strBonus": 0,
       "strength": 30
     },
@@ -19631,6 +19690,7 @@
       },
       "respawn": 60,
       "respawnVerified": true,
+      "size": 1,
       "strBonus": 31,
       "strength": 29
     },
@@ -19985,6 +20045,7 @@
       },
       "respawn": 36,
       "respawnVerified": true,
+      "size": 1,
       "strBonus": 0,
       "strength": 8
     },
@@ -20265,6 +20326,7 @@
       },
       "respawn": 42,
       "respawnVerified": true,
+      "size": 1,
       "strBonus": 7,
       "strength": 21
     },
@@ -20521,6 +20583,7 @@
       },
       "respawn": 42,
       "respawnVerified": true,
+      "size": 1,
       "strBonus": 0,
       "strength": 9
     }
@@ -20530,6 +20593,1151 @@
     "source": "generated",
     "sourceRef": "LostCityRS/Content 376072662e78a314bf35bb18815be39521491a6b",
     "verifiedAt": "2026-07-09T00:00:00.000Z"
+  },
+  "requirements": {
+    "adamant_full_helm": {
+      "itemId": "adamant_full_helm",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier30.rs2:27",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "defence": 30
+      }
+    },
+    "adamant_kite": {
+      "itemId": "adamant_kite",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier30.rs2:29",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "defence": 30
+      }
+    },
+    "adamant_platebody": {
+      "itemId": "adamant_platebody",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier30.rs2:33",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "defence": 30
+      }
+    },
+    "adamant_platelegs": {
+      "itemId": "adamant_platelegs",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier30.rs2:30",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "defence": 30
+      }
+    },
+    "adamant_scimitar": {
+      "itemId": "adamant_scimitar",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier30.rs2:8",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "attack": 30
+      }
+    },
+    "addy_dart_w": {
+      "itemId": "addy_dart_w",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier30.rs2:65",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "ranged": 30
+      }
+    },
+    "addy_knife_w": {
+      "itemId": "addy_knife_w",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier30.rs2:67",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "ranged": 30
+      }
+    },
+    "archer_helm": {
+      "itemId": "archer_helm",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier45.rs2:4",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "defence": 45
+      }
+    },
+    "berserker_helm": {
+      "itemId": "berserker_helm",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier45.rs2:1",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "defence": 45
+      }
+    },
+    "black_dhide_body": {
+      "itemId": "black_dhide_body",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier70.rs2:6",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "defence": 40,
+        "ranged": 70
+      }
+    },
+    "black_dhide_legs": {
+      "itemId": "black_dhide_legs",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier70.rs2:5",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "ranged": 70
+      }
+    },
+    "black_full_helm": {
+      "itemId": "black_full_helm",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier10.rs2:16",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "defence": 10
+      }
+    },
+    "black_kite": {
+      "itemId": "black_kite",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier10.rs2:18",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "defence": 10
+      }
+    },
+    "black_platebody": {
+      "itemId": "black_platebody",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier10.rs2:22",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "defence": 10
+      }
+    },
+    "black_platelegs": {
+      "itemId": "black_platelegs",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier10.rs2:19",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "defence": 10
+      }
+    },
+    "black_scimitar": {
+      "itemId": "black_scimitar",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier10.rs2:7",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "attack": 10
+      }
+    },
+    "black_vambraces": {
+      "itemId": "black_vambraces",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier70.rs2:4",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "ranged": 70
+      }
+    },
+    "blue_dhide_body": {
+      "itemId": "blue_dhide_body",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier50.rs2:9",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "defence": 40,
+        "ranged": 50
+      }
+    },
+    "blue_dhide_legs": {
+      "itemId": "blue_dhide_legs",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier50.rs2:8",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "ranged": 50
+      }
+    },
+    "blue_vambraces": {
+      "itemId": "blue_vambraces",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier50.rs2:7",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "ranged": 50
+      }
+    },
+    "bronze_dart_w": {
+      "itemId": "bronze_dart_w",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier1.rs2:65",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "ranged": 1
+      }
+    },
+    "bronze_knife_w": {
+      "itemId": "bronze_knife_w",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier1.rs2:67",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "ranged": 1
+      }
+    },
+    "coif": {
+      "itemId": "coif",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier20.rs2:32",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "ranged": 20
+      }
+    },
+    "dragon_chainbody": {
+      "itemId": "dragon_chainbody",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier60.rs2:14",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "defence": 60
+      }
+    },
+    "dragon_dagger": {
+      "itemId": "dragon_dagger",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier60.rs2:2",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "attack": 60
+      }
+    },
+    "dragon_dagger_p": {
+      "itemId": "dragon_dagger_p",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier60.rs2:3",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "attack": 60
+      }
+    },
+    "dragon_halberd": {
+      "itemId": "dragon_halberd",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier60.rs2:10",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "attack": 60,
+        "strength": 30
+      }
+    },
+    "dragon_longsword": {
+      "itemId": "dragon_longsword",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier60.rs2:5",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "attack": 60
+      }
+    },
+    "dragon_mace": {
+      "itemId": "dragon_mace",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier60.rs2:4",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "attack": 60
+      }
+    },
+    "dragon_med_helm": {
+      "itemId": "dragon_med_helm",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier60.rs2:12",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "defence": 60
+      }
+    },
+    "dragon_sq": {
+      "itemId": "dragon_sq",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier60.rs2:13",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "defence": 60
+      }
+    },
+    "farseer_helm": {
+      "itemId": "farseer_helm",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier45.rs2:3",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "defence": 45
+      }
+    },
+    "green_dhide_body": {
+      "itemId": "green_dhide_body",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier40.rs2:65",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "defence": 40,
+        "ranged": 40
+      }
+    },
+    "green_dhide_legs": {
+      "itemId": "green_dhide_legs",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier40.rs2:66",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "ranged": 40
+      }
+    },
+    "green_vambraces": {
+      "itemId": "green_vambraces",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier40.rs2:67",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "ranged": 40
+      }
+    },
+    "hardleather_body": {
+      "itemId": "hardleather_body",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier10.rs2:41",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "defence": 10
+      }
+    },
+    "iron_dart_w": {
+      "itemId": "iron_dart_w",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier1.rs2:73",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "ranged": 1
+      }
+    },
+    "iron_full_helm": {
+      "itemId": "iron_full_helm",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier1.rs2:46",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "defence": 1
+      }
+    },
+    "iron_kite": {
+      "itemId": "iron_kite",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier1.rs2:48",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "defence": 1
+      }
+    },
+    "iron_knife_w": {
+      "itemId": "iron_knife_w",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier1.rs2:75",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "ranged": 1
+      }
+    },
+    "iron_platebody": {
+      "itemId": "iron_platebody",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier1.rs2:52",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "defence": 1
+      }
+    },
+    "iron_platelegs": {
+      "itemId": "iron_platelegs",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier1.rs2:49",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "defence": 1
+      }
+    },
+    "iron_scimitar": {
+      "itemId": "iron_scimitar",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier1.rs2:34",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "attack": 1
+      }
+    },
+    "leather_body": {
+      "itemId": "leather_body",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier1.rs2:62",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "ranged": 1
+      }
+    },
+    "leather_chaps": {
+      "itemId": "leather_chaps",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier1.rs2:61",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "ranged": 1
+      }
+    },
+    "leather_vambraces": {
+      "itemId": "leather_vambraces",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier1.rs2:60",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "ranged": 1
+      }
+    },
+    "magic_longbow": {
+      "itemId": "magic_longbow",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier50.rs2:5",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "ranged": 50
+      }
+    },
+    "magic_shortbow": {
+      "itemId": "magic_shortbow",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier50.rs2:6",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "ranged": 50
+      }
+    },
+    "maple_shortbow": {
+      "itemId": "maple_shortbow",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier30.rs2:62",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "ranged": 30
+      }
+    },
+    "mith_dart_w": {
+      "itemId": "mith_dart_w",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier20.rs2:36",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "ranged": 20
+      }
+    },
+    "mith_knife_w": {
+      "itemId": "mith_knife_w",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier20.rs2:38",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "ranged": 20
+      }
+    },
+    "mithril_full_helm": {
+      "itemId": "mithril_full_helm",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier20.rs2:21",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "defence": 20
+      }
+    },
+    "mithril_kite": {
+      "itemId": "mithril_kite",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier20.rs2:23",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "defence": 20
+      }
+    },
+    "mithril_platebody": {
+      "itemId": "mithril_platebody",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier20.rs2:27",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "defence": 20
+      }
+    },
+    "mithril_platelegs": {
+      "itemId": "mithril_platelegs",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier20.rs2:24",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "defence": 20
+      }
+    },
+    "mithril_scimitar": {
+      "itemId": "mithril_scimitar",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier20.rs2:8",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "attack": 20
+      }
+    },
+    "oak_shortbow": {
+      "itemId": "oak_shortbow",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier5.rs2:29",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "ranged": 5
+      }
+    },
+    "ranger_boots": {
+      "itemId": "ranger_boots",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier40.rs2:62",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "ranged": 40
+      }
+    },
+    "red_dhide_body": {
+      "itemId": "red_dhide_body",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier60.rs2:19",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "defence": 40,
+        "ranged": 60
+      }
+    },
+    "red_dhide_legs": {
+      "itemId": "red_dhide_legs",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier60.rs2:18",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "ranged": 60
+      }
+    },
+    "red_vambraces": {
+      "itemId": "red_vambraces",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier60.rs2:17",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "ranged": 60
+      }
+    },
+    "robin_hood_hat": {
+      "itemId": "robin_hood_hat",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier40.rs2:61",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "ranged": 40
+      }
+    },
+    "rune_chainbody": {
+      "itemId": "rune_chainbody",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier40.rs2:25",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "defence": 40
+      }
+    },
+    "rune_dart_w": {
+      "itemId": "rune_dart_w",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier40.rs2:69",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "ranged": 40
+      }
+    },
+    "rune_full_helm": {
+      "itemId": "rune_full_helm",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier40.rs2:20",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "defence": 40
+      }
+    },
+    "rune_kite": {
+      "itemId": "rune_kite",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier40.rs2:22",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "defence": 40
+      }
+    },
+    "rune_knife_w": {
+      "itemId": "rune_knife_w",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier40.rs2:71",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "ranged": 40
+      }
+    },
+    "rune_platebody": {
+      "itemId": "rune_platebody",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier40.rs2:26",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "defence": 40
+      }
+    },
+    "rune_platelegs": {
+      "itemId": "rune_platelegs",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier40.rs2:23",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "defence": 40
+      }
+    },
+    "rune_scimitar": {
+      "itemId": "rune_scimitar",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier40.rs2:8",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "attack": 40
+      }
+    },
+    "shortbow": {
+      "itemId": "shortbow",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier1.rs2:57",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "ranged": 1
+      }
+    },
+    "splitbark_body": {
+      "itemId": "splitbark_body",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier40.rs2:85",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "defence": 40,
+        "magic": 40
+      }
+    },
+    "splitbark_boots": {
+      "itemId": "splitbark_boots",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier40.rs2:87",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "defence": 40,
+        "magic": 40
+      }
+    },
+    "splitbark_gauntlets": {
+      "itemId": "splitbark_gauntlets",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier40.rs2:88",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "defence": 40,
+        "magic": 40
+      }
+    },
+    "splitbark_helm": {
+      "itemId": "splitbark_helm",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier40.rs2:84",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "defence": 40,
+        "magic": 40
+      }
+    },
+    "splitbark_legs": {
+      "itemId": "splitbark_legs",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier40.rs2:86",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "defence": 40,
+        "magic": 40
+      }
+    },
+    "staff_of_air": {
+      "itemId": "staff_of_air",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier1.rs2:83",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "attack": 1,
+        "magic": 1
+      }
+    },
+    "staff_of_earth": {
+      "itemId": "staff_of_earth",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier1.rs2:85",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "attack": 1,
+        "magic": 1
+      }
+    },
+    "staff_of_fire": {
+      "itemId": "staff_of_fire",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier1.rs2:86",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "attack": 1,
+        "magic": 1
+      }
+    },
+    "staff_of_water": {
+      "itemId": "staff_of_water",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier1.rs2:84",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "attack": 1,
+        "magic": 1
+      }
+    },
+    "steel_dart_w": {
+      "itemId": "steel_dart_w",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier5.rs2:32",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "ranged": 5
+      }
+    },
+    "steel_full_helm": {
+      "itemId": "steel_full_helm",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier5.rs2:20",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "defence": 5
+      }
+    },
+    "steel_kite": {
+      "itemId": "steel_kite",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier5.rs2:22",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "defence": 5
+      }
+    },
+    "steel_knife_w": {
+      "itemId": "steel_knife_w",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier5.rs2:34",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "ranged": 5
+      }
+    },
+    "steel_platebody": {
+      "itemId": "steel_platebody",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier5.rs2:26",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "defence": 5
+      }
+    },
+    "steel_platelegs": {
+      "itemId": "steel_platelegs",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier5.rs2:23",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "defence": 5
+      }
+    },
+    "steel_scimitar": {
+      "itemId": "steel_scimitar",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier5.rs2:8",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "attack": 5
+      }
+    },
+    "studded_body": {
+      "itemId": "studded_body",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier20.rs2:33",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "defence": 20,
+        "ranged": 20
+      }
+    },
+    "studded_chaps": {
+      "itemId": "studded_chaps",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier20.rs2:34",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "ranged": 20
+      }
+    },
+    "warrior_helm": {
+      "itemId": "warrior_helm",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier45.rs2:2",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "defence": 45
+      }
+    },
+    "willow_shortbow": {
+      "itemId": "willow_shortbow",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier20.rs2:31",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "ranged": 20
+      }
+    },
+    "wizard_boots": {
+      "itemId": "wizard_boots",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier20.rs2:45",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "magic": 20
+      }
+    },
+    "yew_longbow": {
+      "itemId": "yew_longbow",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier40.rs2:63",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "ranged": 40
+      }
+    },
+    "yew_shortbow": {
+      "itemId": "yew_shortbow",
+      "provenance": {
+        "notes": "Numeric skill gates parsed from pinned levelrequire triggers and definitions; quest completion clauses are outside this contract. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+        "source": "generated",
+        "sourceRef": "scripts/levelrequire/scripts/tier40.rs2:64",
+        "verifiedAt": "2026-07-09T00:00:00.000Z"
+      },
+      "skills": {
+        "ranged": 40
+      }
+    }
   },
   "spells": {
     "claws_of_guthix": {

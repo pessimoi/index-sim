@@ -13,6 +13,7 @@ import {
 
 export const LOSTCITY_MONSTER_COMBAT_FIELDS = [
   "level",
+  "size",
   "hp",
   "attack",
   "strength",
@@ -90,6 +91,7 @@ export function extractLostCityMonsterCombatSource(
     sourceRef: entry.sourceRef,
     fields: {
       level: propertyInteger(entry, "vislevel"),
+      size: propertyInteger(entry, "size", 1),
       hp: propertyInteger(entry, "hitpoints", 1),
       attack: propertyInteger(entry, "attack", 1),
       strength: propertyInteger(entry, "strength", 1),

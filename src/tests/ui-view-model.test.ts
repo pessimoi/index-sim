@@ -402,7 +402,7 @@ describe("rewrite UI view models", () => {
 
   it("uses generated requirements in gear quick action reasons before manual fallback", async () => {
     const { context } = await loadBundledLegacyContext();
-    const generatedContext = withGeneratedRequirement(context, "berserker_helm", { defence: 50 });
+    const generatedContext = withGeneratedRequirement(context, "berserker_helm", { strength: 50 });
     const action = gearQuickActionForSlot({
       gameData: generatedContext.gameData,
       slot: "helm",
@@ -410,14 +410,14 @@ describe("rewrite UI view models", () => {
       weaponId: "rune_scimitar",
       styleId: "aggressive",
       currentItemId: "rune_full_helm",
-      levels: { ...DEFAULT_FORM_STATE.levels, defence: 49 },
+      levels: { ...DEFAULT_FORM_STATE.levels, strength: 49 },
       options: equipmentSlotOptions(generatedContext.gameData, "helm")
     });
 
     expect(action).toMatchObject({
       itemId: "berserker_helm",
       disabled: false,
-      reason: "Apply Berserker helm - requires Defence 50, current 49"
+      reason: "Apply Berserker helm - requires Strength 50, current 49"
     });
   });
 
@@ -885,11 +885,11 @@ describe("rewrite UI view models", () => {
 
   it("uses generated setup requirements without the manual fallback label", async () => {
     const { context } = await loadBundledLegacyContext();
-    const generatedContext = withGeneratedRequirement(context, "iron_scimitar", { attack: 5 });
+    const generatedContext = withGeneratedRequirement(context, "iron_scimitar", { strength: 5 });
     const form = applyWeaponSelection(
       {
         ...DEFAULT_FORM_STATE,
-        levels: { ...DEFAULT_FORM_STATE.levels, attack: 1 },
+        levels: { ...DEFAULT_FORM_STATE.levels, strength: 1 },
         gear: {
           helm: "none",
           amulet: "none",
@@ -912,7 +912,7 @@ describe("rewrite UI view models", () => {
     expect(result.setupRequirements.warnings).toEqual([
       expect.objectContaining({
         itemId: "iron_scimitar",
-        skill: "attack",
+        skill: "strength",
         requiredLevel: 5,
         currentLevel: 1
       })

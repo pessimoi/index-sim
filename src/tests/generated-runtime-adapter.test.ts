@@ -41,7 +41,12 @@ describe("generated runtime adapter", () => {
     expect(result.context.gameData.id).toBe("lostcity-376072662e78-runtime");
     expect(result.context.gameData.provenance?.source).toBe("generated");
     expect(Object.keys(result.context.gameData.monsters)).toContain("giant");
-    expect(result.context.gameData.requirements).toBeUndefined();
+    expect(Object.keys(result.context.gameData.requirements ?? {})).toHaveLength(94);
+    expect(result.context.gameData.requirements?.dragon_halberd?.skills).toEqual({
+      attack: 60,
+      strength: 30
+    });
+    expect(result.context.gameData.monsters.rock_crab?.size).toBe(1);
     expect(result.context.gameData.items.sapphire).toMatchObject({
       name: "Sapphire",
       price: 250

@@ -35,7 +35,13 @@ export type EquipmentSlot = (typeof EQUIPMENT_SLOTS)[number];
 export type EquipmentBonuses = Record<BonusKey, number>;
 export type PriceSource = "bundled" | "imported" | "scraped" | "manual";
 
-export const ITEM_REQUIREMENT_SKILLS = ["attack", "defence", "ranged", "magic"] as const;
+export const ITEM_REQUIREMENT_SKILLS = [
+  "attack",
+  "strength",
+  "defence",
+  "ranged",
+  "magic"
+] as const;
 export type ItemRequirementSkill = (typeof ITEM_REQUIREMENT_SKILLS)[number];
 
 export interface DataProvenance {
@@ -150,6 +156,7 @@ export interface MonsterDefinition {
   id: EntityId;
   name: string;
   level?: number;
+  size?: number;
   hp: number;
   attack?: number;
   strength?: number;

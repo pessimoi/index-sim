@@ -1,0 +1,60 @@
+[label,levelrequire_attack](int $level, int $slot)
+if (stat_base(attack) < $level) { return; }
+
+[label,levelrequire_attack_caps](int $level, int $slot)
+if (stat_base(attack) < $level) { return; }
+
+[label,levelrequire_defence](int $level, int $slot)
+if (stat_base(defence) < $level) { return; }
+
+[label,levelrequire_defence_caps](int $level, int $slot)
+if (stat_base(defence) < $level) { return; }
+
+[label,levelrequire_ranged](int $level, int $slot)
+if (stat_base(ranged) < $level) { return; }
+
+[label,levelrequire_ranged_lower](int $level, int $slot)
+if (stat_base(ranged) < $level) { return; }
+
+[label,levelrequire_magic](int $level, int $slot)
+if (stat_base(magic) < $level) { return; }
+
+[label,levelrequire_magic_and_attack](int $magic_level, int $attack_level, int $slot)
+if (stat_base(magic) < $magic_level | stat_base(attack) < $attack_level) { return; }
+
+[label,levelrequire_ranged_and_defence](int $ranged_level, int $defence_level, int $slot)
+if (stat_base(ranged) < $ranged_level | stat_base(defence) < $defence_level) { return; }
+
+[label,levelrequire_defence_and_strength](int $level, int $slot)
+if (stat_base(strength) < $level | stat_base(defence) < $level) { return; }
+
+[label,levelrequire_magic_and_defence](int $magic_level, int $defence_level, int $slot)
+if (stat_base(magic) < $magic_level | stat_base(defence) < $defence_level) { return; }
+
+[label,levelrequire_dragon_slayer_quest_defence](int $level, int $slot)
+@levelrequire_defence($level, $slot);
+
+[label,levelrequire_dragon_slayer_quest_ranged_and_defence](int $ranged_level, int $defence_level, int $slot)
+@levelrequire_ranged_and_defence($ranged_level, $defence_level, $slot);
+
+[label,levelrequire_heroes_quest_attack](int $level, int $slot)
+@levelrequire_attack_caps($level, $slot);
+
+[label,levelrequire_legends_quest_defence](int $level, int $slot)
+@levelrequire_defence_caps($level, $slot);
+
+[label,levelrequire_zanaris_quest_attack](int $level, int $slot)
+@levelrequire_attack_caps($level, $slot);
+
+[label,levelrequire_viking_quest_helm](int $level, int $slot)
+@levelrequire_defence($level, $slot);
+
+[label,levelrequire_iban_staff](int $slot)
+if (stat_base(magic) < 50) { return; }
+if (stat_base(attack) < 50) { return; }
+
+[label,levelrequire_attack_and_strength](int $attack_level, int $strength_level, int $slot)
+if (stat_base(attack) < $attack_level | stat_base(strength) < $strength_level) { return; }
+
+[label,levelrequire_regicide_quest_attack_strength](int $attack, int $strength, int $slot)
+@levelrequire_attack_and_strength($attack, $strength, $slot);

@@ -134,6 +134,7 @@ export const MonsterDefinitionSchema = z
     id: EntityIdSchema,
     name: z.string().min(1),
     level: NumericSchema.optional(),
+    size: z.number().int().positive().optional(),
     hp: NonNegativeNumberSchema,
     attack: NumericSchema.optional(),
     strength: NumericSchema.optional(),

@@ -229,6 +229,42 @@ describe("pure combat formulas", () => {
     expect(invalid.debug.damageBonus).toBe(derived.debug.damageBonus);
     expect(invalid.attackSpeedSec).toBe(derived.attackSpeedSec);
   });
+
+  it("uses source-backed NPC size for dragon halberd selected-target hits", () => {
+    const runtime = createLegacyRuntime();
+    const legacyContext = domainContextFromLegacy(runtime);
+    const definition = definitionsById.get("melee_dragon_halberd_rock_crab_small_target_spec");
+    expect(definition).toBeDefined();
+    if (!definition) throw new Error("Missing dragon halberd golden definition");
+    const request = domainRequestFromLegacyInput(buildLegacyInput(runtime, definition));
+    const withSize = (size: number): SimulationContext => ({
+      ...legacyContext,
+      gameData: {
+        ...legacyContext.gameData,
+        monsters: {
+          ...legacyContext.gameData.monsters,
+          [request.monsterId]: {
+            ...legacyContext.gameData.monsters[request.monsterId],
+            size
+          }
+        }
+      }
+    });
+
+    const legacy = simulateCombat(request, legacyContext);
+    const small = simulateCombat(request, withSize(1));
+    const large = simulateCombat(request, withSize(2));
+
+    expect(legacy.specialAttack?.hits).toBe(2);
+    expect(legacy.warnings.map((warning) => warning.code)).toContain(
+      "dragon-halberd-npc-size-fallback"
+    );
+    expect(small.specialAttack?.hits).toBe(1);
+    expect(small.specialAttack?.expPerSpec).toBeCloseTo((large.specialAttack?.expPerSpec ?? 0) / 2);
+    expect(small.warnings).toEqual([]);
+    expect(large.specialAttack?.hits).toBe(2);
+    expect(large.warnings).toEqual([]);
+  });
 });
 
 describe("pure equipment core", () => {

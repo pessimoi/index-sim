@@ -837,7 +837,7 @@ test("recomputes the Planner tab workflow from visible planner controls", async 
   await expect(planner.getByLabel("Planner summary")).toContainText("Steps");
   await expect(planner.getByRole("img", { name: "DPS vs cumulative XP chart" })).toBeVisible();
   await expect(planner.getByLabel("Planner gear timeline")).toContainText(/XP|No gear unlocks/);
-  await expect(planner.getByLabel("Planner warnings")).toContainText("manual requirement fallback");
+  await expect(planner).not.toContainText("manual requirement fallback");
 
   await page.waitForFunction(() => {
     const saved = window.localStorage.getItem("index-sim:planner-ui") ?? "";
@@ -1360,7 +1360,8 @@ test("surfaces setup requirement warnings and reviews the active loadout", async
   await expect(equipmentPane.getByLabel("Setup requirement warnings")).toContainText(
     "Rune platebody requires Defence 40; current Defence 1."
   );
-  await expect(equipmentPane).toContainText("Manual requirement fallback");
+  await expect(equipmentPane).toContainText("Generated requirement data");
+  await expect(equipmentPane).not.toContainText("Manual requirement fallback");
 });
 
 test("keeps legacy data and dismisses the migration notice", async ({ page }) => {
@@ -2020,9 +2021,12 @@ test("selects special attacks and shows special metrics", async ({ page }) => {
   await expect(special).toBeVisible();
   await special.getByLabel("Spec weapon").selectOption("dragon_halberd");
   await expect(page.locator('[aria-label="Special attack metrics"]')).toContainText("Spec max hit");
-  await expect(page.locator('[aria-label="Special attack metrics"]')).toContainText(
+  await expect(page.locator('[aria-label="Special attack metrics"]')).toContainText("x2");
+  await expect(page.locator('[aria-label="Special attack metrics"]')).not.toContainText(
     "NPC size data is not modeled"
   );
+  await page.getByLabel("TARGET", { exact: true }).selectOption("rock_crab");
+  await expect(page.locator('[aria-label="Special attack metrics"]')).not.toContainText("x2");
 
   await special.getByLabel("Spec weapon").selectOption("dragon_dagger_p");
 

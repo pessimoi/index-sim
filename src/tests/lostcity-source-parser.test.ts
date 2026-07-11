@@ -1,4 +1,4 @@
-import { cpSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   LostCityContentSourceError,
@@ -46,6 +46,7 @@ import {
 } from "../../scripts/lostcity-content-runtime-mapping";
 import { parseLostCitySourceImpactArgs } from "../../scripts/report-lostcity-source-impact";
 import { createLostCityRawSnapshot } from "../../scripts/lostcity-content-snapshot";
+import { readLostCityItemRequirements } from "../../scripts/lostcity-content-requirements";
 import { EQUIPMENT_SLOTS, type GameDataSnapshot } from "../domain/shared";
 
 const FIXTURE_SOURCE = "src/tests/fixtures/lostcity-source";
@@ -75,6 +76,7 @@ function referenceSnapshot(): GameDataSnapshot {
         id: "giant",
         name: "Giant",
         level: 28,
+        size: 2,
         hp: 35,
         attack: 18,
         strength: 22,
@@ -93,6 +95,7 @@ function referenceSnapshot(): GameDataSnapshot {
         id: "bear",
         name: "Bear",
         level: 19,
+        size: 1,
         hp: 20,
         attack: 15,
         strength: 16,
@@ -149,6 +152,33 @@ function referenceSnapshot(): GameDataSnapshot {
   };
 }
 
+function writeRequirementSource(name: string, files: Record<string, string>): string {
+  const sourceDir = join(TEST_ROOT, name);
+  const scriptsDir = join(sourceDir, "scripts", "levelrequire", "scripts");
+  mkdirSync(scriptsDir, { recursive: true });
+  writeFileSync(
+    join(scriptsDir, "levelrequire.rs2"),
+    readFileSync(
+      join(FIXTURE_SOURCE, "scripts", "levelrequire", "scripts", "levelrequire.rs2"),
+      "utf8"
+    )
+  );
+  for (const [filename, source] of Object.entries(files)) {
+    writeFileSync(join(scriptsDir, filename), source);
+  }
+  return sourceDir;
+}
+
+function requirementReference(itemIds: string[]): GameDataSnapshot {
+  const reference = referenceSnapshot();
+  const template = reference.weapons.rune_scimitar;
+  for (const itemId of itemIds) {
+    reference.items[itemId] = { id: itemId, name: itemId };
+    reference.weapons[itemId] = { ...template, name: itemId };
+  }
+  return reference;
+}
+
 describe("LostCity content source parser", () => {
   beforeEach(() => {
     rmSync(TEST_ROOT, { recursive: true, force: true });
@@ -183,6 +213,7 @@ describe("LostCity content source parser", () => {
       sourceId: "giant",
       fields: {
         level: 28,
+        size: 2,
         hp: 35,
         attackSpeed: 6,
         attBonus: 18,
@@ -190,6 +221,7 @@ describe("LostCity content source parser", () => {
         magicLevel: 1
       }
     });
+    expect(extractLostCityMonsterCombatSource("bear", npc).fields.size).toBe(1);
     expect(
       extractLostCityEquipmentSource({
         slot: "ring",
@@ -525,16 +557,137 @@ describe("LostCity content source parser", () => {
     expect(result.lootExclusionCount).toBe(0);
     expect(result.snapshot.id).toBe("lostcity-fixture-274-runtime");
     expect(result.snapshot.monsters.giant).toMatchObject({
+      size: 2,
       hp: 35,
       loot: expect.arrayContaining([expect.objectContaining({ key: "big_bones", chance: 1 })]),
       provenance: { source: "generated" }
     });
+    expect(result.snapshot.monsters.bear?.size).toBe(1);
+    expect(result.snapshot.requirements?.rune_scimitar).toMatchObject({
+      skills: { attack: 40 },
+      provenance: {
+        source: "generated",
+        sourceRef: "scripts/levelrequire/scripts/tier1.rs2:1"
+      }
+    });
+    expect(result.snapshot.requirements?.bronze_dart_w?.skills).toEqual({ ranged: 1 });
     expect(result.snapshot.weapons.bronze_dart_w).toMatchObject({
       accBonus: 3,
       speed: 3
     });
     expect(result.snapshot.spells.wind_strike).toEqual(referenceSnapshot().spells.wind_strike);
     expect(result.snapshot.items.bronze_dart_w?.provenance?.source).toBe("manual");
+  });
+
+  it("maps every accepted levelrequire family into numeric skill gates", () => {
+    const rows = [
+      ["attack", "attack", "40"],
+      ["attack_caps", "attack_caps", "41"],
+      ["heroes", "heroes_quest_attack", "42"],
+      ["zanaris", "zanaris_quest_attack", "43"],
+      ["defence", "defence", "44"],
+      ["defence_caps", "defence_caps", "45"],
+      ["dragon_def", "dragon_slayer_quest_defence", "46"],
+      ["legends", "legends_quest_defence", "47"],
+      ["viking", "viking_quest_helm", "48"],
+      ["ranged", "ranged", "49"],
+      ["ranged_lower", "ranged_lower", "50"],
+      ["magic", "magic", "51"],
+      ["attack_strength", "attack_and_strength", "52, 30"],
+      ["regicide", "regicide_quest_attack_strength", "53, 31"],
+      ["defence_strength", "defence_and_strength", "54"],
+      ["magic_attack", "magic_and_attack", "55, 32"],
+      ["magic_defence", "magic_and_defence", "56, 33"],
+      ["ranged_defence", "ranged_and_defence", "57, 34"],
+      ["dragon_ranged_def", "dragon_slayer_quest_ranged_and_defence", "58, 35"],
+      ["iban", "iban_staff", ""]
+    ] as const;
+    const sourceDir = writeRequirementSource("all-requirement-families", {
+      "tier1.rs2":
+        rows
+          .map(
+            ([itemId, family, levels]) =>
+              `[opheld2,${itemId}] @levelrequire_${family}(${levels ? `${levels}, ` : ""}last_slot);`
+          )
+          .join("\n") +
+        "\n[opheld2,multiline]\nif (%quest < ^complete) {\n    return;\n}\n@levelrequire_attack(59, last_slot);"
+    });
+    const reference = requirementReference([...rows.map(([itemId]) => itemId), "multiline"]);
+    const objects = readLostCityConfigCatalog({ sourceDir: FIXTURE_SOURCE, extension: ".obj" });
+    const requirements = readLostCityItemRequirements({
+      sourceDir,
+      reference,
+      objects,
+      sourceRevision: "fixture-274"
+    });
+
+    expect(requirements.attack?.skills).toEqual({ attack: 40 });
+    expect(requirements.attack_caps?.skills).toEqual({ attack: 41 });
+    expect(requirements.heroes?.skills).toEqual({ attack: 42 });
+    expect(requirements.zanaris?.skills).toEqual({ attack: 43 });
+    expect(requirements.defence?.skills).toEqual({ defence: 44 });
+    expect(requirements.defence_caps?.skills).toEqual({ defence: 45 });
+    expect(requirements.dragon_def?.skills).toEqual({ defence: 46 });
+    expect(requirements.legends?.skills).toEqual({ defence: 47 });
+    expect(requirements.viking?.skills).toEqual({ defence: 48 });
+    expect(requirements.ranged?.skills).toEqual({ ranged: 49 });
+    expect(requirements.ranged_lower?.skills).toEqual({ ranged: 50 });
+    expect(requirements.magic?.skills).toEqual({ magic: 51 });
+    expect(requirements.attack_strength?.skills).toEqual({ attack: 52, strength: 30 });
+    expect(requirements.regicide?.skills).toEqual({ attack: 53, strength: 31 });
+    expect(requirements.defence_strength?.skills).toEqual({ defence: 54, strength: 54 });
+    expect(requirements.magic_attack?.skills).toEqual({ magic: 55, attack: 32 });
+    expect(requirements.magic_defence?.skills).toEqual({ magic: 56, defence: 33 });
+    expect(requirements.ranged_defence?.skills).toEqual({ ranged: 57, defence: 34 });
+    expect(requirements.dragon_ranged_def?.skills).toEqual({ ranged: 58, defence: 35 });
+    expect(requirements.iban?.skills).toEqual({ attack: 50, magic: 50 });
+    expect(requirements.multiline?.skills).toEqual({ attack: 59 });
+    expect(requirements.regicide?.provenance?.notes).toContain(
+      "quest completion clauses are outside this contract"
+    );
+  });
+
+  it("fails closed on unknown and conflicting levelrequire triggers", () => {
+    const objects = readLostCityConfigCatalog({ sourceDir: FIXTURE_SOURCE, extension: ".obj" });
+    const reference = requirementReference(["rune_scimitar"]);
+    const unknownSource = writeRequirementSource("unknown-requirement", {
+      "tier1.rs2": "[opheld2,rune_scimitar] @levelrequire_unreviewed_policy(40, last_slot);"
+    });
+    expect(() =>
+      readLostCityItemRequirements({
+        sourceDir: unknownSource,
+        reference,
+        objects,
+        sourceRevision: "fixture-274"
+      })
+    ).toThrow(/unsupported levelrequire family/);
+
+    const conflictSource = writeRequirementSource("conflicting-requirement", {
+      "tier1.rs2": "[opheld2,rune_scimitar] @levelrequire_attack(40, last_slot);",
+      "tier2.rs2": "[opheld2,rune_scimitar] @levelrequire_attack(41, last_slot);"
+    });
+    expect(() =>
+      readLostCityItemRequirements({
+        sourceDir: conflictSource,
+        reference,
+        objects,
+        sourceRevision: "fixture-274"
+      })
+    ).toThrow(/conflicting requirement/);
+
+    const driftSource = writeRequirementSource("changed-requirement-definition", {
+      "tier1.rs2": "[opheld2,rune_scimitar] @levelrequire_attack(40, last_slot);",
+      "levelrequire.rs2":
+        "[label,levelrequire_attack](int $level, int $slot)\nif (stat_base(defence) < $level) {\n    return;\n}\n~equip($slot);"
+    });
+    expect(() =>
+      readLostCityItemRequirements({
+        sourceDir: driftSource,
+        reference,
+        objects,
+        sourceRevision: "fixture-274"
+      })
+    ).toThrow(/does not match accepted skill semantics/);
   });
 
   it("parses isolated source-impact options", () => {

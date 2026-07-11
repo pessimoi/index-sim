@@ -40,7 +40,7 @@ import { createGeneratedRuntimePriceSet } from "../src/adapters/generated/price-
 import { createLostCityRawSnapshot } from "./lostcity-content-snapshot";
 import { LostCityContentSourceError } from "./lostcity-content-config";
 
-export const GAME_DATA_GENERATOR_VERSION = "raw-lostcity-runtime-catalog-2";
+export const GAME_DATA_GENERATOR_VERSION = "raw-lostcity-runtime-catalog-3";
 export const DEFAULT_GAME_DATA_SOURCE_DIR = ".sources/lostcity-content";
 export const FOUNDATION_SOURCE_MANIFEST_FILE = "generator-foundation.json";
 export const SOURCE_BACKED_SLICE_DIR = "index-sim-source-slice";
@@ -694,6 +694,17 @@ function rawRuntimeImpactInput(
   });
 }
 
+function rawDragonHalberdImpactInput(): FullSimulationInput {
+  const input = rawRuntimeImpactInput("rock_crab", "melee", "dragon_halberd");
+  return {
+    ...input,
+    request: {
+      ...input.request,
+      specialAttack: { weaponId: "dragon_halberd" }
+    }
+  };
+}
+
 const RAW_RUNTIME_STYLE_CONFIG = [
   {
     combatStyle: "melee",
@@ -731,6 +742,13 @@ export const RAW_LOSTCITY_REPRESENTATIVE_CALCULATION_IMPACT_CASES = [
     tags: ["raw-source", "ranged", "thrown", "high-tier"],
     input: rawRuntimeImpactInput("black_dragon", "ranged", "rune_knife_w"),
     requiredItems: ["rune_knife_w", "rune_knife"]
+  },
+  {
+    id: "raw_dragon_halberd_rock_crab_size",
+    label: "Raw Dragon halberd Rock Crab NPC size",
+    tags: ["raw-source", "melee", "special-attack", "npc-size"],
+    input: rawDragonHalberdImpactInput(),
+    requiredItems: ["dragon_halberd"]
   }
 ] satisfies readonly RepresentativeCalculationImpactCase[];
 
@@ -749,9 +767,11 @@ const RAW_LOSTCITY_ACCEPTED_CALCULATION_CHANGES: Readonly<Record<string, string>
   Object.fromEntries(
     RAW_LOSTCITY_REPRESENTATIVE_CALCULATION_IMPACT_CASES.map((testCase) => [
       testCase.id,
-      testCase.id === "raw_thrown_rune_knife_black_dragon"
-        ? "Accepted source-backed thrown-weapon accuracy delta under D-057; economy metrics use generated high alch under D-063."
-        : "Accepted source-backed monster combat and core-loot delta under D-055; economy metrics use generated high alch under D-063."
+      testCase.id === "raw_dragon_halberd_rock_crab_size"
+        ? "Accepted source-backed dragon halberd selected-target hit-count delta under D-071."
+        : testCase.id === "raw_thrown_rune_knife_black_dragon"
+          ? "Accepted source-backed thrown-weapon accuracy delta under D-057; economy metrics use generated high alch under D-063."
+          : "Accepted source-backed monster combat and core-loot delta under D-055; economy metrics use generated high alch under D-063."
     ])
   );
 
@@ -2873,7 +2893,8 @@ function createRevisionImpactReport(
       ? [
           "- Runtime monster combat fields and reviewed core loot are parsed directly from pinned LostCity NPC config and RuneScript handlers.",
           "- Runtime item, weapon, ammo, spell and equipment calculation fields are parsed directly from pinned LostCity object, param and dbrow configs.",
-          "- Simulator-only synthetic identities remain explicitly app-owned; quest-gated drops, clue tertiaries and generated requirement skill mapping remain outside the raw candidate.",
+          "- Simulator-only synthetic identities remain explicitly app-owned; quest-gated drops and clue tertiaries remain outside the raw candidate.",
+          "- Item skill requirements are parsed from pinned levelrequire triggers/definitions; quest completion clauses remain outside the generated contract, and NPC size comes from config with the source default of 1.",
           "- The root browser runtime consumes this committed source-backed generated snapshot; the legacy-derived static bridge remains reference and rollback evidence.",
           "- Source object costs provide item/alch fallbacks; scheduled PriceSet values remain outside this generator and take precedence in the staged generated runtime adapter."
         ]
@@ -2932,14 +2953,14 @@ function createRevisionImpactReport(
     "",
     ...currentScopeLines,
     "- The committed calculation-impact report and the focused direct-source impact commands remain separate evidence views over the same normalized domain contract.",
-    "- Generated item requirements are consumed by Planner/setup checks and gear quick action reason copy when the runtime snapshot supplies them; the active raw snapshot has no authoritative requirement map, so those consumers use the D-051 manual fallback.",
-    "- NPC-size, dragon halberd behavior and final special-case source truth are not decided here.",
+    "- Generated item requirements are consumed by Planner/setup checks and gear quick action reason copy; D-051 manual fallback remains only for runtime items without a generated row and legacy snapshots.",
+    "- Source-backed NPC size drives dragon halberd selected-target hit count; missing-size legacy snapshots retain the visible D-050 fallback.",
     "- Market prices and market price history are outside this game-data snapshot workflow.",
     "- Historical generated snapshot archives are intentionally not committed.",
     "",
     "## Open Questions",
     "",
-    "- Which authoritative source semantics should map object level requirements into attack, defence, ranged and magic requirement skills without relying on manual classification?",
+    "- Which later product phase, if any, should model quest completion clauses that accompany some source-backed numeric item requirements?",
     "- When can the transitional legacy-derived runtime identity reference be replaced by an app-owned generated catalog manifest?",
     ""
   ].join("\n");
@@ -3054,7 +3075,7 @@ export function createGeneratedGameDataOutputs(
         ...(plan.parserStatus === "raw-lostcity"
           ? [
               "Runtime monster combat/core-loot, item, weapon, ammo, spell and equipment fields are parsed directly from pinned LostCity config and RuneScript sources.",
-              "Simulator-only synthetic identities remain app-owned, and requirement skill classification remains outside the raw candidate.",
+              "Simulator-only synthetic identities remain app-owned; numeric item requirements and NPC size are parsed from pinned source, while quest completion clauses remain outside the runtime contract.",
               `Expected runtime identities are checked against ${RAW_RUNTIME_REFERENCE_PATH} as a regression/reference baseline.`
             ]
           : [

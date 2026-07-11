@@ -32,6 +32,9 @@ implementation card.
 - `src/tests/fixtures/planner-parity-baseline.json` records 29
   `accepted-rewrite-delta` and three `source-data-delta` classifications, with
   zero `rewrite-gap`, `needs-review` or `not-representable` rows.
+- D-071 refreshed 13 current-product digests after generated requirement rows
+  removed only the D-051 manual-fallback warning; reviewed training, numeric,
+  configuration and transition deltas stayed unchanged.
 - `docs/project/planner-parity/current.md` is the generated current report.
 - `npm run planner:parity` runs the focused Planner tests and checks/writes the
   classified report without updating the reviewed baseline.

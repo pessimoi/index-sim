@@ -35,18 +35,18 @@ Boosted sustained melee training remains deterministic on the V1 rewrite path.
 
 - Result: different
 - Classification: accepted-rewrite-delta
-- Reason: The bounded training order and control behavior match. Remaining warning, numeric, configuration or transition differences are owned by the accepted rewrite Planner/domain path, including D-051 fallback and explicit reliability warnings.
-- Source: docs/product/feature-inventory.md (Planner); src/tests/planner-domain.test.ts; docs/project/decisions.md D-051/D-060
+- Reason: Current-product now consumes D-071 source-backed requirement rows; the only baseline change is removal of manual-planner-requirement-fallback while previously reviewed training, numeric, configuration and transition deltas remain unchanged.
+- Source: docs/project/decisions.md D-051/D-071; docs/technical/source-backed-requirements-npc-size-spec.md; docs/product/feature-inventory.md (Planner)
 - Difference count: 1
 - Legacy step order: strength -> strength
 - Rewrite step order: strength -> strength
-- Rewrite warning codes: `manual-planner-requirement-fallback`, `price-fallback-used`
+- Rewrite warning codes: `price-fallback-used`
 - Legacy digest: `d0654477d147ca84`
-- Rewrite digest: `b5eb04418dbee67c`
+- Rewrite digest: `14e56a0519eccbab`
 
 | Path             | Kind   | Legacy | Rewrite |
 | ---------------- | ------ | ------ | ------- |
-| `$.warningCodes` | length | 0      | 2       |
+| `$.warningCodes` | length | 0      | 1       |
 
 ### boosted_sustained_strength_path / reference-context
 
@@ -73,18 +73,18 @@ Current-gear lock prevents an otherwise eligible weapon replacement.
 
 - Result: different
 - Classification: accepted-rewrite-delta
-- Reason: The bounded training order and control behavior match. Remaining warning, numeric, configuration or transition differences are owned by the accepted rewrite Planner/domain path, including D-051 fallback and explicit reliability warnings.
-- Source: docs/product/feature-inventory.md (Planner); src/tests/planner-domain.test.ts; docs/project/decisions.md D-051/D-060
+- Reason: Current-product now consumes D-071 source-backed requirement rows; the only baseline change is removal of manual-planner-requirement-fallback while previously reviewed training, numeric, configuration and transition deltas remain unchanged.
+- Source: docs/project/decisions.md D-051/D-071; docs/technical/source-backed-requirements-npc-size-spec.md; docs/product/feature-inventory.md (Planner)
 - Difference count: 1
 - Legacy step order: attack -> attack
 - Rewrite step order: attack -> attack
-- Rewrite warning codes: `manual-planner-requirement-fallback`, `price-fallback-used`
+- Rewrite warning codes: `price-fallback-used`
 - Legacy digest: `19835253eed06326`
-- Rewrite digest: `06fa5c136ef02e32`
+- Rewrite digest: `2234f7b7485429be`
 
 | Path             | Kind   | Legacy | Rewrite |
 | ---------------- | ------ | ------ | ------- |
-| `$.warningCodes` | length | 0      | 2       |
+| `$.warningCodes` | length | 0      | 1       |
 
 ### current_gear_lock / reference-context
 
@@ -111,18 +111,18 @@ A current-level Attack target locks Attack while Strength advances.
 
 - Result: different
 - Classification: accepted-rewrite-delta
-- Reason: The bounded training order and control behavior match. Remaining warning, numeric, configuration or transition differences are owned by the accepted rewrite Planner/domain path, including D-051 fallback and explicit reliability warnings.
-- Source: docs/product/feature-inventory.md (Planner); src/tests/planner-domain.test.ts; docs/project/decisions.md D-051/D-060
+- Reason: Current-product now consumes D-071 source-backed requirement rows; the only baseline change is removal of manual-planner-requirement-fallback while previously reviewed training, numeric, configuration and transition deltas remain unchanged.
+- Source: docs/project/decisions.md D-051/D-071; docs/technical/source-backed-requirements-npc-size-spec.md; docs/product/feature-inventory.md (Planner)
 - Difference count: 1
 - Legacy step order: strength -> strength
 - Rewrite step order: strength -> strength
-- Rewrite warning codes: `manual-planner-requirement-fallback`, `price-fallback-used`
+- Rewrite warning codes: `price-fallback-used`
 - Legacy digest: `5a7e5e402776ed44`
-- Rewrite digest: `f3efd22d40d48349`
+- Rewrite digest: `c7b93543e1ee43f4`
 
 | Path             | Kind   | Legacy | Rewrite |
 | ---------------- | ------ | ------ | ------- |
-| `$.warningCodes` | length | 0      | 2       |
+| `$.warningCodes` | length | 0      | 1       |
 
 ### locked_attack_strength_training / reference-context
 
@@ -316,14 +316,14 @@ A deliberately short maxLevels bound reports truncation.
 
 - Result: different
 - Classification: accepted-rewrite-delta
-- Reason: The bounded training order and control behavior match. Remaining warning, numeric, configuration or transition differences are owned by the accepted rewrite Planner/domain path, including D-051 fallback and explicit reliability warnings.
-- Source: docs/product/feature-inventory.md (Planner); src/tests/planner-domain.test.ts; docs/project/decisions.md D-051/D-060
+- Reason: Current-product now consumes D-071 source-backed requirement rows; the only baseline change is removal of manual-planner-requirement-fallback while previously reviewed training, numeric, configuration and transition deltas remain unchanged.
+- Source: docs/project/decisions.md D-051/D-071; docs/technical/source-backed-requirements-npc-size-spec.md; docs/product/feature-inventory.md (Planner)
 - Difference count: 17
 - Legacy step order: strength -> attack
 - Rewrite step order: strength -> attack
-- Rewrite warning codes: `manual-planner-requirement-fallback`, `price-fallback-used`
+- Rewrite warning codes: `price-fallback-used`
 - Legacy digest: `7c4a0b3ce4cdae44`
-- Rewrite digest: `af00dc8856780c6d`
+- Rewrite digest: `b02a3cf4bb137837`
 
 | Path                      | Kind   | Legacy       | Rewrite      |
 | ------------------------- | ------ | ------------ | ------------ |
@@ -380,14 +380,14 @@ Compare Attack and Strength ordering across a nearby max-hit boundary.
 
 - Result: different
 - Classification: accepted-rewrite-delta
-- Reason: The bounded training order and control behavior match. Remaining warning, numeric, configuration or transition differences are owned by the accepted rewrite Planner/domain path, including D-051 fallback and explicit reliability warnings.
-- Source: docs/product/feature-inventory.md (Planner); src/tests/planner-domain.test.ts; docs/project/decisions.md D-051/D-060
+- Reason: Current-product now consumes D-071 source-backed requirement rows; the only baseline change is removal of manual-planner-requirement-fallback while previously reviewed training, numeric, configuration and transition deltas remain unchanged.
+- Source: docs/project/decisions.md D-051/D-071; docs/technical/source-backed-requirements-npc-size-spec.md; docs/product/feature-inventory.md (Planner)
 - Difference count: 18
 - Legacy step order: attack -> attack -> strength -> strength
 - Rewrite step order: attack -> attack -> strength -> strength
-- Rewrite warning codes: `manual-planner-requirement-fallback`, `price-fallback-used`
+- Rewrite warning codes: `price-fallback-used`
 - Legacy digest: `cfc4a0ff0eb9eb50`
-- Rewrite digest: `bf62d518eb31d34f`
+- Rewrite digest: `bbde364cfba5a9ef`
 
 | Path                      | Kind   | Legacy       | Rewrite      |
 | ------------------------- | ------ | ------------ | ------------ |
@@ -444,14 +444,14 @@ Balanced scoring maps rewrite balanced to legacy bal deterministically.
 
 - Result: different
 - Classification: accepted-rewrite-delta
-- Reason: The bounded training order and control behavior match. Remaining warning, numeric, configuration or transition differences are owned by the accepted rewrite Planner/domain path, including D-051 fallback and explicit reliability warnings.
-- Source: docs/product/feature-inventory.md (Planner); src/tests/planner-domain.test.ts; docs/project/decisions.md D-051/D-060
+- Reason: Current-product now consumes D-071 source-backed requirement rows; the only baseline change is removal of manual-planner-requirement-fallback while previously reviewed training, numeric, configuration and transition deltas remain unchanged.
+- Source: docs/project/decisions.md D-051/D-071; docs/technical/source-backed-requirements-npc-size-spec.md; docs/product/feature-inventory.md (Planner)
 - Difference count: 22
 - Legacy step order: attack -> strength -> strength -> attack
 - Rewrite step order: attack -> strength -> strength -> attack
-- Rewrite warning codes: `manual-planner-requirement-fallback`, `price-fallback-used`
+- Rewrite warning codes: `price-fallback-used`
 - Legacy digest: `fb21b35eccc79ee5`
-- Rewrite digest: `ee087f94eea735d6`
+- Rewrite digest: `d17a216f947c50ff`
 
 | Path                      | Kind   | Legacy   | Rewrite  |
 | ------------------------- | ------ | -------- | -------- |
@@ -508,14 +508,14 @@ Defence training unlocks rune armour from a bounded pool.
 
 - Result: different
 - Classification: accepted-rewrite-delta
-- Reason: The bounded training order and control behavior match. Remaining warning, numeric, configuration or transition differences are owned by the accepted rewrite Planner/domain path, including D-051 fallback and explicit reliability warnings.
-- Source: docs/product/feature-inventory.md (Planner); src/tests/planner-domain.test.ts; docs/project/decisions.md D-051/D-060
+- Reason: Current-product now consumes D-071 source-backed requirement rows; the only baseline change is removal of manual-planner-requirement-fallback while previously reviewed training, numeric, configuration and transition deltas remain unchanged.
+- Source: docs/project/decisions.md D-051/D-071; docs/technical/source-backed-requirements-npc-size-spec.md; docs/product/feature-inventory.md (Planner)
 - Difference count: 17
 - Legacy step order: defence -> defence
 - Rewrite step order: defence -> defence
-- Rewrite warning codes: `manual-planner-requirement-fallback`, `price-fallback-used`
+- Rewrite warning codes: `price-fallback-used`
 - Legacy digest: `f5afd64c771172e9`
-- Rewrite digest: `3a71390d9c7ae1e1`
+- Rewrite digest: `532095e749b186f1`
 
 | Path                              | Kind  | Legacy            | Rewrite |
 | --------------------------------- | ----- | ----------------- | ------- |
@@ -572,14 +572,14 @@ Attack training unlocks rune scimitar through domain combat scoring.
 
 - Result: different
 - Classification: accepted-rewrite-delta
-- Reason: The bounded training order and control behavior match. Remaining warning, numeric, configuration or transition differences are owned by the accepted rewrite Planner/domain path, including D-051 fallback and explicit reliability warnings.
-- Source: docs/product/feature-inventory.md (Planner); src/tests/planner-domain.test.ts; docs/project/decisions.md D-051/D-060
+- Reason: Current-product now consumes D-071 source-backed requirement rows; the only baseline change is removal of manual-planner-requirement-fallback while previously reviewed training, numeric, configuration and transition deltas remain unchanged.
+- Source: docs/project/decisions.md D-051/D-071; docs/technical/source-backed-requirements-npc-size-spec.md; docs/product/feature-inventory.md (Planner)
 - Difference count: 10
 - Legacy step order: attack -> attack
 - Rewrite step order: attack -> attack
-- Rewrite warning codes: `manual-planner-requirement-fallback`, `price-fallback-used`
+- Rewrite warning codes: `price-fallback-used`
 - Legacy digest: `f162237b680dcc13`
-- Rewrite digest: `83d3fac1e4a4bef1`
+- Rewrite digest: `d1afe9e7a1d60842`
 
 | Path                     | Kind   | Legacy       | Rewrite      |
 | ------------------------ | ------ | ------------ | ------------ |
@@ -592,7 +592,7 @@ Attack training unlocks rune scimitar through domain combat scoring.
 | `$.steps[1].dps`         | number | 1.41386      | 1.481538     |
 | `$.steps[1].metricValue` | number | 17471.90556  | 18232.599809 |
 | `$.transitions`          | length | 0            | 1            |
-| `$.warningCodes`         | length | 0            | 2            |
+| `$.warningCodes`         | length | 0            | 1            |
 
 ### melee_rune_scimitar_attack_unlock / reference-context
 
@@ -628,20 +628,20 @@ A plan with targets at current levels returns no steps.
 
 - Result: different
 - Classification: accepted-rewrite-delta
-- Reason: The bounded training order and control behavior match. Remaining warning, numeric, configuration or transition differences are owned by the accepted rewrite Planner/domain path, including D-051 fallback and explicit reliability warnings.
-- Source: docs/product/feature-inventory.md (Planner); src/tests/planner-domain.test.ts; docs/project/decisions.md D-051/D-060
+- Reason: Current-product now consumes D-071 source-backed requirement rows; the only baseline change is removal of manual-planner-requirement-fallback while previously reviewed training, numeric, configuration and transition deltas remain unchanged.
+- Source: docs/project/decisions.md D-051/D-071; docs/technical/source-backed-requirements-npc-size-spec.md; docs/product/feature-inventory.md (Planner)
 - Difference count: 3
 - Legacy step order: none
 - Rewrite step order: none
-- Rewrite warning codes: `manual-planner-requirement-fallback`, `price-fallback-used`
+- Rewrite warning codes: `price-fallback-used`
 - Legacy digest: `d26e97e207edd124`
-- Rewrite digest: `000a2da1e9c926df`
+- Rewrite digest: `6ae8bf52a235e2f2`
 
 | Path                  | Kind   | Legacy       | Rewrite      |
 | --------------------- | ------ | ------------ | ------------ |
 | `$.start.dps`         | number | 1.404255     | 1.473342     |
 | `$.start.metricValue` | number | 17363.434686 | 18140.816534 |
-| `$.warningCodes`      | length | 0            | 2            |
+| `$.warningCodes`      | length | 0            | 1            |
 
 ### no_work_target / reference-context
 
@@ -670,14 +670,14 @@ Only the remaining XP in the current Attack level is charged.
 
 - Result: different
 - Classification: accepted-rewrite-delta
-- Reason: The bounded training order and control behavior match. Remaining warning, numeric, configuration or transition differences are owned by the accepted rewrite Planner/domain path, including D-051 fallback and explicit reliability warnings.
-- Source: docs/product/feature-inventory.md (Planner); src/tests/planner-domain.test.ts; docs/project/decisions.md D-051/D-060
+- Reason: Current-product now consumes D-071 source-backed requirement rows; the only baseline change is removal of manual-planner-requirement-fallback while previously reviewed training, numeric, configuration and transition deltas remain unchanged.
+- Source: docs/project/decisions.md D-051/D-071; docs/technical/source-backed-requirements-npc-size-spec.md; docs/product/feature-inventory.md (Planner)
 - Difference count: 8
 - Legacy step order: attack
 - Rewrite step order: attack
-- Rewrite warning codes: `manual-planner-requirement-fallback`, `price-fallback-used`
+- Rewrite warning codes: `price-fallback-used`
 - Legacy digest: `1f0157962ebb9355`
-- Rewrite digest: `06a8dc7e8f42c79a`
+- Rewrite digest: `277874b626ecd1fb`
 
 | Path                     | Kind   | Legacy       | Rewrite      |
 | ------------------------ | ------ | ------------ | ------------ |
@@ -688,7 +688,7 @@ Only the remaining XP in the current Attack level is charged.
 | `$.steps[0].dps`         | number | 1.404255     | 1.473342     |
 | `$.steps[0].metricValue` | number | 17363.434686 | 18140.816534 |
 | `$.transitions`          | length | 0            | 1            |
-| `$.warningCodes`         | length | 0            | 2            |
+| `$.warningCodes`         | length | 0            | 1            |
 
 ### partial_current_attack_xp / reference-context
 
@@ -722,18 +722,18 @@ Longrange planning compares Ranged and Defence stance-aware ordering.
 
 - Result: different
 - Classification: accepted-rewrite-delta
-- Reason: The bounded training order and control behavior match. Remaining warning, numeric, configuration or transition differences are owned by the accepted rewrite Planner/domain path, including D-051 fallback and explicit reliability warnings.
-- Source: docs/product/feature-inventory.md (Planner); src/tests/planner-domain.test.ts; docs/project/decisions.md D-051/D-060
+- Reason: Current-product now consumes D-071 source-backed requirement rows; the only baseline change is removal of manual-planner-requirement-fallback while previously reviewed training, numeric, configuration and transition deltas remain unchanged.
+- Source: docs/project/decisions.md D-051/D-071; docs/technical/source-backed-requirements-npc-size-spec.md; docs/product/feature-inventory.md (Planner)
 - Difference count: 1
 - Legacy step order: ranged -> ranged -> defence -> defence
 - Rewrite step order: ranged -> ranged -> defence -> defence
-- Rewrite warning codes: `manual-planner-requirement-fallback`, `price-fallback-used`
+- Rewrite warning codes: `price-fallback-used`
 - Legacy digest: `c562f5c79f939807`
-- Rewrite digest: `1db6a0e4bf06ba86`
+- Rewrite digest: `ee6fa41d110f21b4`
 
 | Path             | Kind   | Legacy | Rewrite |
 | ---------------- | ------ | ------ | ------- |
-| `$.warningCodes` | length | 0      | 2       |
+| `$.warningCodes` | length | 0      | 1       |
 
 ### ranged_longrange_defence_training / reference-context
 
@@ -760,19 +760,19 @@ Ranged training unlocks yew shortbow without copying ranged formulas.
 
 - Result: different
 - Classification: accepted-rewrite-delta
-- Reason: The bounded training order and control behavior match. Remaining warning, numeric, configuration or transition differences are owned by the accepted rewrite Planner/domain path, including D-051 fallback and explicit reliability warnings.
-- Source: docs/product/feature-inventory.md (Planner); src/tests/planner-domain.test.ts; docs/project/decisions.md D-051/D-060
+- Reason: Current-product now consumes D-071 source-backed requirement rows; the only baseline change is removal of manual-planner-requirement-fallback while previously reviewed training, numeric, configuration and transition deltas remain unchanged.
+- Source: docs/project/decisions.md D-051/D-071; docs/technical/source-backed-requirements-npc-size-spec.md; docs/product/feature-inventory.md (Planner)
 - Difference count: 2
 - Legacy step order: ranged -> ranged
 - Rewrite step order: ranged -> ranged
-- Rewrite warning codes: `manual-planner-requirement-fallback`, `price-fallback-used`
+- Rewrite warning codes: `price-fallback-used`
 - Legacy digest: `f6222f2613b97ea5`
-- Rewrite digest: `3bfecace0c3f1cac`
+- Rewrite digest: `5a3bba00a2f7d3f7`
 
 | Path             | Kind   | Legacy | Rewrite |
 | ---------------- | ------ | ------ | ------- |
 | `$.transitions`  | length | 0      | 1       |
-| `$.warningCodes` | length | 0      | 2       |
+| `$.warningCodes` | length | 0      | 1       |
 
 ### ranged_yew_shortbow_unlock / reference-context
 
@@ -800,14 +800,14 @@ A longer Strength path exposes stable transition-run behavior.
 
 - Result: different
 - Classification: accepted-rewrite-delta
-- Reason: The bounded training order and control behavior match. Remaining warning, numeric, configuration or transition differences are owned by the accepted rewrite Planner/domain path, including D-051 fallback and explicit reliability warnings.
-- Source: docs/product/feature-inventory.md (Planner); src/tests/planner-domain.test.ts; docs/project/decisions.md D-051/D-060
+- Reason: Current-product now consumes D-071 source-backed requirement rows; the only baseline change is removal of manual-planner-requirement-fallback while previously reviewed training, numeric, configuration and transition deltas remain unchanged.
+- Source: docs/project/decisions.md D-051/D-071; docs/technical/source-backed-requirements-npc-size-spec.md; docs/product/feature-inventory.md (Planner)
 - Difference count: 25
 - Legacy step order: strength -> strength -> strength -> strength -> strength -> strength -> strength -> strength -> strength -> strength
 - Rewrite step order: strength -> strength -> strength -> strength -> strength -> strength -> strength -> strength -> strength -> strength
-- Rewrite warning codes: `manual-planner-requirement-fallback`, `price-fallback-used`
+- Rewrite warning codes: `price-fallback-used`
 - Legacy digest: `e9f8d0caf7e7a2df`
-- Rewrite digest: `2e8862bae803f2f6`
+- Rewrite digest: `df8a1317645a10df`
 
 | Path                         | Kind   | Legacy        | Rewrite          |
 | ---------------------------- | ------ | ------------- | ---------------- |

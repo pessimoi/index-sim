@@ -33,6 +33,7 @@ export type PlannerLevels = Pick<
 
 export interface SkillRequirements {
   attack?: number;
+  strength?: number;
   defence?: number;
   ranged?: number;
   magic?: number;
@@ -447,6 +448,7 @@ export function requirementForItem(
       itemId,
       requirements: {
         ...(generated.skills.attack !== undefined ? { attack: generated.skills.attack } : {}),
+        ...(generated.skills.strength !== undefined ? { strength: generated.skills.strength } : {}),
         ...(generated.skills.defence !== undefined ? { defence: generated.skills.defence } : {}),
         ...(generated.skills.ranged !== undefined ? { ranged: generated.skills.ranged } : {}),
         ...(generated.skills.magic !== undefined ? { magic: generated.skills.magic } : {})
@@ -480,7 +482,6 @@ export function reqLevel(
   skill: PlannerSkill,
   gameData?: GameDataSnapshot
 ): number {
-  if (skill === "strength") return 0;
   return reqOf(itemId, gameData)[skill] ?? 0;
 }
 
@@ -493,6 +494,7 @@ export function equippable(
   const requirement = reqOf(itemId, gameData);
   return (
     (requirement.attack == null || state.attack >= requirement.attack) &&
+    (requirement.strength == null || state.strength >= requirement.strength) &&
     (requirement.defence == null || state.defence >= requirement.defence) &&
     (requirement.ranged == null || state.ranged >= requirement.ranged) &&
     (requirement.magic == null || state.magic >= requirement.magic)

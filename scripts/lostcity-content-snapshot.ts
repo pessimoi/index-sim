@@ -12,6 +12,7 @@ import { createLostCityItemCandidate, extractLostCityItemSource } from "./lostci
 import { readLostCityLootHandlerCatalog } from "./lostcity-content-loot";
 import { extractLostCityMonsterLootSource } from "./lostcity-content-loot-extractor";
 import { createLostCityMonsterCombatCandidate } from "./lostcity-content-monsters";
+import { readLostCityItemRequirements } from "./lostcity-content-requirements";
 import { lostCityMonsterSourceId, lostCitySourceItemId } from "./lostcity-content-runtime-mapping";
 
 export interface LostCityRawSnapshotResult {
@@ -136,6 +137,13 @@ export function createLostCityRawSnapshot(input: {
     input.generatedAt,
     "Raw config and RuneScript inputs are normalized into simulator-owned runtime contracts; source bodies are not embedded."
   );
+  const requirements = readLostCityItemRequirements({
+    ...catalogOptions,
+    reference: candidate,
+    objects,
+    sourceRevision: input.sourceRevision,
+    generatedAt: input.generatedAt
+  });
   const snapshot = parseGameDataSnapshot({
     ...candidate,
     id: `lostcity-${input.sourceRevision.slice(0, 12)}-runtime`,
@@ -143,7 +151,7 @@ export function createLostCityRawSnapshot(input: {
     items,
     monsters,
     provenance,
-    requirements: undefined
+    requirements
   });
   return { snapshot, lootExclusionCount };
 }

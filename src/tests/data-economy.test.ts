@@ -190,7 +190,16 @@ describe("validated game data snapshots", () => {
     expect(generatedSnapshot.ammo.bronze_arrow?.rangeBonus).toBe(7);
     expect(generatedSnapshot.spells.wind_strike?.base).toBe(2);
     expect(generatedSnapshot.equipment.helm.rune_full_helm?.stabDef).toBe(30);
-    expect(generatedSnapshot.requirements).toBeUndefined();
+    expect(Object.keys(generatedSnapshot.requirements ?? {})).toHaveLength(94);
+    expect(generatedSnapshot.requirements?.dragon_halberd?.skills).toEqual({
+      attack: 60,
+      strength: 30
+    });
+    expect(generatedSnapshot.monsters.rock_crab?.size).toBe(1);
+    expect(generatedSnapshot.monsters.black_dragon?.size).toBeGreaterThan(1);
+    expect(Object.values(generatedSnapshot.monsters).every((monster) => monster.size != null)).toBe(
+      true
+    );
     expect(generatedSnapshot).not.toHaveProperty("priceHistory");
     expect(generatedSnapshot).not.toHaveProperty("historicalSnapshots");
   });

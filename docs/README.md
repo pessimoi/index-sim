@@ -13,6 +13,7 @@ This directory is the project memory layer for humans and AI agents. It keeps cu
 - Duel setup diff specification: [technical/duel-setup-diff-spec.md](technical/duel-setup-diff-spec.md)
 - Stats source distribution specification: [technical/stats-source-distribution-spec.md](technical/stats-source-distribution-spec.md)
 - Accessibility and keyboard specification: [technical/accessibility-keyboard-spec.md](technical/accessibility-keyboard-spec.md)
+- Source-backed requirements and NPC size specification: [technical/source-backed-requirements-npc-size-spec.md](technical/source-backed-requirements-npc-size-spec.md)
 - Legacy Planner parity specification: [technical/legacy-planner-parity-spec.md](technical/legacy-planner-parity-spec.md)
 - Shareable setup permalink specification: [technical/shareable-setup-permalink-spec.md](technical/shareable-setup-permalink-spec.md)
 - Visual regression specification: [technical/visual-regression-spec.md](technical/visual-regression-spec.md)
@@ -44,6 +45,7 @@ These files are useful evidence, but they are not the living source of truth. Pr
 - Duel setup and calculated-impact comparison requirements belong in [technical/duel-setup-diff-spec.md](technical/duel-setup-diff-spec.md).
 - Special-attack and cannon event-distribution requirements belong in [technical/stats-source-distribution-spec.md](technical/stats-source-distribution-spec.md).
 - Workbench and Dense keyboard interaction requirements belong in [technical/accessibility-keyboard-spec.md](technical/accessibility-keyboard-spec.md).
+- Generated item-requirement and NPC-size extraction/formula requirements belong in [technical/source-backed-requirements-npc-size-spec.md](technical/source-backed-requirements-npc-size-spec.md).
 - Optional archived Planner behavior comparison requirements belong in [technical/legacy-planner-parity-spec.md](technical/legacy-planner-parity-spec.md).
 - Hiscores and live market sync requirements belong in [technical/live-integrations-spec.md](technical/live-integrations-spec.md).
 - Hiscores provider/runtime execution work belongs in [technical/hiscores-live-implementation-spec.md](technical/hiscores-live-implementation-spec.md).

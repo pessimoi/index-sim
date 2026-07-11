@@ -104,6 +104,30 @@ describe("planner requirements and candidate pools", () => {
     ).toBe(true);
   });
 
+  it("enforces generated Strength requirements in Planner eligibility", () => {
+    const { context } = createPlannerRuntime();
+    const generatedContext = withGeneratedRequirement(context, "dragon_halberd", {
+      attack: 60,
+      strength: 30
+    });
+
+    expect(reqLevel("dragon_halberd", "strength", generatedContext.gameData)).toBe(30);
+    expect(
+      equippable(
+        "dragon_halberd",
+        { attack: 60, strength: 29, defence: 1, ranged: 1, magic: 1 },
+        generatedContext.gameData
+      )
+    ).toBe(false);
+    expect(
+      equippable(
+        "dragon_halberd",
+        { attack: 60, strength: 30, defence: 1, ranged: 1, magic: 1 },
+        generatedContext.gameData
+      )
+    ).toBe(true);
+  });
+
   it("does not expose future weapons in the default pool", () => {
     const { context } = createPlannerRuntime();
     const pool = defaultPool("melee", context);

@@ -1,6 +1,7 @@
 [giant]
 name=Giant
 vislevel=28
+size=2
 hitpoints=35
 attack=18
 strength=22

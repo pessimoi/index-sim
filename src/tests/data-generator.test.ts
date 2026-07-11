@@ -290,7 +290,7 @@ describe("game data generator foundation", () => {
     expect(sourcePin.generatedAt).toBe(GENERATED_AT);
     expect(sourcePin.generator).toMatchObject({
       name: "index-sim-data-generator",
-      version: "raw-lostcity-runtime-catalog-2"
+      version: "raw-lostcity-runtime-catalog-3"
     });
     expect(sourcePin.generator?.command).toContain("npm run data:generate");
     expect(sourcePin.scope).toMatchObject({
@@ -716,7 +716,7 @@ describe("game data generator foundation", () => {
     const shortbow = items.items.find((item) => item.id === "training_shortbow");
     expect(shortbow).toBeDefined();
     if (!shortbow) throw new Error("Missing training_shortbow fixture item");
-    shortbow.requirements = { skills: { strength: 5 } };
+    shortbow.requirements = { skills: { prayer: 5 } };
     writeSourceSlice(sourceDir, "items.json", items);
 
     const error = expectGeneratorError(
@@ -760,7 +760,7 @@ describe("game data generator foundation", () => {
     expect(reportText).toContain("No previous `game-data.json` baseline was found");
     expect(reportText).toContain("## Current Scope");
     expect(reportText).toContain(
-      "Generated item requirements are consumed by Planner/setup checks and gear quick action reason copy when the runtime snapshot supplies them"
+      "Generated item requirements are consumed by Planner/setup checks and gear quick action reason copy;"
     );
     expect(reportText).toContain("fixture-owned representative cases");
     expect(reportText).not.toContain("first representative fixture cases");

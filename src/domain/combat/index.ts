@@ -699,6 +699,13 @@ function specialAttackResult(
   if (!specData || specData.combat !== request.combatStyle) return null;
 
   const gameData = context.gameData;
+  const monster = gameData.monsters[request.monsterId];
+  const hits =
+    specKey === "dragon_halberd" && monster?.size !== undefined
+      ? monster.size > 1
+        ? 2
+        : 1
+      : specData.hits;
   const specWeapon = gameData.weapons[specKey] ?? {
     name: specKey,
     type: request.combatStyle,
@@ -760,7 +767,7 @@ function specialAttackResult(
     request.combatStyle === "ranged"
       ? maxHitRanged(effectiveDamage + specData.rngLvlBonus, damageBonusSpec + specAmmoBonus)
       : Math.floor(maxHitMelee(effectiveDamage, damageBonusSpec) * specData.dmgMult);
-  const expPerSpec = specData.hits * effectiveHitChance * (maxHitSpec / 2);
+  const expPerSpec = hits * effectiveHitChance * (maxHitSpec / 2);
   const specsPerHour = SA_REGEN_PER_HOUR / specData.cost;
   const specSecPerHour = specsPerHour * (specWeapon.speed || 4) * TICK_SECONDS;
   const normalDamagePerHour = baseDps * Math.max(0, 3600 - specSecPerHour);
@@ -773,7 +780,7 @@ function specialAttackResult(
     specsPerHour,
     expPerSpec,
     maxHit: maxHitSpec,
-    hits: specData.hits,
+    hits,
     hitChance: effectiveHitChance,
     dpsBase: baseDps,
     dpsWithSpec,
@@ -932,7 +939,10 @@ export function simulateCombat(
     dps,
     dbaSelected
   );
-  const warnings = specialAttack?.key === "dragon_halberd" ? [DRAGON_HALBERD_NPC_SIZE_WARNING] : [];
+  const warnings =
+    specialAttack?.key === "dragon_halberd" && monster.size === undefined
+      ? [DRAGON_HALBERD_NPC_SIZE_WARNING]
+      : [];
   const effectiveDps = specialAttack?.dpsWithSpec ?? dps;
   const weapon = context.gameData.weapons[request.loadout.weaponId];
   const poisonSeverity = weapon?.poisonSeverity ?? 0;
