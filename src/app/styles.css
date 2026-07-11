@@ -48,6 +48,16 @@ button:hover,
   border-color: #55708d;
 }
 
+:where(a, button, input, select, summary, [tabindex]):focus-visible {
+  outline: 3px solid #72d9ff;
+  outline-offset: 2px;
+}
+
+.file-button:has(input:focus-visible) {
+  outline: 3px solid #72d9ff;
+  outline-offset: 2px;
+}
+
 button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
@@ -81,6 +91,23 @@ th {
   min-width: 0;
   overflow-x: hidden;
   padding: 1rem;
+}
+
+.skip-link {
+  background: #eef2f7;
+  border-radius: 4px;
+  color: #111317;
+  font-weight: 800;
+  left: 1rem;
+  padding: 0.55rem 0.75rem;
+  position: fixed;
+  top: 0.5rem;
+  transform: translateY(-200%);
+  z-index: 100;
+}
+
+.skip-link:focus-visible {
+  transform: translateY(0);
 }
 
 .topbar {
@@ -3023,9 +3050,10 @@ th {
 }
 
 .dense-table tbody tr:hover,
-.dense-table tbody tr:focus {
+.dense-table tbody tr:focus-visible {
   background: #182331;
-  outline: none;
+  outline: 3px solid #72d9ff;
+  outline-offset: -3px;
 }
 
 .dense-table tbody tr.active {

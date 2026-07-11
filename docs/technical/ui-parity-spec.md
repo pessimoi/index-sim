@@ -112,6 +112,18 @@ scarce spot, explicit safespot override, protection prayer, manual food/bank/pra
 changed supply settings and hidden gear tiers. Stats and Compare render the same
 summary below the metric strip. `Review` only changes the active tab. `Reset` is shown only on the scoped resettable rows above; for example, resetting current-monster loot settings does not remove loot action overrides, resetting loot action overrides does not remove per-monster loot settings, resetting current-monster cannon does not change Trip scarce state, resetting explicit safespot returns to Auto and resetting Trip scarce spot leaves the target-count and respawn values in place.
 
+### Keyboard Interaction
+
+The Workbench navigation uses a roving ARIA tablist with one active Tab stop,
+Left/Right wraparound and Home/End activation. It controls one dynamic active
+tabpanel labelled by the selected tab. A first-focus skip link targets that
+panel, and common controls use a high-contrast focus-visible outline. Dense
+monster rows use one selected-row Tab stop; Up/Down wrap focus across visible
+rows, Home/End jump to the ends and Enter/Space retain target selection. Mouse
+and touch behavior remain unchanged. D-070 treats this as a bounded keyboard
+contract rather than a WCAG conformance claim. The owning details are in the
+[accessibility and keyboard specification](accessibility-keyboard-spec.md).
+
 ### Combat, Stats, Special And Result V1 Slice
 
 Status date: 2026-07-08. The accepted V1 replacement line for this slice is

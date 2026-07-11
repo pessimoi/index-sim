@@ -196,7 +196,7 @@ export async function bootVisualApp(
 }
 
 export async function openWorkbenchTab(page: Page, name: string) {
-  await page.getByLabel("Workbench tabs").getByRole("button", { name, exact: true }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name, exact: true }).click();
 }
 
 export async function capturePane(locator: Locator, name: string) {

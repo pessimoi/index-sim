@@ -235,7 +235,7 @@ test("loads the dense combat spreadsheet root", async ({ page }) => {
   expect(cardBox).not.toBeNull();
   expect(centerBox!.x).toBeGreaterThan(sidebarBox!.x);
   expect(cardBox!.x).toBeGreaterThan(centerBox!.x);
-  await expect(page.getByLabel("Workbench tabs").getByRole("button")).toHaveText([
+  await expect(page.getByLabel("Workbench tabs").getByRole("tab")).toHaveText([
     "Stats",
     "Melee",
     "Ranged",
@@ -261,7 +261,7 @@ test("loads the dense combat spreadsheet root", async ({ page }) => {
   await expect(page.getByText("All monsters")).toBeVisible();
   await expect(page.getByText("DPS").first()).toBeVisible();
   await expect(page.getByRole("region", { name: "Hiscores" })).toBeVisible();
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Economy" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Economy" }).click();
   const market = page.locator('section[aria-label="Market price data"]');
   await expect(
     market.getByText("Market upstream refresh is scheduled, not user-triggered.").first()
@@ -272,6 +272,72 @@ test("loads the dense combat spreadsheet root", async ({ page }) => {
   await expect(page.getByText("run_sim.py")).toHaveCount(0);
   await expect(page.getByText("/api/prices")).toHaveCount(0);
   await expect(page.getByText("/api/scrape")).toHaveCount(0);
+});
+
+test("supports bounded keyboard navigation for workbench tabs and Dense rows", async ({ page }) => {
+  await page.goto("/");
+
+  const skipLink = page.getByRole("link", { name: "Skip to active workbench pane" });
+  await expect(skipLink).toBeAttached();
+  const firstFocusableLabel = await page.evaluate(() => {
+    const first = document.querySelector<HTMLElement>(
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    );
+    return first?.textContent?.trim() ?? null;
+  });
+  expect(firstFocusableLabel).toBe("Skip to active workbench pane");
+  await skipLink.focus();
+  await expect(skipLink).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("tabpanel", { name: "Compare" })).toBeFocused();
+  expect(new URL(page.url()).hash).toBe("");
+
+  const tablist = page.getByRole("tablist", { name: "Workbench tabs" });
+  const compareTab = tablist.getByRole("tab", { name: "Compare" });
+  await expect(compareTab).toHaveAttribute("aria-selected", "true");
+  await expect(compareTab).toHaveAttribute("tabindex", "0");
+  await expect(tablist.getByRole("tab", { name: "Stats" })).toHaveAttribute("tabindex", "-1");
+
+  await compareTab.focus();
+  await page.keyboard.press("ArrowRight");
+  const lootTab = tablist.getByRole("tab", { name: "Loot" });
+  await expect(lootTab).toBeFocused();
+  await expect(lootTab).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tabpanel", { name: "Loot" })).toBeVisible();
+
+  await page.keyboard.press("End");
+  const settingsTab = tablist.getByRole("tab", { name: "Settings" });
+  await expect(settingsTab).toBeFocused();
+  await expect(settingsTab).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("Home");
+  const statsTab = tablist.getByRole("tab", { name: "Stats" });
+  await expect(statsTab).toBeFocused();
+  await expect(statsTab).toHaveAttribute("aria-selected", "true");
+
+  await compareTab.click();
+  const table = page.getByRole("table", { name: "All monsters" });
+  const tabbableRows = table.locator('tbody tr[data-monster-id][tabindex="0"]');
+  await expect(tabbableRows).toHaveCount(1);
+  const selectedRow = tabbableRows;
+  const selectedMonsterId = await selectedRow.getAttribute("data-monster-id");
+  await selectedRow.focus();
+  await page.keyboard.press("ArrowDown");
+  const focusedMonsterId = await page.evaluate(
+    () => (document.activeElement as HTMLElement | null)?.dataset.monsterId ?? null
+  );
+  expect(focusedMonsterId).not.toBe(selectedMonsterId);
+  await expect(selectedRow).toHaveAttribute("aria-selected", "true");
+  const focusedOutline = await page.evaluate(() => {
+    const element = document.activeElement;
+    return element ? getComputedStyle(element).outlineStyle : "none";
+  });
+  expect(focusedOutline).not.toBe("none");
+  await page.keyboard.press("Enter");
+  await expect(table.locator(`tbody tr[data-monster-id="${focusedMonsterId}"]`)).toHaveAttribute(
+    "aria-selected",
+    "true"
+  );
+  await expect(tabbableRows).toHaveCount(1);
 });
 
 test("keeps hiscores disabled fallback focused on manual Player levels", async ({ page }) => {
@@ -349,7 +415,7 @@ test("renders scheduled price status and keeps local PriceSet overrides separate
   });
 
   await page.goto("/");
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Economy" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Economy" }).click();
   const market = page.locator('section[aria-label="Market price data"]');
   const activePriceSetSummary = market.getByLabel("Market active PriceSet summary");
   const scheduledSummary = market.getByLabel("Scheduled price snapshot summary");
@@ -423,7 +489,7 @@ test("renders scheduled price status and keeps local PriceSet overrides separate
   });
   expect(persistedSelected.data.priceSet.alchValues.lobster).not.toBe(0);
   await page.reload();
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Economy" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Economy" }).click();
   const reloadedMarket = page.locator('section[aria-label="Market price data"]');
   const reloadedActivePriceSetSummary = reloadedMarket.getByLabel("Market active PriceSet summary");
   await expect(reloadedActivePriceSetSummary).toContainText(
@@ -448,7 +514,7 @@ test("renders scheduled price status and keeps local PriceSet overrides separate
   expect(historyAfterReset.data.snapshots[0].sourcePriceSetId).toBe("manual-disabled-market");
 
   await page.reload();
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Economy" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Economy" }).click();
   await expect(page.getByLabel("Market active PriceSet summary")).toContainText(
     "Label Scheduled static prices"
   );
@@ -458,7 +524,7 @@ test("renders scheduled price status and keeps local PriceSet overrides separate
 test("shows Stats XP routing trip summary and hit distribution", async ({ page }) => {
   test.setTimeout(90_000);
   await page.goto("/");
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Stats" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Stats" }).click();
 
   const analysis = page.getByLabel("Stats analysis");
   await expect(analysis).toBeVisible();
@@ -542,14 +608,14 @@ test("shows Stats XP routing trip summary and hit distribution", async ({ page }
   await expect(histogram.getByRole("listitem", { name: /max hit bucket/i })).toBeVisible();
   await expect(histogram).toContainText("max hit");
 
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Ranged" }).click();
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Stats" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Ranged" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Stats" }).click();
   await expect(combatRoll).toContainText("Effective accuracy");
   await expect(combatRoll).toContainText("Attack cycle");
   await expect(combatRoll.getByRole("listitem", { name: /Hit chance:/ })).toBeVisible();
 
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Magic" }).click();
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Stats" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Magic" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Stats" }).click();
   await expect(combatRoll).toContainText("Effective damage");
   await expect(
     sourceDetails.getByRole("listitem", { name: /Special attack detail: not modeled/i })
@@ -557,22 +623,22 @@ test("shows Stats XP routing trip summary and hit distribution", async ({ page }
   await expect(sourceDetails).not.toContainText("Special attack histogram");
   await expect(sourceDetails).not.toContainText("Cannon histogram");
 
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Compare" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Compare" }).click();
   await page.getByLabel("TYPE", { exact: true }).selectOption("ranged");
   await page.getByLabel("TARGET", { exact: true }).selectOption("dagannoth");
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Cannon" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Cannon" }).click();
   const cannon = page.locator('section[aria-label="Cannon"]');
   await cannon.getByLabel("Set up cannon").check();
   await cannon.getByLabel("Mobs at spot").fill("6");
   await cannon.getByLabel("Respawn").fill("30");
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Stats" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Stats" }).click();
   const assumptions = page.getByLabel("Active assumptions");
   await expect(assumptions).toContainText("Cannon");
   await assumptions.getByRole("button", { name: "Review Cannon" }).click();
   await expect(
-    page.getByLabel("Workbench tabs").getByRole("button", { name: "Cannon" })
-  ).toHaveAttribute("aria-pressed", "true");
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Stats" }).click();
+    page.getByLabel("Workbench tabs").getByRole("tab", { name: "Cannon" })
+  ).toHaveAttribute("aria-selected", "true");
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Stats" }).click();
   await expect(
     analysis
       .getByRole("list", { name: "XP routing chips" })
@@ -599,7 +665,7 @@ test("shows Stats XP routing trip summary and hit distribution", async ({ page }
   await resetCurrentMonsterCannon.click();
   await expect(resetCurrentMonsterCannon).toHaveCount(0);
 
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Cannon" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Cannon" }).click();
   await expect(cannon.getByLabel("Set up cannon")).not.toBeChecked();
 });
 
@@ -637,10 +703,10 @@ test("updates MonsterCard active defence for melee stance, ranged and magic", as
   await page.getByLabel("STYLE", { exact: true }).selectOption("controlled");
   await expect(activeMonsterDefence(card)).toContainText("Stab defence");
 
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Ranged" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Ranged" }).click();
   await expect(activeMonsterDefence(card)).toContainText("Ranged defence");
 
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Magic" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Magic" }).click();
   await expect(activeMonsterDefence(card)).toContainText("Magic defence");
 });
 
@@ -660,7 +726,7 @@ test("places MonsterCard after the active pane on mobile", async ({ page }) => {
   await expect(card.getByLabel("Target", { exact: true })).toBeVisible();
   await expect(activeMonsterDefence(card)).toBeVisible();
 
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Planner" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Planner" }).click();
   const planner = page.getByRole("region", { name: "Planner", exact: true });
   await expect(planner.getByLabel("Planner summary")).toBeVisible();
   const [plannerBox, mobileCardBox] = await Promise.all([
@@ -741,7 +807,7 @@ test("keeps Dense Compare mobile and tablet overflow contained", async ({ page }
 test("recomputes the Planner tab workflow from visible planner controls", async ({ page }) => {
   test.setTimeout(90_000);
   await page.goto("/");
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Planner" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Planner" }).click();
 
   const planner = page.getByRole("region", { name: "Planner", exact: true });
   await expect(planner).toBeVisible();
@@ -794,7 +860,7 @@ test("uses the Duel tab to snapshot import export rename load delete and persist
   await page.goto("/");
   const tabs = page.getByLabel("Workbench tabs");
 
-  await tabs.getByRole("button", { name: "Duel" }).click();
+  await tabs.getByRole("tab", { name: "Duel" }).click();
   const duel = page.getByRole("region", { name: "Duel", exact: true });
   await expect(duel).toBeVisible();
   await expect(duel.getByRole("heading", { name: "Setup duel" })).toBeVisible();
@@ -837,7 +903,7 @@ test("uses the Duel tab to snapshot import export rename load delete and persist
   expect(download.suggestedFilename()).toBe("index-sim-duel-snapshots.json");
 
   await page.reload();
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Duel" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Duel" }).click();
   const reloadedDuel = page.getByRole("region", { name: "Duel", exact: true });
   await expect(reloadedDuel).toBeVisible();
   let reloadedTable = reloadedDuel.getByRole("table", { name: "Duel comparison" });
@@ -849,7 +915,7 @@ test("uses the Duel tab to snapshot import export rename load delete and persist
     .selectOption("rock_crab");
   const combatType = page.getByLabel("Combat type");
   await combatType.getByRole("button", { name: "ranged" }).click();
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Duel" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Duel" }).click();
   await expect(reloadedDuel).toBeVisible();
   reloadedTable = reloadedDuel.getByRole("table", { name: "Duel comparison" });
   await expect(reloadedTable).toContainText("best", { timeout: 30000 });
@@ -933,11 +999,11 @@ test("builds and filters the all-monster Duel setup matrix on demand", async ({ 
   await page.goto("/");
   const tabs = page.getByLabel("Workbench tabs");
 
-  await tabs.getByRole("button", { name: "Duel" }).click();
+  await tabs.getByRole("tab", { name: "Duel" }).click();
   const duel = page.getByRole("region", { name: "Duel", exact: true });
   await duel.getByRole("button", { name: "Snapshot current setup" }).click();
-  await tabs.getByRole("button", { name: "Ranged" }).click();
-  await tabs.getByRole("button", { name: "Duel" }).click();
+  await tabs.getByRole("tab", { name: "Ranged" }).click();
+  await tabs.getByRole("tab", { name: "Duel" }).click();
 
   await expect(duel.getByRole("table", { name: "All-monster setup matrix" })).toHaveCount(0);
   await duel.getByRole("button", { name: "Monster matrix" }).click();
@@ -1227,7 +1293,7 @@ test("reviews and imports compatible legacy setup data", async ({ page }) => {
       "SUPPLY/KILL": "5,292"
     }
   });
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Duel" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Duel" }).click();
   await expect(page.getByLabel("Rename snapshot Legacy ranged")).toHaveValue("Legacy ranged");
 });
 
@@ -1254,7 +1320,7 @@ test("updates manual combat overrides and resets to derived values", async ({ pa
   await assumptions.getByRole("button", { name: "Reset manual combat overrides" }).click();
   await expect(assumptions).not.toContainText("Manual combat overrides");
 
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Melee" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Melee" }).click();
   const overrides = page.getByLabel("Manual combat overrides");
   await expect(overrides.getByLabel("Accuracy bonus")).toHaveValue("");
   await expect(overrides.getByLabel("Damage bonus")).toHaveValue("");
@@ -1282,8 +1348,8 @@ test("surfaces setup requirement warnings and reviews the active loadout", async
 
   await assumptions.getByRole("button", { name: "Review Setup requirements" }).click();
   await expect(
-    page.getByLabel("Workbench tabs").getByRole("button", { name: "Melee" })
-  ).toHaveAttribute("aria-pressed", "true");
+    page.getByLabel("Workbench tabs").getByRole("tab", { name: "Melee" })
+  ).toHaveAttribute("aria-selected", "true");
 
   const equipmentPane = page.getByLabel("Equipment loadout");
   await expect(equipmentPane).toBeVisible();
@@ -1336,7 +1402,7 @@ test("surfaces and clears invalid rewrite local state in Settings", async ({ pag
   });
 
   await page.goto("/");
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Settings" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Settings" }).click();
 
   const recovery = page.getByLabel("Local state recovery");
   await expect(recovery).toBeVisible();
@@ -1380,7 +1446,7 @@ test("surfaces rewrite local storage save failures without losing current sessio
   await defenceInput.fill("7");
   await expect(defenceInput).toHaveValue("7");
 
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Settings" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Settings" }).click();
   const recovery = page.getByLabel("Local state recovery");
   await expect(recovery).toBeVisible();
   await expect(recovery).toContainText(
@@ -1549,7 +1615,7 @@ test("keeps PriceSet import failures non-fatal and recoverable", async ({ page }
     await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
   });
   await page.goto("/");
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Settings" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Settings" }).click();
   const settings = page.locator('[aria-label="Price data settings"]');
   const priceSetSummary = settings.locator('[aria-label="Active PriceSet summary"]');
   const historySummary = page.locator('[aria-label="Price history summary"]');
@@ -1645,22 +1711,22 @@ test("restores per-combat-style loadout edits when switching styles", async ({ p
   const tabs = page.getByLabel("Workbench tabs");
   const special = page.getByRole("region", { name: "Special attack", exact: true });
 
-  await tabs.getByRole("button", { name: "Melee" }).click();
+  await tabs.getByRole("tab", { name: "Melee" }).click();
   await special.getByLabel("Spec weapon").selectOption("dragon_dagger_p");
   await page.getByLabel("PRAY", { exact: true }).selectOption("clarity");
 
-  await tabs.getByRole("button", { name: "Ranged" }).click();
+  await tabs.getByRole("tab", { name: "Ranged" }).click();
   await expect(page.getByLabel("TYPE", { exact: true })).toHaveValue("ranged");
   await special.getByLabel("Spec weapon").selectOption("magic_shortbow");
   await special.getByLabel("Spec ammo").selectOption("rune_arrow");
   await page.getByLabel("POT", { exact: true }).selectOption("ranging");
 
-  await tabs.getByRole("button", { name: "Melee" }).click();
+  await tabs.getByRole("tab", { name: "Melee" }).click();
   await expect(page.getByLabel("TYPE", { exact: true })).toHaveValue("melee");
   await expect(special.getByLabel("Spec weapon")).toHaveValue("dragon_dagger_p");
   await expect(page.getByLabel("PRAY", { exact: true })).toHaveValue("clarity");
 
-  await tabs.getByRole("button", { name: "Ranged" }).click();
+  await tabs.getByRole("tab", { name: "Ranged" }).click();
   await expect(special.getByLabel("Spec weapon")).toHaveValue("magic_shortbow");
   await expect(special.getByLabel("Spec ammo")).toHaveValue("rune_arrow");
   await expect(page.getByLabel("POT", { exact: true })).toHaveValue("ranging");
@@ -1684,7 +1750,7 @@ test("supports multi-prayer and multi-boost workbench controls with compact prim
 }) => {
   await page.goto("/");
   const tabs = page.getByLabel("Workbench tabs");
-  await tabs.getByRole("button", { name: "Melee" }).click();
+  await tabs.getByRole("tab", { name: "Melee" }).click();
 
   const compactSetup = page.getByLabel("Combat setup");
   const equipmentPane = page.getByLabel("Equipment loadout");
@@ -1735,7 +1801,7 @@ test("edits combat equipment panes and persists style-specific selections", asyn
   const setupContext = page.getByLabel("Setup context");
   const setupDps = setupContext.locator(".metric", { hasText: "DPS" }).locator("strong");
 
-  await tabs.getByRole("button", { name: "Melee" }).click();
+  await tabs.getByRole("tab", { name: "Melee" }).click();
   const meleePane = page.getByLabel("Equipment loadout");
   const meleeDpsBefore = await setupDps.textContent();
   await meleePane.getByLabel("Shield", { exact: true }).selectOption("unholy_book");
@@ -1745,14 +1811,14 @@ test("edits combat equipment panes and persists style-specific selections", asyn
   await expect(meleePane.getByLabel("Shield", { exact: true })).toHaveValue("none");
   await expect.poll(async () => setupDps.textContent()).not.toBe(meleeDpsBefore);
 
-  await tabs.getByRole("button", { name: "Ranged" }).click();
+  await tabs.getByRole("tab", { name: "Ranged" }).click();
   const rangedPane = page.getByLabel("Equipment loadout");
   await rangedPane.getByLabel("Weapon search").fill("magic shortbow");
   await rangedPane.getByLabel("Weapon", { exact: true }).selectOption("magic_shortbow");
   await rangedPane.getByLabel("Ammo search").fill("adamant arrow");
   await rangedPane.getByLabel("Ammo", { exact: true }).selectOption("addy_arrow");
 
-  await tabs.getByRole("button", { name: "Magic" }).click();
+  await tabs.getByRole("tab", { name: "Magic" }).click();
   const magicPane = page.getByLabel("Equipment loadout");
   await magicPane.getByLabel("Spell search").fill("fire wave");
   await magicPane.getByLabel("Spell", { exact: true }).selectOption("fire_wave");
@@ -1774,18 +1840,18 @@ test("edits combat equipment panes and persists style-specific selections", asyn
   await page.reload();
   const reloadedTabs = page.getByLabel("Workbench tabs");
   await expect(reloadedTabs).toBeVisible();
-  await reloadedTabs.getByRole("button", { name: "Melee" }).click();
+  await reloadedTabs.getByRole("tab", { name: "Melee" }).click();
   await expect(
     page.getByLabel("Equipment loadout").getByLabel("Weapon", { exact: true })
   ).toHaveValue("dragon_halberd");
   await expect(
     page.getByLabel("Equipment loadout").getByLabel("Shield", { exact: true })
   ).toBeDisabled();
-  await reloadedTabs.getByRole("button", { name: "Ranged" }).click();
+  await reloadedTabs.getByRole("tab", { name: "Ranged" }).click();
   await expect(
     page.getByLabel("Equipment loadout").getByLabel("Ammo", { exact: true })
   ).toHaveValue("addy_arrow");
-  await reloadedTabs.getByRole("button", { name: "Magic" }).click();
+  await reloadedTabs.getByRole("tab", { name: "Magic" }).click();
   await expect(
     page.getByLabel("Equipment loadout").getByLabel("Spell", { exact: true })
   ).toHaveValue("fire_wave");
@@ -1795,7 +1861,7 @@ test("applies gear quick actions for the active combat style", async ({ page }) 
   await page.goto("/");
   const tabs = page.getByLabel("Workbench tabs");
 
-  await tabs.getByRole("button", { name: "Melee" }).click();
+  await tabs.getByRole("tab", { name: "Melee" }).click();
   const meleePane = page.getByLabel("Equipment loadout");
   await meleePane.getByRole("button", { name: "Best Helm" }).click();
   await expect(meleePane.getByLabel("Helm", { exact: true })).toHaveValue("berserker_helm");
@@ -1806,12 +1872,12 @@ test("applies gear quick actions for the active combat style", async ({ page }) 
   await expect(meleePane.getByRole("button", { name: "Best Shield" })).toBeDisabled();
   await expect(meleePane.getByLabel("Shield", { exact: true })).toHaveValue("none");
 
-  await tabs.getByRole("button", { name: "Ranged" }).click();
+  await tabs.getByRole("tab", { name: "Ranged" }).click();
   const rangedPane = page.getByLabel("Equipment loadout");
   await rangedPane.getByRole("button", { name: "Best Body" }).click();
   await expect(rangedPane.getByLabel("Body", { exact: true })).toHaveValue("black_dhide_body");
 
-  await tabs.getByRole("button", { name: "Magic" }).click();
+  await tabs.getByRole("tab", { name: "Magic" }).click();
   const magicPane = page.getByLabel("Equipment loadout");
   await magicPane.getByRole("button", { name: "Best Cape" }).click();
   await expect(magicPane.getByLabel("Cape", { exact: true })).toHaveValue("god_cape");
@@ -1833,17 +1899,17 @@ test("filters hidden gear tiers while keeping current selections", async ({ page
   await page.goto("/");
   const tabs = page.getByLabel("Workbench tabs");
 
-  await tabs.getByRole("button", { name: "Melee" }).click();
+  await tabs.getByRole("tab", { name: "Melee" }).click();
   const meleePane = page.getByLabel("Equipment loadout");
   await meleePane.getByLabel("Body", { exact: true }).selectOption("iron_platebody");
 
-  await tabs.getByRole("button", { name: "Settings" }).click();
+  await tabs.getByRole("tab", { name: "Settings" }).click();
   const settings = page.locator('[aria-label="Hidden gear tiers"]');
   await expect(settings).toContainText("Gear menu");
   await settings.getByLabel("Hide iron gear").check();
   await expect(settings).toContainText("1 hidden");
 
-  await tabs.getByRole("button", { name: "Melee" }).click();
+  await tabs.getByRole("tab", { name: "Melee" }).click();
   await expect(meleePane.getByLabel("Body", { exact: true })).toHaveValue("iron_platebody");
   const helmOptions = await meleePane
     .getByLabel("Helm", { exact: true })
@@ -1864,11 +1930,11 @@ test("filters hidden gear tiers while keeping current selections", async ({ page
   });
 
   await page.reload();
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Settings" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Settings" }).click();
   await expect(
     page.locator('[aria-label="Hidden gear tiers"]').getByLabel("Hide iron gear")
   ).toBeChecked();
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Melee" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Melee" }).click();
   const reloadedMeleePane = page.getByLabel("Equipment loadout");
   await expect(reloadedMeleePane.getByLabel("Body", { exact: true })).toHaveValue("iron_platebody");
   const reloadedHelmOptions = await reloadedMeleePane
@@ -1887,7 +1953,7 @@ test("creates, restores and removes monster-specific custom setups", async ({ pa
   await setupContext.getByRole("button", { name: "Create custom setup" }).click();
   await expect(setupContext).toContainText("Custom setup");
 
-  await tabs.getByRole("button", { name: "Melee" }).click();
+  await tabs.getByRole("tab", { name: "Melee" }).click();
   const equipmentPane = page.getByLabel("Equipment loadout");
   await equipmentPane.getByLabel("Weapon search").fill("dragon halberd");
   await equipmentPane.getByLabel("Weapon", { exact: true }).selectOption("dragon_halberd");
@@ -1901,12 +1967,12 @@ test("creates, restores and removes monster-specific custom setups", async ({ pa
   await expect(setupContext).toContainText("Custom setup");
   await expect(equipmentPane.getByLabel("Weapon", { exact: true })).toHaveValue("dragon_halberd");
 
-  await tabs.getByRole("button", { name: "Compare" }).click();
+  await tabs.getByRole("tab", { name: "Compare" }).click();
   await expect(page.locator('tr[aria-selected="true"]')).toContainText("custom");
 
   await setupContext.getByRole("button", { name: "Remove custom setup" }).click();
   await expect(setupContext).toContainText("Default setup");
-  await tabs.getByRole("button", { name: "Melee" }).click();
+  await tabs.getByRole("tab", { name: "Melee" }).click();
   await expect(
     page.getByLabel("Equipment loadout").getByLabel("Weapon", { exact: true })
   ).toHaveValue("rune_scimitar");
@@ -1948,7 +2014,7 @@ test("creates, restores and removes monster-specific custom setups", async ({ pa
 test("selects special attacks and shows special metrics", async ({ page }) => {
   test.setTimeout(90_000);
   await page.goto("/");
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Melee" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Melee" }).click();
   const special = page.getByRole("region", { name: "Special attack", exact: true });
 
   await expect(special).toBeVisible();
@@ -1969,7 +2035,7 @@ test("selects special attacks and shows special metrics", async ({ page }) => {
     const saved = window.localStorage.getItem("index-sim:rewrite-setup") ?? "";
     return saved.includes('"weaponId":"dragon_dagger_p"');
   });
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Stats" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Stats" }).click();
   const statsSourceDetails = page
     .getByRole("region", { name: "Source breakdown", exact: true })
     .getByRole("list", { name: "Source detail panels" });
@@ -1998,7 +2064,7 @@ test("selects special attacks and shows special metrics", async ({ page }) => {
       .getByRole("region", { name: "Source breakdown", exact: true })
       .getByRole("listitem", { name: /Special attack: modeled/i })
   ).toContainText("DPS gain");
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Melee" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Melee" }).click();
 
   await page.getByLabel("TYPE", { exact: true }).selectOption("ranged");
   await special.getByLabel("Spec weapon").selectOption("magic_shortbow");
@@ -2016,7 +2082,7 @@ test("selects special attacks and shows special metrics", async ({ page }) => {
   await expect(special).toContainText("unsupported");
   await expect(special).toContainText("Magic special attacks are not modeled yet.");
   await expect(page.locator('[aria-label="Special attack metrics"]')).toHaveCount(0);
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Stats" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Stats" }).click();
   const magicSpecialNote = "Magic DPS special attacks are not modeled yet.";
   const magicSpecialBreakdown = page
     .getByRole("region", { name: "Source breakdown", exact: true })
@@ -2029,7 +2095,7 @@ test("selects special attacks and shows special metrics", async ({ page }) => {
     .getByRole("listitem", { name: /Special attack detail: not modeled/i });
   await expect(magicSpecialDetail).toBeVisible();
   await expect(magicSpecialDetail.getByText(magicSpecialNote, { exact: true })).toBeVisible();
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Melee" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Melee" }).click();
 
   await page.getByLabel("TYPE", { exact: true }).selectOption("melee");
   const boostSelectId = await page
@@ -2042,7 +2108,7 @@ test("selects special attacks and shows special metrics", async ({ page }) => {
   await expect(special).toContainText("DBA boost");
   await expect(special).toContainText("DBA boost uses spec energy as a boost");
   await expect(page.locator('[aria-label="Special attack metrics"]')).toHaveCount(0);
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Stats" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Stats" }).click();
   await expect(
     page
       .getByRole("region", { name: "Source breakdown", exact: true })
@@ -2172,19 +2238,19 @@ test("shows dense row markers for custom setup and per-monster loot settings", a
   const setupContext = page.getByLabel("Setup context");
 
   await setupContext.getByRole("button", { name: "Create custom setup" }).click();
-  await tabs.getByRole("button", { name: "Melee" }).click();
+  await tabs.getByRole("tab", { name: "Melee" }).click();
   const equipmentPane = page.getByLabel("Equipment loadout");
   await equipmentPane.getByLabel("Weapon search").fill("dragon halberd");
   await equipmentPane.getByLabel("Weapon", { exact: true }).selectOption("dragon_halberd");
   await setupContext.getByLabel("Monster", { exact: true }).selectOption("green_dragon");
-  await tabs.getByRole("button", { name: "Loot" }).click();
+  await tabs.getByRole("tab", { name: "Loot" }).click();
 
   const loot = page.locator('section[aria-label="Current monster loot"]');
   await loot.getByLabel("High alch").selectOption("disabled");
   await loot.getByLabel("Overhead", { exact: true }).selectOption("manual");
   await loot.getByLabel("Overhead sec").fill("12.5");
 
-  await tabs.getByRole("button", { name: "Compare" }).click();
+  await tabs.getByRole("tab", { name: "Compare" }).click();
   const table = page.getByRole("table", { name: "All monsters" });
   const giantRow = table.getByRole("row", { name: /Hill Giant/ });
   const greenDragonRow = table.getByRole("row", { name: /Green Dragon/ });
@@ -2257,13 +2323,13 @@ test("matches browser-rendered dense numeric snapshots", async ({ page }) => {
   await expect(page.getByLabel("TYPE", { exact: true })).toHaveValue("ranged");
   await page.getByLabel("TARGET", { exact: true }).selectOption("greater_demon");
   await expect(page.getByLabel("TARGET", { exact: true })).toHaveValue("greater_demon");
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Compare" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Compare" }).click();
   await expectDenseRowMax(table, /Greater Demon/, "10.0");
   const rangedSafespot = await denseNumericSnapshot(table, /Greater Demon/);
   const rangedSafespotResults = await resultMetricSnapshot(page);
 
   await page.getByLabel("TARGET", { exact: true }).selectOption("dagannoth");
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Cannon" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Cannon" }).click();
   const cannon = page.locator('section[aria-label="Cannon"]');
   await cannon.getByLabel("Set up cannon").check();
   await cannon.getByLabel("Mobs at spot").fill("6");
@@ -2272,7 +2338,7 @@ test("matches browser-rendered dense numeric snapshots", async ({ page }) => {
     page.locator('[aria-label="Cannon output"]'),
     CANNON_NUMERIC_LABELS
   );
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Compare" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Compare" }).click();
   await expect(
     table
       .getByRole("row", { name: /Dagannoth \(lvl 74\)/ })
@@ -2393,19 +2459,19 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
   await expect(page.getByLabel("TYPE", { exact: true })).toHaveValue("ranged");
   await page.getByLabel("TARGET", { exact: true }).selectOption("greater_demon");
   await expect(page.getByLabel("TARGET", { exact: true })).toHaveValue("greater_demon");
-  await tabs.getByRole("button", { name: "Compare" }).click();
+  await tabs.getByRole("tab", { name: "Compare" }).click();
   await expectDenseRowMax(table, /Greater Demon/, "10.0");
   const rangedSafespot = await denseNumericSnapshot(table, /Greater Demon/);
   const rangedSafespotResults = await resultMetricSnapshot(page);
   await expectActiveDenseRow(table, /Greater Demon/);
 
   await page.getByLabel("TARGET", { exact: true }).selectOption("dagannoth");
-  await tabs.getByRole("button", { name: "Cannon" }).click();
+  await tabs.getByRole("tab", { name: "Cannon" }).click();
   const cannon = page.locator('section[aria-label="Cannon"]');
   await cannon.getByLabel("Set up cannon").check();
   await cannon.getByLabel("Mobs at spot").fill("6");
   await cannon.getByLabel("Respawn").fill("30");
-  await tabs.getByRole("button", { name: "Compare" }).click();
+  await tabs.getByRole("tab", { name: "Compare" }).click();
   const rangedCannon = await denseNumericSnapshot(table, /Dagannoth \(lvl 74\)/);
   const rangedCannonResults = await resultMetricSnapshot(page);
   await expectActiveDenseRow(table, /Dagannoth \(lvl 74\)/);
@@ -2413,12 +2479,12 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
 
   await page.getByLabel("TYPE", { exact: true }).selectOption("magic");
   await expect(page.getByLabel("TYPE", { exact: true })).toHaveValue("magic");
-  await tabs.getByRole("button", { name: "Magic" }).click();
+  await tabs.getByRole("tab", { name: "Magic" }).click();
   const magicPane = page.getByLabel("Equipment loadout");
   await magicPane.getByLabel("Spell search").fill("fire wave");
   await magicPane.getByLabel("Spell", { exact: true }).selectOption("fire_wave");
   await page.getByLabel("TARGET", { exact: true }).selectOption("blue_dragon");
-  await tabs.getByRole("button", { name: "Compare" }).click();
+  await tabs.getByRole("tab", { name: "Compare" }).click();
   await expect(
     table
       .getByRole("row", { name: /Blue Dragon/ })
@@ -2432,17 +2498,17 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
   await page.getByLabel("TARGET", { exact: true }).selectOption("green_dragon");
   const setupContext = page.getByLabel("Setup context");
   await setupContext.getByRole("button", { name: "Create custom setup" }).click();
-  await tabs.getByRole("button", { name: "Melee" }).click();
+  await tabs.getByRole("tab", { name: "Melee" }).click();
   await expect(page.getByLabel("TYPE", { exact: true })).toHaveValue("melee");
   const meleePane = page.getByLabel("Equipment loadout");
   await meleePane.getByLabel("Weapon search").fill("dragon halberd");
   await meleePane.getByLabel("Weapon", { exact: true }).selectOption("dragon_halberd");
-  await tabs.getByRole("button", { name: "Loot" }).click();
+  await tabs.getByRole("tab", { name: "Loot" }).click();
   const loot = page.locator('section[aria-label="Current monster loot"]');
   await loot.getByLabel("High alch").selectOption("disabled");
   await loot.getByLabel("Overhead", { exact: true }).selectOption("manual");
   await loot.getByLabel("Overhead sec").fill("12.5");
-  await tabs.getByRole("button", { name: "Compare" }).click();
+  await tabs.getByRole("tab", { name: "Compare" }).click();
   const customLootRow = table.getByRole("row", { name: /Green Dragon/ });
   await expect(customLootRow.getByLabel("Custom setup for Green Dragon")).toBeVisible();
   await expect(customLootRow.getByLabel("High alch override for Green Dragon")).toBeVisible();
@@ -2611,7 +2677,7 @@ test("enables cannon for the selected monster and shows cannon rates", async ({ 
   await page.goto("/");
   await page.getByLabel("TYPE", { exact: true }).selectOption("ranged");
   await page.getByLabel("TARGET", { exact: true }).selectOption("dagannoth");
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Cannon" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Cannon" }).click();
 
   const cannon = page.locator('section[aria-label="Cannon"]');
   await expect(cannon).toBeVisible();
@@ -2636,9 +2702,9 @@ test("enables cannon for the selected monster and shows cannon rates", async ({ 
   await expect(output).toContainText("Inventory reserve");
   await expect(cannon.getByLabel("Cannon sparse status")).toContainText(/Trip sparse|Respawn/);
   await expect(cannon.getByText("active")).toBeVisible();
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Compare" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Compare" }).click();
   await expect(page.getByLabel("Simulation results")).toContainText("SUPPLY/KILL");
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Stats" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Stats" }).click();
   const cannonDetail = page
     .getByRole("list", { name: "Source detail panels" })
     .getByRole("listitem", { name: /Cannon detail: modeled/i });
@@ -2663,7 +2729,7 @@ test("enables cannon for the selected monster and shows cannon rates", async ({ 
   });
 
   await page.reload();
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Cannon" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Cannon" }).click();
   const reloadedCannon = page.locator('section[aria-label="Cannon"]');
   await expect(page.getByLabel("Monster", { exact: true })).toHaveValue("dagannoth");
   await expect(reloadedCannon.getByLabel("Set up cannon")).toBeChecked();
@@ -2682,7 +2748,7 @@ test("enables cannon for the selected monster and shows cannon rates", async ({ 
 
 test("updates trip survival controls and keeps the trip summary visible", async ({ page }) => {
   await page.goto("/");
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Trip" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Trip" }).click();
 
   const trip = page.locator('section[aria-label="Trip assumptions"]');
   const summary = page.locator('[aria-label="Trip summary"]');
@@ -2722,7 +2788,7 @@ test("updates trip survival controls and keeps the trip summary visible", async 
   });
 
   await page.reload();
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Trip" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Trip" }).click();
   const reloadedTrip = page.locator('section[aria-label="Trip assumptions"]');
   await expect(reloadedTrip.getByLabel("Safespot")).toHaveValue("off");
   await expect(reloadedTrip.getByLabel("Protect")).toHaveValue("melee");
@@ -2750,7 +2816,7 @@ test("updates manual food controls and recoil ring count", async ({ page }) => {
     window.localStorage.setItem(key, JSON.stringify(setup));
   });
   await page.reload();
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Trip" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Trip" }).click();
 
   const trip = page.locator('section[aria-label="Trip assumptions"]');
   const summary = page.locator('[aria-label="Trip summary"]');
@@ -2780,7 +2846,7 @@ test("updates manual food controls and recoil ring count", async ({ page }) => {
   });
 
   await page.reload();
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Trip" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Trip" }).click();
   const reloadedTrip = page.locator('section[aria-label="Trip assumptions"]');
   await expect(reloadedTrip.getByLabel("Food mode")).toHaveValue("manual");
   await expect(reloadedTrip.getByLabel("Food count")).toHaveValue("4");
@@ -2796,7 +2862,7 @@ test("updates trip food, banking and inventory reserve controls across styles", 
   await page.goto("/");
   const tabs = page.getByLabel("Workbench tabs");
 
-  await tabs.getByRole("button", { name: "Trip" }).click();
+  await tabs.getByRole("tab", { name: "Trip" }).click();
   const trip = page.locator('section[aria-label="Trip assumptions"]');
   const summary = page.locator('[aria-label="Trip summary"]');
 
@@ -2823,21 +2889,21 @@ test("updates trip food, banking and inventory reserve controls across styles", 
   await expect(summary).toContainText("Teleport");
   await expect(summary).toContainText("Off");
 
-  await tabs.getByRole("button", { name: "Ranged" }).click();
-  await tabs.getByRole("button", { name: "Trip" }).click();
+  await tabs.getByRole("tab", { name: "Ranged" }).click();
+  await tabs.getByRole("tab", { name: "Trip" }).click();
   await expect(trip.getByLabel("Recover ammo")).toBeEnabled();
   await trip.getByLabel("Recover ammo").uncheck();
   await expect(summary).toContainText("Ammo recovery");
 
-  await tabs.getByRole("button", { name: "Melee" }).click();
+  await tabs.getByRole("tab", { name: "Melee" }).click();
   await page.getByLabel("Boost", { exact: true }).selectOption("dba_spec");
-  await tabs.getByRole("button", { name: "Trip" }).click();
+  await tabs.getByRole("tab", { name: "Trip" }).click();
   await expect(trip.getByLabel("DBA restore")).toBeEnabled();
   await trip.getByLabel("DBA restore").uncheck();
   await expect(summary).toContainText("DBA restore");
 
-  await tabs.getByRole("button", { name: "Magic" }).click();
-  await tabs.getByRole("button", { name: "Trip" }).click();
+  await tabs.getByRole("tab", { name: "Magic" }).click();
+  await tabs.getByRole("tab", { name: "Trip" }).click();
   await expect(trip.getByLabel("Rune slots")).toBeEnabled();
   await trip.getByLabel("Rune slots").fill("4");
   await expect(summary).toContainText("Rune slots");
@@ -2855,25 +2921,25 @@ test("updates trip food, banking and inventory reserve controls across styles", 
   });
 
   await page.reload();
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Trip" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Trip" }).click();
   const reloadedTrip = page.locator('section[aria-label="Trip assumptions"]');
   await expect(reloadedTrip.getByLabel("Food", { exact: true })).toHaveValue("swordfish");
   await expect(reloadedTrip.getByLabel("Bank time")).toHaveValue("manual");
   await expect(reloadedTrip.getByLabel("Bank sec")).toHaveValue("120");
   await expect(reloadedTrip.getByLabel("Teleport item")).not.toBeChecked();
 
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Ranged" }).click();
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Trip" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Ranged" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Trip" }).click();
   await expect(reloadedTrip.getByLabel("Recover ammo")).toBeEnabled();
   await expect(reloadedTrip.getByLabel("Recover ammo")).not.toBeChecked();
 
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Melee" }).click();
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Trip" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Melee" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Trip" }).click();
   await expect(reloadedTrip.getByLabel("DBA restore")).toBeEnabled();
   await expect(reloadedTrip.getByLabel("DBA restore")).not.toBeChecked();
 
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Magic" }).click();
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Trip" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Magic" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Trip" }).click();
   await expect(reloadedTrip.getByLabel("Rune slots")).toBeEnabled();
   await expect(reloadedTrip.getByLabel("Rune slots")).toHaveValue("4");
 });
@@ -2882,9 +2948,9 @@ test("updates trip potion carry controls and grouped potion summary", async ({ p
   test.setTimeout(60_000);
   await page.goto("/");
   const tabs = page.getByLabel("Workbench tabs");
-  await tabs.getByRole("button", { name: "Melee" }).click();
+  await tabs.getByRole("tab", { name: "Melee" }).click();
   await page.getByLabel("Boost", { exact: true }).selectOption("super_att");
-  await tabs.getByRole("button", { name: "Trip" }).click();
+  await tabs.getByRole("tab", { name: "Trip" }).click();
 
   const trip = page.locator('section[aria-label="Trip assumptions"]');
   const summary = page.locator('[aria-label="Trip summary"]');
@@ -2938,7 +3004,7 @@ test("updates trip potion carry controls and grouped potion summary", async ({ p
   });
 
   await page.reload();
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Trip" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Trip" }).click();
   const reloadedTrip = page.locator('section[aria-label="Trip assumptions"]');
   await expect(reloadedTrip.getByLabel("Single-dose")).toBeChecked();
   await expect(reloadedTrip.getByLabel("Potion vials")).toBeDisabled();
@@ -2949,9 +3015,9 @@ test("updates trip potion carry controls and grouped potion summary", async ({ p
 test("shows inactive trip potion recommendation states", async ({ page }) => {
   await page.goto("/");
   const tabs = page.getByLabel("Workbench tabs");
-  await tabs.getByRole("button", { name: "Melee" }).click();
+  await tabs.getByRole("tab", { name: "Melee" }).click();
   await page.getByLabel("Boost", { exact: true }).selectOption("none");
-  await tabs.getByRole("button", { name: "Trip" }).click();
+  await tabs.getByRole("tab", { name: "Trip" }).click();
 
   const trip = page.locator('section[aria-label="Trip assumptions"]');
   const recommendation = trip.getByLabel("Potion recommendation");
@@ -2961,10 +3027,10 @@ test("shows inactive trip potion recommendation states", async ({ page }) => {
   await expect(recommendation).toContainText("Select a general combat boost");
   await expect(applyRecommendation).toBeDisabled();
 
-  await tabs.getByRole("button", { name: "Melee" }).click();
+  await tabs.getByRole("tab", { name: "Melee" }).click();
   await page.getByLabel("Boost", { exact: true }).selectOption("super_att");
   await page.getByLabel("Sustained").uncheck();
-  await tabs.getByRole("button", { name: "Trip" }).click();
+  await tabs.getByRole("tab", { name: "Trip" }).click();
 
   await expect(recommendation).toContainText("Inactive");
   await expect(recommendation).toContainText("Sustained is off");
@@ -2975,7 +3041,7 @@ test("updates prayer restore detail controls and keeps the trip summary visible"
   page
 }) => {
   await page.goto("/");
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Trip" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Trip" }).click();
 
   const trip = page.locator('section[aria-label="Trip assumptions"]');
   const summary = page.locator('[aria-label="Trip summary"]');
@@ -3021,7 +3087,7 @@ test("updates prayer restore detail controls and keeps the trip summary visible"
   });
 
   await page.reload();
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Trip" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Trip" }).click();
   const reloadedTrip = page.locator('section[aria-label="Trip assumptions"]');
   await expect(reloadedTrip.getByLabel("Prayer mode")).toHaveValue("altar");
   await expect(reloadedTrip.getByLabel("Prayer restore")).toBeDisabled();
@@ -3033,7 +3099,7 @@ test("updates prayer restore detail controls and keeps the trip summary visible"
 test("updates per-monster loot settings and keeps them after reload", async ({ page }) => {
   await page.goto("/");
   await page.getByLabel("TARGET", { exact: true }).selectOption("green_dragon");
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Loot" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Loot" }).click();
 
   const loot = page.locator('section[aria-label="Current monster loot"]');
   const summary = loot.getByLabel("Loot action summary");
@@ -3063,7 +3129,7 @@ test("updates per-monster loot settings and keeps them after reload", async ({ p
 
   await page.reload();
   await page.getByLabel("TARGET", { exact: true }).selectOption("green_dragon");
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Loot" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Loot" }).click();
   const reloadedLoot = page.locator('section[aria-label="Current monster loot"]');
   await expect(reloadedLoot.getByLabel("High alch")).toHaveValue("enabled");
   await expect(reloadedLoot.getByLabel("Overhead", { exact: true })).toHaveValue("manual");
@@ -3076,7 +3142,7 @@ test("resets one Active modifiers loot row while preserving neighboring loot sta
 }) => {
   await page.goto("/");
   await page.getByLabel("TARGET", { exact: true }).selectOption("green_dragon");
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Loot" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Loot" }).click();
 
   const tabs = page.getByLabel("Workbench tabs");
   const loot = page.locator('section[aria-label="Current monster loot"]');
@@ -3090,7 +3156,7 @@ test("resets one Active modifiers loot row while preserving neighboring loot sta
   await loot.getByLabel("Talisman spot").selectOption("overground");
   await dragonBonesAction.selectOption("skip");
 
-  await tabs.getByRole("button", { name: "Stats" }).click();
+  await tabs.getByRole("tab", { name: "Stats" }).click();
   const assumptions = page.getByLabel("Active assumptions");
   await expect(assumptions).toContainText("Loot settings");
   await expect(assumptions).toContainText("Loot action overrides");
@@ -3104,7 +3170,7 @@ test("resets one Active modifiers loot row while preserving neighboring loot sta
   await expect(assumptions).toContainText("Loot settings");
   await expect(assumptions).toContainText("Loot action overrides");
 
-  await tabs.getByRole("button", { name: "Loot" }).click();
+  await tabs.getByRole("tab", { name: "Loot" }).click();
   await expect(loot.getByLabel("High alch")).toHaveValue("enabled");
   await expect(loot.getByLabel("Overhead", { exact: true })).toHaveValue("manual");
   await expect(loot.getByLabel("Overhead sec")).toHaveValue("12.5");
@@ -3120,7 +3186,7 @@ test("resets one Active modifiers loot row while preserving neighboring loot sta
 
 test("updates current monster loot actions, reset and optimize", async ({ page }) => {
   await page.goto("/");
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Loot" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Loot" }).click();
 
   const loot = page.locator('section[aria-label="Current monster loot"]');
   const table = page.getByRole("table", { name: "Current monster drops" });
@@ -3165,7 +3231,7 @@ test("updates current monster loot actions, reset and optimize", async ({ page }
 test("shows loot value composition, nested detail and action impact detail", async ({ page }) => {
   await page.goto("/");
   await page.getByLabel("TARGET", { exact: true }).selectOption("firegiant");
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Loot" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Loot" }).click();
 
   const loot = page.locator('section[aria-label="Current monster loot"]');
   const composition = loot.getByLabel("Loot value composition");
@@ -3211,14 +3277,14 @@ test("matches browser-rendered numeric snapshots for loot action and trip overri
   await page.goto("/");
   const tabs = page.getByLabel("Workbench tabs");
 
-  await tabs.getByRole("button", { name: "Loot" }).click();
+  await tabs.getByRole("tab", { name: "Loot" }).click();
   const drops = page.getByRole("table", { name: "Current monster drops" });
   await expect.poll(async () => drops.locator("tbody tr").count()).toBeGreaterThan(8);
   await page
     .getByLabel(/Action for Big bones/)
     .first()
     .selectOption("loot");
-  await tabs.getByRole("button", { name: "Compare" }).click();
+  await tabs.getByRole("tab", { name: "Compare" }).click();
   const lootAction = await resultMetricSnapshot(page);
 
   await page.waitForFunction(() => window.localStorage.getItem("index-sim:rewrite-setup"));
@@ -3235,7 +3301,7 @@ test("matches browser-rendered numeric snapshots for loot action and trip overri
     window.localStorage.setItem(key, JSON.stringify(setup));
   });
   await page.reload();
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Trip" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Trip" }).click();
 
   const trip = page.locator('section[aria-label="Trip assumptions"]');
   await expect(page.getByLabel("Monster", { exact: true })).toHaveValue("firegiant");
@@ -3251,7 +3317,7 @@ test("matches browser-rendered numeric snapshots for loot action and trip overri
     page.locator('[aria-label="Trip summary"]'),
     TRIP_NUMERIC_LABELS
   );
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Compare" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Compare" }).click();
   const tripManual = await resultMetricSnapshot(page);
 
   expect({
@@ -3298,7 +3364,7 @@ test("matches browser-rendered numeric snapshots for imported price sets", async
     await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
   });
   await page.goto("/");
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Settings" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Settings" }).click();
   const settings = page.locator('[aria-label="Price data settings"]');
   const priceSetSummary = settings.locator('[aria-label="Active PriceSet summary"]');
   const scheduledSummary = settings.locator('[aria-label="Scheduled price snapshot summary"]');
@@ -3336,7 +3402,7 @@ test("matches browser-rendered numeric snapshots for imported price sets", async
   await expect(settings).toContainText("Imported price set: Imported fixture prices");
   await expect(page.locator(".topbar")).toContainText("Imported fixture prices");
 
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Compare" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Compare" }).click();
   await expect(page.locator('[aria-label="Result price warnings"]')).toContainText(
     "Price warnings"
   );
@@ -3361,20 +3427,20 @@ test("matches browser-rendered numeric snapshots for imported price sets", async
   });
 
   await page.reload();
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Settings" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Settings" }).click();
   const reloadedSettings = page.locator('[aria-label="Price data settings"]');
   await expect(reloadedSettings.locator('[aria-label="Active PriceSet summary"]')).toContainText(
     "Label Imported fixture prices"
   );
   await expect(page.getByLabel("Price history summary")).toContainText("Snapshots 1");
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Compare" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Compare" }).click();
   const reloadedImportedPrices = await resultMetricSnapshot(page);
   expect(reloadedImportedPrices).toEqual(importedPrices);
 
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Loot" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Loot" }).click();
   await expect(page.locator('[aria-label="Loot price warnings"]')).toContainText("Price warnings");
 
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Economy" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Economy" }).click();
   await expect(page.locator('[aria-label="Economy price warnings"]')).toContainText(
     "Price warnings"
   );
@@ -3497,7 +3563,7 @@ test("keeps market UI scheduled-only when the compatibility sync API exists", as
   });
 
   await page.goto("/");
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Economy" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Economy" }).click();
   const market = page.locator('section[aria-label="Market price data"]');
 
   await expect(market.getByLabel("Scheduled price snapshot summary")).toContainText(
@@ -3556,7 +3622,7 @@ test("analyzes and manages browser-local price history in Economy", async ({ pag
   });
 
   await page.goto("/");
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Economy" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Economy" }).click();
 
   await expect(page.getByLabel("Price history summary")).toContainText("Snapshots 3");
   await expect(page.getByLabel("Price history summary")).toContainText("Moved 2");
@@ -3575,7 +3641,7 @@ test("analyzes and manages browser-local price history in Economy", async ({ pag
   await expect(page.getByRole("img", { name: "Big bones price trend", exact: true })).toBeVisible();
   await expect(page.getByLabel("Price points for Big bones")).toContainText("2026-07-04");
 
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Loot" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Loot" }).click();
   const bigBonesRow = page.getByRole("table", { name: "Current monster drops" }).getByRole("row", {
     name: /Big bones/
   });
@@ -3585,7 +3651,7 @@ test("analyzes and manages browser-local price history in Economy", async ({ pag
   await expect(localHistory).toContainText("350");
   await expect(localHistory).toContainText("500");
   await expect(localHistory).toContainText("-150");
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Economy" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Economy" }).click();
 
   await page.getByLabel("Item filter").fill("bones");
   await expect(page.getByRole("table", { name: "Price movers" })).toContainText("Big bones");
@@ -3634,7 +3700,7 @@ test("keeps shared scheduled price history read-only beside local comparisons", 
   });
 
   await page.goto("/");
-  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Economy" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Economy" }).click();
   const summary = page.getByLabel("Price history summary");
 
   await expect(summary).toContainText("Snapshots 3");

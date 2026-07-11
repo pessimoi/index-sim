@@ -6,7 +6,8 @@ import {
   useRef,
   useState,
   type ChangeEvent,
-  type FormEvent
+  type FormEvent,
+  type KeyboardEvent
 } from "react";
 import { ZodError } from "zod";
 import {
@@ -3767,6 +3768,28 @@ export function App() {
     setActiveTab(combatStyle);
     setCombatStyle(combatStyle);
   };
+  const activateWorkbenchTab = (tabId: WorkbenchTabId) => {
+    const tab = WORKBENCH_TABS.find((candidate) => candidate.id === tabId);
+    if (!tab) return;
+    setActiveTab(tab.id);
+    if ("combatStyle" in tab) setCombatStyle(tab.combatStyle);
+  };
+  const handleWorkbenchTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    let nextIndex: number | null = null;
+    if (event.key === "ArrowRight") nextIndex = (index + 1) % WORKBENCH_TABS.length;
+    if (event.key === "ArrowLeft") {
+      nextIndex = (index - 1 + WORKBENCH_TABS.length) % WORKBENCH_TABS.length;
+    }
+    if (event.key === "Home") nextIndex = 0;
+    if (event.key === "End") nextIndex = WORKBENCH_TABS.length - 1;
+    if (nextIndex == null) return;
+    event.preventDefault();
+    const nextTab = WORKBENCH_TABS[nextIndex]!;
+    activateWorkbenchTab(nextTab.id);
+    event.currentTarget.parentElement
+      ?.querySelector<HTMLButtonElement>(`#workbench-tab-${nextTab.id}`)
+      ?.focus();
+  };
 
   const reviewActiveAssumption = (tab: ActiveAssumptionReviewTarget) => {
     setActiveTab(tab);
@@ -4656,6 +4679,16 @@ export function App() {
 
   return (
     <main className="app-shell">
+      <a
+        className="skip-link"
+        href="#workbench-active-panel"
+        onClick={(event) => {
+          event.preventDefault();
+          document.getElementById("workbench-active-panel")?.focus();
+        }}
+      >
+        Skip to active workbench pane
+      </a>
       <header className="topbar">
         <div>
           <h1>2004scape Combat Simulator</h1>
@@ -5149,24 +5182,33 @@ export function App() {
             </div>
           </section>
 
-          <nav className="tab-bar" aria-label="Workbench tabs">
-            {WORKBENCH_TABS.map((tab) => (
+          <nav className="tab-bar" aria-label="Workbench tabs" role="tablist">
+            {WORKBENCH_TABS.map((tab, index) => (
               <button
                 key={tab.id}
+                id={`workbench-tab-${tab.id}`}
                 type="button"
+                role="tab"
                 className={activeTab === tab.id ? "active" : undefined}
-                aria-pressed={activeTab === tab.id}
-                onClick={() => {
-                  setActiveTab(tab.id);
-                  if ("combatStyle" in tab) setCombatStyle(tab.combatStyle);
-                }}
+                aria-selected={activeTab === tab.id}
+                aria-controls="workbench-active-panel"
+                tabIndex={activeTab === tab.id ? 0 : -1}
+                onClick={() => activateWorkbenchTab(tab.id)}
+                onKeyDown={(event) => handleWorkbenchTabKeyDown(event, index)}
               >
                 {tab.label}
               </button>
             ))}
           </nav>
 
-          <section className="active-pane" aria-label="Active workbench pane">
+          <section
+            id="workbench-active-panel"
+            className="active-pane"
+            role="tabpanel"
+            aria-label="Active workbench pane"
+            aria-labelledby={`workbench-tab-${activeTab}`}
+            tabIndex={-1}
+          >
             <section className="dense-workbench" aria-label="Dense combat spreadsheet">
               <section
                 className="compact-setup-strip"
@@ -8413,12 +8455,39 @@ export function App() {
                             key={row.monsterId}
                             className={active ? "active" : undefined}
                             aria-selected={active}
-                            tabIndex={0}
+                            aria-current={active ? "true" : undefined}
+                            data-monster-id={row.monsterId}
+                            tabIndex={active ? 0 : -1}
                             onClick={() => selectTarget(row.monsterId)}
                             onKeyDown={(event) => {
-                              if (event.key !== "Enter" && event.key !== " ") return;
-                              event.preventDefault();
-                              selectTarget(row.monsterId);
+                              if (
+                                event.key === "ArrowDown" ||
+                                event.key === "ArrowUp" ||
+                                event.key === "Home" ||
+                                event.key === "End"
+                              ) {
+                                event.preventDefault();
+                                const rows = Array.from(
+                                  event.currentTarget.parentElement?.querySelectorAll<HTMLTableRowElement>(
+                                    "tr[data-monster-id]"
+                                  ) ?? []
+                                );
+                                const currentIndex = rows.indexOf(event.currentTarget);
+                                const nextIndex =
+                                  event.key === "Home"
+                                    ? 0
+                                    : event.key === "End"
+                                      ? rows.length - 1
+                                      : event.key === "ArrowDown"
+                                        ? (currentIndex + 1) % rows.length
+                                        : (currentIndex - 1 + rows.length) % rows.length;
+                                rows[nextIndex]?.focus();
+                                return;
+                              }
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                selectTarget(row.monsterId);
+                              }
                             }}
                           >
                             {DENSE_TABLE_COLUMNS.map((column) => {

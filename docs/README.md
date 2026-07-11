@@ -12,6 +12,7 @@ This directory is the project memory layer for humans and AI agents. It keeps cu
 - UI parity specification: [technical/ui-parity-spec.md](technical/ui-parity-spec.md)
 - Duel setup diff specification: [technical/duel-setup-diff-spec.md](technical/duel-setup-diff-spec.md)
 - Stats source distribution specification: [technical/stats-source-distribution-spec.md](technical/stats-source-distribution-spec.md)
+- Accessibility and keyboard specification: [technical/accessibility-keyboard-spec.md](technical/accessibility-keyboard-spec.md)
 - Legacy Planner parity specification: [technical/legacy-planner-parity-spec.md](technical/legacy-planner-parity-spec.md)
 - Shareable setup permalink specification: [technical/shareable-setup-permalink-spec.md](technical/shareable-setup-permalink-spec.md)
 - Visual regression specification: [technical/visual-regression-spec.md](technical/visual-regression-spec.md)
@@ -42,6 +43,7 @@ These files are useful evidence, but they are not the living source of truth. Pr
 - Legacy-to-rewrite UI layout and workflow parity requirements belong in [technical/ui-parity-spec.md](technical/ui-parity-spec.md).
 - Duel setup and calculated-impact comparison requirements belong in [technical/duel-setup-diff-spec.md](technical/duel-setup-diff-spec.md).
 - Special-attack and cannon event-distribution requirements belong in [technical/stats-source-distribution-spec.md](technical/stats-source-distribution-spec.md).
+- Workbench and Dense keyboard interaction requirements belong in [technical/accessibility-keyboard-spec.md](technical/accessibility-keyboard-spec.md).
 - Optional archived Planner behavior comparison requirements belong in [technical/legacy-planner-parity-spec.md](technical/legacy-planner-parity-spec.md).
 - Hiscores and live market sync requirements belong in [technical/live-integrations-spec.md](technical/live-integrations-spec.md).
 - Hiscores provider/runtime execution work belongs in [technical/hiscores-live-implementation-spec.md](technical/hiscores-live-implementation-spec.md).
