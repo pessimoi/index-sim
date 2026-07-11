@@ -59,7 +59,7 @@ describe("generated runtime adapter", () => {
       "Scheduled static prices + generated item fallbacks"
     );
     expect(result.context.priceSet.source).toBe("scraped");
-    expect(result.context.priceSet.itemPrices.rune_scimitar).toBe(23400);
+    expect(result.context.priceSet.itemPrices.rune_scimitar).toBe(22000);
     expect(result.context.priceSet.itemPrices["1dose2defense"]).toBe(132);
     expect(result.context.priceSet.alchValues.adamant_spear).toBe(1248);
     expect(result.context.priceSet.provenance?.notes).toContain(

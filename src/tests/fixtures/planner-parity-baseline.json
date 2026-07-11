@@ -137,11 +137,11 @@
       "mode": "current-product",
       "result": "different",
       "classification": "source-data-delta",
-      "reason": "The training order matches reference-context behavior. Additional current-product numeric or configuration deltas come from the committed Revision 274 game and price context layered on the accepted rewrite Planner path.",
-      "source": "docs/technical/architecture.md; docs/project/decisions.md D-059/D-060",
+      "reason": "The training order and bounded difference set remain unchanged. The current-product metric values and digests reflect the committed scheduled price snapshot layered on the Revision 274 game context.",
+      "source": "prices.json; price-history.json; docs/technical/architecture.md; docs/project/decisions.md D-059/D-060",
       "legacyDigest": "9dbd0105c727379a",
-      "rewriteDigest": "a176ede2c5e2071d",
-      "differenceDigest": "b4e10d95f97006a3",
+      "rewriteDigest": "60c825e44c2d7dbe",
+      "differenceDigest": "55d993d3bc8b05f8",
       "differenceCount": 17
     },
     {

@@ -106,17 +106,18 @@ The gate skipped npm audit under its documented network-disabled policy; no
 browser, baseline-write, snapshot-refresh or deployment command is part of this
 audit-only goal.
 
-The D-081/D-082 follow-up passes 595/595 unit tests and 19/19 unchanged legacy
-goldens plus typecheck, production build/artifact validation, ESLint, Prettier
-and `git diff --check`. The artifact contains 8 files / 2 assets, 1,805,663
-bytes and SHA-256
-`8fd70f2174ccc9dc1ba8949d794788f1b72e7b1c7c6d32c855f01ebf9c049a5c`.
+The D-081/D-082 follow-up, rebased onto scheduled-price commit `af0d2a4`,
+passes 595/595 unit tests and 19/19 unchanged legacy goldens plus typecheck,
+production build/artifact validation, ESLint, Prettier and `git diff --check`.
+The artifact contains 8 files / 2 assets, 1,807,135 bytes and SHA-256
+`08465aa5092b10b79f42e6a4110a002a8e582e1ca27f23ab85dcd164aad235d1`.
 Runtime readiness is green with blocking `monsters.incomingAttacks` coverage at
 63/63, and the read-only numeric audit reports 5,958 cross-path comparisons
 with zero mismatches and no unclassified legacy findings. Sandbox-external
 localhost execution passed the complete Chromium gate 74/74 and the reviewed
 Darwin visual gate 20/20. The visual update was limited to the documented
-D-075–D-082 review and followed by clean read-only comparison runs.
+D-075–D-082 and scheduled-price integration reviews and followed by a clean
+read-only comparison run.
 
 ## Cloudflare deployment validation
 

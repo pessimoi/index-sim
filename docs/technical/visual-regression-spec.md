@@ -227,6 +227,20 @@ path or raw local diagnostic appeared in the actual images. The candidate
 update remains reversible until the generated PNG set and two clean read-only
 runs have also been reviewed.
 
+### Scheduled-price integration addendum
+
+After the local commits were rebased onto scheduled-price commit `af0d2a4`, a
+read-only comparison passed 15/20 scenarios. The five diffs were limited to
+Dense Compare GP columns, Fire Giant Loot values, Economy scheduled snapshot
+metadata/movers and Settings Price data metadata. Their actual/diff images were
+reviewed against the committed `prices.json` and `price-history.json` change;
+layout, controls, source warnings and fixture/privacy boundaries were
+unchanged. A targeted explicit update is therefore authorized for Dense
+Compare desktop, Loot desktop/mobile, Economy desktop and Settings desktop,
+including detail snapshots owned by those scenarios. All other baselines must
+remain byte-identical. The targeted write changed only those nine owned PNGs;
+the following full read-only comparison passed 20/20 scenarios.
+
 ## Diff policy
 
 Use Playwright `toHaveScreenshot` with:
@@ -291,7 +305,9 @@ functional case passed 1/1 and the complete gates passed 74/74 functional and
 20/20 visual against 31 snapshots. The focused keyboard-navigation test passed
 1/1 after the skip-link hidden-state fix. Typecheck, lint, format check and
 `git diff --check` also passed. The preview/build emitted only the existing
-large-chunk warning.
+large-chunk warning. After integration with scheduled-price commit `af0d2a4`,
+the reviewed nine-PNG price refresh was followed by another clean 20/20 visual
+comparison; the functional gate remained 74/74.
 
 ## Rollout
 
