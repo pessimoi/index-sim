@@ -4,18 +4,38 @@ Revision 274
 
 Prices updated 3 July 2026
 
-## Run
+## Quick start
 
 The production app path is the Vite/React rewrite:
 
-Use Node 22 and npm 10; `.nvmrc`, `package.json` and the repository workflow use
-the same major-version contract.
+Use Node 22 and npm 10. `.nvmrc`, `package.json` and the repository workflow use
+the same major-version contract. From a fresh clone:
 
 ```sh
+nvm use
+npm ci
+npm run verify
 npm run dev
+```
+
+Open the local URL printed by Vite. To exercise the production artifact locally:
+
+```sh
 npm run build
 npm run preview
 ```
+
+Normal install, verification, build and runtime use committed generated data and
+need no `.sources/` checkout, environment variables, Cloudflare credentials or
+database. The optional raw game-source checkout is needed only for a reviewed
+game revision update; follow the runbook in
+[docs/operations/README.md](docs/operations/README.md#game-revision-bump-pr-runbook).
+
+`npm run verify` is the authoritative repository handoff gate. It runs typecheck,
+the full unit and explicit golden suites, production build and artifact checks,
+lint, formatting, dependency audit when network access is available, and
+`git diff --check`. Browser and visual suites remain separate because they need
+a compatible Playwright/browser environment.
 
 After a production build, verify the D-066 Cloudflare artifact contract with
 `npm run deploy:verify-artifact`.

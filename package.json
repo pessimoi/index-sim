@@ -8,6 +8,7 @@
   },
   "type": "module",
   "scripts": {
+    "verify": "$NODE scripts/run-cloudflare-release.mjs gate",
     "dev": "$NODE node_modules/vite/bin/vite.js --config vite.config.ts",
     "build": "$NODE node_modules/typescript/bin/tsc -b && $NODE node_modules/vite/bin/vite.js build --config vite.config.ts",
     "preview": "$NODE node_modules/vite/bin/vite.js preview --config vite.config.ts",

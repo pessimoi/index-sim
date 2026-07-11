@@ -21,6 +21,7 @@ This directory is the project memory layer for humans and AI agents. It keeps cu
 - Public deployment specification: [operations/public-deployment-spec.md](operations/public-deployment-spec.md)
 - Roadmap, backlog, decisions and ideas: [project/README.md](project/README.md)
 - Current worktree delivery specification: [project/worktree-delivery-spec.md](project/worktree-delivery-spec.md)
+- Repository handoff hardening specification: [project/handoff-hardening-spec.md](project/handoff-hardening-spec.md)
 
 ## Supporting audit snapshots
 

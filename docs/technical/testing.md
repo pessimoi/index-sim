@@ -12,7 +12,16 @@ Game revision bumps are development changes, not scheduled data refreshes. The c
 
 ## Rewrite scaffold commands
 
-Run these for the new `src/` scaffold:
+The authoritative repository handoff and pre-release gate is:
+
+```sh
+npm run verify
+```
+
+It reuses the same implementation as `npm run deploy:cloudflare:build` without
+requiring a Cloudflare account. It runs the checks below, production artifact
+validation, dependency audit when network access is available and
+`git diff --check`:
 
 ```sh
 npm run typecheck
@@ -21,6 +30,8 @@ npm run build
 npm run lint
 npm run format:check
 ```
+
+Playwright and visual suites remain separate environment-dependent gates.
 
 Node 22 and npm 10 are the repository runtime contract. `.nvmrc`, the root
 `package.json` engines and the scheduled workflow use the same major versions.
@@ -108,7 +119,7 @@ For live integration release-copy audits, also run the narrower command below an
 rg -n "run_sim.py|/api/prices|/api/scrape|/api/hiscores" index.html legacy/index.html src views.jsx planner.jsx market.js docs
 ```
 
-The npm scripts use npm's `$NODE` value for Node-based tool commands. This keeps commands on the active NVM Node version even if a parent `node_modules/.bin/node` appears earlier in `PATH`.
+The npm scripts use npm's `$NODE` value for Node-based tool commands. This keeps commands on the active NVM Node version even if a parent `node_modules/.bin/node` appears earlier in `PATH`. `npm run verify` is implemented by the shared gate mode in `scripts/run-cloudflare-release.mjs`; update that one command sequence instead of maintaining separate handoff and deploy checklists in code.
 
 Use repository-local caches and helper files for tests. For example, this project uses `.npm-cache` for npm commands. Do not place project scripts in `/tmp` or another external scratch directory unless a human explicitly approves.
 

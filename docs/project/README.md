@@ -11,6 +11,7 @@ This section owns planning material. Keep it light and keep implementation detai
 - [idea-inbox.md](idea-inbox.md): ideas that are not ready for implementation.
 - [planner-parity/current.md](planner-parity/current.md): generated current legacy Planner behavior audit evidence.
 - [worktree-delivery-spec.md](worktree-delivery-spec.md): review, commit grouping, validation and safe `origin/master` delivery plan for the current accumulated worktree.
+- [handoff-hardening-spec.md](handoff-hardening-spec.md): fresh-clone onboarding, repository verification, source-pin maintenance and technical handoff acceptance.
 
 ## Rules
 

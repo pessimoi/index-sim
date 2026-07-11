@@ -95,6 +95,7 @@ Current state:
 
 - Rewrite build: `npm run build`.
 - Rewrite preview: `npm run preview`.
+- Repository handoff/release gate: `npm run verify`.
 - D-066 Cloudflare release gate: `npm run deploy:cloudflare:build`.
 - Exact Wrangler preview upload: `npm run deploy:cloudflare:preview`.
 - Exact Wrangler production deploy: `npm run deploy:cloudflare`.
@@ -192,6 +193,32 @@ These commands are read-only evidence paths for reviewing the same raw parser us
 
 ### Game revision bump PR runbook
 
+Ordinary install, verification, build and runtime use the committed generated
+snapshot and do not need the raw source checkout. Only create the gitignored
+checkout when reviewing a new game revision:
+
+```sh
+git clone --filter=blob:none https://github.com/LostCityRS/Content.git .sources/lostcity-content
+SOURCE_COMMIT="$(node -p "JSON.parse(require('fs').readFileSync('src/data/generated/source-pin.json', 'utf8')).source.commit")"
+git -C .sources/lostcity-content checkout --detach "$SOURCE_COMMIT"
+git -C .sources/lostcity-content rev-parse HEAD
+```
+
+The final `rev-parse` value must equal `source.commit` in
+`src/data/generated/source-pin.json` before reproducing the current snapshot.
+For later revisions, fetch and review the intended upstream commit before
+running the generator; the generator writes a new pin as part of the reviewed
+change.
+
+[LostCityRS/Content](https://github.com/LostCityRS/Content#license) states that
+its source code uses the MIT License but its included assets are Jagex Ltd.
+intellectual property and are not covered by that software license. Keep the
+checkout gitignored, do not copy raw source bodies or assets into this
+repository, and commit only the normalized outputs allowed below. This does not
+license the retained `index-rs/index-sim` code or this repository as a whole;
+public distribution still requires the separate rights decision recorded in
+[the handoff specification](../project/handoff-hardening-spec.md#licensing-and-distribution-boundary).
+
 Use this checklist for a revision bump branch or PR:
 
 1. Update or pin the gitignored `.sources/lostcity-content/` checkout to the intended LostCityRS/Content revision.
@@ -246,7 +273,7 @@ The latest release-evidence check was refreshed through 2026-07-11 for the sourc
 For repository handoff or a trusted-tester build, use this checklist. It is intentionally lighter than operating a public instance or full CI/CD pipeline:
 
 1. Confirm intended price snapshot date.
-2. Run checks from [../technical/testing.md](../technical/testing.md).
+2. Run `npm ci` from a fresh checkout and then the authoritative `npm run verify` gate from [../technical/testing.md](../technical/testing.md).
 3. Smoke test the main UI in a browser if possible.
 4. Confirm no stale generated or local-only files are included accidentally.
 5. Run the live integration release copy audit and classify any remaining `run_sim.py` or legacy `/api/*` hits.

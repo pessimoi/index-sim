@@ -181,8 +181,7 @@ The detailed rewrite contract is owned by [rewrite-spec.md](rewrite-spec.md).
 - A future adopter may choose a custom domain after its preview/production evidence passes; no domain decision is required by this repository.
 - Which authoritative upstream fields should map item requirements to app skill ids, and what evidence is sufficient to remove the D-051 fallback?
 - Should the four quest-gated drops and 21 clue-scroll tertiary rows enter the snapshot, and under which explicit policy?
-- What exact live `markets.lostcity.rs` API/scrape response contract should the accepted GitHub Actions price snapshot writer rely on?
-- What is the deployment target? The architecture is static-first and provider-agnostic until live integration constraints are known.
+- If the accepted `markets.lostcity.rs/items/{slug}` Inertia contract changes, what reviewed replacement contract should supersede D-062?
 - Should future Legacy Migration work broaden beyond the D-042-compatible `sim_input_v3.monsterSetups` and `sim_input_v3.cannonByMonster` import, for example to older shapes or additional legacy-only UI state?
 - Whether the eventual public UI-facing contract should be renamed back to `SimulationResult` remains open. Current code uses `CombatSimulationResult` for the combat-only slice and `FullSimulationResult` for the composed foundation.
 - D-048 keeps old planner state such as `sim_planner_v1` review-only/not migrated for V1. D-049 keeps full legacy price-history payloads review-only/not migrated for V1; any later full history import, shared/server-managed history or reset-only policy requires a separate product/storage decision.

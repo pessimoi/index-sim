@@ -12,7 +12,7 @@ function run(executable, args) {
     env: { ...process.env, NODE: process.execPath }
   });
   if (result.error) {
-    console.error("Cloudflare release command could not start");
+    console.error("Repository verification command could not start");
     process.exit(1);
   }
   if (result.status !== 0) process.exit(result.status ?? 1);
@@ -50,7 +50,7 @@ if (command === "gate") {
 
   const npmCli = process.env.npm_execpath;
   if (!npmCli) {
-    console.error("Cloudflare release gate requires npm_execpath");
+    console.error("Repository verification requires npm_execpath");
     process.exit(1);
   }
   if (process.env.CODEX_SANDBOX_NETWORK_DISABLED === "1") {

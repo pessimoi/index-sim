@@ -10,7 +10,7 @@
 - [shareable-setup-permalink-spec.md](shareable-setup-permalink-spec.md): static, review-before-load setup sharing contract.
 - [visual-regression-spec.md](visual-regression-spec.md): deterministic Playwright screenshot coverage and baseline policy.
 - [live-integrations-spec.md](live-integrations-spec.md): hiscores lookup and live market sync product/API specification.
-- [hiscores-live-implementation-spec.md](hiscores-live-implementation-spec.md): decision prerequisites and implementation/evidence plan for the remaining live Hiscores provider/runtime slice.
+- [hiscores-live-implementation-spec.md](hiscores-live-implementation-spec.md): implemented Hiscores provider/runtime contract and adopter live-evidence runbook.
 - [testing.md](testing.md): current validation commands and future test strategy.
 
 ## Related evidence

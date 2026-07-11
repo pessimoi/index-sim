@@ -184,16 +184,13 @@ Do not rebuild different source during promotion if the provider can promote an 
 Minimum pre-deploy gate:
 
 ```sh
-npm run typecheck
-npm run test
-npm run test:golden
-npm run build
-npm run deploy:verify-artifact
-npm run lint
-npm run format:check
-npm audit
-git diff --check
+npm ci
+npm run verify
 ```
+
+`npm run verify` owns the expanded command sequence in
+[testing.md](../technical/testing.md); do not maintain a second provider-specific
+list here.
 
 Run functional and visual Playwright gates in a compatible environment before production promotion:
 
