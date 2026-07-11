@@ -1,6 +1,6 @@
 # Repository handoff hardening specification
 
-- Status: accepted for implementation
+- Status: complete
 - Date: 2026-07-11
 - Owner: project docs
 - Source: adopter-ready completion boundary D-067
@@ -162,6 +162,30 @@ npm run verify
 Playwright and visual suites remain separate because browser installation and
 platform-specific baselines are environment-dependent. Existing reviewed
 browser evidence remains valid when this goal changes only scripts and docs.
+
+## Completion evidence
+
+Commit `43f8b5f` was validated on 2026-07-11 in a detached repository-local
+worktree created from that exact commit:
+
+- the checkout initially had no `.sources`, `node_modules`, `dist`, `.vite` or
+  test output;
+- explicit `nvm use` selected Node `22.19.0` and npm `10.9.3`;
+- `npm ci` installed 237 packages from `package-lock.json` and reported zero
+  vulnerabilities;
+- `npm run verify` passed 34 files/523 tests, the explicit 19-test golden suite,
+  typecheck, build, artifact validation, lint, formatting and diff hygiene;
+- a separate network-enabled `npm audit` reported zero vulnerabilities;
+- the artifact retained 7 files, 2 hashed assets, 1,384,153 bytes, 13 market
+  history snapshots and SHA-256
+  `a8bd9ee19cfa6c17ff659006cbde54e50ab846e2c93e276098fa2af35bf4d2ce`;
+- `.sources` remained absent while `dist/index.html` was produced from committed
+  generated data;
+- the temporary worktree was removed and the primary worktree stayed clean.
+
+The optional source runbook command was also checked against the current local
+gitignored checkout: its `HEAD` matched `source.commit`
+`376072662e78a314bf35bb18815be39521491a6b` from the committed source pin.
 
 ## Done when
 
