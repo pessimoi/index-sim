@@ -1525,9 +1525,14 @@ describe("rewrite UI view models", () => {
     expect(rangedSpecialDetail).toMatchObject({
       status: "modeled",
       statusLabel: "modeled",
-      histogram: null,
+      histogramScopeLabel: "Per special hit",
       warnings: []
     });
+    expect(rangedSpecialDetail?.histogram).toMatchObject({
+      hitChance: rangedResult.combat.specialAttack?.hitChance,
+      maxHit: rangedResult.combat.specialAttack?.maxHit
+    });
+    expect(rangedSpecialDetail?.histogram?.probabilityTotal).toBeCloseTo(1);
     expect(rangedSpecialMetrics.get("specs-hr")?.numericValue).toBeGreaterThan(0);
     expect(rangedSpecialMetrics.get("spec-weapon")?.value).toBe("Magic shortbow");
     expect(rangedSpecialMetrics.get("dps-with-spec")?.numericValue).toBe(
@@ -1576,9 +1581,13 @@ describe("rewrite UI view models", () => {
       label: "Special attack",
       status: "modeled",
       statusLabel: "modeled",
-      histogram: null,
+      histogramScopeLabel: "Per special hit",
       warnings: []
     });
+    expect(specialDetail?.histogram?.averageHit).toBeCloseTo(
+      (result.combat.specialAttack?.expPerSpec ?? 0) / (result.combat.specialAttack?.hits ?? 1)
+    );
+    expect(specialDetail?.histogram?.probabilityTotal).toBeCloseTo(1);
     expect(specialMetrics.get("dps-gain")?.numericValue).toBe(
       result.combat.specialAttack?.dpsGainPct
     );
@@ -1650,9 +1659,12 @@ describe("rewrite UI view models", () => {
     expect(statsSourceDetail(halberdResult, "special-attack")).toMatchObject({
       status: "partial",
       statusLabel: "partial",
-      histogram: null,
+      histogramScopeLabel: "Per special hit",
       warnings: halberdResult.specialWarnings
     });
+    expect(
+      statsSourceDetail(halberdResult, "special-attack")?.histogram?.probabilityTotal
+    ).toBeCloseTo(1);
     expect(statsSourceDetail(halberdResult, "special-attack")?.notes.join("\n")).toContain(
       warningText
     );
@@ -2202,8 +2214,16 @@ describe("rewrite UI view models", () => {
       label: "Cannon",
       status: "modeled",
       statusLabel: "modeled",
-      histogram: null
+      histogramScopeLabel: "Per fired cannonball"
     });
+    expect(withCannonDetail?.histogram).toMatchObject({
+      hitChance: withCannon.combat.hitChance,
+      maxHit: withCannon.trip.cannon?.maxBall
+    });
+    expect(withCannonDetail?.histogram?.averageHit).toBeCloseTo(
+      (withCannon.trip.cannon?.cannonDps ?? 0) / (withCannon.trip.cannon?.ballsPerSec ?? 1)
+    );
+    expect(withCannonDetail?.histogram?.probabilityTotal).toBeCloseTo(1);
     expect(withCannonMetrics.get("effective-targets")?.numericValue).toBe(
       withCannon.trip.cannon?.effTargets
     );

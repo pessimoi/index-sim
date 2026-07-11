@@ -239,6 +239,7 @@ export interface StatsSourceDetailViewModel {
   notes: string[];
   warnings: CalculationWarningViewModel[];
   histogram: HitDistributionViewModel | null;
+  histogramScopeLabel: string | null;
 }
 
 export interface StatsSourceBreakdownViewModel {
@@ -2322,6 +2323,7 @@ function statsSourceDetail(input: {
   notes?: readonly string[];
   warnings?: readonly CalculationWarningViewModel[];
   histogram?: HitDistributionViewModel | null;
+  histogramScopeLabel?: string | null;
 }): StatsSourceDetailViewModel {
   return {
     id: input.row.id,
@@ -2331,7 +2333,8 @@ function statsSourceDetail(input: {
     metrics: input.metrics ?? statsSourceBaseMetrics(input.row),
     notes: [...(input.notes ?? input.row.notes)],
     warnings: [...(input.warnings ?? [])],
-    histogram: input.histogram ?? null
+    histogram: input.histogram ?? null,
+    histogramScopeLabel: input.histogramScopeLabel ?? null
   };
 }
 
@@ -2382,6 +2385,23 @@ function createStatsSourceBreakdownViewModel(input: {
       ? "inactive"
       : "modeled"
     : "inactive";
+  const specialHistogram = special
+    ? createHitDistributionFromValues({
+        hitChance: special.hitChance,
+        averageHit: special.hits > 0 ? special.expPerSpec / special.hits : Number.NaN,
+        maxHit: special.maxHit,
+        peakMaxHit: special.maxHit
+      })
+    : null;
+  const cannonHistogram =
+    cannon && !cannon.idle && cannon.ballsPerSec > 0
+      ? createHitDistributionFromValues({
+          hitChance: combat.hitChance,
+          averageHit: cannon.cannonDps / cannon.ballsPerSec,
+          maxHit: cannon.maxBall,
+          peakMaxHit: cannon.maxBall
+        })
+      : null;
   const normalRow = statsSourceBreakdownRow({
     id: "normal-attack",
     label: "Normal attack",
@@ -2524,17 +2544,22 @@ function createStatsSourceBreakdownViewModel(input: {
       statsSourceDetail({
         row: normalRow,
         warnings: input.moneyWarnings,
-        histogram: input.hitDistribution
+        histogram: input.hitDistribution,
+        histogramScopeLabel: "Per normal attack"
       }),
       statsSourceDetail({
         row: specialRow,
         metrics: specialMetrics,
-        warnings: input.specialWarnings
+        warnings: input.specialWarnings,
+        histogram: specialHistogram,
+        histogramScopeLabel: specialHistogram ? "Per special hit" : null
       }),
       statsSourceDetail({
         row: cannonRow,
         metrics: cannonMetrics,
-        warnings: cannon ? input.moneyWarnings : []
+        warnings: cannon ? input.moneyWarnings : [],
+        histogram: cannonHistogram,
+        histogramScopeLabel: cannonHistogram ? "Per fired cannonball" : null
       })
     ]
   };
@@ -2649,15 +2674,24 @@ function createTripBankingSummaryViewModel(
   };
 }
 
-function createHitDistributionViewModel(
-  combat: ReturnType<typeof simulateCombat>
-): HitDistributionViewModel {
-  const distribution = createHitDistribution({
-    hitChance: combat.hitChance,
-    averageHit: combat.avgHit,
-    maxHit: combat.maxHit,
-    peakMaxHit: combat.peakMaxHit
-  });
+function createHitDistributionFromValues(input: {
+  hitChance: number;
+  averageHit: number;
+  maxHit: number;
+  peakMaxHit: number;
+}): HitDistributionViewModel | null {
+  if (
+    !Number.isFinite(input.hitChance) ||
+    !Number.isFinite(input.averageHit) ||
+    !Number.isFinite(input.maxHit) ||
+    !Number.isFinite(input.peakMaxHit) ||
+    input.averageHit < 0 ||
+    input.maxHit < 0 ||
+    input.peakMaxHit < 0
+  ) {
+    return null;
+  }
+  const distribution = createHitDistribution(input);
   const maxProbability = Math.max(...distribution.buckets.map((bucket) => bucket.probability), 0);
 
   return {
@@ -2689,6 +2723,21 @@ function createHitDistributionViewModel(
       };
     })
   };
+}
+
+function createHitDistributionViewModel(
+  combat: ReturnType<typeof simulateCombat>
+): HitDistributionViewModel {
+  const distribution = createHitDistributionFromValues({
+    hitChance: combat.hitChance,
+    averageHit: combat.avgHit,
+    maxHit: combat.maxHit,
+    peakMaxHit: combat.peakMaxHit
+  });
+  if (!distribution) {
+    throw new Error("Current combat result has invalid hit distribution values.");
+  }
+  return distribution;
 }
 
 function finiteNumberOrNull(value: number): number | null {

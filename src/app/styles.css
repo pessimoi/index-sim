@@ -991,6 +991,50 @@ th {
   overflow-wrap: anywhere;
 }
 
+.source-detail-distribution {
+  border-top: 1px solid #26303d;
+  display: grid;
+  gap: 0.55rem;
+  min-width: 0;
+  padding-top: 0.55rem;
+}
+
+.source-detail-distribution-heading {
+  align-items: end;
+  display: flex;
+  gap: 0.5rem;
+  justify-content: space-between;
+}
+
+.source-detail-distribution-heading h4 {
+  color: #d8e2f0;
+  font-size: 0.74rem;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.source-detail-distribution-heading span {
+  color: #81d5bd;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.source-detail-distribution .hit-distribution-summary {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.source-detail-distribution .metric {
+  min-height: 2.6rem;
+}
+
+.source-detail-distribution .metric strong {
+  font-size: 1rem;
+}
+
+.source-detail-distribution .hit-bucket {
+  grid-template-columns: 3.8rem minmax(0, 1fr) 3.8rem auto;
+}
+
 .combat-roll-panel {
   border-bottom: 1px solid #26303d;
   padding-bottom: 0.75rem;

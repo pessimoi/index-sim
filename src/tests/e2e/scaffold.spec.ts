@@ -1985,6 +1985,14 @@ test("selects special attacks and shows special metrics", async ({ page }) => {
   await expect(specialDetail).toContainText("DPS with spec");
   await expect(specialDetail).toContainText("DPS gain");
   await expect(specialDetail).toContainText("Special attack XP is included in player combat XP/hr");
+  const specialDistribution = specialDetail.getByRole("region", {
+    name: "Special attack damage distribution"
+  });
+  await expect(specialDistribution).toContainText("Per special hit");
+  await expect(specialDistribution).toContainText("Average hit");
+  await expect(
+    specialDistribution.getByRole("list", { name: "Special attack damage distribution buckets" })
+  ).not.toBeEmpty();
   await expect(
     page
       .getByRole("region", { name: "Source breakdown", exact: true })
@@ -2630,6 +2638,18 @@ test("enables cannon for the selected monster and shows cannon rates", async ({ 
   await expect(cannon.getByText("active")).toBeVisible();
   await page.getByLabel("Workbench tabs").getByRole("button", { name: "Compare" }).click();
   await expect(page.getByLabel("Simulation results")).toContainText("SUPPLY/KILL");
+  await page.getByLabel("Workbench tabs").getByRole("button", { name: "Stats" }).click();
+  const cannonDetail = page
+    .getByRole("list", { name: "Source detail panels" })
+    .getByRole("listitem", { name: /Cannon detail: modeled/i });
+  const cannonDistribution = cannonDetail.getByRole("region", {
+    name: "Cannon damage distribution"
+  });
+  await expect(cannonDistribution).toContainText("Per fired cannonball");
+  await expect(cannonDistribution).toContainText("Max hit");
+  await expect(
+    cannonDistribution.getByRole("list", { name: "Cannon damage distribution buckets" })
+  ).not.toBeEmpty();
   await page.waitForFunction(() => {
     const saved = window.localStorage.getItem("index-sim:rewrite-setup") ?? "";
     return (

@@ -276,6 +276,7 @@ import {
   type DuelMatrixMetricId,
   type DuelMatrixViewModel,
   type CalculationWarningViewModel,
+  type HitDistributionViewModel,
   type MonsterCardViewModel,
   type PlannerGearPoolEditorViewModel,
   type PlannerPanelViewModel,
@@ -1311,6 +1312,50 @@ function orderedStatsSourceDetailMetrics(detail: StatsSourceDetailViewModel) {
   });
 }
 
+function HitDistributionChart({
+  distribution,
+  ariaLabel,
+  showPeakBucket = false
+}: {
+  distribution: HitDistributionViewModel;
+  ariaLabel: string;
+  showPeakBucket?: boolean;
+}) {
+  const summary = [
+    { label: "Hit chance", value: distribution.hitChanceLabel, tone: "teal" },
+    { label: "Average hit", value: distribution.averageHitLabel },
+    { label: "Max hit", value: distribution.maxHitLabel }
+  ];
+  if (showPeakBucket) {
+    summary.push({ label: "Peak bucket", value: formatNumber(distribution.peakMaxHit) });
+  }
+
+  return (
+    <>
+      <div className="hit-distribution-summary">{metricList(summary)}</div>
+      <div className="hit-histogram" role="list" aria-label={ariaLabel}>
+        {distribution.buckets.map((bucket) => (
+          <div
+            className={`hit-bucket ${bucket.isMiss ? "miss" : ""} ${
+              bucket.isMaxHit ? "max-hit" : ""
+            }`}
+            role="listitem"
+            aria-label={bucket.ariaLabel}
+            key={bucket.id}
+          >
+            <span className="hit-bucket-label">{bucket.label}</span>
+            <span className="hit-bucket-bar" aria-hidden="true">
+              <span style={{ width: `${bucket.widthPercent}%` }} />
+            </span>
+            <strong>{bucket.percentLabel}</strong>
+            {bucket.isMaxHit && <em>max hit</em>}
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
 function StatsSourceDetailCard({ detail }: { detail: StatsSourceDetailViewModel }) {
   const metrics = orderedStatsSourceDetailMetrics(detail);
 
@@ -1345,6 +1390,21 @@ function StatsSourceDetailCard({ detail }: { detail: StatsSourceDetailViewModel 
             <li key={note}>{note}</li>
           ))}
         </ul>
+      ) : null}
+      {detail.histogram && detail.histogramScopeLabel ? (
+        <section
+          className="source-detail-distribution"
+          aria-label={`${detail.label} damage distribution`}
+        >
+          <div className="source-detail-distribution-heading">
+            <h4>Damage distribution</h4>
+            <span>{detail.histogramScopeLabel}</span>
+          </div>
+          <HitDistributionChart
+            distribution={detail.histogram}
+            ariaLabel={`${detail.label} damage distribution buckets`}
+          />
+        </section>
       ) : null}
     </article>
   );
@@ -5395,46 +5455,11 @@ export function App() {
                       {viewModel.hitDistribution.hitChanceLabel} hit
                     </span>
                   </div>
-                  <div className="hit-distribution-summary">
-                    {metricList([
-                      {
-                        label: "Hit chance",
-                        value: viewModel.hitDistribution.hitChanceLabel,
-                        tone: "teal"
-                      },
-                      {
-                        label: "Average hit",
-                        value: viewModel.hitDistribution.averageHitLabel
-                      },
-                      {
-                        label: "Max hit",
-                        value: viewModel.hitDistribution.maxHitLabel
-                      },
-                      {
-                        label: "Peak bucket",
-                        value: formatNumber(viewModel.hitDistribution.peakMaxHit)
-                      }
-                    ])}
-                  </div>
-                  <div className="hit-histogram" role="list" aria-label="Hit distribution buckets">
-                    {viewModel.hitDistribution.buckets.map((bucket) => (
-                      <div
-                        className={`hit-bucket ${bucket.isMiss ? "miss" : ""} ${
-                          bucket.isMaxHit ? "max-hit" : ""
-                        }`}
-                        role="listitem"
-                        aria-label={bucket.ariaLabel}
-                        key={bucket.id}
-                      >
-                        <span className="hit-bucket-label">{bucket.label}</span>
-                        <span className="hit-bucket-bar" aria-hidden="true">
-                          <span style={{ width: `${bucket.widthPercent}%` }} />
-                        </span>
-                        <strong>{bucket.percentLabel}</strong>
-                        {bucket.isMaxHit && <em>max hit</em>}
-                      </div>
-                    ))}
-                  </div>
+                  <HitDistributionChart
+                    distribution={viewModel.hitDistribution}
+                    ariaLabel="Hit distribution buckets"
+                    showPeakBucket
+                  />
                 </section>
               </section>
 
