@@ -1896,6 +1896,39 @@ test("applies gear quick actions for the active combat style", async ({ page }) 
   });
 });
 
+test("optimizes the visible whole loadout and restores it with Undo", async ({ page }) => {
+  await page.goto("/");
+  const tabs = page.getByLabel("Workbench tabs");
+  await tabs.getByRole("tab", { name: "Melee" }).click();
+
+  const setup = page.getByLabel("Setup context");
+  const monster = setup.getByLabel("Monster", { exact: true });
+  const loadout = page.getByLabel("Equipment loadout");
+  const weapon = loadout.getByLabel("Weapon", { exact: true });
+  const style = loadout.getByLabel("Style", { exact: true });
+  const originalMonster = await monster.inputValue();
+  const originalStyle = await style.inputValue();
+
+  await loadout.getByLabel("Weapon search").fill("iron scimitar");
+  await weapon.selectOption("iron_scimitar");
+  await expect(weapon).toHaveValue("iron_scimitar");
+
+  await loadout.getByRole("button", { name: "Optimize loadout" }).click();
+  await expect(weapon).not.toHaveValue("iron_scimitar");
+  await expect(monster).toHaveValue(originalMonster);
+  await expect(style).toHaveValue(originalStyle);
+
+  const undo = page.getByLabel("Local state undo");
+  await expect(undo).toContainText("Optimized loadout for Hill Giant");
+  await expect(undo).toContainText("normal DPS");
+  await undo.getByRole("button", { name: "Undo" }).click();
+
+  await expect(weapon).toHaveValue("iron_scimitar");
+  await expect(monster).toHaveValue(originalMonster);
+  await expect(style).toHaveValue(originalStyle);
+  await expect(page.locator(".topbar")).toContainText("Restored loadout for Hill Giant");
+});
+
 test("filters hidden gear tiers while keeping current selections", async ({ page }) => {
   await page.goto("/");
   const tabs = page.getByLabel("Workbench tabs");

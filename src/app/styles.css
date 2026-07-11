@@ -1435,6 +1435,11 @@ th {
   min-width: 0;
 }
 
+.loadout-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .compact-selection-control {
   align-items: center;
   display: grid;

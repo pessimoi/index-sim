@@ -32,6 +32,7 @@ import type {
   EquipmentSlot,
   EntityId,
   GameDataSnapshot,
+  GearSelection,
   PlayerLevels,
   SimulationContext,
   SimulationRequest,
@@ -80,6 +81,7 @@ import {
   type CannonByMonsterState,
   DEFAULT_FORM_STATE,
   PRAYER_SELECTION_OPTIONS,
+  applyWeaponSelection,
   formToSimulationRequest,
   formToTripPolicy,
   normalizeFormState,
@@ -765,6 +767,37 @@ export interface GearQuickActionInput {
   shieldLocked?: boolean;
 }
 
+export interface BoundedLoadoutOptimizerInput {
+  form: CombatSetupFormState;
+  context: SimulationContext;
+  weaponOptions: readonly SelectOptionViewModel[];
+  gearOptions: Readonly<Record<EquipmentSlot, readonly SelectOptionViewModel[]>>;
+  frontierLimit?: number;
+}
+
+export interface BoundedLoadoutOptimizerResult {
+  form: CombatSetupFormState;
+  baselineDps: number;
+  optimizedDps: number;
+  dpsDelta: number;
+  dpsDeltaPct: number;
+  changedFields: string[];
+  evaluatedLoadouts: number;
+  frontierPeak: number;
+  capped: boolean;
+}
+
+interface LoadoutFrontierState {
+  gear: GearSelection;
+  accuracy: number;
+  damage: number;
+  changedSlots: number;
+  signature: string;
+}
+
+const DEFAULT_LOADOUT_FRONTIER_LIMIT = 512;
+const LOADOUT_DPS_EPSILON = 1e-12;
+
 function nullableNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
@@ -904,6 +937,246 @@ export function gearQuickActionForSlot(input: GearQuickActionInput): GearQuickAc
     itemLabel: best.label,
     disabled: currentIsBest,
     reason: requirementReason ? `${baseReason} - ${requirementReason}` : baseReason
+  };
+}
+
+function loadoutBonusPair(
+  item: EquipmentItemDefinition,
+  combatStyle: CombatStyle,
+  attackType: AttackType
+): { accuracy: number; damage: number } {
+  if (combatStyle === "melee") {
+    return {
+      accuracy: item[meleeAttackBonusKey(attackType)] ?? 0,
+      damage: item.str ?? 0
+    };
+  }
+  if (combatStyle === "ranged") {
+    return { accuracy: item.rngAtt ?? 0, damage: item.rngStr ?? 0 };
+  }
+  return { accuracy: item.magAtt ?? 0, damage: item.magDmg ?? 0 };
+}
+
+function loadoutGearSignature(gear: GearSelection): string {
+  return EQUIPMENT_SLOTS.map((slot) => `${slot}:${gear[slot] ?? "none"}`).join("|");
+}
+
+function preferFrontierState(
+  left: LoadoutFrontierState,
+  right: LoadoutFrontierState
+): LoadoutFrontierState {
+  if (left.changedSlots !== right.changedSlots) {
+    return left.changedSlots < right.changedSlots ? left : right;
+  }
+  return left.signature.localeCompare(right.signature) <= 0 ? left : right;
+}
+
+function paretoFrontier(states: LoadoutFrontierState[]): LoadoutFrontierState[] {
+  const equalPairs = new Map<string, LoadoutFrontierState>();
+  for (const state of states) {
+    const key = `${state.accuracy}|${state.damage}`;
+    const current = equalPairs.get(key);
+    equalPairs.set(key, current ? preferFrontierState(current, state) : state);
+  }
+  const sorted = [...equalPairs.values()].sort(
+    (left, right) =>
+      right.accuracy - left.accuracy ||
+      right.damage - left.damage ||
+      left.changedSlots - right.changedSlots ||
+      left.signature.localeCompare(right.signature)
+  );
+  const frontier: LoadoutFrontierState[] = [];
+  let bestDamage = -Infinity;
+  for (const state of sorted) {
+    if (state.damage <= bestDamage) continue;
+    frontier.push(state);
+    bestDamage = state.damage;
+  }
+  return frontier;
+}
+
+function sampleFrontier(states: LoadoutFrontierState[], limit: number): LoadoutFrontierState[] {
+  if (states.length <= limit) return states;
+  if (limit <= 1) {
+    return [
+      [...states].sort(
+        (left, right) =>
+          right.accuracy + right.damage * 2 - (left.accuracy + left.damage * 2) ||
+          left.changedSlots - right.changedSlots ||
+          left.signature.localeCompare(right.signature)
+      )[0]
+    ];
+  }
+  const sampled = new Map<number, LoadoutFrontierState>();
+  for (let index = 0; index < limit; index += 1) {
+    const sourceIndex = Math.round((index * (states.length - 1)) / (limit - 1));
+    sampled.set(sourceIndex, states[sourceIndex]);
+  }
+  return [...sampled.entries()].sort(([left], [right]) => left - right).map(([, state]) => state);
+}
+
+function visibleEquipmentCandidates(
+  gameData: GameDataSnapshot,
+  slot: EquipmentSlot,
+  options: readonly SelectOptionViewModel[],
+  forceNone: boolean
+): Array<{ id: EntityId; item: EquipmentItemDefinition }> {
+  if (forceNone) return [{ id: "none", item: { name: "None" } }];
+  return options.flatMap((option) => {
+    if (option.id === "none") return [{ id: option.id, item: { name: "None" } }];
+    const item = gameData.equipment[slot]?.[option.id];
+    return item ? [{ id: option.id, item }] : [];
+  });
+}
+
+function buildLoadoutFrontier(input: {
+  form: CombatSetupFormState;
+  original: CombatSetupFormState;
+  gameData: GameDataSnapshot;
+  gearOptions: Readonly<Record<EquipmentSlot, readonly SelectOptionViewModel[]>>;
+  frontierLimit: number;
+}): { states: LoadoutFrontierState[]; peak: number; capped: boolean } {
+  const weapon = input.gameData.weapons[input.form.weaponId];
+  const activeStance = weaponStances(input.form.weaponId, input.gameData).find(
+    (stance) => stance.id === input.form.styleId
+  );
+  const attackType = input.form.combatStyle === "melee" ? (activeStance?.type ?? "slash") : "slash";
+  let states: LoadoutFrontierState[] = [
+    { gear: {}, accuracy: 0, damage: 0, changedSlots: 0, signature: "" }
+  ];
+  let peak = 1;
+  let capped = false;
+
+  for (const slot of EQUIPMENT_SLOTS) {
+    const candidates = visibleEquipmentCandidates(
+      input.gameData,
+      slot,
+      input.gearOptions[slot],
+      slot === "shield" && weapon?.twoHand === true
+    );
+    if (!candidates.length) continue;
+    const expanded = states.flatMap((state) =>
+      candidates.map((candidate) => {
+        const gear = { ...state.gear, [slot]: candidate.id };
+        const pair = loadoutBonusPair(candidate.item, input.form.combatStyle, attackType);
+        return {
+          gear,
+          accuracy: state.accuracy + pair.accuracy,
+          damage: state.damage + pair.damage,
+          changedSlots:
+            state.changedSlots + (candidate.id === (input.original.gear[slot] ?? "none") ? 0 : 1),
+          signature: loadoutGearSignature(gear)
+        };
+      })
+    );
+    const frontier = paretoFrontier(expanded);
+    peak = Math.max(peak, frontier.length);
+    if (frontier.length > input.frontierLimit) capped = true;
+    states = sampleFrontier(frontier, input.frontierLimit);
+  }
+  return { states, peak, capped };
+}
+
+function changedLoadoutFields(
+  original: CombatSetupFormState,
+  candidate: CombatSetupFormState
+): string[] {
+  const changed = [
+    original.weaponId === candidate.weaponId ? null : "weapon",
+    original.ammoId === candidate.ammoId ? null : "ammo",
+    original.styleId === candidate.styleId ? null : "style",
+    ...EQUIPMENT_SLOTS.map((slot) =>
+      (original.gear[slot] ?? "none") === (candidate.gear[slot] ?? "none") ? null : slot
+    )
+  ];
+  return changed.filter((field): field is string => field !== null);
+}
+
+function loadoutFormSignature(form: CombatSetupFormState): string {
+  return [form.weaponId, form.ammoId, form.styleId, loadoutGearSignature(form.gear)].join("|");
+}
+
+export function optimizeVisibleLoadout(
+  input: BoundedLoadoutOptimizerInput
+): BoundedLoadoutOptimizerResult {
+  const original = normalizeFormState(input.form);
+  const requestedFrontierLimit =
+    input.frontierLimit == null || !Number.isFinite(input.frontierLimit)
+      ? DEFAULT_LOADOUT_FRONTIER_LIMIT
+      : input.frontierLimit;
+  const frontierLimit = Math.max(
+    1,
+    Math.min(DEFAULT_LOADOUT_FRONTIER_LIMIT, Math.floor(requestedFrontierLimit))
+  );
+  const baseline = simulateCombat(
+    formToSimulationRequest(original, input.context.gameData),
+    input.context
+  );
+  let evaluatedLoadouts = 1;
+  let frontierPeak = 1;
+  let capped = false;
+  let bestForm = original;
+  let bestDps = Number.isFinite(baseline.dps) ? baseline.dps : 0;
+  let bestChangedFields: string[] = [];
+  let bestSignature = loadoutFormSignature(original);
+
+  const weaponCandidates = input.weaponOptions.flatMap((option) => {
+    const weapon = input.context.gameData.weapons[option.id];
+    return weapon?.type === original.combatStyle ? [option.id] : [];
+  });
+  for (const weaponId of weaponCandidates) {
+    const weaponForm = applyWeaponSelection(original, weaponId, input.context.gameData);
+    const frontier = buildLoadoutFrontier({
+      form: weaponForm,
+      original,
+      gameData: input.context.gameData,
+      gearOptions: input.gearOptions,
+      frontierLimit
+    });
+    frontierPeak = Math.max(frontierPeak, frontier.peak);
+    capped ||= frontier.capped;
+    for (const state of frontier.states) {
+      const candidate = normalizeFormState({ ...weaponForm, gear: state.gear });
+      let dps: number;
+      try {
+        dps = simulateCombat(
+          formToSimulationRequest(candidate, input.context.gameData),
+          input.context
+        ).dps;
+      } catch {
+        continue;
+      }
+      evaluatedLoadouts += 1;
+      if (!Number.isFinite(dps)) continue;
+      const changedFields = changedLoadoutFields(original, candidate);
+      const signature = loadoutFormSignature(candidate);
+      const improves = dps > bestDps + LOADOUT_DPS_EPSILON;
+      const ties = Math.abs(dps - bestDps) <= LOADOUT_DPS_EPSILON;
+      const winsTie =
+        ties &&
+        (changedFields.length < bestChangedFields.length ||
+          (changedFields.length === bestChangedFields.length &&
+            signature.localeCompare(bestSignature) < 0));
+      if (!improves && !winsTie) continue;
+      bestForm = candidate;
+      bestDps = dps;
+      bestChangedFields = changedFields;
+      bestSignature = signature;
+    }
+  }
+
+  const optimizedDps = Math.max(bestDps, Number.isFinite(baseline.dps) ? baseline.dps : 0);
+  const dpsDelta = optimizedDps - (Number.isFinite(baseline.dps) ? baseline.dps : 0);
+  return {
+    form: dpsDelta < -LOADOUT_DPS_EPSILON ? original : bestForm,
+    baselineDps: Number.isFinite(baseline.dps) ? baseline.dps : 0,
+    optimizedDps,
+    dpsDelta: Math.max(0, dpsDelta),
+    dpsDeltaPct: baseline.dps > 0 ? (Math.max(0, dpsDelta) / baseline.dps) * 100 : 0,
+    changedFields: dpsDelta < -LOADOUT_DPS_EPSILON ? [] : bestChangedFields,
+    evaluatedLoadouts,
+    frontierPeak,
+    capped
   };
 }
 

@@ -267,6 +267,7 @@ import {
   createSimulationViewModel,
   equipmentSlotOptions,
   optimizeLootPrefsForMonster,
+  optimizeVisibleLoadout,
   plannerAllowedPool,
   type ActiveAssumptionResetTarget,
   type ActiveAssumptionReviewTarget,
@@ -3304,6 +3305,31 @@ export function App() {
     setStatus(label);
   };
 
+  const optimizeCurrentLoadout = () => {
+    if (!context) return;
+    const previousForm = form;
+    const result = optimizeVisibleLoadout({
+      form,
+      context,
+      weaponOptions: weaponSelectOptions,
+      gearOptions: gearSelectOptions
+    });
+    const monsterName = context.gameData.monsters[form.monsterId]?.name ?? form.monsterId;
+    if (!result.changedFields.length) {
+      setStatus(`Current loadout is already best visible for ${monsterName}`);
+      return;
+    }
+    commitFormState(result.form);
+    const capLabel = result.capped ? ", bounded search" : "";
+    const detail = `Optimized loadout for ${monsterName}: +${formatNumber(
+      result.dpsDeltaPct,
+      2
+    )}% normal DPS, ${formatNumber(result.changedFields.length)} fields${capLabel}`;
+    setUndoableStatus(detail, `Restored loadout for ${monsterName}`, () => {
+      commitFormState(previousForm);
+    });
+  };
+
   const undoPendingAction = () => {
     if (!pendingUndo) return;
     pendingUndo.restore();
@@ -5626,6 +5652,15 @@ export function App() {
                       setFormSafe((current) => updateForm(current, { repotThreshold }))
                     }
                   />
+                </div>
+                <div className="loadout-actions">
+                  <button
+                    type="button"
+                    onClick={optimizeCurrentLoadout}
+                    title="Maximize current-target normal DPS using visible weapon and equipment choices"
+                  >
+                    Optimize loadout
+                  </button>
                 </div>
                 <div className="manual-overrides-panel" aria-label="Manual combat overrides">
                   <div className="section-title-row">

@@ -29,6 +29,7 @@ import {
   equipmentSlotOptions,
   formatNumber,
   gearQuickActionForSlot,
+  optimizeVisibleLoadout,
   optimizeLootPrefsForMonster,
   spellOptions,
   sortDenseCompareRows,
@@ -37,7 +38,7 @@ import {
 } from "../app/view-models/simulation";
 import { simulateFullSimulation } from "../domain/simulation";
 import { HIGH_ALCH_MAGIC_XP_PER_CAST } from "../domain/trip";
-import type { SimulationContext } from "../domain/shared";
+import { EQUIPMENT_SLOTS, type SimulationContext } from "../domain/shared";
 
 interface GoldenFixture {
   tolerances: {
@@ -481,6 +482,160 @@ describe("rewrite UI view models", () => {
       disabled: false,
       reason: "Apply Amulet of power"
     });
+  });
+
+  it("optimizes the visible whole loadout deterministically for current-target normal DPS", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const form = normalizeFormState({
+      ...DEFAULT_FORM_STATE,
+      monsterId: "black_dragon",
+      weaponId: "bronze_dagger",
+      gear: Object.fromEntries(EQUIPMENT_SLOTS.map((slot) => [slot, "none"]))
+    });
+    const input = {
+      form,
+      context,
+      weaponOptions: weaponOptions(context.gameData, form.combatStyle),
+      gearOptions: Object.fromEntries(
+        EQUIPMENT_SLOTS.map((slot) => [slot, equipmentSlotOptions(context.gameData, slot)])
+      ) as Record<(typeof EQUIPMENT_SLOTS)[number], ReturnType<typeof equipmentSlotOptions>>
+    };
+    const startedAt = performance.now();
+    const first = optimizeVisibleLoadout(input);
+    const elapsedMs = performance.now() - startedAt;
+    const second = optimizeVisibleLoadout(input);
+
+    expect(first.optimizedDps).toBeGreaterThan(first.baselineDps);
+    expect(first.dpsDelta).toBeCloseTo(first.optimizedDps - first.baselineDps, 12);
+    expect(first.changedFields).toContain("weapon");
+    expect(first.evaluatedLoadouts).toBeGreaterThan(1);
+    expect(first).toEqual(second);
+    expect(elapsedMs).toBeLessThan(750);
+  });
+
+  it("keeps whole-loadout optimization inside visible candidates and two-handed rules", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const form = normalizeFormState({
+      ...DEFAULT_FORM_STATE,
+      monsterId: "black_dragon",
+      weaponId: "bronze_dagger"
+    });
+    const visibleWeapons = weaponOptions(context.gameData, form.combatStyle).filter(
+      (option) => option.id !== "dragon_halberd"
+    );
+    const visibleGear = Object.fromEntries(
+      EQUIPMENT_SLOTS.map((slot) => [
+        slot,
+        equipmentSlotOptions(context.gameData, slot).filter(
+          (option) => option.id !== "berserker_helm"
+        )
+      ])
+    ) as Record<(typeof EQUIPMENT_SLOTS)[number], ReturnType<typeof equipmentSlotOptions>>;
+    const result = optimizeVisibleLoadout({
+      form,
+      context,
+      weaponOptions: visibleWeapons,
+      gearOptions: visibleGear
+    });
+
+    expect(visibleWeapons.map((option) => option.id)).toContain(result.form.weaponId);
+    expect(result.form.weaponId).not.toBe("dragon_halberd");
+    for (const slot of EQUIPMENT_SLOTS) {
+      expect(visibleGear[slot].map((option) => option.id)).toContain(
+        result.form.gear[slot] ?? "none"
+      );
+    }
+    if (context.gameData.weapons[result.form.weaponId]?.twoHand) {
+      expect(result.form.gear.shield).toBe("none");
+    }
+  });
+
+  it("keeps requirements non-blocking and reports bounded no-regression results", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const form = normalizeFormState({
+      ...DEFAULT_FORM_STATE,
+      monsterId: "black_dragon",
+      weaponId: "bronze_dagger",
+      levels: {
+        ...DEFAULT_FORM_STATE.levels,
+        attack: 1,
+        strength: 1,
+        defence: 1
+      },
+      gear: Object.fromEntries(EQUIPMENT_SLOTS.map((slot) => [slot, "none"]))
+    });
+    const gearOptions = Object.fromEntries(
+      EQUIPMENT_SLOTS.map((slot) => [slot, equipmentSlotOptions(context.gameData, slot)])
+    ) as Record<(typeof EQUIPMENT_SLOTS)[number], ReturnType<typeof equipmentSlotOptions>>;
+    const result = optimizeVisibleLoadout({
+      form,
+      context,
+      weaponOptions: weaponOptions(context.gameData, form.combatStyle),
+      gearOptions,
+      frontierLimit: 1
+    });
+    const optimizedViewModel = createSimulationViewModel(result.form, context);
+
+    expect(result.capped).toBe(true);
+    expect(result.optimizedDps).toBeGreaterThanOrEqual(result.baselineDps);
+    expect(result.changedFields.length).toBeGreaterThan(0);
+    expect(optimizedViewModel.setupRequirements.hasWarnings).toBe(true);
+  });
+
+  it("keeps the current loadout on an equal visible candidate set", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const form = normalizeFormState(DEFAULT_FORM_STATE);
+    const result = optimizeVisibleLoadout({
+      form,
+      context,
+      weaponOptions: [
+        {
+          id: form.weaponId,
+          label: context.gameData.weapons[form.weaponId]?.name ?? form.weaponId
+        }
+      ],
+      gearOptions: Object.fromEntries(
+        EQUIPMENT_SLOTS.map((slot) => {
+          const itemId = form.gear[slot] ?? "none";
+          return [
+            slot,
+            [
+              {
+                id: itemId,
+                label: context.gameData.equipment[slot]?.[itemId]?.name ?? "None"
+              }
+            ]
+          ];
+        })
+      ) as Record<(typeof EQUIPMENT_SLOTS)[number], ReturnType<typeof equipmentSlotOptions>>
+    });
+
+    expect(result.form).toEqual(form);
+    expect(result.changedFields).toEqual([]);
+    expect(result.dpsDelta).toBe(0);
+    expect(result.capped).toBe(false);
+  });
+
+  it("sanitizes an invalid frontier limit without dropping valid candidates", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const form = normalizeFormState({
+      ...DEFAULT_FORM_STATE,
+      monsterId: "black_dragon",
+      weaponId: "bronze_dagger",
+      gear: Object.fromEntries(EQUIPMENT_SLOTS.map((slot) => [slot, "none"]))
+    });
+    const result = optimizeVisibleLoadout({
+      form,
+      context,
+      weaponOptions: weaponOptions(context.gameData, form.combatStyle),
+      gearOptions: Object.fromEntries(
+        EQUIPMENT_SLOTS.map((slot) => [slot, equipmentSlotOptions(context.gameData, slot)])
+      ) as Record<(typeof EQUIPMENT_SLOTS)[number], ReturnType<typeof equipmentSlotOptions>>,
+      frontierLimit: Number.NaN
+    });
+
+    expect(result.evaluatedLoadouts).toBeGreaterThan(1);
+    expect(result.optimizedDps).toBeGreaterThan(result.baselineDps);
   });
 
   it("clears and locks shield state when a two-handed weapon is selected", async () => {
