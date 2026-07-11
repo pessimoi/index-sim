@@ -218,6 +218,12 @@ export async function capturePane(locator: Locator, name: string) {
   await expect(locator).toHaveScreenshot(name);
 }
 
+export async function captureActivePane(page: Page, name: string) {
+  const activePane = page.locator("#workbench-active-panel");
+  await expect(activePane).toHaveAttribute("role", "tabpanel");
+  await capturePane(activePane, name);
+}
+
 export async function captureFullPage(page: Page, name: string) {
   await expect(page.getByLabel("Workbench shell")).toBeVisible();
   await page.evaluate(() => document.fonts.ready);

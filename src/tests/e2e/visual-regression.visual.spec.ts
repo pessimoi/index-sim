@@ -2,6 +2,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import {
   bootVisualApp,
+  captureActivePane,
   captureFullPage,
   capturePane,
   openCombatSetup,
@@ -109,7 +110,11 @@ test.describe("repository visual regression", () => {
     await openCombatSetup(page, "melee");
     const loadout = page.getByRole("region", { name: "Equipment loadout", exact: true });
     await expect(loadout.getByRole("heading", { name: "melee loadout" })).toBeVisible();
-    await capturePane(loadout, "loadout-melee-desktop.png");
+    await captureActivePane(page, "loadout-melee-desktop.png");
+    const bonusSummary = loadout.getByLabel("Equipment bonus summary");
+    await bonusSummary.scrollIntoViewIfNeeded();
+    await expect(bonusSummary).toBeVisible();
+    await captureActivePane(page, "loadout-melee-details-desktop.png");
   });
 
   test("Ranged loadout desktop", async ({ page }) => {
@@ -120,7 +125,11 @@ test.describe("repository visual regression", () => {
     await loadout.getByLabel("Damage bonus").fill("31");
     await expect(loadout.getByLabel("Ammo", { exact: true })).toBeVisible();
     await expect(loadout.getByLabel("Manual combat overrides")).toContainText("2 active");
-    await capturePane(loadout, "loadout-ranged-desktop.png");
+    await captureActivePane(page, "loadout-ranged-desktop.png");
+    const bonusSummary = loadout.getByLabel("Equipment bonus summary");
+    await bonusSummary.scrollIntoViewIfNeeded();
+    await expect(bonusSummary).toBeVisible();
+    await captureActivePane(page, "loadout-ranged-details-desktop.png");
   });
 
   test("Magic loadout desktop", async ({ page }) => {
@@ -128,7 +137,11 @@ test.describe("repository visual regression", () => {
     await openCombatSetup(page, "magic");
     const loadout = page.getByRole("region", { name: "Equipment loadout", exact: true });
     await expect(loadout.getByLabel("Spell", { exact: true })).toBeVisible();
-    await capturePane(loadout, "loadout-magic-desktop.png");
+    await captureActivePane(page, "loadout-magic-desktop.png");
+    const bonusSummary = loadout.getByLabel("Equipment bonus summary");
+    await bonusSummary.scrollIntoViewIfNeeded();
+    await expect(bonusSummary).toBeVisible();
+    await captureActivePane(page, "loadout-magic-details-desktop.png");
   });
 
   test("Stats desktop", async ({ page }) => {
@@ -138,12 +151,21 @@ test.describe("repository visual regression", () => {
     await expect(stats.getByRole("region", { name: "Combat roll details" })).toBeVisible();
     await expect(stats.getByLabel("XP routing chips")).toBeVisible();
     await expect(stats.getByLabel("Hit distribution buckets")).toBeVisible();
-    await capturePane(stats, "stats-desktop.png");
+    await captureActivePane(page, "stats-desktop.png");
+    const combatRoll = stats.getByRole("region", { name: "Combat roll details" });
+    await combatRoll.scrollIntoViewIfNeeded();
+    await expect(combatRoll).toBeVisible();
+    await captureActivePane(page, "stats-combat-roll-desktop.png");
+    const hitDistribution = stats.getByRole("region", { name: "Hit distribution" });
+    await hitDistribution.scrollIntoViewIfNeeded();
+    await expect(hitDistribution).toBeVisible();
+    await captureActivePane(page, "stats-hit-distribution-desktop.png");
   });
 
   test("Trip desktop", async ({ page }) => {
     await bootVisualApp(page, "desktop");
-    await capturePane(await prepareTrip(page), "trip-desktop.png");
+    await prepareTrip(page);
+    await captureActivePane(page, "trip-desktop.png");
   });
 
   test("Trip mobile", async ({ page }) => {
@@ -154,7 +176,7 @@ test.describe("repository visual regression", () => {
   test("Loot desktop", async ({ page }) => {
     await bootVisualApp(page, "desktop");
     const loot = await prepareLoot(page);
-    await capturePane(loot, "loot-desktop.png");
+    await captureActivePane(page, "loot-desktop.png");
     await captureLootDetails(loot, "desktop");
   });
 
@@ -169,10 +191,23 @@ test.describe("repository visual regression", () => {
     await bootVisualApp(page, "desktop");
     await openWorkbenchTab(page, "Economy");
     const economy = page.getByRole("region", { name: "Economy", exact: true });
-    await economy.getByLabel("Trend item").selectOption("big_bones");
+    const trendItem = economy.getByRole("combobox", { name: "Trend item", exact: true });
+    await trendItem.click();
+    await economy
+      .getByRole("searchbox", { name: "Search Trend item options", exact: true })
+      .fill("Big bones");
+    await economy
+      .getByRole("listbox", { name: "Trend item options", exact: true })
+      .getByRole("option", { name: /^Big bones(?:$|\s|\()/i })
+      .click();
+    await expect(trendItem).toHaveAttribute("data-selected-id", "big_bones");
     await expect(economy.getByLabel("Top movers")).toBeVisible();
     await expect(economy.getByRole("table", { name: "Price movers" })).toContainText("Big bones");
-    await capturePane(economy, "economy-desktop.png");
+    await captureActivePane(page, "economy-desktop.png");
+    const itemTrend = economy.getByLabel("Item price trend");
+    await itemTrend.scrollIntoViewIfNeeded();
+    await expect(itemTrend.getByRole("img", { name: "Big bones price trend" })).toBeVisible();
+    await captureActivePane(page, "economy-trend-desktop.png");
   });
 
   test("Cannon desktop", async ({ page }) => {
@@ -184,12 +219,13 @@ test.describe("repository visual regression", () => {
     await cannon.getByLabel("Mobs at spot").fill("6");
     await cannon.getByLabel("Respawn").fill("30");
     await expect(cannon.getByLabel("Cannon output")).toContainText("Cannon DPS");
-    await capturePane(cannon, "cannon-desktop.png");
+    await captureActivePane(page, "cannon-desktop.png");
   });
 
   test("Planner desktop", async ({ page }) => {
     await bootVisualApp(page, "desktop");
-    await capturePane(await preparePlanner(page), "planner-desktop.png");
+    await preparePlanner(page);
+    await captureActivePane(page, "planner-desktop.png");
   });
 
   test("Planner mobile", async ({ page }) => {
@@ -199,7 +235,8 @@ test.describe("repository visual regression", () => {
 
   test("Duel desktop", async ({ page }) => {
     await bootVisualApp(page, "desktop");
-    await capturePane(await prepareDuelMatrix(page), "duel-desktop.png");
+    await prepareDuelMatrix(page);
+    await captureActivePane(page, "duel-desktop.png");
   });
 
   test("Duel mobile", async ({ page }) => {
@@ -214,7 +251,11 @@ test.describe("repository visual regression", () => {
     const settings = page.getByRole("region", { name: "Live services", exact: true });
     await expect(settings.getByLabel("Local state recovery")).toBeVisible();
     await expect(settings.getByLabel("Price data settings")).toBeVisible();
-    await capturePane(settings, "settings-desktop.png");
+    await captureActivePane(page, "settings-desktop.png");
+    const priceData = settings.getByLabel("Price data settings");
+    await priceData.scrollIntoViewIfNeeded();
+    await expect(priceData).toBeVisible();
+    await captureActivePane(page, "settings-price-data-desktop.png");
     await capturePane(
       page.getByLabel("Legacy setup migration"),
       "settings-legacy-review-desktop.png"

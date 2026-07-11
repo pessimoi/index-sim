@@ -99,7 +99,9 @@ th {
   color: #111317;
   font-weight: 800;
   left: 1rem;
+  opacity: 0;
   padding: 0.55rem 0.75rem;
+  pointer-events: none;
   position: fixed;
   top: 0.5rem;
   transform: translateY(-200%);
@@ -107,6 +109,8 @@ th {
 }
 
 .skip-link:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
   transform: translateY(0);
 }
 
