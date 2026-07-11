@@ -2361,12 +2361,77 @@ describe("rewrite UI view models", () => {
     expect(snapshotRow.effectiveXpPerHour).toBe(snapshotVm.result.xp.effectiveXpPerHour);
     expect(snapshotRow.effectiveNetGpPerHour).toBe(snapshotVm.result.rates.effectiveNetGpPerHour);
     expect(snapshotRow.deltas.dps).toBeCloseTo(snapshotRow.dps - duel.liveRow.dps);
+    expect(duel.liveRow.setupDiff).toBeNull();
+    expect(snapshotRow.setupDiff).toMatchObject({
+      sharedContextNote: expect.stringContaining("current target"),
+      groups: expect.arrayContaining([
+        expect.objectContaining({ id: "combat" }),
+        expect.objectContaining({ id: "loadout" }),
+        expect.objectContaining({ id: "prayers-boosts" })
+      ])
+    });
+    const diffItems = snapshotRow.setupDiff!.groups.flatMap((group) => group.items);
+    expect(diffItems).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "combat-style",
+          liveValue: "Melee",
+          snapshotValue: "Ranged"
+        }),
+        expect.objectContaining({
+          id: "weapon",
+          snapshotValue: "Magic shortbow"
+        }),
+        expect.objectContaining({
+          id: "ammo",
+          snapshotValue: "Mithril arrow"
+        })
+      ])
+    );
+    expect(diffItems.map((item) => item.id)).not.toEqual(
+      expect.arrayContaining(["monster", "planner-targets", "per-style-loadouts"])
+    );
+    expect(snapshotRow.deltas).toMatchObject({
+      maxHit: snapshotRow.maxHit - duel.liveRow.maxHit,
+      hitChance: snapshotRow.hitChance - duel.liveRow.hitChance,
+      ttkSec: snapshotRow.ttkSec - duel.liveRow.ttkSec,
+      killsPerTrip: snapshotRow.killsPerTrip - duel.liveRow.killsPerTrip,
+      killsPerHour: snapshotRow.killsPerHour - duel.liveRow.killsPerHour,
+      supplyCostPerHour: snapshotRow.supplyCostPerHour - duel.liveRow.supplyCostPerHour
+    });
     expect(
       duel.rows.some(
         (row) => row.best.effectiveXpPerHour || row.best.effectiveNetGpPerHour || row.best.gpPerXp
       )
     ).toBe(true);
     expect(JSON.stringify(snapshot)).not.toContain("effectiveXpPerHour");
+  }, 15_000);
+
+  it("excludes shared target and inactive setup caches from Duel setup diffs", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const snapshotForm = normalizeFormState({
+      ...DEFAULT_FORM_STATE,
+      monsterId: "firegiant",
+      plannerTargets: { attack: 99 },
+      perStyleLoadouts: {
+        ...DEFAULT_FORM_STATE.perStyleLoadouts,
+        ranged: {
+          ...DEFAULT_FORM_STATE.perStyleLoadouts.ranged,
+          weaponId: "yew_shortbow"
+        }
+      }
+    });
+    const snapshot = createDuelSnapshot("excluded-state", "Excluded state", snapshotForm);
+    const duel = createDuelComparisonViewModel(
+      DEFAULT_FORM_STATE,
+      { snapshots: [snapshot] },
+      context
+    );
+
+    expect(duel.snapshotRows[0]?.setupDiff).toMatchObject({
+      changeCount: 0,
+      groups: []
+    });
   }, 15_000);
 
   it("builds an all-monster Duel matrix only from live and saved setup inputs", async () => {

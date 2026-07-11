@@ -39,6 +39,7 @@ import type {
 } from "@/domain/shared";
 import { EQUIPMENT_SLOTS } from "@/domain/shared";
 import {
+  FOOD,
   HIGH_ALCH_MAGIC_XP_PER_CAST,
   simulateTripLootSupply,
   type LootAction,
@@ -75,8 +76,10 @@ import {
   type PlannerUiState
 } from "../state/planner";
 import {
+  BOOST_SELECTION_OPTIONS,
   type CannonByMonsterState,
   DEFAULT_FORM_STATE,
+  PRAYER_SELECTION_OPTIONS,
   formToSimulationRequest,
   formToTripPolicy,
   normalizeFormState,
@@ -529,10 +532,38 @@ export interface CompareRowViewModel {
 export type DuelComparisonRowSource = "live" | "snapshot";
 
 export interface DuelComparisonRowDeltasViewModel {
+  maxHit: number;
   dps: number;
+  hitChance: number;
+  ttkSec: number;
+  killsPerTrip: number;
+  killsPerHour: number;
   effectiveXpPerHour: number;
   effectiveNetGpPerHour: number;
   gpPerXp: number | null;
+  supplyCostPerHour: number;
+}
+
+export type DuelSetupDiffCategoryId =
+  "combat" | "levels" | "loadout" | "gear" | "prayers-boosts" | "special-overrides" | "trip";
+
+export interface DuelSetupDiffItemViewModel {
+  id: string;
+  label: string;
+  liveValue: string;
+  snapshotValue: string;
+}
+
+export interface DuelSetupDiffGroupViewModel {
+  id: DuelSetupDiffCategoryId;
+  label: string;
+  items: DuelSetupDiffItemViewModel[];
+}
+
+export interface DuelSetupDiffViewModel {
+  changeCount: number;
+  groups: DuelSetupDiffGroupViewModel[];
+  sharedContextNote: string;
 }
 
 export interface DuelComparisonBestMarkersViewModel {
@@ -562,6 +593,7 @@ export interface DuelComparisonRowViewModel {
   supplyCostPerHour: number;
   bound: string;
   warnings: string[];
+  setupDiff: DuelSetupDiffViewModel | null;
   deltas: DuelComparisonRowDeltasViewModel;
   best: DuelComparisonBestMarkersViewModel;
 }
@@ -2979,7 +3011,10 @@ export function createSimulationViewModel(
   };
 }
 
-type DuelComparisonBaseRowViewModel = Omit<DuelComparisonRowViewModel, "deltas" | "best">;
+type DuelComparisonBaseRowViewModel = Omit<
+  DuelComparisonRowViewModel,
+  "deltas" | "best" | "setupDiff"
+>;
 
 function gpPerXpValue(effectiveNetGpPerHour: number, effectiveXpPerHour: number): number | null {
   return effectiveXpPerHour > 0 ? effectiveNetGpPerHour / effectiveXpPerHour : null;
@@ -3032,6 +3067,303 @@ function duelBaseRowFromSimulation(
   };
 }
 
+const DUEL_DIFF_CATEGORY_LABELS: Record<DuelSetupDiffCategoryId, string> = {
+  combat: "Combat",
+  levels: "Levels",
+  loadout: "Loadout",
+  gear: "Gear",
+  "prayers-boosts": "Prayers and boosts",
+  "special-overrides": "Special and overrides",
+  trip: "Trip"
+};
+
+const DUEL_LEVEL_LABELS: Record<keyof CombatSetupFormState["levels"], string> = {
+  attack: "Attack",
+  strength: "Strength",
+  defence: "Defence",
+  hitpoints: "Hitpoints",
+  ranged: "Ranged",
+  magic: "Magic",
+  prayer: "Prayer"
+};
+
+const DUEL_TRIP_LABELS: Record<keyof CombatSetupFormState["trip"], string> = {
+  foodKey: "Food",
+  teleport: "Teleport",
+  bankSeconds: "Bank time",
+  potionSets: "Boost vials",
+  potionDoses: "Boost doses",
+  singleDose: "Single-dose boosts",
+  dbaRestore: "DBA restore",
+  prayerMode: "Prayer restore",
+  alching: "High alch",
+  recoverAmmo: "Recover ammo",
+  runeSlots: "Rune slots",
+  antifire: "Antifire",
+  antipoison: "Antipoison",
+  safespot: "Safespot",
+  protect: "Protection prayer",
+  recoilRings: "Recoil rings",
+  foodCount: "Food count",
+  foodPerKillOverride: "Food per kill",
+  prayerPotionSets: "Prayer potion vials",
+  prayerPotionDoses: "Prayer potion doses",
+  altarSeconds: "Altar time",
+  scarceSpot: "Scarce spot",
+  targetsAtSpot: "Targets at spot",
+  respawnSeconds: "Respawn time"
+};
+
+function duelHumanizeId(value: string): string {
+  return value.replace(/_/g, " ").replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function duelBooleanLabel(value: boolean): string {
+  return value ? "On" : "Off";
+}
+
+function duelOptionalValue(value: string | number | boolean | null): string {
+  if (value == null) return "Auto";
+  if (typeof value === "boolean") return duelBooleanLabel(value);
+  return String(value);
+}
+
+function duelSelectionLabel(
+  values: readonly string[],
+  options: ReadonlyArray<{ id: string; label: string }>
+): string {
+  const labels = values
+    .filter((value) => value !== "none")
+    .map((value) => options.find((option) => option.id === value)?.label ?? duelHumanizeId(value));
+  return labels.length > 0 ? labels.join(", ") : "None";
+}
+
+function duelItemLabel(
+  context: SimulationContext,
+  kind: "weapon" | "ammo" | "spell",
+  itemId: EntityId
+): string {
+  if (itemId === "none") return "None";
+  if (kind === "weapon") return context.gameData.weapons[itemId]?.name ?? duelHumanizeId(itemId);
+  if (kind === "ammo") return context.gameData.ammo[itemId]?.name ?? duelHumanizeId(itemId);
+  return context.gameData.spells[itemId]?.name ?? duelHumanizeId(itemId);
+}
+
+function duelGearLabel(context: SimulationContext, slot: EquipmentSlot, itemId: EntityId): string {
+  if (itemId === "none") return "None";
+  return context.gameData.equipment[slot]?.[itemId]?.name ?? duelHumanizeId(itemId);
+}
+
+function createDuelSetupDiffViewModel(
+  liveForm: CombatSetupFormState,
+  snapshotForm: CombatSetupFormState,
+  context: SimulationContext
+): DuelSetupDiffViewModel {
+  const groups = new Map<DuelSetupDiffCategoryId, DuelSetupDiffItemViewModel[]>();
+  const add = (
+    category: DuelSetupDiffCategoryId,
+    id: string,
+    label: string,
+    liveRaw: unknown,
+    snapshotRaw: unknown,
+    liveValue = duelOptionalValue(liveRaw as string | number | boolean | null),
+    snapshotValue = duelOptionalValue(snapshotRaw as string | number | boolean | null)
+  ) => {
+    if (JSON.stringify(liveRaw) === JSON.stringify(snapshotRaw)) return;
+    const items = groups.get(category) ?? [];
+    items.push({ id, label, liveValue, snapshotValue });
+    groups.set(category, items);
+  };
+
+  add(
+    "combat",
+    "combat-style",
+    "Combat style",
+    liveForm.combatStyle,
+    snapshotForm.combatStyle,
+    duelHumanizeId(liveForm.combatStyle),
+    duelHumanizeId(snapshotForm.combatStyle)
+  );
+  add(
+    "combat",
+    "attack-style",
+    "Attack style",
+    liveForm.styleId,
+    snapshotForm.styleId,
+    duelHumanizeId(liveForm.styleId),
+    duelHumanizeId(snapshotForm.styleId)
+  );
+
+  for (const skill of Object.keys(DUEL_LEVEL_LABELS) as Array<keyof typeof DUEL_LEVEL_LABELS>) {
+    add(
+      "levels",
+      `level-${skill}`,
+      DUEL_LEVEL_LABELS[skill],
+      liveForm.levels[skill],
+      snapshotForm.levels[skill]
+    );
+  }
+
+  add(
+    "loadout",
+    "weapon",
+    "Weapon",
+    liveForm.weaponId,
+    snapshotForm.weaponId,
+    duelItemLabel(context, "weapon", liveForm.weaponId),
+    duelItemLabel(context, "weapon", snapshotForm.weaponId)
+  );
+  if (liveForm.combatStyle === "ranged" || snapshotForm.combatStyle === "ranged") {
+    add(
+      "loadout",
+      "ammo",
+      "Ammo",
+      liveForm.ammoId,
+      snapshotForm.ammoId,
+      duelItemLabel(context, "ammo", liveForm.ammoId),
+      duelItemLabel(context, "ammo", snapshotForm.ammoId)
+    );
+  }
+  if (liveForm.combatStyle === "magic" || snapshotForm.combatStyle === "magic") {
+    add(
+      "loadout",
+      "spell",
+      "Spell",
+      liveForm.spellId,
+      snapshotForm.spellId,
+      duelItemLabel(context, "spell", liveForm.spellId),
+      duelItemLabel(context, "spell", snapshotForm.spellId)
+    );
+  }
+
+  for (const slot of EQUIPMENT_SLOTS) {
+    const liveItem = liveForm.gear[slot] ?? "none";
+    const snapshotItem = snapshotForm.gear[slot] ?? "none";
+    add(
+      "gear",
+      `gear-${slot}`,
+      SETUP_REQUIREMENT_SLOT_LABELS[slot],
+      liveItem,
+      snapshotItem,
+      duelGearLabel(context, slot, liveItem),
+      duelGearLabel(context, slot, snapshotItem)
+    );
+  }
+
+  add(
+    "prayers-boosts",
+    "prayers",
+    "Prayers",
+    liveForm.prayers,
+    snapshotForm.prayers,
+    duelSelectionLabel(liveForm.prayers, PRAYER_SELECTION_OPTIONS),
+    duelSelectionLabel(snapshotForm.prayers, PRAYER_SELECTION_OPTIONS)
+  );
+  add(
+    "prayers-boosts",
+    "boosts",
+    "Boosts",
+    liveForm.boosts,
+    snapshotForm.boosts,
+    duelSelectionLabel(liveForm.boosts, BOOST_SELECTION_OPTIONS),
+    duelSelectionLabel(snapshotForm.boosts, BOOST_SELECTION_OPTIONS)
+  );
+  add(
+    "prayers-boosts",
+    "sustained",
+    "Sustained boosts",
+    liveForm.sustained,
+    snapshotForm.sustained
+  );
+  add(
+    "prayers-boosts",
+    "repot-threshold",
+    "Repot threshold",
+    liveForm.repotThreshold,
+    snapshotForm.repotThreshold
+  );
+
+  add(
+    "special-overrides",
+    "special-weapon",
+    "Special weapon",
+    liveForm.specialAttack.weaponId,
+    snapshotForm.specialAttack.weaponId,
+    duelItemLabel(context, "weapon", liveForm.specialAttack.weaponId),
+    duelItemLabel(context, "weapon", snapshotForm.specialAttack.weaponId)
+  );
+  add(
+    "special-overrides",
+    "special-ammo",
+    "Special ammo",
+    liveForm.specialAttack.ammoId,
+    snapshotForm.specialAttack.ammoId,
+    duelItemLabel(context, "ammo", liveForm.specialAttack.ammoId),
+    duelItemLabel(context, "ammo", snapshotForm.specialAttack.ammoId)
+  );
+  add(
+    "special-overrides",
+    "accuracy-override",
+    "Accuracy override",
+    liveForm.manualOverrides.accuracyBonus,
+    snapshotForm.manualOverrides.accuracyBonus
+  );
+  add(
+    "special-overrides",
+    "damage-override",
+    "Damage override",
+    liveForm.manualOverrides.damageBonus,
+    snapshotForm.manualOverrides.damageBonus
+  );
+  add(
+    "special-overrides",
+    "speed-override",
+    "Attack speed override",
+    liveForm.manualOverrides.attackSpeedSec,
+    snapshotForm.manualOverrides.attackSpeedSec
+  );
+  add(
+    "special-overrides",
+    "ring-of-wealth",
+    "Ring of wealth",
+    liveForm.ringOfWealth,
+    snapshotForm.ringOfWealth
+  );
+
+  for (const key of Object.keys(DUEL_TRIP_LABELS) as Array<keyof typeof DUEL_TRIP_LABELS>) {
+    const liveRaw = liveForm.trip[key];
+    const snapshotRaw = snapshotForm.trip[key];
+    let liveValue = duelOptionalValue(liveRaw);
+    let snapshotValue = duelOptionalValue(snapshotRaw);
+    if (key === "foodKey") {
+      liveValue = FOOD[String(liveRaw)]?.name ?? duelHumanizeId(String(liveRaw));
+      snapshotValue = FOOD[String(snapshotRaw)]?.name ?? duelHumanizeId(String(snapshotRaw));
+    } else if (key === "protect" || key === "prayerMode") {
+      liveValue = duelHumanizeId(String(liveRaw));
+      snapshotValue = duelHumanizeId(String(snapshotRaw));
+    }
+    add(
+      "trip",
+      `trip-${key}`,
+      DUEL_TRIP_LABELS[key],
+      liveRaw,
+      snapshotRaw,
+      liveValue,
+      snapshotValue
+    );
+  }
+
+  const orderedGroups = (Object.keys(DUEL_DIFF_CATEGORY_LABELS) as DuelSetupDiffCategoryId[])
+    .map((id) => ({ id, label: DUEL_DIFF_CATEGORY_LABELS[id], items: groups.get(id) ?? [] }))
+    .filter((group) => group.items.length > 0);
+  return {
+    changeCount: orderedGroups.reduce((total, group) => total + group.items.length, 0),
+    groups: orderedGroups,
+    sharedContextNote:
+      "Both setups are recalculated against the current target, cannon, loot policy and active prices. These shared inputs are not snapshot differences."
+  };
+}
+
 function finiteBest(values: ReadonlyArray<number | null>): number | null {
   const finiteValues = values.filter((value): value is number => value != null && isFinite(value));
   if (!finiteValues.length) return null;
@@ -3068,7 +3400,7 @@ export function createDuelComparisonViewModel(
     { includeLootRows: false }
   );
   const liveBaseRow = duelBaseRowFromSimulation("duel-live", "live", null, "Live loadout", liveVm);
-  const snapshotBaseRows = normalizedSnapshots.map((snapshot) => {
+  const snapshotEntries = normalizedSnapshots.map((snapshot) => {
     const snapshotForm = normalizeFormState({
       ...snapshot.form,
       monsterId: currentMonsterId
@@ -3081,28 +3413,39 @@ export function createDuelComparisonViewModel(
       lootSettingsByMonster,
       { includeLootRows: false }
     );
-    return duelBaseRowFromSimulation(
-      `duel-snapshot:${snapshot.id}`,
-      "snapshot",
-      snapshot.id,
-      snapshot.name,
-      vm
-    );
+    return {
+      row: duelBaseRowFromSimulation(
+        `duel-snapshot:${snapshot.id}`,
+        "snapshot",
+        snapshot.id,
+        snapshot.name,
+        vm
+      ),
+      setupDiff: createDuelSetupDiffViewModel(currentForm, snapshotForm, context)
+    };
   });
+  const snapshotBaseRows = snapshotEntries.map((entry) => entry.row);
   const baseRows = [liveBaseRow, ...snapshotBaseRows];
   const bestEffectiveXpPerHour = finiteBest(baseRows.map((row) => row.effectiveXpPerHour));
   const bestEffectiveNetGpPerHour = finiteBest(baseRows.map((row) => row.effectiveNetGpPerHour));
   const bestGpPerXp = finiteBest(baseRows.map((row) => row.gpPerXp));
-  const rows = baseRows.map((row) => ({
+  const rows = baseRows.map((row, index) => ({
     ...row,
+    setupDiff: index === 0 ? null : snapshotEntries[index - 1]!.setupDiff,
     deltas: {
+      maxHit: row.maxHit - liveBaseRow.maxHit,
       dps: row.dps - liveBaseRow.dps,
+      hitChance: row.hitChance - liveBaseRow.hitChance,
+      ttkSec: row.ttkSec - liveBaseRow.ttkSec,
+      killsPerTrip: row.killsPerTrip - liveBaseRow.killsPerTrip,
+      killsPerHour: row.killsPerHour - liveBaseRow.killsPerHour,
       effectiveXpPerHour: row.effectiveXpPerHour - liveBaseRow.effectiveXpPerHour,
       effectiveNetGpPerHour: row.effectiveNetGpPerHour - liveBaseRow.effectiveNetGpPerHour,
       gpPerXp:
         row.gpPerXp != null && liveBaseRow.gpPerXp != null
           ? row.gpPerXp - liveBaseRow.gpPerXp
-          : null
+          : null,
+      supplyCostPerHour: row.supplyCostPerHour - liveBaseRow.supplyCostPerHour
     },
     best: {
       effectiveXpPerHour: isBestDuelValue(

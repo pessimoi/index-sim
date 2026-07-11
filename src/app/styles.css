@@ -2196,6 +2196,116 @@ th {
   text-align: center;
 }
 
+.duel-diff-row > td {
+  background: #0f141b;
+  padding: 0;
+}
+
+.duel-diff-panel {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.duel-diff-heading {
+  align-items: end;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.duel-diff-heading strong,
+.duel-diff-heading span {
+  display: block;
+}
+
+.duel-diff-heading span,
+.duel-diff-heading small,
+.duel-shared-context,
+.duel-no-field-diff {
+  color: #8f9bab;
+}
+
+.duel-impact-grid {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(5, minmax(7rem, 1fr));
+  margin: 0;
+}
+
+.duel-impact-grid > div {
+  background: #171d25;
+  border: 1px solid #2c3643;
+  border-radius: 6px;
+  min-width: 0;
+  padding: 0.55rem 0.65rem;
+}
+
+.duel-impact-grid dt {
+  color: #8f9bab;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+}
+
+.duel-impact-grid dd {
+  color: #f1c45b;
+  font-variant-numeric: tabular-nums;
+  margin: 0.2rem 0 0;
+}
+
+.duel-field-groups {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.duel-field-groups h3 {
+  color: #d9e1eb;
+  font-size: 0.82rem;
+  margin: 0 0 0.35rem;
+}
+
+.duel-field-diff-header,
+.duel-field-diff {
+  align-items: start;
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: minmax(8rem, 0.8fr) repeat(2, minmax(10rem, 1fr));
+}
+
+.duel-field-diff-header {
+  border-bottom: 1px solid #2c3643;
+  color: #6f7b8a;
+  font-size: 0.66rem;
+  padding: 0 0.5rem 0.3rem;
+  text-transform: uppercase;
+}
+
+.duel-field-diff {
+  border-bottom: 1px solid #222a35;
+  color: #c8d1dd;
+  padding: 0.45rem 0.5rem;
+}
+
+.duel-field-diff strong {
+  color: #9eaaba;
+  font-size: 0.75rem;
+}
+
+.duel-field-diff span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.duel-field-diff small {
+  display: none;
+}
+
+.duel-shared-context,
+.duel-no-field-diff {
+  font-size: 0.76rem;
+  margin: 0;
+}
+
 .duel-matrix-panel {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
@@ -3704,6 +3814,10 @@ th {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
+  .duel-impact-grid {
+    grid-template-columns: repeat(2, minmax(7rem, 1fr));
+  }
+
   .trip-output,
   .special-output,
   .cannon-output-grid {
@@ -3793,6 +3907,28 @@ th {
 
   .duel-matrix-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .duel-diff-heading {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .duel-impact-grid,
+  .duel-field-diff {
+    grid-template-columns: 1fr;
+  }
+
+  .duel-field-diff-header {
+    display: none;
+  }
+
+  .duel-field-diff small {
+    color: #6f7b8a;
+    display: block;
+    font-size: 0.64rem;
+    margin-bottom: 0.1rem;
+    text-transform: uppercase;
   }
 
   .level-grid,

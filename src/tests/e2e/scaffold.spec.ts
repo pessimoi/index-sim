@@ -853,6 +853,20 @@ test("uses the Duel tab to snapshot import export rename load delete and persist
   await expect(reloadedDuel).toBeVisible();
   reloadedTable = reloadedDuel.getByRole("table", { name: "Duel comparison" });
   await expect(reloadedTable).toContainText("best", { timeout: 30000 });
+  const reviewDiff = reloadedTable.getByRole("button", { name: "Review diff" });
+  await reviewDiff.click();
+  const hideDiff = reloadedTable.getByRole("button", { name: "Hide diff" });
+  await expect(hideDiff).toHaveAttribute("aria-expanded", "true");
+  await expect(hideDiff).toHaveAttribute("aria-controls", /^duel-diff-/);
+  const setupDiff = reloadedTable.getByRole("region", {
+    name: "Melee saved setup and impact diff"
+  });
+  await expect(setupDiff).toContainText("Snapshot compared with live");
+  await expect(setupDiff).toContainText("Combat style");
+  await expect(setupDiff).toContainText("Impact is snapshot minus live");
+  await expect(setupDiff).toContainText("current target, cannon, loot policy and active prices");
+  await hideDiff.click();
+  await expect(setupDiff).toHaveCount(0);
   await reloadedTable.getByRole("button", { name: "Load" }).click();
   await expect(combatType.getByRole("button", { name: "melee" })).toHaveAttribute(
     "aria-pressed",

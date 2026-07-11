@@ -1,4 +1,5 @@
 import {
+  Fragment,
   useEffect,
   useId,
   useMemo,
@@ -2357,6 +2358,7 @@ export function App() {
   );
   const [duelSnapshots, setDuelSnapshots] = useState<DuelSnapshotsState>(loadInitialDuelSnapshots);
   const [duelViewMode, setDuelViewMode] = useState<DuelViewMode>("current-target");
+  const [expandedDuelDiffId, setExpandedDuelDiffId] = useState<string | null>(null);
   const [duelMatrixMetric, setDuelMatrixMetric] =
     useState<DuelMatrixMetricId>("effectiveXpPerHour");
   const [duelMatrixFilter, setDuelMatrixFilter] = useState("");
@@ -7085,80 +7087,214 @@ export function App() {
                         </tr>
                       </thead>
                       <tbody>
-                        {duelComparison?.rows.map((row) => (
-                          <tr key={row.id} className={duelRowClass(row)}>
-                            <td className="duel-setup-cell">
-                              {row.source === "live" ? (
-                                <strong>Live setup</strong>
-                              ) : (
-                                <input
-                                  aria-label={`Rename snapshot ${row.name}`}
-                                  defaultValue={row.name}
-                                  maxLength={80}
-                                  onBlur={(event) => {
-                                    if (!row.snapshotId) return;
-                                    const accepted = commitDuelSnapshotName(
-                                      row.snapshotId,
-                                      event.currentTarget.value
-                                    );
-                                    if (!accepted) event.currentTarget.value = row.name;
-                                  }}
-                                  onKeyDown={(event) => {
-                                    if (event.key === "Enter") event.currentTarget.blur();
-                                    if (event.key === "Escape") {
-                                      event.currentTarget.value = row.name;
-                                      event.currentTarget.blur();
-                                    }
-                                  }}
-                                />
+                        {duelComparison?.rows.map((row) => {
+                          const diffId = `duel-diff-${row.snapshotId ?? "live"}`;
+                          const diffExpanded = row.snapshotId === expandedDuelDiffId;
+                          return (
+                            <Fragment key={row.id}>
+                              <tr className={duelRowClass(row)}>
+                                <td className="duel-setup-cell">
+                                  {row.source === "live" ? (
+                                    <strong>Live setup</strong>
+                                  ) : (
+                                    <input
+                                      aria-label={`Rename snapshot ${row.name}`}
+                                      defaultValue={row.name}
+                                      maxLength={80}
+                                      onBlur={(event) => {
+                                        if (!row.snapshotId) return;
+                                        const accepted = commitDuelSnapshotName(
+                                          row.snapshotId,
+                                          event.currentTarget.value
+                                        );
+                                        if (!accepted) event.currentTarget.value = row.name;
+                                      }}
+                                      onKeyDown={(event) => {
+                                        if (event.key === "Enter") event.currentTarget.blur();
+                                        if (event.key === "Escape") {
+                                          event.currentTarget.value = row.name;
+                                          event.currentTarget.blur();
+                                        }
+                                      }}
+                                    />
+                                  )}
+                                  <span>{row.combatStyle}</span>
+                                </td>
+                                <td className="duel-loadout-cell" title={row.loadoutLabel}>
+                                  {row.loadoutLabel}
+                                </td>
+                                <td className="numeric">{formatNumber(row.maxHit, 1)}</td>
+                                <td className="numeric">
+                                  <span>{formatNumber(row.dps, 2)}</span>
+                                  <small>{duelDeltaDisplay(row.deltas.dps, 2)}</small>
+                                </td>
+                                <td
+                                  className={`numeric ${row.best.effectiveXpPerHour ? "best" : ""}`}
+                                >
+                                  <span>{formatNumber(row.effectiveXpPerHour)}</span>
+                                  {row.best.effectiveXpPerHour && <em>best</em>}
+                                  <small>{duelDeltaDisplay(row.deltas.effectiveXpPerHour)}</small>
+                                </td>
+                                <td
+                                  className={`numeric ${row.best.effectiveNetGpPerHour ? "best" : ""}`}
+                                >
+                                  <span>{formatNumber(row.effectiveNetGpPerHour)}</span>
+                                  {row.best.effectiveNetGpPerHour && <em>best</em>}
+                                  <small>
+                                    {duelDeltaDisplay(row.deltas.effectiveNetGpPerHour)}
+                                  </small>
+                                </td>
+                                <td className={`numeric ${row.best.gpPerXp ? "best" : ""}`}>
+                                  <span>{gpPerXpDisplay(row.gpPerXp)}</span>
+                                  {row.best.gpPerXp && <em>best</em>}
+                                  <small>{duelDeltaDisplay(row.deltas.gpPerXp, 2)}</small>
+                                </td>
+                                <td className="numeric">
+                                  <span>{formatNumber(row.killsPerHour)}</span>
+                                  <small>{duelDeltaDisplay(row.deltas.killsPerHour)}</small>
+                                </td>
+                                <td>
+                                  {row.snapshotId ? (
+                                    <div className="duel-row-actions">
+                                      <button
+                                        type="button"
+                                        aria-expanded={diffExpanded}
+                                        aria-controls={diffId}
+                                        onClick={() =>
+                                          setExpandedDuelDiffId(
+                                            diffExpanded ? null : row.snapshotId
+                                          )
+                                        }
+                                      >
+                                        {diffExpanded ? "Hide diff" : "Review diff"}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => loadDuelSnapshot(row.snapshotId!)}
+                                      >
+                                        Load
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => deleteDuelSnapshot(row.snapshotId!)}
+                                      >
+                                        Delete
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <span className="duel-live-marker">Active</span>
+                                  )}
+                                </td>
+                              </tr>
+                              {row.setupDiff && diffExpanded && (
+                                <tr className="duel-diff-row">
+                                  <td colSpan={9}>
+                                    <section
+                                      id={diffId}
+                                      className="duel-diff-panel"
+                                      aria-label={`${row.name} setup and impact diff`}
+                                    >
+                                      <div className="duel-diff-heading">
+                                        <div>
+                                          <strong>Snapshot compared with live</strong>
+                                          <span>
+                                            {row.setupDiff.changeCount} setup field
+                                            {row.setupDiff.changeCount === 1 ? "" : "s"} changed
+                                          </span>
+                                        </div>
+                                        <small>Impact is snapshot minus live.</small>
+                                      </div>
+                                      <dl
+                                        className="duel-impact-grid"
+                                        aria-label="Calculated impact"
+                                      >
+                                        <div>
+                                          <dt>Max hit</dt>
+                                          <dd>{duelDeltaDisplay(row.deltas.maxHit, 1)}</dd>
+                                        </div>
+                                        <div>
+                                          <dt>DPS</dt>
+                                          <dd>{duelDeltaDisplay(row.deltas.dps, 2)}</dd>
+                                        </div>
+                                        <div>
+                                          <dt>Hit chance</dt>
+                                          <dd>{signedPercent(row.deltas.hitChance)}</dd>
+                                        </div>
+                                        <div>
+                                          <dt>TTK</dt>
+                                          <dd>{duelDeltaDisplay(row.deltas.ttkSec, 1)}s</dd>
+                                        </div>
+                                        <div>
+                                          <dt>Kills/trip</dt>
+                                          <dd>{duelDeltaDisplay(row.deltas.killsPerTrip, 1)}</dd>
+                                        </div>
+                                        <div>
+                                          <dt>Kills/hr</dt>
+                                          <dd>{duelDeltaDisplay(row.deltas.killsPerHour, 1)}</dd>
+                                        </div>
+                                        <div>
+                                          <dt>XP/hr</dt>
+                                          <dd>{duelDeltaDisplay(row.deltas.effectiveXpPerHour)}</dd>
+                                        </div>
+                                        <div>
+                                          <dt>Net GP/hr</dt>
+                                          <dd>
+                                            {duelDeltaDisplay(row.deltas.effectiveNetGpPerHour)}
+                                          </dd>
+                                        </div>
+                                        <div>
+                                          <dt>GP/XP</dt>
+                                          <dd>{duelDeltaDisplay(row.deltas.gpPerXp, 2)}</dd>
+                                        </div>
+                                        <div>
+                                          <dt>Supply GP/hr</dt>
+                                          <dd>{duelDeltaDisplay(row.deltas.supplyCostPerHour)}</dd>
+                                        </div>
+                                      </dl>
+                                      {row.setupDiff.groups.length > 0 ? (
+                                        <div className="duel-field-groups">
+                                          {row.setupDiff.groups.map((group) => (
+                                            <section key={group.id}>
+                                              <h3>{group.label}</h3>
+                                              <div
+                                                className="duel-field-diff-header"
+                                                aria-hidden="true"
+                                              >
+                                                <span>Field</span>
+                                                <span>Live</span>
+                                                <span>Snapshot</span>
+                                              </div>
+                                              {group.items.map((item) => (
+                                                <div className="duel-field-diff" key={item.id}>
+                                                  <strong>{item.label}</strong>
+                                                  <span>
+                                                    <small>Live</small>
+                                                    {item.liveValue}
+                                                  </span>
+                                                  <span>
+                                                    <small>Snapshot</small>
+                                                    {item.snapshotValue}
+                                                  </span>
+                                                </div>
+                                              ))}
+                                            </section>
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        <p className="duel-no-field-diff">
+                                          No active setup fields differ.
+                                        </p>
+                                      )}
+                                      <p className="duel-shared-context">
+                                        {row.setupDiff.sharedContextNote}
+                                      </p>
+                                    </section>
+                                  </td>
+                                </tr>
                               )}
-                              <span>{row.combatStyle}</span>
-                            </td>
-                            <td className="duel-loadout-cell" title={row.loadoutLabel}>
-                              {row.loadoutLabel}
-                            </td>
-                            <td className="numeric">{formatNumber(row.maxHit, 1)}</td>
-                            <td className="numeric">{formatNumber(row.dps, 2)}</td>
-                            <td className={`numeric ${row.best.effectiveXpPerHour ? "best" : ""}`}>
-                              <span>{formatNumber(row.effectiveXpPerHour)}</span>
-                              {row.best.effectiveXpPerHour && <em>best</em>}
-                              <small>{duelDeltaDisplay(row.deltas.effectiveXpPerHour)}</small>
-                            </td>
-                            <td
-                              className={`numeric ${row.best.effectiveNetGpPerHour ? "best" : ""}`}
-                            >
-                              <span>{formatNumber(row.effectiveNetGpPerHour)}</span>
-                              {row.best.effectiveNetGpPerHour && <em>best</em>}
-                              <small>{duelDeltaDisplay(row.deltas.effectiveNetGpPerHour)}</small>
-                            </td>
-                            <td className={`numeric ${row.best.gpPerXp ? "best" : ""}`}>
-                              <span>{gpPerXpDisplay(row.gpPerXp)}</span>
-                              {row.best.gpPerXp && <em>best</em>}
-                              <small>{duelDeltaDisplay(row.deltas.gpPerXp, 2)}</small>
-                            </td>
-                            <td className="numeric">{formatNumber(row.killsPerHour)}</td>
-                            <td>
-                              {row.snapshotId ? (
-                                <div className="duel-row-actions">
-                                  <button
-                                    type="button"
-                                    onClick={() => loadDuelSnapshot(row.snapshotId!)}
-                                  >
-                                    Load
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => deleteDuelSnapshot(row.snapshotId!)}
-                                  >
-                                    Delete
-                                  </button>
-                                </div>
-                              ) : (
-                                <span className="duel-live-marker">Active</span>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
+                            </Fragment>
+                          );
+                        })}
                         {duelComparison?.snapshotRows.length === 0 && (
                           <tr className="duel-empty-row">
                             <td colSpan={9}>No snapshots</td>

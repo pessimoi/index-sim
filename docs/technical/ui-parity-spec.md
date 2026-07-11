@@ -757,6 +757,7 @@ Required content:
 - Versioned snapshot export/import with bounded validation and non-destructive merge behavior.
 - Table comparing live and saved setups on the current monster.
 - Best markers for effective XP/hr, effective net GP/hr and GP/XP.
+- A visible DPS delta and an expandable live-versus-snapshot review for active setup fields and calculated impact.
 - On-demand cross-monster matrix for live and saved setups with metric selection, filtering and per-monster best markers.
 
 Current implementation note: the rewrite Duel tab now exposes the visible
@@ -774,6 +775,13 @@ new snapshots only while the current 12-entry cap has room. The comparison table
 uses `createDuelComparisonViewModel()` to build live plus snapshot rows by
 re-simulating each snapshot setup against the current active monster, including
 XP/hr, effective net GP/hr, GP/XP and best-marker fields where live can also win.
+Each saved row also exposes one keyboard-operable `Review diff` panel at a time.
+The panel groups normalized active setup field differences and shows snapshot-minus-live
+calculated deltas for combat, trip, XP and economy metrics. The target, cannon,
+loot policy and prices are shared recalculation inputs rather than snapshot
+differences; Planner targets and inactive per-style caches are excluded. D-068
+keeps this comparative and does not claim per-field causal attribution. The
+snapshot persistence and export/import schema are unchanged.
 The optional Monster matrix is built only after an explicit user action through
 `createDuelMatrixViewModel()`. It evaluates the live setup and at most 12 saved
 setups across the current generated monster catalog, exposes DPS, XP/hr, net
