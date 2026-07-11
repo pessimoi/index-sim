@@ -83,6 +83,8 @@ describe("full simulation result contract", () => {
       combatSkillXpPerHour + cannonEffectiveXpPerHour + prayerXpPerHour + magicAlchXpPerHour,
       12
     );
+    expect(full.rates.ttkSec).toBe(trip.ttkSec);
+    expect(full.rates.ttkSec).not.toBe(combat.ttkSec);
     expect(full.rates.effectiveNetGpPerHour).toBe(trip.effectiveNetGpPerHour);
     expect(full.debug.combatXpDamageFraction).toBe(trip.combatXpDamageFraction);
   });

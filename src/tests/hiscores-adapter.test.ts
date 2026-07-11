@@ -142,6 +142,24 @@ describe("hiscores browser adapter", () => {
     ).rejects.toMatchObject({ code: "bad-request" });
   });
 
+  it("bounds response streams before parsing them", async () => {
+    const fetcher: typeof fetch = async () =>
+      new Response(JSON.stringify(readHiscoresFixture()), {
+        headers: { "Content-Type": "application/json" }
+      });
+
+    await expect(
+      lookupHiscores("Fixture Player", {
+        fetcher,
+        baseUrl: "http://app.local/",
+        maxBytes: 64
+      })
+    ).rejects.toMatchObject({
+      code: "upstream-invalid",
+      message: "Invalid hiscores API response"
+    });
+  });
+
   it("stores only validated last-player input", () => {
     const storage = createMemoryStorage();
 

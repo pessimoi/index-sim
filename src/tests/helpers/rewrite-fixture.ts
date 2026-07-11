@@ -1,5 +1,6 @@
 import {
   DEFAULT_FORM_STATE,
+  applyWeaponSelection,
   normalizeFormState,
   type CannonByMonsterState,
   type CombatSetupFormState
@@ -219,7 +220,8 @@ export function createRewriteFixtureCase(
   if (definition.legends === false) {
     throw new Error(`Fixture '${definition.id}' requires unsupported legends=false UI state.`);
   }
-  const form = fixtureForm(definition);
+  const fixture = fixtureForm(definition);
+  const form = applyWeaponSelection(fixture, fixture.weaponId, context.gameData);
   const cannonByMonster = fixtureCannonByMonster(definition);
   const lootSettingsByMonster = fixtureLootSettings(definition);
   const lootPrefsByMonster = fixtureLootPrefs(

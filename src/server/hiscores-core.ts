@@ -16,6 +16,7 @@ export const HISCORES_API_PATH = "/api/hiscores";
 export const HISCORES_STATUS_API_PATH = "/api/hiscores/status";
 export const HISCORES_PROVIDER_TIMEOUT_MS = 4_000;
 export const HISCORES_LOOKUP_RATE_LIMIT_PER_MINUTE = 30;
+export const HISCORES_RATE_LIMIT_MAX_CLIENTS = 10_000;
 
 const DISABLED_HISCORES_STATUS: HiscoresStatusResponse = {
   available: false,
@@ -114,10 +115,16 @@ export interface HiscoresApiHandlerOptions {
 }
 
 export function createMemoryHiscoresRateLimiter(
-  options: { requestsPerMinute?: number; windowMs?: number; now?: () => number } = {}
+  options: {
+    requestsPerMinute?: number;
+    windowMs?: number;
+    maxEntries?: number;
+    now?: () => number;
+  } = {}
 ): HiscoresRateLimiter {
   const requestsPerMinute = options.requestsPerMinute ?? HISCORES_LOOKUP_RATE_LIMIT_PER_MINUTE;
   const windowMs = options.windowMs ?? 60_000;
+  const maxEntries = options.maxEntries ?? HISCORES_RATE_LIMIT_MAX_CLIENTS;
   const now = options.now ?? (() => Date.now());
   const windows = new Map<string, { startedAt: number; count: number }>();
 
@@ -126,11 +133,23 @@ export function createMemoryHiscoresRateLimiter(
     check(key) {
       const currentTime = now();
       for (const [entryKey, entry] of windows) {
-        if (currentTime - entry.startedAt >= windowMs) windows.delete(entryKey);
+        if (currentTime - entry.startedAt < windowMs) break;
+        windows.delete(entryKey);
       }
 
       const existing = windows.get(key);
       if (!existing || currentTime - existing.startedAt >= windowMs) {
+        if (windows.size >= maxEntries) {
+          const oldest = windows.values().next().value as
+            { startedAt: number; count: number } | undefined;
+          return {
+            allowed: false,
+            retryAfterSeconds: Math.max(
+              1,
+              Math.ceil((windowMs - (currentTime - (oldest?.startedAt ?? currentTime))) / 1000)
+            )
+          };
+        }
         windows.set(key, { startedAt: currentTime, count: 1 });
         return { allowed: true };
       }
@@ -248,8 +267,14 @@ export function createHiscoresApiHandler(options: HiscoresApiHandlerOptions = {}
 
     if (url.pathname === HISCORES_STATUS_API_PATH) {
       try {
-        return jsonResponse(200, await providerStatus(provider, rateLimiter.requestsPerMinute));
-      } catch {
+        return jsonResponse(
+          200,
+          await withTimeout(timeoutMs, () =>
+            providerStatus(provider, rateLimiter.requestsPerMinute)
+          )
+        );
+      } catch (error) {
+        if (error instanceof HiscoresProviderError) return errorResponse(error.code);
         return errorResponse("upstream-invalid");
       }
     }

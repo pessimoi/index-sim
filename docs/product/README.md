@@ -7,9 +7,13 @@
 ## Primary user workflows
 
 - Choose combat type, levels, weapon, gear, monster and boosts.
+- Read long selected setup values without losing them to compact control clipping.
+- Open one selector and filter monsters, loadout items, spells, food, risk drops and
+  Economy history choices from the search field inside its popup.
 - Compare effective XP/hr, GP/hr, DPS, supply use and trip behavior.
 - Inspect loot value and alch/bury/keep/drop choices.
 - Compare monsters under the current setup.
+- Inspect modeled kill-time, food, trip and timed-profit ranges plus drop/GP target probabilities beside deterministic averages.
 - Use the planner to estimate training order and gear unlock impact.
 - Import or sync market prices when the relevant path is available.
 - Look up player hiscores and apply combat levels once the accepted live integration path is implemented.
@@ -65,6 +69,8 @@ Target data direction: use the current accepted LostCityRS/Content game revision
 - Trip, loot and supply rules now have a pure rewrite-domain owner in `src/domain/trip`.
 - Training planner rules now have a pure rewrite-domain owner in `src/domain/planner`.
 - The root Vite rewrite UI now covers a selected parity slice: combat setup, result summary, loot/economy, trip, monster compare and planner.
+- On desktop, the root workbench uses the accepted legacy-console shape: one viewport-bound three-zone shell with compact Player controls, the active workbench pane and MonsterCard scrolling independently. Tablet and mobile retain normal document flow.
+- Three compact quick-navigation summaries distinguish active prayers/combat boosts from Trip-owned potion carry and prayer restore, show current values and jump directly to the owning setup, Trip or Loot pane. The redundant `Where to edit` intro copy is omitted. Negative net GP results explain the supply-vs-loot gap and link to the relevant controls.
 - The legacy UI is archived at `legacy/index.html` and still has source files in `views.jsx`, `planner.jsx` and `planner-core.js` for reference/parity work.
 - Current feature coverage and missing legacy workflows are tracked in [feature-inventory.md](feature-inventory.md).
 

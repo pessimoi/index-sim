@@ -133,6 +133,21 @@ function snapshotLabel(snapshot: BrowserPriceHistorySnapshot | null): string {
   return snapshot ? `${snapshot.label} (${snapshot.capturedAt})` : "-";
 }
 
+function activePriceSetMatchesSnapshot(
+  activePriceSet: PriceSet,
+  snapshot: BrowserPriceHistorySnapshot
+): boolean {
+  const identityMatches =
+    (activePriceSet.id === snapshot.sourcePriceSetId && activePriceSet.label === snapshot.label) ||
+    activePriceSet.createdAt === snapshot.capturedAt;
+  if (!identityMatches) return false;
+  const prices = Object.entries(snapshot.itemPrices);
+  return (
+    prices.length > 0 &&
+    prices.every(([itemId, price]) => activePriceSet.itemPrices[itemId] === price)
+  );
+}
+
 export function createPriceHistorySnapshot(
   priceSet: PriceSet,
   capturedAt: Date = new Date()
@@ -209,10 +224,7 @@ export function summarizePriceHistory(
     activeLabel: activePriceSet?.label ?? "-",
     latestLabel: latest?.label ?? "-",
     activeMatchesLatest:
-      !!activePriceSet &&
-      !!latest &&
-      activePriceSet.id === latest.sourcePriceSetId &&
-      activePriceSet.label === latest.label
+      !!activePriceSet && !!latest && activePriceSetMatchesSnapshot(activePriceSet, latest)
   };
 }
 

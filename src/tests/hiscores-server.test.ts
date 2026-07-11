@@ -140,6 +140,22 @@ describe("hiscores API handler", () => {
     expect(second?.headers["Retry-After"]).toBe("60");
   });
 
+  it("bounds ephemeral rate-limit client state and releases expired entries", () => {
+    let currentTime = 1_000;
+    const limiter = createMemoryHiscoresRateLimiter({
+      requestsPerMinute: 30,
+      windowMs: 1_000,
+      maxEntries: 2,
+      now: () => currentTime
+    });
+
+    expect(limiter.check("client-a").allowed).toBe(true);
+    expect(limiter.check("client-b").allowed).toBe(true);
+    expect(limiter.check("client-c")).toMatchObject({ allowed: false, retryAfterSeconds: 1 });
+    currentTime = 2_000;
+    expect(limiter.check("client-c").allowed).toBe(true);
+  });
+
   it("fails closed when the provider exceeds the runtime guard", async () => {
     const slowProvider: HiscoresProvider = {
       status: () => availableStatus,
@@ -154,5 +170,14 @@ describe("hiscores API handler", () => {
     expect(parseBody<{ error: { code: string } }>(response?.body ?? "").error.code).toBe(
       "upstream-unavailable"
     );
+
+    const statusResponse = await createHiscoresApiHandler({
+      provider: {
+        status: () => new Promise(() => undefined),
+        lookup: slowProvider.lookup
+      },
+      timeoutMs: 1
+    })({ method: "GET", url: "/api/hiscores/status" });
+    expect(statusResponse?.status).toBe(503);
   });
 });

@@ -10,6 +10,8 @@ This section owns planning material. Keep it light and keep implementation detai
 - [bug-triage.md](bug-triage.md): known legacy behavior risks and golden-fixture handling.
 - [idea-inbox.md](idea-inbox.md): ideas that are not ready for implementation.
 - [planner-parity/current.md](planner-parity/current.md): generated current legacy Planner behavior audit evidence.
+- [numeric-user-path-audit.md](numeric-user-path-audit.md): generated cross-path numeric consistency and large legacy-delta evidence.
+- [npc-attack-source-audit.md](npc-attack-source-audit.md): generated Revision 274 NPC attack-handler coverage and the still-open calculation decision package.
 - [worktree-delivery-spec.md](worktree-delivery-spec.md): review, commit grouping, validation and safe `origin/master` delivery plan for the current accumulated worktree.
 - [handoff-hardening-spec.md](handoff-hardening-spec.md): fresh-clone onboarding, repository verification, source-pin maintenance and technical handoff acceptance.
 

@@ -89,6 +89,9 @@ describe("generated runtime adapter", () => {
     const monsterLootCoverage = report.sections.find(
       (section) => section.section === "monsters.loot"
     );
+    const monsterIncomingCoverage = report.sections.find(
+      (section) => section.section === "monsters.incomingAttacks"
+    );
     const equipmentCoverage = report.sections.find((section) => section.section === "equipment");
     const weaponFieldCoverage = report.sections.find(
       (section) => section.section === "weapons.runtimeFields"
@@ -135,6 +138,12 @@ describe("generated runtime adapter", () => {
       extraCount: 0
     });
     expect(monsterLootCoverage).toMatchObject({
+      candidateCount: 63,
+      missingCount: 0,
+      extraCount: 0
+    });
+    expect(monsterIncomingCoverage).toMatchObject({
+      blocking: true,
       candidateCount: 63,
       missingCount: 0,
       extraCount: 0
@@ -198,6 +207,7 @@ describe("generated runtime adapter", () => {
       "| Section | Blocking | Reference | Candidate | Matched | Missing | Extra | Examples |"
     );
     expect(markdown).toContain("| monsters.combatStats | yes |");
+    expect(markdown).toContain("| monsters.incomingAttacks | yes |");
     expect(markdown).toContain("| equipment.runtimeFields | yes |");
     expect(markdown).toContain("- none");
     expect(markdown).not.toContain(process.cwd());
@@ -233,6 +243,7 @@ describe("generated runtime adapter", () => {
     expect(markdown).toContain("## Blocking Coverage Gaps");
     expect(markdown).not.toContain("| monsters |");
     expect(markdown).not.toContain("| monsters.combatStats |");
+    expect(markdown).not.toContain("| monsters.incomingAttacks |");
     expect(markdown).not.toContain("| monsters.loot |");
     expect(markdown).not.toContain("| weapons |");
     expect(markdown).not.toContain("| weapons.runtimeFields |");
@@ -266,6 +277,8 @@ describe("generated runtime adapter", () => {
 
     delete (candidate.gameData.weapons.rune_scimitar as unknown as Record<string, unknown>).speed;
     delete (candidate.gameData.items.rune_scimitar as unknown as Record<string, unknown>).price;
+    delete candidate.gameData.monsters.goblin.incomingAttacks;
+    delete candidate.gameData.monsters.goblin.incomingAttackCoverage;
 
     const report = createGeneratedRuntimeReadinessReport({
       reference: legacy.context,
@@ -278,6 +291,9 @@ describe("generated runtime adapter", () => {
     const weaponFields = report.sections.find(
       (section) => section.section === "weapons.runtimeFields"
     );
+    const incomingFields = report.sections.find(
+      (section) => section.section === "monsters.incomingAttacks"
+    );
 
     expect(weaponIds?.missingCount).toBe(0);
     expect(itemIds?.missingCount).toBe(0);
@@ -289,8 +305,12 @@ describe("generated runtime adapter", () => {
       missingCount: 1,
       missingIds: ["rune_scimitar"]
     });
+    expect(incomingFields).toMatchObject({ missingCount: 1, missingIds: ["goblin"] });
     expect(report.blockers.join("\n")).toContain(
       "weapons.runtimeFields is missing required field coverage for 1"
+    );
+    expect(report.blockers.join("\n")).toContain(
+      "monsters.incomingAttacks is missing or incomplete for 1"
     );
   });
 

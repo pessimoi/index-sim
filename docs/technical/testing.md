@@ -2,6 +2,15 @@
 
 ## Current state
 
+The latest complete production-preview Chromium gate passed 73/73 on
+2026-07-11 after the D-080 control-ownership and compact-input audit. Earlier 57/57,
+58/58 or 63/63 counts in the historical evidence log below are superseded run snapshots.
+The separate Darwin visual comparison currently passes 5/19: Compare, loadout,
+Trip, Economy, Cannon, Planner, Duel and Settings baselines differ from the
+current worktree. The baselines were not updated automatically; each difference
+still needs a product-change review before accepting new PNGs. Functional and
+numeric browser assertions for those workflows remain green in the 63/63 gate.
+
 The root app path uses the Vite/React rewrite and has npm scripts for TypeScript, Vite, Vitest, Playwright, ESLint and Prettier. The archived legacy app in `legacy/index.html` still transforms JSX in the browser by Babel Standalone and has no local JSX typecheck/build step.
 
 Use [rewrite-parity-report.md](rewrite-parity-report.md) to interpret which user-visible calculation areas are currently legacy-parity certified, partially covered or not ported.
@@ -35,6 +44,81 @@ Playwright and visual suites remain separate environment-dependent gates.
 
 Node 22 and npm 10 are the repository runtime contract. `.nvmrc`, the root
 `package.json` engines and the scheduled workflow use the same major versions.
+
+## Revision 274 NPC attack source audit
+
+Run the read-only pinned-source audit with:
+
+```sh
+npm run npc:attack-audit
+```
+
+After reviewing an intentional audit-tool or pinned-source change, regenerate
+the committed decision evidence with:
+
+```sh
+npm run npc:attack-audit:write
+```
+
+The command verifies the local LostCity checkout against the committed source
+pin, requires exactly 63 active NPC rows and checks that the committed report is
+current. The shared bounded RuneScript reader rejects source/scripts symlinks,
+oversized files/trees, excessive block graphs, stale mappings, duplicate or
+conflicting triggers/profiles, unknown parser shapes and invalid numeric bounds.
+Report output is capped at 2 MiB and contains no raw source bodies, absolute
+paths or inferred contextual weights.
+
+Focused coverage is:
+
+```sh
+npm run test -- src/tests/npc-attack-source-audit.test.ts src/tests/lostcity-source-parser.test.ts
+```
+
+It covers standard melee/ranged, spell-backed and forced magic, scripted fixed
+damage, explicit source-weighted selection, contextual effect selection,
+duplicate/conflicting/unknown/invalid/deep shapes and symlink/source/report
+limits. The current report has 55 exact source paths and eight partial paths;
+four dragon rows carry explicit pinned-source weights while four
+contextual/effect rows remain unweighted. This is Goal 1 evidence only: it does
+not by itself authorize future formula or baseline changes; D-081 separately
+accepts the implemented bounded profile/descriptor policy.
+
+The generator now emits typed profiles for all 63 rows and the focused
+generator/Trip/Risk/view-model suites verify formula-input retention, runtime
+formula revalidation, typed defence/protection selection, exact weighted
+normalization, partial/legacy compatibility coverage, overlay separation and
+Risk model-version 2 sampling. Run:
+
+```sh
+npm run test -- src/tests/data-generator.test.ts src/tests/npc-attack-source-audit.test.ts src/tests/trip-loot-supply.test.ts src/tests/risk-analysis.test.ts src/tests/ui-view-model.test.ts src/tests/calculation-task.test.ts src/tests/full-simulation-result.test.ts
+npm run numeric:audit
+npm run runtime:readiness -- --example-limit 5
+```
+
+`numeric:audit` is read-only here. Do not use `numeric:audit:write`, visual
+update or golden refresh as failure recovery.
+
+The 2026-07-11 Goal 1 completion gate passed the 25/25 focused audit/parser
+tests and `npm run verify`: 592/592 unit tests, 19/19 golden tests, typecheck,
+production build/artifact validation, ESLint, Prettier and `git diff --check`.
+The artifact contained 8 files / 2 assets, 1,724,342 bytes and SHA-256
+`a223e3040a46854245378a84af4d58a9850c9ec32950af589c3d9546f1540db9`.
+The gate skipped npm audit under its documented network-disabled policy; no
+browser, baseline-write, snapshot-refresh or deployment command is part of this
+audit-only goal.
+
+The D-081 Goal 2–4 follow-up passes 595/595 unit tests and 19/19 unchanged
+legacy goldens plus typecheck, production build/artifact validation, ESLint,
+Prettier and `git diff --check`. The artifact contains 8 files / 2 assets,
+1,805,109 bytes and SHA-256
+`3793ea3d719e6d3506792a137b3cb5bcb469f84a64e5223ca337d768da9d2db8`.
+Runtime readiness is green with blocking `monsters.incomingAttacks` coverage at
+63/63, and the read-only numeric audit reports 5,958 cross-path comparisons
+with zero mismatches and no unclassified legacy findings. The focused Risk
+browser case built successfully but preview binding to `127.0.0.1:5173` failed
+with sandbox `EPERM`; escalation was unavailable, so browser and visual
+read-only evidence are `PARTIAL_BLOCKED`, not passed. No numeric, golden or
+visual baseline-write command was run.
 
 ## Cloudflare deployment validation
 
@@ -112,6 +196,32 @@ npm run planner:parity:report -- --update-baseline --allow-needs-review
 Review every changed field and replace every `needs-review` classification with
 evidence or leave the local gate failing. The audit never calls live upstreams,
 reads real browser state or imports `planner-core.js` into production modules.
+
+For the broad numeric user-path audit, run:
+
+```sh
+npm run numeric:audit
+```
+
+The command evaluates the default setup for all 189 generated
+monster/combat-style combinations and 18 legacy golden setup variants. It
+compares Result, Dense Compare, calculation worker, Duel live, Duel matrix and
+saved-setup round-trip values at absolute and relative tolerance `1e-9`. The
+2026-07-11 baseline contains 5,958 current-path comparisons and zero
+mismatches. It also reports legacy-to-rewrite changes only when both the
+metric-specific absolute and relative thresholds are exceeded; those findings
+must be classified rather than silently treated as rewrite truth.
+
+Regenerate the committed evidence after an intentional reviewed change with:
+
+```sh
+npm run numeric:audit:write
+```
+
+The report is [../project/numeric-user-path-audit.md](../project/numeric-user-path-audit.md).
+The audit is local and deterministic: it does not call live upstreams or read
+real browser storage. Browser formatting remains covered by the Playwright
+all-fixture and release-path numeric snapshot cases.
 
 For live integration release-copy audits, also run the narrower command below and classify every hit as production code, typed same-origin contract/test, archived legacy evidence or documentation:
 
@@ -201,7 +311,7 @@ validates every mapped setup and finite generated-runtime metric. The Playwright
 case reloads each setup through the versioned rewrite browser-storage envelopes
 and compares all ten visible metric-strip values with the same source-backed
 view-model result. The focused production-preview browser case passes 1/1, and
-the expanded default Playwright gate passes 57/57. The first focused run found
+the expanded default Playwright gate passes 63/63. The first focused run found
 that the browser's dynamically loaded scheduled snapshot had dropped generated
 item/alch fallbacks; `src/app/state/market-sync.ts` now composes those fallbacks
 without overriding scheduled values, with focused unit coverage.
@@ -343,6 +453,7 @@ The latest functional and repository-local visual release-evidence checks were r
 
 | Check                                                       | Latest result                                                             | Notes and follow-up                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | ----------------------------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 2026-07-11 rewrite reliability audit                        | `pass`                                                                    | Final source passed 37 Vitest files/574 tests, 19/19 legacy golden tests, typecheck, ESLint, Prettier, `git diff --check`, generated runtime readiness with no blockers, Planner parity with 16 cases/32 comparisons and zero review/rewrite-gap rows, and `npm audit` with 0 vulnerabilities. The single-worker production-preview gate passed 63/63, including all 18 browser fixtures, strict setup/Duel recovery and the Compare/Planner/Duel Chromium Long Task budget. Production build and artifact validation passed with 8 files/2 assets, 1,692,036 bytes, 13 history snapshots and SHA-256 `f4eab3d3f19248eb6f9880485feecd295ee3b0ab4cd379c721a6d9c0ac3f7bb7`; the known main-chunk size advisory remains non-blocking. Static DOM/code-execution, secret, path, release-copy and raw-diagnostic searches found only the trusted legacy-reference sandbox, tests, dependencies and documented archived boundaries.  |
 | `npm ci && npm run verify` in detached fresh checkout       | `pass`                                                                    | Commit `43f8b5f` was tested without `.sources`, prior `node_modules`, `dist`, `.vite` or test output under Node 22.19.0/npm 10.9.3. Lockfile install added 237 packages; verify passed 523 unit tests, 19 explicit golden tests, typecheck, build/artifact, lint, format and diff checks. Build produced the expected artifact checksum from committed generated data, and a separate network-enabled `npm audit` reported 0 vulnerabilities.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `npm run typecheck`                                         | `pass`                                                                    | 2026-07-11 D-073 refresh passed.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `npm run test`                                              | `pass`                                                                    | The D-073 full Vitest gate passed 34 files and 543 tests, including the existing source/runtime/domain/Planner evidence plus bounded loadout optimizer determinism, candidate limits, cap handling, no-regression and performance coverage.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
@@ -352,7 +463,7 @@ The latest functional and repository-local visual release-evidence checks were r
 | Generated/runtime evidence                                  | `pass`                                                                    | Deterministic raw Revision 274 generation produced 390 items, 63 monsters with size, 94 numeric requirement rows and 25 typed conditional loot rows. Generated and legacy-reference readiness are `ready`, coverage has no blockers, source audit has zero unresolved identities, and focused parser/domain/Planner/UI checks pass. The committed report owns D-055/D-057/D-071/D-072 deltas and passes 11/11 representative cases with 22 advisory outliers across 189 evaluations.                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | Source-backed requirements/NPC size focused checks          | `pass`                                                                    | Focused parser/generator/runtime/domain/Planner/UI tests passed 190/190; refreshed Planner parity passed 13/13 with 16 cases/32 comparisons, zero review rows and zero rewrite gaps. Legacy golden stayed 19/19. Focused production-preview Planner/setup copy passed 2/2 and dragon-halberd size behavior 1/1. Full `npm run verify` passed 528 unit tests and artifact SHA-256 `acb785ea914a29cacbe33a8514d8a5e7be9b69c412aebbb64db75942610c2f8c`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | Bounded whole-loadout optimizer focused checks              | `pass`                                                                    | `src/tests/ui-view-model.test.ts` passed 87/87 with deterministic improvement/no-regression, candidate-policy, cap, requirement and performance coverage. The focused production-preview apply/Undo smoke passed 1/1 after sandbox-external localhost execution and retained the active monster/style. Full `npm run verify` passed 543 unit tests, 19 golden tests, typecheck, build/artifact, lint, format and diff checks; the artifact SHA-256 is `b50e40eb6edc76f34922ed3c84783db7dffe6f91daf42c714bb7cc9805d67522`.                                                                                                                                                                                                                                                                                                                                                                                                      |
-| `npm run test:e2e -- --workers=1`                           | `pass`                                                                    | The prior complete 2026-07-11 production-preview gate passed 58/58 in Chromium after the bounded keyboard pass. D-073 adds a separately passing 1/1 optimizer apply/Undo case; the surrounding full-suite code and fixtures are unchanged. Both runs used sandbox-external localhost permission because the managed sandbox rejects preview binds.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `npm run test:e2e -- --workers=1`                           | `pass`                                                                    | The complete 2026-07-11 D-080 production-preview gate passed 73/73 in Chromium. It includes all 11 workbench tabs at 390x844, single-owner combat-style selection with one dynamic setup tab, read-only compact `TYPE`, all six optional-number input/reset pairs, three compact setup-summary buttons without redundant intro copy, sticky long-table headers, popup search and keyboard selection, mobile Food popup containment, compact Risk/Duel containment, bounded legacy-migration notice scrolling and all prior simulation, storage, import, Planner, Duel, Loot, Trip, Economy, Risk and permalink workflows. The run used sandbox-external localhost permission because the managed sandbox rejects preview binds.                                                                                                                                                                                                |
 | `npm run test:e2e:visual`                                   | `pass on Darwin`                                                          | The isolated comparison passed 19/19 scenarios against 23 reviewed fixture-only Darwin PNGs without writing baselines. It covers root, Compare, loadouts, Stats, Trip, Loot details, Economy, Cannon, Planner, Duel and Settings at the specified desktop/tablet/mobile viewports. `npm run test:e2e:visual:update` remains the only baseline-write command. No CI runner or remote merge requirement is accepted.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | Shareable setup focused checks                              | `unit and browser pass`                                                   | `npm run test -- src/tests/shareable-setup.test.ts src/tests/ui-adapters.test.ts` passed 59/59, and the three permalink production-preview tests are included in the full 57/57 gate. Evidence covers strict bounded parsing, duplicate keys, game-data mismatch/unknown ids/stale loot, root/sub-path URL handling, clipboard failure, review-before-write, Load/Dismiss, complete Undo and preservation of unrelated/local price state.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | Duel monster matrix focused checks                          | `pass`                                                                    | `npm run test -- src/tests/ui-view-model.test.ts` passed 80/80, isolated `src/tests/ui-performance.test.ts` passed 3/3 with the 12-snapshot/819-cell matrix completing in about 2.5 seconds wall time, and the focused production-preview Playwright smoke passed 1/1. The full parallel Vitest gate also passed the CPU-time bound.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
@@ -461,7 +572,7 @@ the later 51/51 default Playwright pass.
 | `places MonsterCard after the active pane on mobile`                             | Mobile shell / MonsterCard           | `.workbench-shell > *` returned an empty array even though the error context shows `Workbench shell`, `Player sidebar`, `Workbench center` and `Monster card`. | The test evaluates a CSS selector immediately after navigation without first waiting for the shell, while the accessible layout is present in the failure context.                      | `timing/flaky`                                        | Keep as a browser-smoke blocker until a focused rerun or test hardening proves mobile ordering reliably passes.                                         |
 | `recomputes the Planner tab workflow from visible planner controls`              | Planner                              | Timeout while checking `Lock Attack`; the checkbox resolves but the action never completes.                                                                    | Planner UI is present, but the control is not actionably stable during the test window, likely due render/workload timing or locator actionability.                                     | `timing/flaky`                                        | Keep as a release gate failure for the visible Planner workflow until focused Planner smoke is stable.                                                  |
 | `uses the Duel tab to snapshot rename load delete and persist setup comparisons` | Duel snapshots                       | After Undo, the undo status says the snapshot was restored, but the rename control for `Melee saved` is not visible.                                           | Likely Duel undo/table refresh regression, or a stale table reference after restore. The current context shows only the live setup row.                                                 | `regression`                                          | Release-blocking for the Duel workflow unless a focused rerun proves it is flaky and not a state bug.                                                   |
-| `restores per-combat-style loadout edits when switching styles`                  | Basic combat setup / per-style state | Ranged `POT` is expected to restore to `ranging`, but the compact selector is empty in the last full default run.                                              | Likely per-style boost restore or compact boost synchronization regression in that run; the focused Goal 1 rerun passed after the combat-style tab routing fix.                         | `regression` in last full run; focused rerun `pass`   | Remove from the remaining likely-regression list after the next full default gate confirms the focused result.                                          |
+| `restores per-combat-style loadout edits when switching styles`                  | Basic combat setup / per-style state | Ranged `BOOST` is expected to restore to `ranging`, but the compact selector was empty in the historical full default run.                                     | Likely per-style boost restore or compact boost synchronization regression in that run; the focused Goal 1 rerun passed after the combat-style tab routing fix.                         | `regression` in historical run; focused rerun `pass`  | Remove from the remaining likely-regression list after the next full default gate confirms the focused result.                                          |
 | `edits combat equipment panes and persists style-specific selections`            | Equipment loadout persistence        | Timeout clicking the `Melee` tab after reload; the tab resolves but does not become actionably stable.                                                         | Reload/tab actionability timing issue is more evident than a numeric or persisted-value mismatch.                                                                                       | `timing/flaky`                                        | Keep as a smoke-gate failure; confirm with focused rerun before classifying as product regression.                                                      |
 | `creates, restores and removes monster-specific custom setups`                   | Custom setup snapshots               | After Undo for removed custom setup, `Setup context` does not contain `Custom setup`.                                                                          | Likely custom setup undo or setup-context refresh regression.                                                                                                                           | `regression`                                          | Release-blocking for monster-specific setup workflow until fixed or reclassified with evidence.                                                         |
 | `selects special attacks and shows special metrics`                              | Special attacks                      | Assertion times out on DBA boost explanatory copy, while the error context shows the same copy inside `Special attack` in the last full default run.           | The expected UI exists in the final context; the focused Goal 1 rerun passed after tab-route and locator hardening, so this is not treated as missing visible special-attack behavior.  | `timing/flaky` in last full run; focused rerun `pass` | Keep the full smoke gate failed until rerun, but do not treat this row as a remaining Special attacks product blocker.                                  |
@@ -532,7 +643,19 @@ Accepted budgets:
 - heavy compare/planner work must not block the UI in chunks longer than about 200 ms
 - if compare/planner misses the budget, move that workload behind the calculation runner boundary into a Web Worker
 
-Tests should specifically cover level-input updates because that path has already shown visible jank in the rewrite UI. Keep the first implementation main-thread friendly with memoization and debouncing, but preserve worker-compatible request/result/cancel/progress boundaries.
+Representative direct Dense Compare/Planner and maximum Duel matrix calculations exceeded this budget, so all three heavy paths now use `src/app/calculation-task.ts` through a cancellable one-shot Web Worker. Pure dispatch, structured-clone safety, success/failure and cancellation are covered by:
+
+```sh
+npm run test -- src/tests/calculation-task.test.ts src/tests/ui-performance.test.ts
+```
+
+The production-preview smoke installs a Chromium Long Task observer, triggers Compare, Planner and Duel through visible controls and rejects tasks over 200 ms:
+
+```sh
+npm run test:e2e -- --grep "keeps Compare, Planner and Duel worker calculations off the main event loop"
+```
+
+Tests should continue to cover level-input updates because that path has already shown visible jank. Do not move formulas or calculated output into worker-owned persistence; requests/results stay structured-cloneable and superseded work must remain cancellable.
 
 ## Domain core tests
 
@@ -744,6 +867,49 @@ They cover:
 - scarce/AFK spot target and respawn caps, visible inventory reserve details and prayer restore capacity fields
 - domain-owned general potion carry recommendation, including sustained-off inactive state, no-general-boost inactive fallback, non-finite manual-carry fallback, vial and single-dose under/over/matched state, `canApply` gating and long-trip carry scaling
 
+## Risk and variability tests
+
+The implemented contract is
+[risk-variability-spec.md](risk-variability-spec.md). The focused domain suite
+is `src/tests/risk-analysis.test.ts`; it covers deterministic PRNG vectors,
+identical-input reproducibility, ordered finite quantiles, probability bounds,
+analytic drop fixtures, food-sufficiency edge cases, invalid targets,
+stochastic coverage, exact source-backed incoming sampling, partial and
+compatibility mean-only coverage and bounded full-day hour-block composition.
+
+Run at minimum:
+
+```sh
+npm run test -- src/tests/risk-analysis.test.ts src/tests/calculation-task.test.ts src/tests/ui-view-model.test.ts
+npm run typecheck
+npm run test:e2e -- --workers=1 --grep "Risk"
+git diff --check
+```
+
+The complete delivery gate also requires `npm run test`, `npm run test:golden`,
+`npm run build` and the full browser suite. Existing deterministic golden values
+must remain unchanged; risk fixtures use explicit seeds and tolerance/property
+assertions instead of accepting incidental random snapshots.
+
+The 2026-07-11 implementation pass completed the repository gate with 38 files
+and 586 unit tests, 19/19 legacy goldens, typecheck, production build/artifact
+validation, lint, format and diff checks. The generated artifact had 8 files, 2
+assets, 1,712,492 bytes and SHA-256
+`2bffcddb2651d3283a51f8324ba4485a28ee3fe35ca7602fd312201ce9f1cc65`.
+Focused 10,000-trial one-hour and 24-hour-block measurements completed in about
+2.1 s and 1.8 s respectively outside the UI main thread.
+
+The focused Playwright case `runs, invalidates and cancels modeled Risk
+analysis` passes 1/1 in Chromium against the production preview. It verifies
+Run, all five outputs, coverage and warning copy, source-change staleness and
+cancellation. The first runtime attempt exposed a status-priority race: a stale
+prior result hid the latest `Cancelled` state even though cancellation itself
+had succeeded. Prioritizing the latest cancellation state closed the defect,
+and the focused rerun plus typecheck passed.
+Keep the runtime browser gate pending until it can run in an allowed preview
+environment; do not classify discovery as a passed browser check or the bind
+failure as a product regression.
+
 ## Planner domain tests
 
 The current planner-domain tests live in `src/tests/planner-domain.test.ts` and run as part of:
@@ -860,7 +1026,14 @@ with:
 npm run test:e2e -- --workers=1 -g "restores per-combat-style"
 npm run test:e2e -- --workers=1 -g "shows Stats XP routing"
 npm run test:e2e -- --workers=1 -g "selects special attacks"
+npm run test:e2e -- --workers=1 -g "explains setup ownership"
 ```
+
+The setup-ownership case verifies current prayer/boost, potion-carry/prayer
+restore and loot-policy summaries, the negative net-GP supply gap, direct Trip
+and active-style navigation and the explicit combat-potion labels. The
+2026-07-11 focused Chromium run passed this case together with desktop console,
+mobile order, multi-prayer/multi-boost and potion-carry coverage (5/5).
 
 Run the focused browser smoke for the Dense Compare scale indicators with:
 
@@ -883,6 +1056,13 @@ npm run test:e2e -- --grep "release-path dense"
 Run the focused browser smoke for the accepted Goal 2 Dense/Compare slice with:
 
 ```sh
+npm run test:e2e -- --workers=1 -g "keeps the desktop workbench inside one console viewport"
+npm run test:e2e -- --workers=1 -g "keeps long selected monster names readable"
+npm run test:e2e -- --workers=1 -g "keeps compact setup actions, Risk controls and Duel summaries readable"
+npm run test:e2e -- --workers=1 -g "keeps every workbench tab inside a narrow mobile viewport"
+npm run test:e2e -- --workers=1 -g "keeps search inside the dropdown and supports keyboard selection"
+npm run test:e2e -- --workers=1 -g "uses popup search for every primary long-choice field"
+npm run test:e2e -- --workers=1 -g "keeps the Food dropdown search and results inside the mobile viewport"
 npm run test:e2e -- --workers=1 -g "keeps Dense Compare mobile and tablet overflow contained"
 npm run test:e2e -- --workers=1 -g "shows dense compare calculation freshness"
 npm run test:e2e -- --workers=1 -g "filters dense compare rows and persists hidden monsters"
@@ -890,6 +1070,33 @@ npm run test:e2e -- --workers=1 -g "shows dense row markers"
 npm run test:e2e -- --workers=1 -g "matches browser-rendered dense numeric snapshots"
 npm run test:e2e -- --workers=1 -g "sorts the full monster table and selects a target row"
 ```
+
+The desktop console case fixes the viewport at 1280×720, waits for the dense
+rows, asserts that document/body height stays inside the viewport, verifies
+`auto` vertical overflow ownership for PlayerSidebar, the active pane and
+MonsterCard, scrolls the two overflowing regions and confirms `window.scrollY`
+remains zero. The mobile/tablet case continues to own normal document flow,
+pane order and horizontal table containment. The 2026-07-11 focused Chromium
+run passed all three desktop-console, mobile-order and mobile/tablet-overflow
+cases (3/3).
+
+The long-value case selects Water Elemental through the setup context, verifies
+that both synchronized monster selects expose the complete label, measures the
+rendered label against usable select width at 1280x720 and confirms that setup
+guide summaries use wrapping rather than ellipsis.
+
+The whole-UI audit regressions cover the compact setup action row, Risk action
+containment, Duel summary wrapping, the shared popup-combobox presentation and
+document-width/setup-context containment for every workbench tab at 390x844.
+The keyboard case filters and selects Magic `Fire Wave`; the inventory case
+opens the setup/MonsterCard targets, weapon, every gear slot, ammo, spell, Trip
+food, Risk target drop and Economy snapshot/trend-item popups and confirms the
+search stays inside each. The mobile case checks the Food popup and selected
+Swordfish state at 390x844. The Settings recovery case verifies that a large
+legacy-migration notice owns a bounded desktop scroll area instead of covering
+workbench controls. The final full gate passed 73/73 browser cases; `npm run verify` passed 586 unit tests,
+19/19 legacy goldens, build/artifact, lint, format and diff checks with artifact
+SHA-256 `66f25a71cabfd55811a51f78303b34bfb7f49b6d026f188ba2c97c7ddebd431c`.
 
 Run the focused browser smoke for the accepted Loot/Economy slice with:
 
@@ -1018,6 +1225,7 @@ node -e "for (const f of ['prices.json','alch.json','price-history.json']) JSON.
 - Composed simulation result contract or main view-model result-source changes: run `npm run typecheck` and `npm run test -- src/tests/full-simulation-result.test.ts src/tests/domain-core.test.ts src/tests/trip-loot-supply.test.ts src/tests/xp-parity.test.ts src/tests/ui-view-model.test.ts src/tests/data-economy.test.ts`. This validates the `CombatSimulationResult`/`FullSimulationResult` boundary against current combat, trip, XP, economy and UI view-model evidence without requiring Playwright unless visible UI behavior changes.
 - XP calculation or XP row changes: `npm run test -- src/tests/xp-parity.test.ts`, `npm run test`, and `npm run test:golden` when current-behavior parity can change.
 - Trip/loot/supply domain changes: `npm run test -- src/tests/trip-loot-supply.test.ts`, `npm run test`, and `npm run test:golden` when current-behavior parity can change. Include `src/tests/xp-parity.test.ts` when `effectiveKph`, recoil, poison or cannon behavior can affect XP/hr.
+- Risk/variability changes: `npm run test -- src/tests/risk-analysis.test.ts src/tests/calculation-task.test.ts src/tests/ui-view-model.test.ts`, `npm run typecheck`, representative performance coverage and the focused `Risk` Playwright workflow. Run the full unit, golden, build and browser gates before delivery; stochastic tests use fixed seeds and analytic/property tolerances.
 - Data or prices: JSON parse, `npm run test -- src/tests/data-economy.test.ts`, and representative simulation fixtures when simulation behavior can change.
 - Generated runtime readiness: `npm run test -- src/tests/generated-runtime-adapter.test.ts`, `npm run runtime:readiness -- --example-limit 5`, `npm run runtime:coverage-plan -- --example-limit 5`, `npm run test -- src/tests/data-generator.test.ts src/tests/data-economy.test.ts src/tests/trip-loot-supply.test.ts`, `npm run test:golden`, `npm run typecheck` and `git diff --check`. The default readiness command is blocking and must stay green for the active snapshot. Use `--allow-not-ready` only for deliberate incomplete local candidates. Rerun full domain/golden/browser evidence for generated snapshot value or bootstrap changes.
 - Planner: `npm run test -- src/tests/planner-domain.test.ts` for gear eligibility, scoring, stance selection and golden plan fixtures. Run full `npm run test` if planner changes interact with combat, trip, data or economy contracts.

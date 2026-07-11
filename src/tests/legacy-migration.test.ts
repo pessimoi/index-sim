@@ -541,23 +541,26 @@ describe("legacy storage migration foundation", () => {
     );
   });
 
-  it("reports malformed legacy JSON without returning a setup candidate", () => {
-    const storage = createMemoryStorage({
-      [LEGACY_INPUT_STORAGE_KEY]: "{bad json"
-    });
+  it.each(["{bad json", '{"combatType":"melee","combatType":"ranged"}'])(
+    "reports malformed or ambiguous legacy JSON without returning a setup candidate",
+    (legacyJson) => {
+      const storage = createMemoryStorage({
+        [LEGACY_INPUT_STORAGE_KEY]: legacyJson
+      });
 
-    const report = inspectLegacySetupMigration({ storage, gameData });
+      const report = inspectLegacySetupMigration({ storage, gameData });
 
-    expect(report.foundKeys).toEqual([LEGACY_INPUT_STORAGE_KEY]);
-    expect(report.setup).toBeNull();
-    expect(report.skippedFields).toContainEqual({
-      field: LEGACY_INPUT_STORAGE_KEY,
-      reason: "invalid JSON"
-    });
-    expect(report.warnings).toEqual(
-      expect.arrayContaining(["Legacy setup input could not be parsed as JSON."])
-    );
-  });
+      expect(report.foundKeys).toEqual([LEGACY_INPUT_STORAGE_KEY]);
+      expect(report.setup).toBeNull();
+      expect(report.skippedFields).toContainEqual({
+        field: LEGACY_INPUT_STORAGE_KEY,
+        reason: "invalid JSON"
+      });
+      expect(report.warnings).toEqual(
+        expect.arrayContaining(["Legacy setup input could not be parsed as JSON."])
+      );
+    }
+  );
 
   it("reports invalid non-object legacy setup state without returning a setup candidate", () => {
     const storage = createMemoryStorage({
@@ -1059,6 +1062,23 @@ describe("legacy storage migration foundation", () => {
   it("skips malformed legacy price JSON safely", () => {
     const storage = createMemoryStorage({
       sim_prices_v1: "{bad json",
+      sim_alch_v1: JSON.stringify({ lobster: 90 })
+    });
+
+    const report = inspectLegacySetupMigration({ storage, gameData });
+
+    expect(report.priceSet).toBeNull();
+    expect(report.skippedFields).toEqual(
+      expect.arrayContaining([
+        { field: "sim_prices_v1", reason: "invalid JSON" },
+        { field: "prices.priceSet", reason: "legacy price set could not be parsed safely" }
+      ])
+    );
+  });
+
+  it("skips duplicate-key legacy price JSON safely", () => {
+    const storage = createMemoryStorage({
+      sim_prices_v1: '{"lobster":100,"lobster":200}',
       sim_alch_v1: JSON.stringify({ lobster: 90 })
     });
 

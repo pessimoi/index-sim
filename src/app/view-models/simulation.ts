@@ -2208,6 +2208,20 @@ function fullSimulationInputFor(
   };
 }
 
+export function createFullSimulationInputForForm(
+  form: CombatSetupFormState,
+  context: SimulationContext,
+  cannonByMonster: CannonByMonsterState = {},
+  lootPrefs: Record<string, LootAction | string | undefined> = {},
+  lootSettingsByMonster: LootSettingsByMonsterState = {}
+): FullSimulationInput {
+  const request = formToSimulationRequest(form, context.gameData);
+  return {
+    ...fullSimulationInputFor(form, request, cannonByMonster, lootSettingsByMonster),
+    lootPrefs
+  };
+}
+
 function simulateWithLootPrefs(
   input: TripLootSupplyInput,
   context: SimulationContext,
@@ -2870,11 +2884,13 @@ function createStatsSourceBreakdownViewModel(input: {
 }
 
 function finiteMinutesLabel(minutes: number): string {
-  return Number.isFinite(minutes) ? `${formatNumber(minutes, 1)}m` : "unlimited";
+  if (minutes === Number.POSITIVE_INFINITY) return "unlimited";
+  return Number.isFinite(minutes) ? `${formatNumber(minutes, 1)}m` : "-";
 }
 
 function finiteSecondsLabel(seconds: number): string {
-  return Number.isFinite(seconds) ? `${formatNumber(seconds)}s` : "unlimited";
+  if (seconds === Number.POSITIVE_INFINITY) return "unlimited";
+  return Number.isFinite(seconds) ? `${formatNumber(seconds)}s` : "-";
 }
 
 function statsTripRow(input: {
@@ -2973,6 +2989,15 @@ function createTripBankingSummaryViewModel(
         label: "Protection prayer",
         value: protectionStateLabel(form, trip),
         note: trip.trip.incoming.protected ? "Incoming damage blocked by protection prayer." : ""
+      }),
+      statsTripRow({
+        id: "incoming-model",
+        label: "Incoming model",
+        value: trip.trip.incoming.descriptor.sourceLabel,
+        note:
+          trip.trip.incoming.descriptor.coverage === "source-backed"
+            ? "Revision 274 typed attack profile."
+            : "Incoming variance remains mean-only for this model coverage."
       })
     ]
   };
@@ -3956,6 +3981,34 @@ export function sortDenseCompareRows(
   return [...rows].sort((left, right) => compareDenseRows(left, right, normalizedSort));
 }
 
+export function presentDenseCompareRows(
+  rows: readonly DenseCompareRowViewModel[],
+  gameData: GameDataSnapshot,
+  denseCompare: unknown = DEFAULT_DENSE_COMPARE_SORT_STATE
+): DenseCompareRowViewModel[] {
+  const denseState = normalizeDenseCompareUiState(denseCompare);
+  const irrelevantMonsterIds = new Set(denseState.irrelevantMonsterIds);
+  const presentedRows = rows
+    .map((row) => {
+      const rowWithRelevance = {
+        ...row,
+        isIrrelevant: irrelevantMonsterIds.has(row.monsterId),
+        isForcedVisible: false
+      };
+      const isForcedVisible =
+        rowWithRelevance.isActiveTarget &&
+        !rowMatchesDenseFilters(rowWithRelevance, gameData, denseState);
+      return {
+        ...rowWithRelevance,
+        isForcedVisible,
+        markers: createDenseCompareRowMarkers({ ...rowWithRelevance, isForcedVisible })
+      };
+    })
+    .filter((row) => row.isForcedVisible || rowMatchesDenseFilters(row, gameData, denseState));
+
+  return sortDenseCompareRows(presentedRows, denseState.sort);
+}
+
 export function createDenseCompareRows(
   form: CombatSetupFormState,
   context: SimulationContext,
@@ -3965,9 +4018,6 @@ export function createDenseCompareRows(
   customSetupsByMonster: CustomSetupsByMonsterState = {},
   lootSettingsByMonster: LootSettingsByMonsterState = {}
 ): DenseCompareRowViewModel[] {
-  const denseState = normalizeDenseCompareUiState(denseCompare);
-  const sort = denseState.sort;
-  const irrelevantMonsterIds = new Set(denseState.irrelevantMonsterIds);
   const rows = Object.values(context.gameData.monsters).map((monster) => {
     const customSetup = customSetupsByMonster[monster.id];
     const lootSettings = lootSettingsByMonster[monster.id];
@@ -3988,7 +4038,7 @@ export function createDenseCompareRows(
       monsterLevel: monster.level ?? null,
       isActiveTarget: monster.id === form.monsterId,
       isForcedVisible: false,
-      isIrrelevant: irrelevantMonsterIds.has(monster.id),
+      isIrrelevant: false,
       hasCustomSetup: customSetup != null,
       hasHighAlchOverride,
       hasOverheadOverride,
@@ -3996,7 +4046,7 @@ export function createDenseCompareRows(
         hasCustomSetup: customSetup != null,
         hasHighAlchOverride,
         hasOverheadOverride,
-        isIrrelevant: irrelevantMonsterIds.has(monster.id),
+        isIrrelevant: false,
         isForcedVisible: false
       }),
       hitChance: vm.result.combat.hitChance,
@@ -4011,22 +4061,7 @@ export function createDenseCompareRows(
       bound: vm.result.trip.trip.bound
     };
   });
-
-  const filteredRows = rows
-    .map((row) => {
-      const isForcedVisible =
-        row.isActiveTarget && !rowMatchesDenseFilters(row, context.gameData, denseState);
-      return {
-        ...row,
-        isForcedVisible,
-        markers: createDenseCompareRowMarkers({ ...row, isForcedVisible })
-      };
-    })
-    .filter(
-      (row) => row.isForcedVisible || rowMatchesDenseFilters(row, context.gameData, denseState)
-    );
-
-  return sortDenseCompareRows(filteredRows, sort);
+  return presentDenseCompareRows(rows, context.gameData, denseCompare);
 }
 
 export function createCompareRows(
@@ -4596,7 +4631,8 @@ export function styleOptions(
 }
 
 export function formatNumber(value: number, digits = 0): string {
-  if (!Number.isFinite(value)) return "unlimited";
+  if (value === Number.POSITIVE_INFINITY) return "unlimited";
+  if (!Number.isFinite(value)) return "-";
   return value.toLocaleString("en-US", {
     maximumFractionDigits: digits,
     minimumFractionDigits: digits

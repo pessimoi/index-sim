@@ -1,14 +1,11 @@
 import { z } from "zod";
-import { supportedSpecialAttacksForCombatStyle, weaponStances } from "@/domain/combat";
-import { EQUIPMENT_SLOTS, type CombatStyle, type GameDataSnapshot } from "@/domain/shared";
-import { FOOD, lootPreferenceKeysForMonster, type CannonSettings } from "@/domain/trip";
+import type { GameDataSnapshot } from "@/domain/shared";
+import { lootPreferenceKeysForMonster, type CannonSettings } from "@/domain/trip";
 import { DataReliabilityError, parseJsonWithDuplicateKeyCheck } from "@/data/reliability";
 import {
-  BOOST_SELECTION_OPTIONS,
   CannonByMonsterSchema,
   CombatSetupFormSchema,
   DEFAULT_CANNON_SETTINGS,
-  PRAYER_SELECTION_OPTIONS,
   normalizeFormState,
   type CannonByMonsterState,
   type CombatSetupFormState
@@ -20,6 +17,7 @@ import {
   type LootSettingsByMonsterState,
   type MonsterLootSettings
 } from "./loot-settings";
+import { combatSetupCompatibilityIssues } from "./setup-compatibility";
 
 export const SHAREABLE_SETUP_KIND = "index-sim-setup";
 export const SHAREABLE_SETUP_VERSION = 1;
@@ -264,72 +262,12 @@ export function decodeShareableSetupEnvelope(payload: string): ShareableSetupEnv
   return envelopeFromUnknown(value);
 }
 
-function validStyleIds(
-  combatStyle: CombatStyle,
-  weaponId: string,
-  gameData: GameDataSnapshot
-): Set<string> {
-  if (combatStyle === "melee") {
-    return new Set(weaponStances(weaponId, gameData).map((stance) => stance.id));
-  }
-  if (combatStyle === "ranged") return new Set(["accurate", "rapid", "longrange"]);
-  return new Set(["accurate", "defensive", "longrange"]);
-}
-
-function validateLoadoutEntities(
-  combatStyle: CombatStyle,
-  loadout: CombatSetupFormState["perStyleLoadouts"][CombatStyle],
-  gameData: GameDataSnapshot,
-  issues: string[]
-): void {
-  const weapon = gameData.weapons[loadout.weaponId];
-  if (!weapon || weapon.type !== combatStyle) issues.push(`${combatStyle}.weaponId`);
-  if (loadout.ammoId !== "none" && !gameData.ammo[loadout.ammoId]) {
-    issues.push(`${combatStyle}.ammoId`);
-  }
-  if (loadout.spellId !== "none" && !gameData.spells[loadout.spellId]) {
-    issues.push(`${combatStyle}.spellId`);
-  }
-  if (!validStyleIds(combatStyle, loadout.weaponId, gameData).has(loadout.styleId)) {
-    issues.push(`${combatStyle}.styleId`);
-  }
-
-  for (const slot of EQUIPMENT_SLOTS) {
-    const itemId = loadout.gear[slot];
-    if (itemId && itemId !== "none" && !gameData.equipment[slot]?.[itemId]) {
-      issues.push(`${combatStyle}.gear.${slot}`);
-    }
-  }
-
-  const prayerIds = new Set(PRAYER_SELECTION_OPTIONS.map((option) => option.id));
-  const boostIds = new Set(BOOST_SELECTION_OPTIONS.map((option) => option.id));
-  if (loadout.prayers.some((id) => !prayerIds.has(id))) issues.push(`${combatStyle}.prayers`);
-  if (loadout.boosts.some((id) => !boostIds.has(id))) issues.push(`${combatStyle}.boosts`);
-
-  if (loadout.specialAttack.weaponId !== "none") {
-    const supported = supportedSpecialAttacksForCombatStyle(combatStyle, gameData).some(
-      (special) => special.weaponId === loadout.specialAttack.weaponId
-    );
-    if (!supported || !gameData.weapons[loadout.specialAttack.weaponId]) {
-      issues.push(`${combatStyle}.specialAttack.weaponId`);
-    }
-  }
-  if (loadout.specialAttack.ammoId !== "none" && !gameData.ammo[loadout.specialAttack.ammoId]) {
-    issues.push(`${combatStyle}.specialAttack.ammoId`);
-  }
-}
-
 export function reviewShareableSetup(
   envelope: ShareableSetupEnvelopeV1,
   gameData: GameDataSnapshot
 ): ShareableSetupReview {
   const form = envelope.data.form;
-  const issues: string[] = [];
-  if (!gameData.monsters[form.monsterId]) issues.push("monsterId");
-  if (!Object.prototype.hasOwnProperty.call(FOOD, form.trip.foodKey)) issues.push("trip.foodKey");
-  for (const combatStyle of ["melee", "ranged", "magic"] as const) {
-    validateLoadoutEntities(combatStyle, form.perStyleLoadouts[combatStyle], gameData, issues);
-  }
+  const issues = combatSetupCompatibilityIssues(form, gameData, "form");
   if (issues.length > 0) {
     throw new ShareableSetupError(
       "incompatible_entities",

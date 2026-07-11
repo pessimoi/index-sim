@@ -1,6 +1,13 @@
 import { z } from "zod";
+import {
+  DataReliabilityError,
+  assertUniqueRecordIds,
+  parseJsonWithDuplicateKeyCheck
+} from "@/data/reliability";
 
 import { CombatSetupFormSchema, normalizeFormState, type CombatSetupFormState } from "./ui-state";
+import { duelSnapshotsCompatibilityIssues } from "./setup-compatibility";
+import type { GameDataSnapshot } from "@/domain/shared";
 
 export const DUEL_SNAPSHOTS_STORAGE_KEY = "index-sim:duel-snapshots";
 export const DUEL_SNAPSHOTS_VERSION = 1;
@@ -26,7 +33,13 @@ export interface DuelSnapshotsExportEnvelope {
 }
 
 export type DuelSnapshotsImportErrorCode =
-  "body_too_large" | "invalid_json" | "unsupported_version" | "invalid_data";
+  | "body_too_large"
+  | "duplicate_keys"
+  | "duplicate_ids"
+  | "invalid_json"
+  | "unsupported_version"
+  | "invalid_data"
+  | "incompatible_entities";
 
 export class DuelSnapshotsImportError extends Error {
   constructor(readonly code: DuelSnapshotsImportErrorCode) {
@@ -133,7 +146,8 @@ export function createDuelSnapshotsExport(
 
 export function parseDuelSnapshotsExportText(
   text: string,
-  maxBytes = DUEL_SNAPSHOTS_IMPORT_MAX_BYTES
+  maxBytes = DUEL_SNAPSHOTS_IMPORT_MAX_BYTES,
+  gameData?: GameDataSnapshot
 ): DuelSnapshotsExportEnvelope {
   if (new TextEncoder().encode(text).byteLength > maxBytes) {
     throw new DuelSnapshotsImportError("body_too_large");
@@ -141,8 +155,11 @@ export function parseDuelSnapshotsExportText(
 
   let value: unknown;
   try {
-    value = JSON.parse(text);
-  } catch {
+    value = parseJsonWithDuplicateKeyCheck(text, { maxBytes, source: "Duel snapshot import" });
+  } catch (error) {
+    if (error instanceof DataReliabilityError && error.code === "duplicate_keys") {
+      throw new DuelSnapshotsImportError("duplicate_keys");
+    }
     throw new DuelSnapshotsImportError("invalid_json");
   }
 
@@ -155,8 +172,34 @@ export function parseDuelSnapshotsExportText(
     throw new DuelSnapshotsImportError("unsupported_version");
   }
 
+  try {
+    const data = value !== null && typeof value === "object" && "data" in value ? value.data : null;
+    const snapshots =
+      data !== null &&
+      typeof data === "object" &&
+      "snapshots" in data &&
+      Array.isArray(data.snapshots)
+        ? data.snapshots
+        : [];
+    assertUniqueRecordIds(
+      snapshots.filter(
+        (snapshot): snapshot is Record<string, unknown> =>
+          snapshot !== null && typeof snapshot === "object" && !Array.isArray(snapshot)
+      ),
+      { label: "Duel snapshots" }
+    );
+  } catch (error) {
+    if (error instanceof DataReliabilityError && error.code === "duplicate_ids") {
+      throw new DuelSnapshotsImportError("duplicate_ids");
+    }
+    throw error;
+  }
+
   const parsed = DuelSnapshotsExportEnvelopeSchema.safeParse(value);
   if (!parsed.success) throw new DuelSnapshotsImportError("invalid_data");
+  if (gameData && duelSnapshotsCompatibilityIssues(parsed.data.data, gameData).length > 0) {
+    throw new DuelSnapshotsImportError("incompatible_entities");
+  }
   return parsed.data;
 }
 

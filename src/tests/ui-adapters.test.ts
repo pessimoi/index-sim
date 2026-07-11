@@ -1,4 +1,5 @@
 import { parsePriceSetFileText } from "../adapters/market";
+import { createGeneratedRuntimeContext } from "../adapters/generated";
 import { createMemoryStorage, loadPersisted, savePersisted } from "../adapters/storage";
 import {
   DEFAULT_DENSE_COMPARE_STATE,
@@ -323,6 +324,26 @@ describe("versioned rewrite persistence", () => {
     });
   });
 
+  it("rejects Duel snapshot entities unavailable in the current game revision", () => {
+    const { context } = createGeneratedRuntimeContext();
+    const exported = createDuelSnapshotsExport({
+      snapshots: [
+        createDuelSnapshot("removed-entity", "Removed entity", {
+          ...DEFAULT_FORM_STATE,
+          monsterId: "removed_revision_monster"
+        })
+      ]
+    });
+
+    expect(() =>
+      parseDuelSnapshotsExportText(
+        JSON.stringify(exported),
+        DUEL_SNAPSHOTS_IMPORT_MAX_BYTES,
+        context.gameData
+      )
+    ).toThrowError(expect.objectContaining({ code: "incompatible_entities" }));
+  });
+
   it("rejects unsafe Duel snapshot imports and preserves a full current list", () => {
     const full = {
       snapshots: Array.from({ length: MAX_DUEL_SNAPSHOTS }, (_, index) =>
@@ -339,6 +360,21 @@ describe("versioned rewrite persistence", () => {
 
     const invalidCases: Array<[DuelSnapshotsImportError["code"], string, number?]> = [
       ["invalid_json", "{bad"],
+      [
+        "duplicate_keys",
+        JSON.stringify(createDuelSnapshotsExport(imported)).replace(
+          `"version":${DUEL_SNAPSHOTS_VERSION}`,
+          `"version":${DUEL_SNAPSHOTS_VERSION},"version":${DUEL_SNAPSHOTS_VERSION}`
+        )
+      ],
+      [
+        "duplicate_ids",
+        JSON.stringify({
+          version: DUEL_SNAPSHOTS_VERSION,
+          exportedAt: "now",
+          data: { snapshots: [imported.snapshots[0], imported.snapshots[0]] }
+        })
+      ],
       ["unsupported_version", JSON.stringify({ version: 2, exportedAt: "now", data: imported })],
       [
         "invalid_data",

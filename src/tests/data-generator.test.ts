@@ -272,6 +272,15 @@ describe("game data generator foundation", () => {
     });
     expect(outputs.gameData.monsters.giant).toMatchObject({
       hp: 35,
+      incomingAttackCoverage: "exact",
+      incomingAttacks: [
+        expect.objectContaining({
+          attackType: "melee",
+          formulaId: "standard-melee-v1",
+          formulaInputs: { kind: "standard", level: 22, bonus: 16 },
+          coverage: "exact"
+        })
+      ],
       loot: expect.arrayContaining([expect.objectContaining({ key: "big_bones" })])
     });
     expect(outputs.gameData.weapons.bronze_dart_w.accBonus).toBe(3);
@@ -326,7 +335,7 @@ describe("game data generator foundation", () => {
     expect(sourcePin.generatedAt).toBe(GENERATED_AT);
     expect(sourcePin.generator).toMatchObject({
       name: "index-sim-data-generator",
-      version: "raw-lostcity-runtime-catalog-3"
+      version: "raw-lostcity-runtime-catalog-4"
     });
     expect(sourcePin.generator?.command).toContain("npm run data:generate");
     expect(sourcePin.scope).toMatchObject({

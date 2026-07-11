@@ -7,7 +7,7 @@ Status: raw LostCity source report.
 - Source ref: LostCityRS/Content / 376072662e78a314bf35bb18815be39521491a6b
 - Source path: `.sources/lostcity-content`
 - Generated at: 2026-07-09T00:00:00.000Z
-- Generator version: raw-lostcity-runtime-catalog-3
+- Generator version: raw-lostcity-runtime-catalog-4
 - Generator command: `npm run data:generate -- --source-dir .sources/lostcity-content --output-root . --generated-at 2026-07-09T00:00:00.000Z --impact-outlier-limit 25`
 
 ## Runtime Status

@@ -166,6 +166,46 @@ export interface DropDefinition {
 
 export type DropEntry = DropDefinition | DropDefinition[];
 
+export type IncomingAttackType = "melee" | "ranged" | "magic";
+export type IncomingAttackCoverage = "exact" | "partial" | "fallback";
+export type IncomingAttackFormulaId =
+  | "standard-melee-v1"
+  | "standard-ranged-v1"
+  | "spell-row-v1"
+  | "forced-max-hit-v1"
+  | "scripted-fixed-v1";
+
+export type IncomingAttackFormulaInputs =
+  { kind: "standard"; level: number; bonus: number } | { kind: "source-value"; value: number };
+
+export type IncomingAttackAccuracy =
+  { kind: "standard"; level: number; bonus: number } | { kind: "always" } | { kind: "mean-only" };
+
+export type IncomingAttackSelection =
+  | { kind: "always" }
+  | { kind: "weighted"; weight: number }
+  | {
+      kind: "contextual";
+      reason:
+        | "selection-policy-required"
+        | "non-damaging-spell-selection"
+        | "separate-overlay"
+        | "unsupported-source-path";
+    };
+
+export interface IncomingAttackProfile {
+  id: EntityId;
+  attackType: IncomingAttackType;
+  attackSpeedTicks: number;
+  maxHit: number;
+  formulaId: IncomingAttackFormulaId;
+  formulaInputs: IncomingAttackFormulaInputs;
+  accuracy: IncomingAttackAccuracy;
+  selection: IncomingAttackSelection;
+  coverage: IncomingAttackCoverage;
+  provenance: DataProvenance;
+}
+
 export interface MonsterDefinition {
   id: EntityId;
   name: string;
@@ -184,6 +224,8 @@ export interface MonsterDefinition {
   defCrush?: number;
   defRange?: number;
   defMagic?: number;
+  incomingAttacks?: IncomingAttackProfile[];
+  incomingAttackCoverage?: IncomingAttackCoverage;
   loot?: DropEntry[];
   provenance?: DataProvenance;
 }

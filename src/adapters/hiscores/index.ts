@@ -16,6 +16,10 @@ import type {
   HiscoresStatusResponse,
   IntegrationErrorResponse
 } from "@/domain/shared";
+import {
+  ResponseBodyTooLargeError,
+  readBoundedResponseText
+} from "@/adapters/browser/bounded-response";
 
 export const HISCORES_LAST_PLAYER_STORAGE_KEY = "index-sim:hiscores:last-player";
 export const HISCORES_LAST_PLAYER_STORAGE_VERSION = 1;
@@ -70,10 +74,6 @@ function sameOriginUrl(path: string, options: HiscoresFetchOptions): URL {
   return target;
 }
 
-async function readResponseText(response: Response): Promise<string> {
-  return response.text();
-}
-
 function adapterErrorFromStatus(status: number): IntegrationErrorResponse["error"]["code"] {
   if (status === 400) return "bad-request";
   if (status === 404) return "not-found";
@@ -88,6 +88,9 @@ function validationToAdapterError(
   fallbackCode: IntegrationErrorResponse["error"]["code"]
 ) {
   if (error instanceof LiveIntegrationValidationError) {
+    return new HiscoresAdapterError(fallbackCode, "Invalid hiscores API response");
+  }
+  if (error instanceof ResponseBodyTooLargeError) {
     return new HiscoresAdapterError(fallbackCode, "Invalid hiscores API response");
   }
   return error;
@@ -110,9 +113,13 @@ async function errorFromResponse(
 ): Promise<HiscoresAdapterError> {
   const fallbackCode = adapterErrorFromStatus(response.status);
   try {
-    const parsed = parseIntegrationErrorResponseJson(await readResponseText(response), {
-      maxBytes: options.maxBytes ?? LIVE_INTEGRATION_JSON_MAX_BYTES
-    });
+    const maxBytes = options.maxBytes ?? LIVE_INTEGRATION_JSON_MAX_BYTES;
+    const parsed = parseIntegrationErrorResponseJson(
+      await readBoundedResponseText(response, maxBytes),
+      {
+        maxBytes
+      }
+    );
     return new HiscoresAdapterError(parsed.error.code, parsed.error.message, {
       status: response.status,
       retryAfterSeconds: parsed.error.retryAfterSeconds
@@ -140,8 +147,9 @@ export async function fetchHiscoresStatus(
   }
 
   try {
-    return parseHiscoresStatusResponseJson(await readResponseText(response), {
-      maxBytes: options.maxBytes ?? LIVE_INTEGRATION_JSON_MAX_BYTES
+    const maxBytes = options.maxBytes ?? LIVE_INTEGRATION_JSON_MAX_BYTES;
+    return parseHiscoresStatusResponseJson(await readBoundedResponseText(response, maxBytes), {
+      maxBytes
     });
   } catch (error) {
     throw validationToAdapterError(error, "upstream-invalid");
@@ -168,8 +176,9 @@ export async function lookupHiscores(
   }
 
   try {
-    return parseHiscoresResponseJson(await readResponseText(response), {
-      maxBytes: options.maxBytes ?? LIVE_INTEGRATION_JSON_MAX_BYTES
+    const maxBytes = options.maxBytes ?? LIVE_INTEGRATION_JSON_MAX_BYTES;
+    return parseHiscoresResponseJson(await readBoundedResponseText(response, maxBytes), {
+      maxBytes
     });
   } catch (error) {
     throw validationToAdapterError(error, "upstream-invalid");

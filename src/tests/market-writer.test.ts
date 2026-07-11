@@ -326,6 +326,35 @@ describe("scheduled market writer", () => {
     expect(ambiguousItem.history?.map((trade) => trade.price)).toEqual([200, 220]);
   });
 
+  it("rejects duplicate keys in JSON and HTML Inertia item pages", () => {
+    const mapping = TEST_MAPPINGS.find((candidate) => candidate.itemId === "lobster")!;
+    const duplicatePayload = itemPagePayload("lobster", [200, 210, 220]).replace(
+      '"component":"items/show/page"',
+      '"component":"unexpected/page","component":"items/show/page"'
+    );
+
+    expectWriterError(
+      () =>
+        parseMarketsLostcityItemPage({
+          text: duplicatePayload,
+          contentType: "application/json",
+          mapping
+        }),
+      "invalid_upstream"
+    );
+
+    const htmlPayload = duplicatePayload.replaceAll("&", "&amp;").replaceAll('"', "&quot;");
+    expectWriterError(
+      () =>
+        parseMarketsLostcityItemPage({
+          text: `<main data-page="${htmlPayload}"></main>`,
+          contentType: "text/html; charset=UTF-8",
+          mapping
+        }),
+      "invalid_upstream"
+    );
+  });
+
   it("rejects invalid normalized/raw rows and incomplete approved mapping sets", () => {
     expectWriterError(() => parseFixture("upstream-invalid-numeric.json"), "invalid_upstream");
     expectWriterError(() => parseRawFixture("raw-invalid-numeric.json"), "invalid_upstream");

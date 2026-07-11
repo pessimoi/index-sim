@@ -32,7 +32,7 @@ npm run build
 npm run preview
 ```
 
-The Vite dev server serves the rewrite UI from the root `index.html`. Use `legacy/index.html` only for archived legacy reference work.
+The Vite dev server serves the rewrite UI from the root `index.html`. Use `legacy/index.html` only for archived legacy reference work. The dev configuration serves `planner.jsx` and `views.jsx` unchanged so the archive's browser-side Babel path is not rewritten by Vite before it runs.
 
 Run temporary scripts, local caches and generated helper files from inside this repository. Avoid `/tmp` or other external scratch paths for project work unless a human explicitly approves, because endpoint security on the user's work machine may flag those runs.
 

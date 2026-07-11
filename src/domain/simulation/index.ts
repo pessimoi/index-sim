@@ -118,7 +118,7 @@ export function composeFullSimulationResult(parts: FullSimulationParts): FullSim
     rates: {
       dps: combat.dps,
       effectiveDps: combat.effectiveDps,
-      ttkSec: combat.ttkSec,
+      ttkSec: trip.ttkSec,
       cycleSec: trip.cycleSec,
       killsPerHour: trip.killsPerHour,
       effectiveKph: trip.effectiveKph,

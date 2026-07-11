@@ -12,6 +12,7 @@ import {
   bonePrayerXp,
   defaultLootAction,
   evaluateLoot,
+  createIncomingDamageDescriptor,
   isStackable,
   lootPreferenceKey,
   normalizeLootName,
@@ -26,7 +27,13 @@ import {
   createPriceSetFromLegacyGameData,
   type LegacySnapshotInput
 } from "../data";
-import { type PriceSet, type SimulationContext, type SimulationRequest } from "../domain/shared";
+import {
+  type IncomingAttackProfile,
+  type MonsterDefinition,
+  type PriceSet,
+  type SimulationContext,
+  type SimulationRequest
+} from "../domain/shared";
 
 interface GoldenFixture {
   tolerances: {
@@ -459,6 +466,184 @@ describe("trip/loot/supply unit rules", () => {
     expect(protectedResult.trip.incoming.hpPerKill).toBeLessThan(
       forcedOffResult.trip.incoming.hpPerKill
     );
+  });
+
+  it("normalizes exact typed melee, ranged and magic profiles through one descriptor", () => {
+    const runtime = createLegacyRuntime();
+    const baseContext = domainContextFromLegacy(runtime);
+    const definition = definitionsById.get("melee_ring_recoil_fire_giant_food_trip");
+    if (!definition) throw new Error("Missing incoming profile fixture");
+    const input = buildTripInput(runtime, definition, baseContext);
+    const context: SimulationContext = {
+      ...baseContext,
+      gameData: {
+        ...baseContext.gameData,
+        equipment: {
+          ...baseContext.gameData.equipment,
+          helm: {
+            ...baseContext.gameData.equipment.helm,
+            incoming_guard: {
+              name: "Incoming guard",
+              slashDef: 100,
+              rngDef: 0,
+              magDef: -20
+            }
+          }
+        }
+      }
+    };
+    const request: SimulationRequest = {
+      ...input.request,
+      loadout: {
+        ...input.request.loadout,
+        gear: { ...input.request.loadout.gear, helm: "incoming_guard" }
+      }
+    };
+    const profile = (
+      id: string,
+      attackType: IncomingAttackProfile["attackType"],
+      weight: number
+    ): IncomingAttackProfile => ({
+      id,
+      attackType,
+      attackSpeedTicks: 4,
+      maxHit: 8,
+      formulaId: "scripted-fixed-v1",
+      formulaInputs: { kind: "source-value", value: 8 },
+      accuracy: { kind: "standard", level: 50, bonus: 0 },
+      selection: { kind: "weighted", weight },
+      coverage: "exact",
+      provenance: { source: "generated", sourceRef: "scripts/fixture.rs2#attack" }
+    });
+    const monster: MonsterDefinition = {
+      ...context.gameData.monsters[request.monsterId]!,
+      incomingAttackCoverage: "exact",
+      incomingAttacks: [
+        profile("melee", "melee", 1),
+        profile("ranged", "ranged", 1),
+        profile("magic", "magic", 2)
+      ]
+    };
+    const tripContext = {
+      monster,
+      combatStyle: request.combatStyle,
+      ttkSec: 24,
+      cycleSec: 30,
+      prayerDef: 1
+    } as const;
+    const descriptor = createIncomingDamageDescriptor(
+      request,
+      context,
+      { safespot: false, protect: "none" },
+      tripContext
+    );
+    const byType = new Map(descriptor.profiles.map((entry) => [entry.attackType, entry]));
+
+    expect(descriptor.coverage).toBe("source-backed");
+    expect(descriptor.sourceLabel).toBe("Source-backed");
+    expect(descriptor.profiles.map((entry) => entry.selectionProbability)).toEqual([
+      0.25, 0.25, 0.5
+    ]);
+    expect(byType.get("melee")!.hitChance).toBeLessThan(byType.get("ranged")!.hitChance);
+    expect(byType.get("ranged")!.hitChance).toBeLessThan(byType.get("magic")!.hitChance);
+    expect(descriptor.attackDamagePerKill).toBeCloseTo(
+      descriptor.profiles.reduce((sum, entry) => sum + entry.expectedDamagePerKill, 0),
+      10
+    );
+
+    const protectedDescriptor = createIncomingDamageDescriptor(
+      request,
+      context,
+      { safespot: false, protect: "missiles" },
+      tripContext
+    );
+    expect(
+      protectedDescriptor.profiles.find((entry) => entry.attackType === "ranged")?.hitChance
+    ).toBe(0);
+    expect(
+      protectedDescriptor.profiles.find((entry) => entry.attackType === "melee")?.hitChance
+    ).toBeGreaterThan(0);
+  });
+
+  it("keeps partial and legacy incoming models on visible compatibility paths and fails bad exact data", () => {
+    const runtime = createLegacyRuntime();
+    const context = domainContextFromLegacy(runtime);
+    const definition = definitionsById.get("melee_ring_recoil_fire_giant_food_trip");
+    if (!definition) throw new Error("Missing compatibility fixture");
+    const input = buildTripInput(runtime, definition, context);
+    const baseMonster = context.gameData.monsters[input.request.monsterId]!;
+    const partialProfile: IncomingAttackProfile = {
+      id: "contextual-magic",
+      attackType: "magic",
+      attackSpeedTicks: 4,
+      maxHit: 8,
+      formulaId: "forced-max-hit-v1",
+      formulaInputs: { kind: "source-value", value: 8 },
+      accuracy: { kind: "standard", level: 50, bonus: 0 },
+      selection: { kind: "contextual", reason: "selection-policy-required" },
+      coverage: "partial",
+      provenance: { source: "generated", sourceRef: "scripts/fixture.rs2#contextual" }
+    };
+    const common = {
+      combatStyle: input.request.combatStyle,
+      ttkSec: 24,
+      cycleSec: 30,
+      prayerDef: 1
+    } as const;
+    const partial = createIncomingDamageDescriptor(
+      input.request,
+      context,
+      { safespot: false },
+      {
+        ...common,
+        monster: {
+          ...baseMonster,
+          incomingAttackCoverage: "partial",
+          incomingAttacks: [partialProfile]
+        }
+      }
+    );
+    const legacy = createIncomingDamageDescriptor(
+      input.request,
+      context,
+      { safespot: false },
+      { ...common, monster: baseMonster }
+    );
+
+    expect(partial).toMatchObject({
+      coverage: "partial",
+      sourceLabel: "Partial model",
+      meanOnly: true
+    });
+    expect(partial.profiles[0]?.formulaId).toBe("compatibility-fallback-v1");
+    expect(legacy).toMatchObject({
+      coverage: "compatibility-fallback",
+      sourceLabel: "Compatibility fallback",
+      meanOnly: true
+    });
+
+    expect(() =>
+      createIncomingDamageDescriptor(
+        input.request,
+        context,
+        { safespot: false },
+        {
+          ...common,
+          monster: {
+            ...baseMonster,
+            incomingAttackCoverage: "exact",
+            incomingAttacks: [
+              {
+                ...partialProfile,
+                coverage: "exact",
+                selection: { kind: "always" },
+                maxHit: 9
+              }
+            ]
+          }
+        }
+      )
+    ).toThrow(/does not match its source formula/);
   });
 
   it("applies antifire and antipoison trip controls to incoming damage", () => {

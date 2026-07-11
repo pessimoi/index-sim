@@ -28,6 +28,7 @@ export const MARKET_API_PATH = "/api/market/sync";
 export const MARKET_STATUS_API_PATH = "/api/market/status";
 export const MARKET_PROVIDER_TIMEOUT_MS = 6_000;
 export const MARKET_SYNC_REQUESTS_PER_SECOND = 1;
+export const MARKET_RATE_LIMIT_MAX_CLIENTS = 10_000;
 
 const DISABLED_MARKET_SOURCE: MarketSource = {
   id: "disabled",
@@ -131,10 +132,16 @@ export interface MarketApiHandlerOptions {
 }
 
 export function createMemoryMarketRateLimiter(
-  options: { requestsPerSecond?: number; windowMs?: number; now?: () => number } = {}
+  options: {
+    requestsPerSecond?: number;
+    windowMs?: number;
+    maxEntries?: number;
+    now?: () => number;
+  } = {}
 ): MarketRateLimiter {
   const requestsPerSecond = options.requestsPerSecond ?? MARKET_SYNC_REQUESTS_PER_SECOND;
   const windowMs = options.windowMs ?? 1000;
+  const maxEntries = options.maxEntries ?? MARKET_RATE_LIMIT_MAX_CLIENTS;
   const now = options.now ?? (() => Date.now());
   const windows = new Map<string, { startedAt: number; count: number }>();
 
@@ -143,11 +150,23 @@ export function createMemoryMarketRateLimiter(
     check(key) {
       const currentTime = now();
       for (const [entryKey, entry] of windows) {
-        if (currentTime - entry.startedAt >= windowMs) windows.delete(entryKey);
+        if (currentTime - entry.startedAt < windowMs) break;
+        windows.delete(entryKey);
       }
 
       const existing = windows.get(key);
       if (!existing || currentTime - existing.startedAt >= windowMs) {
+        if (windows.size >= maxEntries) {
+          const oldest = windows.values().next().value as
+            { startedAt: number; count: number } | undefined;
+          return {
+            allowed: false,
+            retryAfterSeconds: Math.max(
+              1,
+              Math.ceil((windowMs - (currentTime - (oldest?.startedAt ?? currentTime))) / 1000)
+            )
+          };
+        }
         windows.set(key, { startedAt: currentTime, count: 1 });
         return { allowed: true };
       }
@@ -258,11 +277,15 @@ function normalizeProviderReports(
   mappings: readonly MarketSourceMapping[],
   providerReports: readonly MarketItemReport[]
 ): MarketItemReport[] {
-  const expectedItemIds = new Set(mappings.map((mapping) => mapping.itemId));
+  const expectedMappings = new Map(mappings.map((mapping) => [mapping.itemId, mapping]));
   const reportsByItemId = new Map<string, MarketItemReport>();
 
   for (const report of providerReports) {
-    if (!expectedItemIds.has(report.itemId)) {
+    const mapping = expectedMappings.get(report.itemId);
+    if (!mapping) {
+      throw new MarketProviderError("upstream-invalid");
+    }
+    if (report.sourceSlug !== undefined && report.sourceSlug !== mapping.sourceSlug) {
       throw new MarketProviderError("upstream-invalid");
     }
     if (reportsByItemId.has(report.itemId)) {
@@ -361,8 +384,12 @@ export function createMarketApiHandler(options: MarketApiHandlerOptions = {}) {
         return jsonResponse(405, integrationError("bad-request"), { Allow: "GET" });
       }
       try {
-        return jsonResponse(200, await providerStatus(provider, rateLimiter));
-      } catch {
+        return jsonResponse(
+          200,
+          await withTimeout(timeoutMs, () => providerStatus(provider, rateLimiter))
+        );
+      } catch (error) {
+        if (error instanceof MarketProviderError) return errorResponse(error.code);
         return errorResponse("upstream-invalid");
       }
     }
@@ -401,7 +428,7 @@ export function createMarketApiHandler(options: MarketApiHandlerOptions = {}) {
     }
 
     try {
-      const status = await providerStatus(provider, rateLimiter);
+      const status = await withTimeout(timeoutMs, () => providerStatus(provider, rateLimiter));
       if (!status.available) return errorResponse("upstream-unavailable");
 
       const expanded = expandMarketSyncRequestItems(options.gameData, syncRequest);

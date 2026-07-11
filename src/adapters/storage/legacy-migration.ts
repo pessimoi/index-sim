@@ -10,6 +10,7 @@ import {
 } from "@/domain/shared";
 import { FOOD, lootPreferenceKey, lootPreferenceKeysForMonster } from "@/domain/trip";
 import { HiscoresPlayerNameSchema, createPriceSetFromLegacyRecords } from "@/data/schemas";
+import { parseJsonWithDuplicateKeyCheck } from "@/data/reliability";
 import {
   BOOST_SELECTION_OPTIONS,
   CannonByMonsterSchema,
@@ -405,7 +406,7 @@ function inspectLegacySetupInput(
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(rawInput);
+    parsed = parseJsonWithDuplicateKeyCheck(rawInput, { source: "Legacy setup state" });
   } catch {
     skip(report, LEGACY_INPUT_STORAGE_KEY, "invalid JSON");
     warn(report, "Legacy setup input could not be parsed as JSON.");
@@ -1687,7 +1688,10 @@ function parseLegacyJsonStorageValue(
   }
 
   try {
-    return { ok: true, value: JSON.parse(rawValue) };
+    return {
+      ok: true,
+      value: parseJsonWithDuplicateKeyCheck(rawValue, { source: "Legacy browser state" })
+    };
   } catch {
     skip(report, field, "invalid JSON");
     warn(report, `${subject} could not be parsed as JSON.`);

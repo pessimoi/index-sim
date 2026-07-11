@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { parseJsonWithDuplicateKeyCheck } from "../data/reliability";
 import type {
   HiscoresResponse,
   HiscoresSkill,
@@ -215,7 +216,10 @@ export function createLostCityHiscoresProvider(
       }
       let parsed: unknown;
       try {
-        parsed = JSON.parse(responseText) as unknown;
+        parsed = parseJsonWithDuplicateKeyCheck(responseText, {
+          maxBytes,
+          source: "Hiscores upstream response"
+        });
       } catch {
         throw new HiscoresProviderError("upstream-invalid");
       }

@@ -15,6 +15,7 @@ import {
   maxHitMelee,
   maxHitRanged,
   resolveMeleeStance,
+  roll,
   simulateCombat
 } from "../domain/combat";
 import { loadoutToCombatBonuses, sumEquipmentBonuses } from "../domain/equipment";
@@ -145,6 +146,39 @@ describe("pure combat formulas", () => {
     expect(maxHitMagic(20, 0)).toBe(20);
     expect(hitChance(10_000, 5_000)).toBeCloseTo(0.7499500049995);
     expect(hitChance(5_000, 10_000)).toBeCloseTo(0.24997500249975);
+  });
+
+  it("keeps accepted negative manual bonus bounds from producing negative combat metrics", () => {
+    expect(maxHitMelee(90, -250)).toBe(0);
+    expect(maxHitRanged(86, -250)).toBe(0);
+    expect(maxHitMagic(20, -250)).toBe(0);
+    expect(roll(90, -250)).toBe(0);
+    expect(hitChance(-1, 10_000)).toBe(0);
+    expect(hitChance(10_000, -1)).toBeGreaterThan(0);
+    expect(hitChance(10_000, -1)).toBeLessThanOrEqual(1);
+
+    const runtime = createLegacyRuntime();
+    const context = domainContextFromLegacy(runtime);
+    const definition = definitionsById.get("melee_rune_scimitar_hill_giant_super_prayers");
+    expect(definition).toBeDefined();
+    if (!definition) throw new Error("Missing manual override fixture");
+    const request = domainRequestFromLegacyInput(buildLegacyInput(runtime, definition));
+    const result = simulateCombat(
+      {
+        ...request,
+        specialAttack: undefined,
+        manualOverrides: { accuracyBonus: -250, damageBonus: -250 }
+      },
+      context
+    );
+
+    expect(result.attackRoll).toBe(0);
+    expect(result.hitChance).toBe(0);
+    expect(result.maxHit).toBe(0);
+    expect(result.avgHit).toBe(0);
+    expect(result.dps).toBe(0);
+    expect(result.effectiveDps).toBe(0);
+    expect(result.ttkSec).toBe(Number.POSITIVE_INFINITY);
   });
 
   it("builds a bounded hit distribution with miss and max-hit buckets", () => {

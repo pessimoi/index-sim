@@ -11,6 +11,15 @@ import {
 } from "react";
 import { ZodError } from "zod";
 import {
+  CalculationTaskCancelledError,
+  startCalculationTask,
+  type RunningCalculationTask
+} from "./calculation-worker-client";
+import type {
+  DuelMatrixCalculationRequest,
+  RiskAnalysisCalculationRequest
+} from "./calculation-task";
+import {
   captureBrowserShareableSetupFragment,
   createBrowserShareableSetupUrl,
   downloadJsonFile,
@@ -25,8 +34,6 @@ import {
   saveLastHiscoresPlayer
 } from "@/adapters/hiscores";
 import {
-  MarketAdapterError,
-  fetchMarketStatus,
   loadScheduledStaticPriceSnapshot,
   parsePriceSetFileText,
   type ScheduledStaticPriceSnapshotStatus
@@ -55,6 +62,11 @@ import {
 } from "@/adapters/generated";
 import { supportedSpecialAttacksForCombatStyle } from "@/domain/combat";
 import { loadoutToCombatBonuses } from "@/domain/equipment";
+import type {
+  DistributionSummary,
+  RiskAnalysisParameters,
+  RiskAnalysisResult
+} from "@/domain/risk";
 import {
   SKILL_LABEL,
   type PlannerGearSlot,
@@ -69,7 +81,6 @@ import type {
   EntityId,
   HiscoresResponse,
   HiscoresStatusResponse,
-  MarketStatusResponse,
   PriceSet,
   SimulationContext
 } from "@/domain/shared";
@@ -200,6 +211,15 @@ import {
   type ShareableSetupReview
 } from "./state/shareable-setup";
 import {
+  SETUP_IMPORT_MAX_BYTES,
+  SetupImportError,
+  parseSavedSetupExportText
+} from "./state/setup-import";
+import {
+  duelSnapshotsCompatibilityIssues,
+  savedSetupCompatibilityIssues
+} from "./state/setup-compatibility";
+import {
   PLANNER_METRICS,
   PLANNER_SKILLS,
   PLANNER_UI_STORAGE_KEY,
@@ -222,7 +242,6 @@ import {
   PRAYER_SELECTION_OPTIONS,
   REWRITE_SETUP_STORAGE_KEY,
   REWRITE_SETUP_VERSION,
-  SavedSetupEnvelopeSchema,
   SavedSetupSchema,
   applyWeaponSelection,
   extraBoostSelectionCount,
@@ -257,13 +276,10 @@ import {
 import {
   ammoOptions,
   createDenseCompareScaleModel,
-  createDenseCompareRows,
   createDuelComparisonViewModel,
-  createDuelMatrixViewModel,
   gearQuickActionForSlot,
   createPlannerGearPoolEditorViewModel,
-  createPlannerPanelViewModel,
-  createPlannerViewModel,
+  presentDenseCompareRows,
   createSimulationViewModel,
   equipmentSlotOptions,
   optimizeLootPrefsForMonster,
@@ -429,6 +445,8 @@ function describeSelectedPriceSetLoadIssue(result: LoadSelectedPriceSetResult): 
   switch (result.reason) {
     case "body_too_large":
       return "Saved active PriceSet is too large. Bundled prices were loaded.";
+    case "duplicate_keys":
+      return "Saved active PriceSet contains duplicate data. Bundled prices were loaded.";
     case "invalid_json":
       return "Saved active PriceSet is not valid JSON. Bundled prices were loaded.";
     case "invalid_envelope":
@@ -479,8 +497,7 @@ interface PendingUndo {
 
 type PriceImportSurface = "topbar" | "settings" | "market";
 type ScopedPriceImportNotice = PriceImportNotice & { surface: PriceImportSurface };
-
-const SETUP_IMPORT_MAX_BYTES = 250_000;
+const EMPTY_DENSE_COMPARE_ROWS: DenseCompareRowViewModel[] = [];
 
 const COMBAT_STYLE_OPTIONS: SelectOption[] = [
   { id: "melee", label: "melee" },
@@ -818,12 +835,11 @@ function ShareSetupDialog({
 
 const WORKBENCH_TABS = [
   { id: "stats", label: "Stats" },
-  { id: "melee", label: "Melee", combatStyle: "melee" },
-  { id: "ranged", label: "Ranged", combatStyle: "ranged" },
-  { id: "magic", label: "Magic", combatStyle: "magic" },
+  { id: "loadout", label: "Loadout" },
   { id: "compare", label: "Compare" },
   { id: "loot", label: "Loot" },
   { id: "trip", label: "Trip" },
+  { id: "risk", label: "Risk" },
   { id: "cannon", label: "Cannon" },
   { id: "duel", label: "Duel" },
   { id: "planner", label: "Planner" },
@@ -832,8 +848,6 @@ const WORKBENCH_TABS = [
 ] as const;
 
 type WorkbenchTabId = (typeof WORKBENCH_TABS)[number]["id"];
-
-const COMBAT_STYLE_TAB_IDS = new Set<WorkbenchTabId>(["melee", "ranged", "magic"]);
 
 function useDebouncedValue<T>(value: T, delayMs: number): T {
   const [debounced, setDebounced] = useState(value);
@@ -951,7 +965,8 @@ function signedDecimal(value: number, digits = 2): string {
 }
 
 function formatDuration(seconds: number): string {
-  if (!Number.isFinite(seconds)) return "unlimited";
+  if (seconds === Number.POSITIVE_INFINITY) return "unlimited";
+  if (!Number.isFinite(seconds)) return "-";
   if (seconds < 60) return `${formatNumber(seconds, 1)}s`;
   const minutes = Math.floor(seconds / 60);
   const remainingSeconds = Math.round(seconds % 60)
@@ -961,7 +976,7 @@ function formatDuration(seconds: number): string {
 }
 
 function formatAge(seconds: number | null): string {
-  if (seconds === null) return "-";
+  if (seconds === null || !Number.isFinite(seconds) || seconds < 0) return "-";
   if (seconds < 60) return "<1m";
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
   if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
@@ -1037,6 +1052,70 @@ interface BuiltDuelMatrixState {
     lootPrefsByMonster: LootPrefsState;
     lootSettingsByMonster: LootSettingsByMonsterState;
   };
+}
+
+interface BuiltDenseCompareState {
+  rows: DenseCompareRowViewModel[];
+  error: boolean;
+  source: {
+    form: CombatSetupFormState;
+    context: SimulationContext;
+    cannonByMonster: CannonByMonsterState;
+    lootPrefsByMonster: LootPrefsState;
+    customSetupsByMonster: CustomSetupsByMonsterState;
+    lootSettingsByMonster: LootSettingsByMonsterState;
+  };
+}
+
+interface BuiltPlannerState {
+  panel: PlannerPanelViewModel | null;
+  error: string | null;
+  source: {
+    form: CombatSetupFormState;
+    context: SimulationContext;
+    lootSettingsByMonster: LootSettingsByMonsterState;
+    plannerState: PlannerUiState;
+  };
+}
+
+type RiskControls = Pick<
+  RiskAnalysisParameters,
+  "targetKills" | "horizonMinutes" | "gpTarget" | "targetDropRowId"
+>;
+
+type RiskRunStatus = "idle" | "running" | "ready" | "cancelled" | "unavailable";
+
+interface BuiltRiskState {
+  result: RiskAnalysisResult;
+  source: {
+    form: CombatSetupFormState;
+    context: SimulationContext;
+    cannonByMonster: CannonByMonsterState;
+    lootPrefs: Record<string, LootAction | string | undefined>;
+    lootSettingsByMonster: LootSettingsByMonsterState;
+    analysis: RiskControls;
+  };
+}
+
+const DEFAULT_RISK_CONTROLS: RiskControls = {
+  targetKills: 50,
+  horizonMinutes: 60,
+  gpTarget: 100_000,
+  targetDropRowId: null
+};
+
+function formatRiskRange(summary: DistributionSummary | null, digits: number, suffix = ""): string {
+  if (!summary) return "Unbounded";
+  return `${formatNumber(summary.p10, digits)} / ${formatNumber(summary.p50, digits)} / ${formatNumber(summary.p90, digits)}${suffix}`;
+}
+
+function formatRiskProbability(probability: number, zeroBoundSampleCount?: number): string {
+  if (!Number.isFinite(probability)) return "Unavailable";
+  if (probability === 0 && zeroBoundSampleCount && zeroBoundSampleCount > 0) {
+    return `<${formatNumber((3 / zeroBoundSampleCount) * 100, 2)}%`;
+  }
+  if (probability > 0 && probability < 0.001) return "<0.1%";
+  return `${formatNumber(probability * 100, 1)}%`;
 }
 
 function duelSnapshotId(): string {
@@ -1209,11 +1288,27 @@ function PriceTrendSparkline({ row }: { row: PriceHistoryMoverRow }) {
   );
 }
 
-function metric(label: string, value: string, tone?: string) {
+function metric(
+  label: string,
+  value: string,
+  tone?: string,
+  detail?: string,
+  onDetail?: () => void
+) {
   return (
     <div className="metric">
       <span>{label}</span>
       <strong className={tone}>{value}</strong>
+      {detail ? (
+        <small>
+          {detail}
+          {onDetail ? (
+            <button type="button" className="metric-detail-link" onClick={onDetail}>
+              Risk
+            </button>
+          ) : null}
+        </small>
+      ) : null}
     </div>
   );
 }
@@ -1225,6 +1320,16 @@ function metricList(items: DisplayMetric[]) {
       <strong className={item.tone}>{item.value}</strong>
     </div>
   ));
+}
+
+function setupSelectionSummary(
+  selectedIds: readonly string[],
+  options: readonly SetupSelectionOption[]
+): string {
+  if (selectedIds.length === 0) return "None";
+  return selectedIds
+    .map((id) => options.find((option) => option.id === id)?.label ?? id)
+    .join(" + ");
 }
 
 function tripMetricGroup(title: string, items: DisplayMetric[]) {
@@ -1901,21 +2006,6 @@ function describeHiscoresError(error: unknown): string {
   return "Hiscores lookup failed. Player level fields still work for manual edits.";
 }
 
-function describeMarketError(error: unknown): string {
-  if (error instanceof MarketAdapterError) {
-    if (error.code === "bad-request") return "Check the market price request";
-    if (error.code === "not-found") return "Market price data not found";
-    if (error.code === "rate-limited") {
-      return error.retryAfterSeconds
-        ? `Rate limited. Try again in ${error.retryAfterSeconds}s`
-        : "Rate limited";
-    }
-    if (error.code === "upstream-unavailable") return marketUnavailableMessage(null);
-    if (error.code === "upstream-invalid") return "Market price response invalid";
-  }
-  return "Market price data check failed. Bundled, scheduled and imported PriceSets still work.";
-}
-
 function sanitizeImportDetail(value: string): string {
   return value
     .replace(/(?:[A-Za-z]:)?[\\/][^\s"']+/g, "[path]")
@@ -1937,15 +2027,48 @@ function zodIssueSummaries(error: ZodError): string[] {
 }
 
 function describeSetupImportError(error: unknown): SetupImportNotice {
-  if (error instanceof SyntaxError) {
-    return { tone: "error", message: "Setup import failed: the file is not valid JSON." };
-  }
-
   if (error instanceof Error && /^File exceeds \d+ bytes$/.test(error.message)) {
     return {
       tone: "error",
       message:
         "Setup import failed: the file is too large. Choose an exported setup JSON under 250 KB."
+    };
+  }
+
+  if (error instanceof SetupImportError) {
+    if (error.code === "body_too_large") {
+      return {
+        tone: "error",
+        message:
+          "Setup import failed: the file is too large. Choose an exported setup JSON under 250 KB."
+      };
+    }
+    if (error.code === "duplicate_keys") {
+      return {
+        tone: "error",
+        message: "Setup import failed: the JSON contains duplicate keys."
+      };
+    }
+    if (error.code === "invalid_json") {
+      return { tone: "error", message: "Setup import failed: the file is not valid JSON." };
+    }
+    if (error.code === "unsupported_version") {
+      return {
+        tone: "error",
+        message: `Setup import failed: this app only supports rewrite setup version ${REWRITE_SETUP_VERSION}. Export a fresh setup and try again.`
+      };
+    }
+    if (error.code === "incompatible_entities") {
+      return {
+        tone: "error",
+        message: "Setup import failed: the setup references data unavailable in this game version.",
+        details: error.issues.map(sanitizeImportDetail)
+      };
+    }
+    return {
+      tone: "error",
+      message: "Setup import failed: the file is not a valid rewrite setup export.",
+      details: error.issues.map(sanitizeImportDetail)
     };
   }
 
@@ -2000,6 +2123,18 @@ function describeDuelSnapshotsImportError(error: unknown): SetupImportNotice {
   if (code === "invalid_json") {
     return { tone: "error", message: "Duel import failed: the file is not valid JSON." };
   }
+  if (code === "duplicate_keys" || code === "duplicate_ids") {
+    return {
+      tone: "error",
+      message: "Duel import failed: the export contains duplicate snapshot data."
+    };
+  }
+  if (code === "incompatible_entities") {
+    return {
+      tone: "error",
+      message: "Duel import failed: a snapshot references data unavailable in this game version."
+    };
+  }
   if (code === "unsupported_version") {
     return {
       tone: "error",
@@ -2012,10 +2147,7 @@ function describeDuelSnapshotsImportError(error: unknown): SetupImportNotice {
   };
 }
 
-function statusText(
-  status: HiscoresStatusResponse | MarketStatusResponse | null,
-  available: boolean
-): string {
+function statusText(status: HiscoresStatusResponse | null, available: boolean): string {
   if (status === null) return "checking";
   if (available) return "available";
   return status.source.id === "disabled" ? "disabled" : "unavailable";
@@ -2027,32 +2159,30 @@ function hiscoresUnavailableMessage(status: HiscoresStatusResponse | null): stri
     : "Hiscores lookup is unavailable right now. Use the Player level fields above to edit levels manually.";
 }
 
-function marketUnavailableMessage(status: MarketStatusResponse | null): string {
-  return status?.source.id === "disabled"
-    ? "Market upstream refresh is scheduled, not user-triggered. Import a PriceSet file to override prices locally."
-    : "Market price service is unavailable right now. Scheduled, bundled and imported PriceSets still work.";
-}
-
 function SelectField({
   label,
   value,
   options,
   onChange,
-  disabled = false
+  disabled = false,
+  className
 }: {
   label: string;
   value: string;
   options: Array<{ id: string; label: string }>;
   onChange: (value: string) => void;
   disabled?: boolean;
+  className?: string;
 }) {
   const id = useId();
+  const selectedLabel = options.find((option) => option.id === value)?.label ?? value;
   return (
-    <div className="field">
+    <div className={`field ${className ?? ""}`.trim()}>
       <label htmlFor={id}>{label}</label>
       <select
         id={id}
         value={value}
+        title={selectedLabel}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
       >
@@ -2080,11 +2210,17 @@ function CompactSelectionSelectField({
   onChange: (value: string) => void;
 }) {
   const id = useId();
+  const selectedLabel = options.find((option) => option.id === value)?.label ?? value;
   return (
     <div className="field compact-selection-field">
       <label htmlFor={id}>{label}</label>
       <div className="compact-selection-control">
-        <select id={id} value={value} onChange={(event) => onChange(event.target.value)}>
+        <select
+          id={id}
+          value={value}
+          title={selectedLabel}
+          onChange={(event) => onChange(event.target.value)}
+        >
           {options.map((option) => (
             <option key={option.id} value={option.id}>
               {option.label}
@@ -2152,7 +2288,8 @@ function SearchableSelectField({
   options,
   onChange,
   disabled = false,
-  searchPlaceholder = "Search"
+  searchPlaceholder = "Search",
+  className
 }: {
   label: string;
   value: string;
@@ -2160,12 +2297,20 @@ function SearchableSelectField({
   onChange: (value: string) => void;
   disabled?: boolean;
   searchPlaceholder?: string;
+  className?: string;
 }) {
-  const id = useId();
-  const searchId = useId();
+  const labelId = useId();
+  const triggerId = useId();
+  const listboxId = useId();
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const [expanded, setExpanded] = useState(false);
   const [query, setQuery] = useState("");
+  const [activeIndex, setActiveIndex] = useState(0);
   const normalizedQuery = query.trim().toLocaleLowerCase();
   const selectedOption = options.find((option) => option.id === value);
+  const selectedLabel = selectedOption?.label ?? value;
   const filteredOptions =
     normalizedQuery.length === 0
       ? options
@@ -2175,38 +2320,171 @@ function SearchableSelectField({
             .toLocaleLowerCase()
             .includes(normalizedQuery)
         );
-  const visibleOptions =
-    selectedOption && !filteredOptions.some((option) => option.id === selectedOption.id)
-      ? [selectedOption, ...filteredOptions]
-      : filteredOptions;
+  const boundedActiveIndex = Math.max(
+    0,
+    Math.min(activeIndex, Math.max(0, filteredOptions.length - 1))
+  );
+  const activeOption = filteredOptions[boundedActiveIndex];
+
+  useEffect(() => {
+    if (expanded) searchInputRef.current?.focus();
+  }, [expanded]);
+
+  useEffect(() => {
+    if (!expanded) return;
+    optionRefs.current[boundedActiveIndex]?.scrollIntoView({ block: "nearest" });
+  }, [boundedActiveIndex, expanded]);
+
+  const openOptions = () => {
+    if (disabled) return;
+    setQuery("");
+    setActiveIndex(
+      Math.max(
+        0,
+        options.findIndex((option) => option.id === value)
+      )
+    );
+    setExpanded(true);
+  };
+
+  const closeOptions = (restoreTriggerFocus = false) => {
+    setExpanded(false);
+    setQuery("");
+    if (restoreTriggerFocus) triggerRef.current?.focus();
+  };
+
+  const commitOption = (option: SelectOption) => {
+    onChange(option.id);
+    setQuery("");
+    setExpanded(false);
+    triggerRef.current?.focus();
+  };
+
+  const handleSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setActiveIndex((current) => Math.min(current + 1, filteredOptions.length - 1));
+      return;
+    }
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setActiveIndex((current) => Math.max(0, current - 1));
+      return;
+    }
+    if (event.key === "Home") {
+      event.preventDefault();
+      setActiveIndex(0);
+      return;
+    }
+    if (event.key === "End") {
+      event.preventDefault();
+      setActiveIndex(Math.max(0, filteredOptions.length - 1));
+      return;
+    }
+    if (event.key === "Enter" && activeOption) {
+      event.preventDefault();
+      commitOption(activeOption);
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeOptions(true);
+    }
+  };
 
   return (
-    <div className="field searchable-field">
-      <label htmlFor={id}>{label}</label>
-      <input
-        id={searchId}
-        type="search"
-        value={query}
-        placeholder={searchPlaceholder}
+    <div
+      className={`field searchable-field ${expanded ? "expanded" : ""} ${className ?? ""}`.trim()}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) closeOptions();
+      }}
+    >
+      <label id={labelId}>{label}</label>
+      <button
+        ref={triggerRef}
+        id={triggerId}
+        type="button"
+        role="combobox"
+        className="searchable-combobox-trigger"
+        title={selectedLabel}
+        aria-labelledby={labelId}
+        aria-controls={listboxId}
+        aria-expanded={expanded}
+        aria-haspopup="listbox"
+        data-selected-id={value}
         disabled={disabled}
-        aria-label={`${label} search`}
-        onChange={(event) => setQuery(event.target.value)}
-      />
-      <select
-        id={id}
-        value={value}
-        disabled={disabled}
-        onChange={(event) => onChange(event.target.value)}
+        onClick={() => (expanded ? closeOptions() : openOptions())}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault();
+            openOptions();
+          }
+          if (event.key === "Escape" && expanded) {
+            event.preventDefault();
+            closeOptions(true);
+          }
+        }}
       >
-        {visibleOptions.map((option) => (
-          <option key={option.id} value={option.id}>
-            {option.hint ? `${option.label} - ${option.hint}` : option.label}
-          </option>
-        ))}
-      </select>
-      <span className="field-hint">
-        {formatNumber(visibleOptions.length)} / {formatNumber(options.length)}
-      </span>
+        <span>{selectedLabel}</span>
+        <span aria-hidden="true">{expanded ? "▲" : "▼"}</span>
+      </button>
+      {expanded && (
+        <div className="searchable-combobox-popover">
+          <div className="searchable-combobox-search">
+            <input
+              ref={searchInputRef}
+              type="search"
+              value={query}
+              placeholder={searchPlaceholder}
+              autoComplete="off"
+              aria-label={`Search ${label} options`}
+              aria-controls={listboxId}
+              aria-activedescendant={
+                activeOption ? `${listboxId}-option-${boundedActiveIndex}` : undefined
+              }
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setActiveIndex(0);
+              }}
+              onKeyDown={handleSearchKeyDown}
+            />
+            <span className="searchable-combobox-status" role="status" aria-live="polite">
+              {formatNumber(filteredOptions.length)} of {formatNumber(options.length)} options
+            </span>
+          </div>
+          <div
+            id={listboxId}
+            className="searchable-combobox-list"
+            role="listbox"
+            aria-label={`${label} options`}
+          >
+            {filteredOptions.length ? (
+              filteredOptions.map((option, index) => (
+                <button
+                  ref={(element) => {
+                    optionRefs.current[index] = element;
+                  }}
+                  id={`${listboxId}-option-${index}`}
+                  type="button"
+                  role="option"
+                  className={`searchable-combobox-option ${index === boundedActiveIndex ? "active" : ""}`}
+                  aria-label={option.label}
+                  aria-selected={option.id === value}
+                  key={option.id}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => commitOption(option)}
+                >
+                  <span>{option.label}</span>
+                  {option.hint && <small aria-hidden="true">{option.hint}</small>}
+                  {option.id === value && <em aria-hidden="true">Selected</em>}
+                </button>
+              ))
+            ) : (
+              <p className="searchable-combobox-empty">No matching options</p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2286,7 +2564,8 @@ function OptionalNumberField({
   max,
   step = 1,
   placeholder,
-  resetLabel = "Reset"
+  resetLabel = "Reset",
+  compactReset = false
 }: {
   label: string;
   value: number | null;
@@ -2296,10 +2575,11 @@ function OptionalNumberField({
   step?: number;
   placeholder?: string;
   resetLabel?: string;
+  compactReset?: boolean;
 }) {
   const id = useId();
   return (
-    <div className="field optional-number-field">
+    <div className={`field optional-number-field ${compactReset ? "compact" : ""}`.trim()}>
       <label htmlFor={id}>{label}</label>
       <div className="optional-number-control">
         <input
@@ -2321,8 +2601,14 @@ function OptionalNumberField({
             onChange(parsed);
           }}
         />
-        <button type="button" disabled={value == null} onClick={() => onChange(null)}>
-          {resetLabel}
+        <button
+          type="button"
+          aria-label={compactReset ? `${resetLabel} ${label}` : undefined}
+          title={compactReset ? `${resetLabel} ${label} to derived value` : undefined}
+          disabled={value == null}
+          onClick={() => onChange(null)}
+        >
+          {compactReset ? "↺" : resetLabel}
         </button>
       </div>
     </div>
@@ -2338,10 +2624,11 @@ function ReadOnlyField({
   value: string;
   disabled?: boolean;
 }) {
+  const labelId = useId();
   return (
     <div className={`field readonly-field ${disabled ? "disabled" : ""}`}>
-      <span>{label}</span>
-      <output>{value}</output>
+      <span id={labelId}>{label}</span>
+      <output aria-labelledby={labelId}>{value}</output>
     </div>
   );
 }
@@ -2374,6 +2661,9 @@ function localStateReasonLabel(item: LocalStateHealthItem): string {
   if (item.reason === "body_too_large") {
     return "Saved data is too large. Defaults are active until this key is cleared or replaced.";
   }
+  if (item.reason === "duplicate_keys") {
+    return "Saved data contains duplicate JSON keys. Defaults are active until this key is cleared or replaced.";
+  }
   if (item.reason === "invalid_json") {
     return "Saved data is not valid JSON. Defaults are active until this key is cleared or replaced.";
   }
@@ -2395,6 +2685,7 @@ function localStateRecoveryStatus(report: LocalStateHealthReport): string {
 export function App() {
   const [context, setContext] = useState<SimulationContext | null>(null);
   const [initialSavedSetup] = useState(loadInitialSavedSetup);
+  const [initialDuelSnapshots] = useState(loadInitialDuelSnapshots);
   const [form, setForm] = useState<CombatSetupFormState>(() =>
     normalizeFormState(initialSavedSetup.setup.form)
   );
@@ -2418,7 +2709,7 @@ export function App() {
   const [hiddenGearTiers, setHiddenGearTiers] = useState<HiddenGearTiersState>(
     loadInitialHiddenGearTiers
   );
-  const [duelSnapshots, setDuelSnapshots] = useState<DuelSnapshotsState>(loadInitialDuelSnapshots);
+  const [duelSnapshots, setDuelSnapshots] = useState<DuelSnapshotsState>(initialDuelSnapshots);
   const [duelViewMode, setDuelViewMode] = useState<DuelViewMode>("current-target");
   const [expandedDuelDiffId, setExpandedDuelDiffId] = useState<string | null>(null);
   const [duelMatrixMetric, setDuelMatrixMetric] =
@@ -2426,6 +2717,10 @@ export function App() {
   const [duelMatrixFilter, setDuelMatrixFilter] = useState("");
   const [duelMatrixBuild, setDuelMatrixBuild] = useState<BuiltDuelMatrixState | null>(null);
   const [duelMatrixBusy, setDuelMatrixBusy] = useState(false);
+  const duelMatrixTaskRef = useRef<RunningCalculationTask<DuelMatrixCalculationRequest> | null>(
+    null
+  );
+  const [denseCompareBuild, setDenseCompareBuild] = useState<BuiltDenseCompareState | null>(null);
   const [priceHistory, setPriceHistory] =
     useState<BrowserPriceHistoryState>(loadInitialPriceHistory);
   const [bundledPriceSet, setBundledPriceSet] = useState<PriceSet | null>(null);
@@ -2435,6 +2730,11 @@ export function App() {
   const [plannerState, setPlannerState] = useState<PlannerUiState>(loadInitialPlannerUiState);
   const [plannerComputedState, setPlannerComputedState] =
     useState<PlannerUiState>(loadInitialPlannerUiState);
+  const [plannerBuild, setPlannerBuild] = useState<BuiltPlannerState | null>(null);
+  const [riskControls, setRiskControls] = useState<RiskControls>(DEFAULT_RISK_CONTROLS);
+  const [riskBuild, setRiskBuild] = useState<BuiltRiskState | null>(null);
+  const [riskRunStatus, setRiskRunStatus] = useState<RiskRunStatus>("idle");
+  const riskTaskRef = useRef<RunningCalculationTask<RiskAnalysisCalculationRequest> | null>(null);
   const [legacyMigrationDismissed, setLegacyMigrationDismissed] = useState(
     loadInitialLegacyMigrationDismissed
   );
@@ -2450,6 +2750,9 @@ export function App() {
   >(null);
   const [localStateStorageFailures, setLocalStateStorageFailures] = useState<
     LocalStateStorageFailure[]
+  >([]);
+  const [localStateContextInvalidIds, setLocalStateContextInvalidIds] = useState<
+    LocalStateHealthItemId[]
   >([]);
   const [priceAgeNowMs, setPriceAgeNowMs] = useState(() => Date.now());
   const [localStateRecoveryNotice, setLocalStateRecoveryNotice] = useState<string | null>(() =>
@@ -2513,7 +2816,8 @@ export function App() {
   ): LocalStateHealthReport => {
     const report = createLocalStateHealthReport(storage, new Date(), {
       storageUnavailable: localStorageAccessUnavailable,
-      storageFailures
+      storageFailures,
+      contextInvalidItemIds: localStateContextInvalidIds
     });
     setLocalStateHealthReport(report);
     return report;
@@ -2559,10 +2863,16 @@ export function App() {
     setLocalStateRecoveryBlockedIds((current) =>
       current.filter((itemId) => !itemIds.includes(itemId))
     );
+    setLocalStateContextInvalidIds((current) =>
+      current.filter((itemId) => !itemIds.includes(itemId))
+    );
   };
   const unblockReplacedLocalState = (itemIds: readonly LocalStateHealthItemId[]): void => {
     if (!itemIds.length) return;
     setLocalStateRecoveryBlockedIds((current) =>
+      current.filter((itemId) => !itemIds.includes(itemId))
+    );
+    setLocalStateContextInvalidIds((current) =>
       current.filter((itemId) => !itemIds.includes(itemId))
     );
   };
@@ -2570,13 +2880,21 @@ export function App() {
   /* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps -- Storage failures are external-system state and this effect refreshes their sanitized UI report. */
   useEffect(() => {
     refreshLocalStateHealthReport(localStateStorageFailures);
-  }, [localStateStorageFailures]);
+  }, [localStateContextInvalidIds, localStateStorageFailures]);
   /* eslint-enable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
 
   useEffect(() => {
     const timerId = window.setInterval(() => setPriceAgeNowMs(Date.now()), 60_000);
     return () => window.clearInterval(timerId);
   }, []);
+
+  useEffect(
+    () => () => {
+      duelMatrixTaskRef.current?.cancel();
+      duelMatrixTaskRef.current = null;
+    },
+    []
+  );
 
   useEffect(() => {
     hiscoresPlayerRef.current = hiscoresPlayer;
@@ -2604,28 +2922,47 @@ export function App() {
 
   useEffect(() => {
     let cancelled = false;
-    fetchMarketStatus()
-      .then((result) => {
-        if (cancelled) return;
-        setMarketNotice(
-          result.available ? null : { tone: "neutral", message: marketUnavailableMessage(result) }
-        );
-      })
-      .catch((caught: unknown) => {
-        if (cancelled) return;
-        setMarketNotice({ tone: "error", message: describeMarketError(caught) });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
     loadGeneratedRuntimeContext()
       .then(async (result) => {
         if (cancelled) return;
         const bundledContext = result.context;
+        const setupCompatibilityIssues = initialSavedSetup.loaded
+          ? savedSetupCompatibilityIssues(initialSavedSetup.setup, bundledContext.gameData)
+          : [];
+        const duelCompatibilityIssues = duelSnapshotsCompatibilityIssues(
+          initialDuelSnapshots,
+          bundledContext.gameData
+        );
+        if (setupCompatibilityIssues.length > 0) {
+          const fallbackSetup = savedSetupFromForm(DEFAULT_FORM_STATE);
+          setForm(fallbackSetup.form);
+          setDefaultForm(fallbackSetup.defaultForm);
+          setSetupMode(fallbackSetup.setupMode);
+          setCustomSetupsByMonster(fallbackSetup.customSetupsByMonster);
+          setCannonByMonster(fallbackSetup.cannonByMonster);
+          setDenseCompare(fallbackSetup.denseCompare);
+        }
+        if (duelCompatibilityIssues.length > 0) {
+          setDuelSnapshots(DEFAULT_DUEL_SNAPSHOTS_STATE);
+        }
+        const contextInvalidIds: LocalStateHealthItemId[] = [
+          ...(setupCompatibilityIssues.length > 0 ? (["rewrite-setup"] as const) : []),
+          ...(duelCompatibilityIssues.length > 0 ? (["duel-snapshots"] as const) : [])
+        ];
+        if (contextInvalidIds.length > 0) {
+          setLocalStateContextInvalidIds(contextInvalidIds);
+          setLocalStateRecoveryBlockedIds((current) => [
+            ...current,
+            ...contextInvalidIds.filter((itemId) => !current.includes(itemId))
+          ]);
+          setLocalStateRecoveryNotice(
+            contextInvalidIds.length > 1
+              ? "Saved setup and Duel snapshots reference data unavailable in this game version. Defaults are active until the saved data is cleared or replaced."
+              : setupCompatibilityIssues.length > 0
+                ? "Saved rewrite setup references data unavailable in this game version. Defaults are active until the saved setup is cleared or replaced."
+                : "Saved Duel snapshots reference data unavailable in this game version. An empty Duel list is active until the saved snapshots are cleared or replaced."
+          );
+        }
         const selectedPriceSet = loadSelectedPriceSet(storage);
         const restoredPriceSet =
           selectedPriceSet.status === "loaded"
@@ -2684,15 +3021,24 @@ export function App() {
             setMarketNotice({ tone: "error", message: selectedPriceSetIssue });
           }
         }
+        if (setupCompatibilityIssues.length > 0) {
+          setStatus("Saved rewrite setup is incompatible; defaults are active");
+        } else if (duelCompatibilityIssues.length > 0) {
+          setStatus("Saved Duel snapshots are incompatible; an empty list is active");
+        }
         setReadyToPersist(true);
       })
-      .catch((caught: unknown) => {
-        if (!cancelled) setFatalError(caught instanceof Error ? caught.message : String(caught));
+      .catch(() => {
+        if (!cancelled) {
+          setFatalError(
+            "Source-backed runtime data could not be loaded. Verify the deployed data artifacts and reload."
+          );
+        }
       });
     return () => {
       cancelled = true;
     };
-  }, [initialSavedSetup.loaded]);
+  }, [initialDuelSnapshots, initialSavedSetup]);
 
   const legacyMigrationReport = useMemo<LegacySetupMigrationReport | null>(() => {
     if (!context || legacyMigrationDismissed) return null;
@@ -3007,40 +3353,72 @@ export function App() {
         row.monsterId.toLocaleLowerCase().includes(query)
     );
   }, [duelMatrix, duelMatrixFilter]);
+  useEffect(() => {
+    if (!context || activeTab !== "compare") return;
+    const source = {
+      form: heavyForm,
+      context,
+      cannonByMonster,
+      lootPrefsByMonster: lootPrefsForGameData,
+      customSetupsByMonster,
+      lootSettingsByMonster
+    };
+    const task = startCalculationTask({ kind: "dense-compare", ...source });
+    void task.promise
+      .then((rows) => setDenseCompareBuild({ rows, error: false, source }))
+      .catch((error: unknown) => {
+        if (error instanceof CalculationTaskCancelledError) return;
+        setDenseCompareBuild({ rows: [], error: true, source });
+      });
+    return task.cancel;
+  }, [
+    activeTab,
+    cannonByMonster,
+    context,
+    customSetupsByMonster,
+    heavyForm,
+    lootPrefsForGameData,
+    lootSettingsByMonster
+  ]);
+  const denseCompareBuildFresh =
+    denseCompareBuild != null &&
+    denseCompareBuild.source.form === heavyForm &&
+    denseCompareBuild.source.context === context &&
+    denseCompareBuild.source.cannonByMonster === cannonByMonster &&
+    denseCompareBuild.source.lootPrefsByMonster === lootPrefsForGameData &&
+    denseCompareBuild.source.customSetupsByMonster === customSetupsByMonster &&
+    denseCompareBuild.source.lootSettingsByMonster === lootSettingsByMonster;
   const denseCompareRows = useMemo(
     () =>
       context
-        ? createDenseCompareRows(
-            heavyForm,
-            context,
-            denseCompareForGameData,
-            cannonByMonster,
-            lootPrefsForGameData,
-            customSetupsByMonster,
-            lootSettingsByMonster
+        ? presentDenseCompareRows(
+            denseCompareBuild?.rows ?? EMPTY_DENSE_COMPARE_ROWS,
+            context.gameData,
+            denseCompareForGameData
           )
-        : [],
-    [
-      cannonByMonster,
-      context,
-      customSetupsByMonster,
-      denseCompareForGameData,
-      heavyForm,
-      lootSettingsByMonster,
-      lootPrefsForGameData
-    ]
+        : EMPTY_DENSE_COMPARE_ROWS,
+    [context, denseCompareBuild?.rows, denseCompareForGameData]
   );
   const denseComparePending = useMemo(
-    () => JSON.stringify(form) !== JSON.stringify(heavyForm),
-    [form, heavyForm]
+    () => JSON.stringify(form) !== JSON.stringify(heavyForm) || !denseCompareBuildFresh,
+    [denseCompareBuildFresh, form, heavyForm]
   );
-  const denseCompareFreshnessLabel = denseComparePending ? "Updating" : "Current";
-  const denseCompareFreshnessSummary = denseComparePending
-    ? "rows may reflect previous loadout"
-    : "current loadout";
-  const denseCompareFreshnessAria = denseComparePending
-    ? "Compare calculation status: Updating. Rows may reflect the previous loadout."
-    : "Compare calculation status: Current. Rows match the live setup.";
+  const denseCompareFailed = denseCompareBuildFresh && denseCompareBuild?.error === true;
+  const denseCompareFreshnessLabel = denseCompareFailed
+    ? "Unavailable"
+    : denseComparePending
+      ? "Updating"
+      : "Current";
+  const denseCompareFreshnessSummary = denseCompareFailed
+    ? "calculation failed"
+    : denseComparePending
+      ? "rows may reflect previous loadout"
+      : "current loadout";
+  const denseCompareFreshnessAria = denseCompareFailed
+    ? "Compare calculation status: Unavailable. The latest calculation failed."
+    : denseComparePending
+      ? "Compare calculation status: Updating. Rows may reflect the previous loadout."
+      : "Compare calculation status: Current. Rows match the live setup.";
   const denseCompareScale = useMemo(
     () => createDenseCompareScaleModel(denseCompareRows),
     [denseCompareRows]
@@ -3201,32 +3579,84 @@ export function App() {
     () => JSON.stringify(plannerStateForCompute) !== JSON.stringify(plannerComputedState),
     [plannerComputedState, plannerStateForCompute]
   );
-  const plannerResult = useMemo<{
-    panel: PlannerPanelViewModel | null;
-    error: string | null;
-  } | null>(() => {
-    if (!context || activeTab !== "planner") return null;
-    try {
-      const plan = createPlannerViewModel(
-        form,
-        context,
-        lootSettingsByMonster,
-        plannerComputedState
-      );
-      return {
-        panel: createPlannerPanelViewModel(plan),
-        error: null
-      };
-    } catch {
-      return {
-        panel: null,
-        error: "Planner could not compute the current plan"
-      };
-    }
+  useEffect(() => {
+    if (!context || activeTab !== "planner") return;
+    const source = {
+      form,
+      context,
+      lootSettingsByMonster,
+      plannerState: plannerComputedState
+    };
+    const task = startCalculationTask({ kind: "planner", ...source });
+    void task.promise
+      .then((panel) => setPlannerBuild({ panel, error: null, source }))
+      .catch((error: unknown) => {
+        if (error instanceof CalculationTaskCancelledError) return;
+        setPlannerBuild({
+          panel: null,
+          error: "Planner could not compute the current plan",
+          source
+        });
+      });
+    return task.cancel;
   }, [activeTab, context, form, lootSettingsByMonster, plannerComputedState]);
+  const plannerBuildFresh =
+    plannerBuild != null &&
+    plannerBuild.source.form === form &&
+    plannerBuild.source.context === context &&
+    plannerBuild.source.lootSettingsByMonster === lootSettingsByMonster &&
+    plannerBuild.source.plannerState === plannerComputedState;
+  const plannerPending = activeTab === "planner" && context != null && !plannerBuildFresh;
+  const plannerResult = plannerBuildFresh ? plannerBuild : null;
   const plannerGearPoolEditor = useMemo<PlannerGearPoolEditorViewModel | null>(
     () => (context ? createPlannerGearPoolEditorViewModel(form, context, plannerState) : null),
     [context, form, plannerState]
+  );
+  const riskDropOptions = useMemo<SelectOption[]>(
+    () => [
+      { id: "", label: "No target drop" },
+      ...(viewModel?.lootRows ?? [])
+        .filter((row) => row.pref !== "skip" && row.chance > 0)
+        .map((row) => ({ id: row.rowId, label: row.name }))
+    ],
+    [viewModel]
+  );
+  const riskBuildFresh =
+    riskBuild != null &&
+    riskBuild.source.form === form &&
+    riskBuild.source.context === context &&
+    riskBuild.source.cannonByMonster === cannonByMonster &&
+    riskBuild.source.lootPrefs === currentLootPrefs &&
+    riskBuild.source.lootSettingsByMonster === lootSettingsByMonster &&
+    riskBuild.source.analysis === riskControls;
+  const riskStatusLabel =
+    riskRunStatus === "running"
+      ? "Running"
+      : riskRunStatus === "unavailable"
+        ? "Unavailable"
+        : riskRunStatus === "cancelled"
+          ? "Cancelled"
+          : riskBuild && !riskBuildFresh
+            ? "Stale"
+            : riskBuildFresh
+              ? "Ready"
+              : "Idle";
+  const riskDisplayResult = riskBuild?.result ?? null;
+  const riskDisplayControls = riskBuild?.source.analysis ?? riskControls;
+
+  useEffect(() => {
+    if (!riskTaskRef.current) return;
+    riskTaskRef.current.cancel();
+    riskTaskRef.current = null;
+    setRiskRunStatus("cancelled");
+  }, [cannonByMonster, context, currentLootPrefs, form, lootSettingsByMonster, riskControls]);
+
+  useEffect(
+    () => () => {
+      riskTaskRef.current?.cancel();
+      riskTaskRef.current = null;
+    },
+    []
   );
 
   const commitFormState = (nextForm: CombatSetupFormState, mode: SetupMode = setupMode) => {
@@ -3402,11 +3832,12 @@ export function App() {
 
   const importSetup = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (!file || !context) return;
     try {
       setSetupImportNotice(null);
-      const parsed = SavedSetupEnvelopeSchema.parse(
-        JSON.parse(await readBrowserFileText(file, SETUP_IMPORT_MAX_BYTES))
+      const parsed = parseSavedSetupExportText(
+        await readBrowserFileText(file, SETUP_IMPORT_MAX_BYTES),
+        context.gameData
       );
       const setup = parsed.data;
       const persisted = persistLocalState("rewrite-setup", setupStorageOptions, setup);
@@ -3791,14 +4222,13 @@ export function App() {
   const setCombatStyle = (combatStyle: CombatStyle) =>
     setFormSafe((current) => switchCombatStyleLoadout(current, combatStyle));
   const selectCombatStyle = (combatStyle: CombatStyle) => {
-    setActiveTab(combatStyle);
+    setActiveTab("loadout");
     setCombatStyle(combatStyle);
   };
   const activateWorkbenchTab = (tabId: WorkbenchTabId) => {
     const tab = WORKBENCH_TABS.find((candidate) => candidate.id === tabId);
     if (!tab) return;
     setActiveTab(tab.id);
-    if ("combatStyle" in tab) setCombatStyle(tab.combatStyle);
   };
   const handleWorkbenchTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
     let nextIndex: number | null = null;
@@ -3818,8 +4248,12 @@ export function App() {
   };
 
   const reviewActiveAssumption = (tab: ActiveAssumptionReviewTarget) => {
+    if (tab === "melee" || tab === "ranged" || tab === "magic") {
+      setCombatStyle(tab);
+      setActiveTab("loadout");
+      return;
+    }
     setActiveTab(tab);
-    if (tab === "melee" || tab === "ranged" || tab === "magic") setCombatStyle(tab);
   };
 
   const updateLevel = (skill: keyof CombatSetupFormState["levels"], value: number) =>
@@ -3915,6 +4349,8 @@ export function App() {
   const selectedBoost = primaryBoostValue(form.boosts);
   const extraPrayerCount = extraPrayerSelectionCount(form.prayers);
   const extraBoostCount = extraBoostSelectionCount(form.boosts);
+  const prayerSelectionSummary = setupSelectionSummary(form.prayers, PRAYER_SELECTION_OPTIONS);
+  const boostSelectionSummary = setupSelectionSummary(form.boosts, BOOST_SELECTION_OPTIONS);
   const selectedSpecialWeapon = specialAttackOptions.some(
     (option) => option.id === form.specialAttack.weaponId
   )
@@ -3947,6 +4383,48 @@ export function App() {
     : hasCurrentCustomSetup
       ? "Default setup - custom saved"
       : "Default setup";
+  const runRiskAnalysis = () => {
+    const source = {
+      form,
+      context,
+      cannonByMonster,
+      lootPrefs: currentLootPrefs,
+      lootSettingsByMonster,
+      analysis: riskControls
+    };
+    riskTaskRef.current?.cancel();
+    const task = startCalculationTask({ kind: "risk-analysis", ...source });
+    riskTaskRef.current = task;
+    setRiskRunStatus("running");
+    setStatus("Running modeled risk analysis");
+    void task.promise
+      .then((result) => {
+        if (riskTaskRef.current !== task) return;
+        setRiskBuild({ result, source });
+        setRiskRunStatus("ready");
+        setStatus(`Risk analysis ready: ${formatNumber(result.sampleCount)} trials`);
+      })
+      .catch((error: unknown) => {
+        if (riskTaskRef.current !== task) return;
+        if (error instanceof CalculationTaskCancelledError) {
+          setRiskRunStatus("cancelled");
+          setStatus("Risk analysis cancelled");
+          return;
+        }
+        setRiskRunStatus("unavailable");
+        setStatus("Risk analysis unavailable");
+      })
+      .finally(() => {
+        if (riskTaskRef.current === task) riskTaskRef.current = null;
+      });
+  };
+  const cancelRiskAnalysis = () => {
+    if (!riskTaskRef.current) return;
+    riskTaskRef.current.cancel();
+    riskTaskRef.current = null;
+    setRiskRunStatus("cancelled");
+    setStatus("Risk analysis cancelled");
+  };
   const buildDuelMatrix = () => {
     if (duelMatrixBusy || duelSnapshots.snapshots.length === 0) return;
     const source = {
@@ -3957,28 +4435,37 @@ export function App() {
       lootPrefsByMonster: lootPrefsForGameData,
       lootSettingsByMonster
     };
+    duelMatrixTaskRef.current?.cancel();
+    const task = startCalculationTask({
+      kind: "duel-matrix",
+      form: source.form,
+      snapshots: source.snapshots,
+      context: source.context,
+      cannonByMonster: source.cannonByMonster,
+      lootPrefsByMonster: source.lootPrefsByMonster,
+      lootSettingsByMonster: source.lootSettingsByMonster
+    });
+    duelMatrixTaskRef.current = task;
     setDuelViewMode("monster-matrix");
     setDuelMatrixBusy(true);
     setStatus("Building Duel monster matrix");
-    window.setTimeout(() => {
-      try {
-        const model = createDuelMatrixViewModel(
-          source.form,
-          source.snapshots,
-          source.context,
-          source.cannonByMonster,
-          source.lootPrefsByMonster,
-          source.lootSettingsByMonster
-        );
+    void task.promise
+      .then((model) => {
+        if (duelMatrixTaskRef.current !== task) return;
         setDuelMatrixBuild({ model, source });
         setStatus(`Duel matrix ready: ${model.monsterCount} monsters, ${model.setupCount} setups`);
-      } catch {
+      })
+      .catch((error: unknown) => {
+        if (error instanceof CalculationTaskCancelledError) return;
+        if (duelMatrixTaskRef.current !== task) return;
         setDuelMatrixBuild(null);
         setStatus("Duel matrix could not be built");
-      } finally {
+      })
+      .finally(() => {
+        if (duelMatrixTaskRef.current !== task) return;
+        duelMatrixTaskRef.current = null;
         setDuelMatrixBusy(false);
-      }
-    }, 0);
+      });
   };
   const snapshotCurrentSetup = () => {
     const snapshot = createDuelSnapshot(
@@ -4007,7 +4494,9 @@ export function App() {
     try {
       setDuelImportNotice(null);
       const imported = parseDuelSnapshotsExportText(
-        await readBrowserFileText(file, DUEL_SNAPSHOTS_IMPORT_MAX_BYTES)
+        await readBrowserFileText(file, DUEL_SNAPSHOTS_IMPORT_MAX_BYTES),
+        DUEL_SNAPSHOTS_IMPORT_MAX_BYTES,
+        context.gameData
       );
       const merged = mergeDuelSnapshots(duelSnapshots, imported.data);
       setDuelSnapshots(merged.state);
@@ -4149,7 +4638,7 @@ export function App() {
     setCannonByMonster(applied.state.cannonByMonster);
     setLootPrefsByMonster(applied.state.lootPrefsByMonster);
     setLootSettingsByMonster(applied.state.lootSettingsByMonster);
-    setActiveTab(applied.state.form.combatStyle);
+    setActiveTab("loadout");
     setShareReviewDismissed(true);
     unblockReplacedLocalState(["rewrite-setup", "loot-prefs", "loot-settings"]);
     const monsterName =
@@ -4299,6 +4788,20 @@ export function App() {
   const potionCarrySummary = form.trip.singleDose
     ? `${formatNumber(form.trip.potionDoses)} doses/type`
     : `${formatNumber(form.trip.potionSets)} vials/type`;
+  const prayerRestoreSourceSummary =
+    form.prayers.length === 0
+      ? "No active prayer"
+      : form.trip.prayerMode === "potions"
+        ? "Prayer potions"
+        : form.trip.prayerMode === "altar"
+          ? "Altar"
+          : "No restore";
+  const explicitLootChoiceCount = Object.keys(currentLootPrefs).length;
+  const lootPolicySummary = `${highAlchEnabled ? "High alch on" : "High alch off"} · ${formatNumber(
+    explicitLootChoiceCount
+  )} row ${explicitLootChoiceCount === 1 ? "choice" : "choices"}`;
+  const supplyGapPerKill = viewModel.trip.supply.supplyCostPerKill - viewModel.trip.gpPerKill;
+  const supplyCostsExceedLoot = viewModel.trip.effectiveNetGpPerHour < 0 && supplyGapPerKill > 0;
   const potionRecommendation = viewModel.trip.potionRecommendation;
   const potionRecommendationStatus =
     potionRecommendation.status === "matched"
@@ -4542,11 +5045,13 @@ export function App() {
     ? "error"
     : plannerStateDirty
       ? "pending"
-      : plannerPanel?.isEmpty
-        ? "empty"
-        : plannerPanel
-          ? "ready"
-          : "idle";
+      : plannerPending
+        ? "running"
+        : plannerPanel?.isEmpty
+          ? "empty"
+          : plannerPanel
+            ? "ready"
+            : "idle";
   const plannerMetricDelta =
     plannerPanel != null ? plannerPanel.summary.endMetric - plannerPanel.summary.startMetric : 0;
   const plannerMetricDeltaValue =
@@ -4995,6 +5500,40 @@ export function App() {
         </section>
       )}
 
+      <nav className="setup-guide-bar" aria-label="Setup quick navigation">
+        <button
+          type="button"
+          aria-label="Edit prayers and combat boosts"
+          onClick={() => activateWorkbenchTab("loadout")}
+        >
+          <span>Prayers &amp; combat boosts</span>
+          <strong>
+            {prayerSelectionSummary} · {boostSelectionSummary}
+          </strong>
+          <small>{form.combatStyle} setup</small>
+        </button>
+        <button
+          type="button"
+          aria-label="Edit potion carry and prayer restore"
+          onClick={() => activateWorkbenchTab("trip")}
+        >
+          <span>Potion carry &amp; prayer restore</span>
+          <strong>
+            {potionCarrySummary} · {prayerRestoreSourceSummary}
+          </strong>
+          <small>Trip</small>
+        </button>
+        <button
+          type="button"
+          aria-label="Edit loot rules"
+          onClick={() => activateWorkbenchTab("loot")}
+        >
+          <span>Loot rules</span>
+          <strong>{lootPolicySummary}</strong>
+          <small>Loot</small>
+        </button>
+      </nav>
+
       <section className="workbench-shell" aria-label="Workbench shell">
         <aside className="player-sidebar" aria-label="Player sidebar">
           <section className="sidebar-section" aria-label="Player setup">
@@ -5160,35 +5699,47 @@ export function App() {
               <h2>{currentMonster?.name ?? form.monsterId}</h2>
               <span>{setupStatus}</span>
             </div>
-            <SelectField
+            <SearchableSelectField
               label="Monster"
               value={form.monsterId}
               options={monsters}
+              className="setup-context-monster-field"
+              searchPlaceholder="Search monsters"
               onChange={selectTarget}
             />
             <div className="setup-context-actions" aria-label="Setup actions">
-              <button type="button" disabled={activeSetupIsCustom} onClick={createCustomSetup}>
-                Create custom setup
+              <button
+                type="button"
+                aria-label="Create custom setup"
+                title="Create custom setup"
+                disabled={activeSetupIsCustom}
+                onClick={createCustomSetup}
+              >
+                New
               </button>
               {hasCurrentCustomSetup ? (
                 <button
                   type="button"
+                  aria-label={activeSetupIsCustom ? "Edit default" : "Edit custom"}
+                  title={activeSetupIsCustom ? "Edit default setup" : "Edit custom setup"}
                   onClick={activeSetupIsCustom ? editDefaultSetup : editCustomSetup}
                 >
-                  {activeSetupIsCustom ? "Edit default" : "Edit custom"}
+                  Edit
                 </button>
               ) : (
-                <button type="button" disabled>
-                  Edit default
+                <button type="button" aria-label="Edit default" title="Edit default setup" disabled>
+                  Edit
                 </button>
               )}
               <button
                 type="button"
                 className="danger-button"
+                aria-label="Remove custom setup"
+                title="Remove custom setup"
                 disabled={!hasCurrentCustomSetup}
                 onClick={removeCurrentCustomSetup}
               >
-                Remove custom setup
+                Remove
               </button>
             </div>
             <div className="setup-context-metrics">
@@ -5222,7 +5773,9 @@ export function App() {
                 onClick={() => activateWorkbenchTab(tab.id)}
                 onKeyDown={(event) => handleWorkbenchTabKeyDown(event, index)}
               >
-                {tab.label}
+                {tab.id === "loadout"
+                  ? `${form.combatStyle.charAt(0).toUpperCase()}${form.combatStyle.slice(1)} setup`
+                  : tab.label}
               </button>
             ))}
           </nav>
@@ -5239,14 +5792,9 @@ export function App() {
               <section
                 className="compact-setup-strip"
                 aria-label="Combat setup"
-                hidden={activeTab !== "compare" && !COMBAT_STYLE_TAB_IDS.has(activeTab)}
+                hidden={activeTab !== "compare" && activeTab !== "loadout"}
               >
-                <SelectField
-                  label="TYPE"
-                  value={form.combatStyle}
-                  options={COMBAT_STYLE_OPTIONS}
-                  onChange={(combatStyle) => selectCombatStyle(combatStyle as CombatStyle)}
-                />
+                <ReadOnlyField label="TYPE" value={form.combatStyle} />
                 <NumberField
                   label={primaryLevelLabel(form.combatStyle)}
                   value={form.levels[primarySkill]}
@@ -5257,6 +5805,7 @@ export function App() {
                     label="SPELL"
                     value={form.spellId}
                     options={spellSelectOptions}
+                    className="compact-spell-field"
                     onChange={setSpellSelection}
                   />
                 ) : form.combatStyle === "ranged" ? (
@@ -5277,10 +5826,11 @@ export function App() {
                   label="STANCE"
                   value={form.styleId}
                   options={styles}
+                  className="compact-stance-field"
                   onChange={(styleId) => setFormSafe((current) => updateForm(current, { styleId }))}
                 />
                 <CompactSelectionSelectField
-                  label="PRAY"
+                  label="PRAYER"
                   value={selectedPrayer}
                   options={PRAYER_OPTIONS}
                   extraCount={extraPrayerCount}
@@ -5293,7 +5843,7 @@ export function App() {
                   }
                 />
                 <CompactSelectionSelectField
-                  label="POT"
+                  label="BOOST"
                   value={selectedBoost}
                   options={BOOST_OPTIONS}
                   extraCount={extraBoostCount}
@@ -5311,6 +5861,7 @@ export function App() {
                   min={-250}
                   max={350}
                   placeholder={derivedAccuracyPlaceholder}
+                  compactReset
                   onChange={(value) => setManualOverride("accuracyBonus", value)}
                 />
                 <OptionalNumberField
@@ -5319,6 +5870,7 @@ export function App() {
                   min={-250}
                   max={350}
                   placeholder={derivedDamagePlaceholder}
+                  compactReset
                   onChange={(value) => setManualOverride("damageBonus", value)}
                 />
                 <OptionalNumberField
@@ -5328,6 +5880,7 @@ export function App() {
                   max={12}
                   step={0.1}
                   placeholder={derivedSpeedPlaceholder}
+                  compactReset
                   onChange={(value) => setManualOverride("attackSpeedSec", value)}
                 />
                 <ReadOnlyField
@@ -5338,6 +5891,7 @@ export function App() {
                   label="TARGET"
                   value={form.monsterId}
                   options={monsters}
+                  className="compact-target-field"
                   onChange={selectTarget}
                 />
               </section>
@@ -5350,11 +5904,35 @@ export function App() {
                 {metric("DPS", formatNumber(viewModel.combat.effectiveDps, 2), "teal")}
                 {metric("MAX HIT", formatNumber(viewModel.combat.maxHit, 1))}
                 {metric("HIT %", `${formatNumber(viewModel.combat.hitChance * 100, 1)}%`)}
-                {metric("TTK", formatDuration(viewModel.combat.ttkSec))}
+                {metric(
+                  "TTK",
+                  formatDuration(viewModel.combat.ttkSec),
+                  undefined,
+                  riskBuildFresh && riskDisplayResult
+                    ? `P10/50/90 ${formatRiskRange(riskDisplayResult.killTimeSeconds, 1, "s")}`
+                    : undefined,
+                  riskBuildFresh && riskDisplayResult
+                    ? () => activateWorkbenchTab("risk")
+                    : undefined
+                )}
                 {metric("KILLS/HR", formatNumber(viewModel.trip.killsPerHour))}
                 {metric("XP/HR", formatNumber(viewModel.effectiveXpPerHour), "teal")}
                 {metric("GP/HR", formatNumber(viewModel.trip.gpPerHour))}
-                {metric("GP/HR NET", formatNumber(viewModel.trip.effectiveNetGpPerHour), "gold")}
+                {metric(
+                  "GP/HR NET",
+                  formatNumber(viewModel.trip.effectiveNetGpPerHour),
+                  "gold",
+                  riskBuildFresh && riskDisplayResult
+                    ? `${formatNumber(riskDisplayControls.horizonMinutes)}m P10/50/90 ${formatRiskRange(
+                        riskDisplayResult.timedNetGp,
+                        0,
+                        " gp"
+                      )}`
+                    : undefined,
+                  riskBuildFresh && riskDisplayResult
+                    ? () => activateWorkbenchTab("risk")
+                    : undefined
+                )}
                 {metric("SUPPLY/KILL", formatNumber(viewModel.trip.supply.supplyCostPerKill))}
                 {metric("GP/KILL", formatNumber(viewModel.trip.gpPerKill))}
               </section>
@@ -5362,6 +5940,26 @@ export function App() {
                 className="calculation-warning-slot"
                 hidden={activeTab !== "stats" && activeTab !== "compare"}
               >
+                {supplyCostsExceedLoot ? (
+                  <section className="net-gp-guidance" aria-label="Net GP explanation">
+                    <div>
+                      <strong>Why net GP is negative</strong>
+                      <span>
+                        Supplies {formatNumber(viewModel.trip.supply.supplyCostPerKill)} GP/kill
+                        exceed loot {formatNumber(viewModel.trip.gpPerKill)} GP/kill by{" "}
+                        {formatNumber(supplyGapPerKill)} GP.
+                      </span>
+                    </div>
+                    <div className="net-gp-guidance-actions">
+                      <button type="button" onClick={() => activateWorkbenchTab("loadout")}>
+                        Edit prayers &amp; boosts
+                      </button>
+                      <button type="button" onClick={() => activateWorkbenchTab("trip")}>
+                        Review potion carry
+                      </button>
+                    </div>
+                  </section>
+                ) : null}
                 <CalculationWarningSummary
                   warnings={viewModel.moneyWarnings}
                   label="Result price warnings"
@@ -5534,7 +6132,7 @@ export function App() {
               <section
                 className="equipment-pane"
                 aria-label="Equipment loadout"
-                hidden={!COMBAT_STYLE_TAB_IDS.has(activeTab)}
+                hidden={activeTab !== "loadout"}
               >
                 <div className="section-title-row">
                   <h2>{form.combatStyle} loadout</h2>
@@ -5786,7 +6384,7 @@ export function App() {
               <section
                 className="special-strip"
                 aria-label="Special attack"
-                hidden={!COMBAT_STYLE_TAB_IDS.has(activeTab)}
+                hidden={activeTab !== "loadout"}
               >
                 <div className="section-title-row">
                   <h2>Special attack</h2>
@@ -6261,7 +6859,14 @@ export function App() {
               >
                 <div className="section-title-row">
                   <h2>Trip assumptions</h2>
-                  <span className="status-pill">{tripStatus}</span>
+                  <div className="section-title-actions">
+                    {riskBuildFresh && riskDisplayResult ? (
+                      <button type="button" onClick={() => activateWorkbenchTab("risk")}>
+                        Risk ranges
+                      </button>
+                    ) : null}
+                    <span className="status-pill">{tripStatus}</span>
+                  </div>
                 </div>
                 <div className="trip-body">
                   <SearchableSelectField
@@ -6324,7 +6929,7 @@ export function App() {
                     <span>Single-dose</span>
                   </label>
                   <NumberField
-                    label="Potion vials"
+                    label="Combat potion vials / type"
                     value={form.trip.potionSets}
                     min={0}
                     max={28}
@@ -6338,7 +6943,7 @@ export function App() {
                     }
                   />
                   <NumberField
-                    label="Potion doses"
+                    label="Combat potion doses / type"
                     value={form.trip.potionDoses}
                     min={0}
                     max={112}
@@ -6718,6 +7323,7 @@ export function App() {
                   <div className="trip-output grouped" aria-label="Trip summary">
                     {[
                       tripMetricGroup("Survival", [
+                        { label: "Incoming model", value: incoming.descriptor.sourceLabel },
                         { label: "Safespot", value: safespotSummary },
                         {
                           label: "Protection prayer",
@@ -6875,6 +7481,14 @@ export function App() {
                           label: "Kills/trip",
                           value: formatNumber(viewModel.trip.trip.killsPerTrip, 1)
                         },
+                        ...(riskBuildFresh && riskDisplayResult
+                          ? [
+                              {
+                                label: "Modeled P10/50/90",
+                                value: formatRiskRange(riskDisplayResult.killsPerTrip, 0)
+                              }
+                            ]
+                          : []),
                         {
                           label: "Trip length",
                           value: Number.isFinite(viewModel.trip.trip.tripMinutes)
@@ -6906,6 +7520,248 @@ export function App() {
                     ]}
                   </div>
                 </div>
+              </section>
+
+              <section className="risk-strip" aria-label="Risk" hidden={activeTab !== "risk"}>
+                <div className="section-title-row">
+                  <div>
+                    <h2>Risk &amp; variability</h2>
+                    <p className="risk-intro">
+                      Modeled ranges complement the current averages. They are not death odds or
+                      confidence intervals.
+                    </p>
+                  </div>
+                  <span
+                    className={`status-pill ${riskRunStatus === "running" ? "pending" : riskBuildFresh ? "ready" : ""}`}
+                    aria-live="polite"
+                  >
+                    {riskStatusLabel}
+                  </span>
+                </div>
+
+                <div className="risk-controls" aria-label="Risk analysis controls">
+                  <NumberField
+                    label="Target kills"
+                    value={riskControls.targetKills}
+                    min={1}
+                    max={10_000}
+                    onChange={(targetKills) =>
+                      setRiskControls((current) => ({ ...current, targetKills }))
+                    }
+                  />
+                  <NumberField
+                    label="Horizon min"
+                    value={riskControls.horizonMinutes}
+                    min={1}
+                    max={1_440}
+                    onChange={(horizonMinutes) =>
+                      setRiskControls((current) => ({ ...current, horizonMinutes }))
+                    }
+                  />
+                  <NumberField
+                    label="GP target"
+                    value={riskControls.gpTarget}
+                    min={0}
+                    max={1_000_000_000}
+                    onChange={(gpTarget) =>
+                      setRiskControls((current) => ({ ...current, gpTarget }))
+                    }
+                  />
+                  <SearchableSelectField
+                    label="Target drop"
+                    value={riskControls.targetDropRowId ?? ""}
+                    options={riskDropOptions}
+                    searchPlaceholder="Search drops"
+                    onChange={(targetDropRowId) =>
+                      setRiskControls((current) => ({
+                        ...current,
+                        targetDropRowId: targetDropRowId || null
+                      }))
+                    }
+                  />
+                  <div className="risk-actions">
+                    <button
+                      type="button"
+                      onClick={runRiskAnalysis}
+                      disabled={riskRunStatus === "running"}
+                    >
+                      Run analysis
+                    </button>
+                    <button
+                      type="button"
+                      onClick={cancelRiskAnalysis}
+                      disabled={riskRunStatus !== "running"}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+
+                {riskDisplayResult ? (
+                  <div className="risk-results" aria-label="Modeled risk results">
+                    {!riskBuildFresh && (
+                      <p className="inline-status warning" role="status">
+                        Results are stale because the setup, prices, loot policy or analysis
+                        controls changed. Run again to refresh them.
+                      </p>
+                    )}
+                    <p className="risk-range-key">
+                      Ranges show P10 / median / P90 from{" "}
+                      {formatNumber(riskDisplayResult.sampleCount)}
+                      deterministic seeded trials.
+                    </p>
+                    <div className="summary-strip risk-summary">
+                      <div className="metric">
+                        <span>Kill time</span>
+                        <strong className="teal">
+                          {formatRiskRange(riskDisplayResult.killTimeSeconds, 1, "s")}
+                        </strong>
+                        <small>
+                          Modeled mean {formatNumber(riskDisplayResult.killTimeSeconds.mean, 1)}s;
+                          expected {formatNumber(viewModel.result.rates.ttkSec, 1)}s
+                        </small>
+                      </div>
+                      <div className="metric">
+                        <span>Food runs out</span>
+                        <strong>
+                          {formatRiskProbability(
+                            riskDisplayResult.foodRunsOutProbability,
+                            riskDisplayResult.coverage.incomingDamage === "sampled"
+                              ? riskDisplayResult.sampleCount
+                              : undefined
+                          )}
+                        </strong>
+                        <small>
+                          Before {formatNumber(riskDisplayControls.targetKills)} kills; not death
+                          chance
+                        </small>
+                      </div>
+                      <div className="metric">
+                        <span>Kills / trip</span>
+                        <strong>{formatRiskRange(riskDisplayResult.killsPerTrip, 0)}</strong>
+                        <small>
+                          Modeled mean{" "}
+                          {riskDisplayResult.killsPerTrip
+                            ? formatNumber(riskDisplayResult.killsPerTrip.mean, 1)
+                            : "unbounded"}
+                          ; expected {finiteMetric(viewModel.trip.trip.killsPerTrip, 1)}
+                        </small>
+                      </div>
+                      <div className="metric">
+                        <span>Trip cycle</span>
+                        <strong>
+                          {formatRiskRange(riskDisplayResult.tripCycleMinutes, 1, "m")}
+                        </strong>
+                        <small>
+                          Mean{" "}
+                          {riskDisplayResult.tripCycleMinutes
+                            ? formatNumber(riskDisplayResult.tripCycleMinutes.mean, 1) + "m"
+                            : "unbounded"}
+                          ; includes bank and altar time
+                        </small>
+                      </div>
+                      <div className="metric">
+                        <span>{formatNumber(riskDisplayControls.horizonMinutes)}m net GP</span>
+                        <strong className="gold">
+                          {formatRiskRange(riskDisplayResult.timedNetGp, 0, " gp")}
+                        </strong>
+                        <small>
+                          Mean {formatNumber(riskDisplayResult.timedNetGp.mean)} gp; completed kills
+                          only
+                        </small>
+                      </div>
+                      <div className="metric">
+                        <span>Reach GP target</span>
+                        <strong>
+                          {formatRiskProbability(
+                            riskDisplayResult.gpTargetProbability,
+                            riskDisplayResult.sampleCount
+                          )}
+                        </strong>
+                        <small>
+                          At least {formatNumber(riskDisplayControls.gpTarget)} gp in{" "}
+                          {formatNumber(riskDisplayControls.horizonMinutes)}m
+                        </small>
+                      </div>
+                      <div className="metric">
+                        <span>Target drop</span>
+                        <strong>
+                          {riskDisplayResult.targetDrop
+                            ? formatRiskProbability(riskDisplayResult.targetDrop.timedProbability)
+                            : "Not selected"}
+                        </strong>
+                        <small>
+                          {riskDisplayResult.targetDrop
+                            ? `${riskDisplayResult.targetDrop.name}; ${formatRiskProbability(
+                                riskDisplayResult.targetDrop.fixedKillProbability
+                              )} within ${formatNumber(riskDisplayControls.targetKills)} fixed kills`
+                            : "Choose an active drop and run again"}
+                        </small>
+                      </div>
+                    </div>
+
+                    <section className="risk-coverage" aria-label="Risk model coverage">
+                      <h3>Model coverage</h3>
+                      <dl>
+                        <div>
+                          <dt>Player damage</dt>
+                          <dd>{riskDisplayResult.coverage.playerDamage}</dd>
+                        </div>
+                        <div>
+                          <dt>Incoming damage</dt>
+                          <dd>{riskDisplayResult.coverage.incomingDamage}</dd>
+                        </div>
+                        <div>
+                          <dt>Incoming model</dt>
+                          <dd>{riskDisplayResult.coverage.incomingModel}</dd>
+                        </div>
+                        <div>
+                          <dt>Loot occurrence</dt>
+                          <dd>
+                            {formatRiskProbability(riskDisplayResult.coverage.lootOccurrence)}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Exact quantity/correlation</dt>
+                          <dd>
+                            {formatRiskProbability(
+                              riskDisplayResult.coverage.lootQuantityCorrelation
+                            )}
+                          </dd>
+                        </div>
+                      </dl>
+                      {riskDisplayResult.coverage.meanOnlySources.length > 0 && (
+                        <p>
+                          Mean-only sources: {riskDisplayResult.coverage.meanOnlySources.join(", ")}
+                          .
+                        </p>
+                      )}
+                    </section>
+
+                    {riskDisplayResult.warnings.length > 0 && (
+                      <div
+                        className="calculation-warnings"
+                        role="status"
+                        aria-label="Risk warnings"
+                      >
+                        <strong>Modeled-result notes</strong>
+                        {riskDisplayResult.warnings.map((warning) => (
+                          <span
+                            className={warning.severity}
+                            key={`${warning.code}-${warning.message}`}
+                          >
+                            {warning.message}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="empty-state">
+                    Run the analysis to model kill time, food sufficiency, trip length, timed net GP
+                    and target probabilities.
+                  </p>
+                )}
               </section>
 
               <section className="cannon-strip" aria-label="Cannon" hidden={activeTab !== "cannon"}>
@@ -7467,7 +8323,7 @@ export function App() {
                                 aria-current={row.isCurrentTarget ? "true" : undefined}
                                 key={row.monsterId}
                               >
-                                <th scope="row">
+                                <th scope="row" title={row.monsterName}>
                                   <strong>{row.monsterName}</strong>
                                   <span>
                                     {row.monsterLevel == null
@@ -7654,7 +8510,11 @@ export function App() {
                   )}
                 </div>
 
-                {plannerResult?.error ? (
+                {plannerPending ? (
+                  <p className="inline-status" role="status" aria-live="polite">
+                    Calculating plan
+                  </p>
+                ) : plannerResult?.error ? (
                   <p className="inline-status error" role="alert">
                     {plannerResult.error}
                   </p>
@@ -8226,7 +9086,7 @@ export function App() {
                           setEconomyBaselineMode(value as PriceHistoryBaselineMode)
                         }
                       />
-                      <SelectField
+                      <SearchableSelectField
                         label="Snapshot"
                         value={effectiveEconomySnapshotKey}
                         options={
@@ -8238,6 +9098,7 @@ export function App() {
                           economyBaselineMode !== "snapshot" ||
                           priceHistorySnapshotOptions.length === 0
                         }
+                        searchPlaceholder="Search snapshots"
                         onChange={setEconomySnapshotKey}
                       />
                       <div className="field">
@@ -8250,7 +9111,7 @@ export function App() {
                           onChange={(event) => setEconomyItemFilter(event.target.value)}
                         />
                       </div>
-                      <SelectField
+                      <SearchableSelectField
                         label="Trend item"
                         value={effectiveEconomyTrendItemId}
                         options={
@@ -8259,6 +9120,7 @@ export function App() {
                             : [{ id: "", label: "No tracked items" }]
                         }
                         disabled={priceHistoryTrendItemOptions.length === 0}
+                        searchPlaceholder="Search items"
                         onChange={setEconomyTrendItemId}
                       />
                     </div>
@@ -8269,7 +9131,7 @@ export function App() {
                           <ol>
                             {priceHistoryMovers.topGainers.map((row) => (
                               <li key={row.itemId}>
-                                <span>{row.itemLabel}</span>
+                                <span title={row.itemLabel}>{row.itemLabel}</span>
                                 <strong>{optionalDelta(row.gpDelta)}</strong>
                               </li>
                             ))}
@@ -8284,7 +9146,7 @@ export function App() {
                           <ol>
                             {priceHistoryMovers.topFallers.map((row) => (
                               <li key={row.itemId}>
-                                <span>{row.itemLabel}</span>
+                                <span title={row.itemLabel}>{row.itemLabel}</span>
                                 <strong>{optionalDelta(row.gpDelta)}</strong>
                               </li>
                             ))}

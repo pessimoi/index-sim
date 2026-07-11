@@ -12,6 +12,10 @@ import { createLostCityItemCandidate, extractLostCityItemSource } from "./lostci
 import { readLostCityLootHandlerCatalog } from "./lostcity-content-loot";
 import { extractLostCityMonsterLootSource } from "./lostcity-content-loot-extractor";
 import { createLostCityMonsterCombatCandidate } from "./lostcity-content-monsters";
+import {
+  createNpcAttackSourceAudit,
+  generatedIncomingAttacksFromAuditRow
+} from "./lostcity-content-npc-attacks";
 import { readLostCityItemRequirements } from "./lostcity-content-requirements";
 import { lostCityMonsterSourceId, lostCitySourceItemId } from "./lostcity-content-runtime-mapping";
 
@@ -69,6 +73,13 @@ export function createLostCityRawSnapshot(input: {
   const params = readLostCityConfigCatalog({ ...catalogOptions, extension: ".param" });
   const dbrows = readLostCityConfigCatalog({ ...catalogOptions, extension: ".dbrow" });
   const handlers = readLostCityLootHandlerCatalog(catalogOptions);
+  const attackAudit = createNpcAttackSourceAudit({
+    sourceDir: input.sourceDir,
+    sourceRevision: input.sourceRevision,
+    reference: input.reference,
+    ...(input.repoRoot ? { repoRoot: input.repoRoot } : {})
+  });
+  const attackRows = new Map(attackAudit.rows.map((row) => [row.runtimeId, row]));
 
   let candidate = createLostCityMonsterCombatCandidate(input.reference, npcs);
   candidate = createLostCityEquipmentCandidate(candidate, objects);
@@ -91,6 +102,15 @@ export function createLostCityRawSnapshot(input: {
       if (extraction.status !== "complete") {
         throw new Error(`LostCity loot extraction is incomplete for ${runtimeId}.`);
       }
+      const attackRow = attackRows.get(runtimeId);
+      if (!attackRow) {
+        throw new Error(`LostCity incoming attack extraction is incomplete for ${runtimeId}.`);
+      }
+      const incoming = generatedIncomingAttacksFromAuditRow(
+        attackRow,
+        input.sourceRevision,
+        input.generatedAt
+      );
       lootExclusionCount += extraction.exclusions.length;
       const loot = extraction.loot.map((drop) => {
         const collectItemIds = (entry: DropEntry): void => {
@@ -107,6 +127,7 @@ export function createLostCityRawSnapshot(input: {
       });
       const definition: MonsterDefinition = {
         ...monster,
+        ...incoming,
         loot,
         provenance: generatedProvenance(
           [combatSource?.sourceRef, extraction.sourceRef].filter(Boolean).join(", "),

@@ -172,12 +172,28 @@ describe("market API handler", () => {
       url: "/api/market/sync",
       body: JSON.stringify({ scope: "items", itemIds: ["lobster"] })
     });
+    const mismatchedSlug = await handler(context, {
+      status: () => availableStatus,
+      sync: () => [
+        {
+          itemId: "lobster",
+          sourceSlug: "not_lobster",
+          status: "updated",
+          price: 210
+        }
+      ]
+    })({
+      method: "POST",
+      url: "/api/market/sync",
+      body: JSON.stringify({ scope: "items", itemIds: ["lobster"] })
+    });
 
     expect(unavailable?.status).toBe(503);
     expect(
       parseBody<{ error: { message: string } }>(unavailable?.body ?? "").error.message
     ).not.toContain("Raw upstream");
     expect(invalid?.status).toBe(502);
+    expect(mismatchedSlug?.status).toBe(502);
   });
 
   it("enforces per-process sync rate limits and provider timeouts", async () => {
@@ -215,9 +231,32 @@ describe("market API handler", () => {
       url: "/api/market/sync",
       body: JSON.stringify({ scope: "items", itemIds: ["lobster"] })
     });
+    const statusTimedOut = await createMarketApiHandler({
+      provider: {
+        status: () => new Promise(() => undefined),
+        sync: () => []
+      },
+      timeoutMs: 1
+    })({ method: "GET", url: "/api/market/status" });
 
     expect(first?.status).toBe(200);
     expect(second?.status).toBe(429);
     expect(timedOut?.status).toBe(503);
+    expect(statusTimedOut?.status).toBe(503);
+  });
+
+  it("bounds ephemeral market rate-limit client state", () => {
+    let currentTime = 1_000;
+    const limiter = createMemoryMarketRateLimiter({
+      requestsPerSecond: 1,
+      windowMs: 1_000,
+      maxEntries: 1,
+      now: () => currentTime
+    });
+
+    expect(limiter.check("client-a").allowed).toBe(true);
+    expect(limiter.check("client-b")).toMatchObject({ allowed: false, retryAfterSeconds: 1 });
+    currentTime = 2_000;
+    expect(limiter.check("client-b").allowed).toBe(true);
   });
 });

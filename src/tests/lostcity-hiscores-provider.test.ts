@@ -134,6 +134,7 @@ describe("LostCity hiscores provider", () => {
     const rows = JSON.parse(FIXTURE) as Array<Record<string, unknown>>;
     const cases = [
       jsonResponse("{bad"),
+      jsonResponse(FIXTURE.replace('"type": 1', '"type": 1, "type": 1')),
       jsonResponse(JSON.stringify([rows[0], rows[0]])),
       jsonResponse(JSON.stringify([{ ...rows[0], level: 120 }])),
       new Response("<html>unexpected</html>", {

@@ -40,7 +40,7 @@ import { createGeneratedRuntimePriceSet } from "../src/adapters/generated/price-
 import { createLostCityRawSnapshot } from "./lostcity-content-snapshot";
 import { LostCityContentSourceError } from "./lostcity-content-config";
 
-export const GAME_DATA_GENERATOR_VERSION = "raw-lostcity-runtime-catalog-3";
+export const GAME_DATA_GENERATOR_VERSION = "raw-lostcity-runtime-catalog-4";
 export const DEFAULT_GAME_DATA_SOURCE_DIR = ".sources/lostcity-content";
 export const FOUNDATION_SOURCE_MANIFEST_FILE = "generator-foundation.json";
 export const SOURCE_BACKED_SLICE_DIR = "index-sim-source-slice";

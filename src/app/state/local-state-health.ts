@@ -46,6 +46,7 @@ import {
 import { REWRITE_SETUP_STORAGE_KEY, REWRITE_SETUP_VERSION, SavedSetupSchema } from "./ui-state";
 
 export const LOCAL_STATE_HEALTH_REASON_VALUES = [
+  "duplicate_keys",
   "invalid_json",
   "invalid_envelope",
   "invalid_data",
@@ -102,6 +103,7 @@ export interface LocalStateStorageFailure {
 export interface LocalStateHealthReportOptions {
   storageUnavailable?: boolean;
   storageFailures?: readonly LocalStateStorageFailure[];
+  contextInvalidItemIds?: readonly LocalStateHealthItemId[];
 }
 
 export interface LocalStateHealthExport {
@@ -297,6 +299,17 @@ function healthItemWithStorageFailure(
   };
 }
 
+function healthItemWithContextInvalid(item: LocalStateHealthItem): LocalStateHealthItem {
+  return {
+    ...item,
+    status: "invalid",
+    reason: "invalid_data",
+    loaded: false,
+    defaultUsed: true,
+    needsAttention: true
+  };
+}
+
 export function createLocalStateHealthReport(
   storage: KeyValueStorage,
   now: Date = new Date(),
@@ -305,10 +318,14 @@ export function createLocalStateHealthReport(
   const failuresById = new Map(
     (options.storageFailures ?? []).map((failure) => [failure.id, failure])
   );
+  const contextInvalidItemIds = new Set(options.contextInvalidItemIds ?? []);
   const items = LOCAL_STATE_HEALTH_DESCRIPTORS.map((descriptor) => {
-    const item = options.storageUnavailable
+    let item = options.storageUnavailable
       ? unavailableHealthItem(descriptor)
       : healthItemFromResult(descriptor, descriptor.load(storage));
+    if (contextInvalidItemIds.has(descriptor.id) && item.status === "loaded") {
+      item = healthItemWithContextInvalid(item);
+    }
     const failure = failuresById.get(descriptor.id);
     return failure ? healthItemWithStorageFailure(item, failure) : item;
   });

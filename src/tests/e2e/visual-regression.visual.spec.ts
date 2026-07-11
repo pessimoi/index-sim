@@ -27,7 +27,7 @@ async function prepareTrip(page: Page) {
   const trip = page.getByRole("region", { name: "Trip assumptions", exact: true });
   await trip.getByLabel("Bank time").selectOption("manual");
   await trip.getByLabel("Bank sec").fill("75");
-  await trip.getByLabel("Potion vials").fill("2");
+  await trip.getByLabel("Combat potion vials / type").fill("2");
   await trip.getByLabel("Prayer restore").selectOption("manual_doses");
   await trip.getByLabel("Prayer doses").fill("8");
   await trip.getByLabel("Food mode").selectOption("manual");

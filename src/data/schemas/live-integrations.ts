@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { parseJsonWithDuplicateKeyCheck } from "../reliability";
 import type {
   HiscoresLookupRequest,
   HiscoresResponse,
@@ -56,7 +57,10 @@ function parseJsonText(jsonText: string, maxBytes: number): unknown {
   }
 
   try {
-    return JSON.parse(jsonText) as unknown;
+    return parseJsonWithDuplicateKeyCheck(jsonText, {
+      maxBytes,
+      source: "Live integration payload"
+    });
   } catch {
     throw new LiveIntegrationValidationError(
       "invalid_json",
@@ -76,6 +80,11 @@ function parseWithSchema<T>(schema: z.ZodType<T>, input: unknown, label: string)
   }
   return result.data;
 }
+
+const IntegrationTimestampSchema = z
+  .string()
+  .min(1)
+  .refine((value) => Number.isFinite(Date.parse(value)), "Invalid timestamp");
 
 export function parseLiveIntegrationJson<T>(
   jsonText: string,
@@ -186,7 +195,7 @@ export const HiscoresResponseSchema: z.ZodType<HiscoresResponse> = z
     player: HiscoresPlayerNameSchema,
     normalizedPlayer: HiscoresPlayerNameSchema,
     source: HiscoresSourceSchema,
-    fetchedAt: z.string().min(1),
+    fetchedAt: IntegrationTimestampSchema,
     skills: HiscoresSkillsSchema,
     warnings: z.array(IntegrationWarningSchema)
   })
@@ -281,8 +290,8 @@ export const MarketSyncReportSchema = z
     updated: z.number().int().nonnegative(),
     skipped: z.number().int().nonnegative(),
     failed: z.number().int().nonnegative(),
-    startedAt: z.string().min(1),
-    finishedAt: z.string().min(1),
+    startedAt: IntegrationTimestampSchema,
+    finishedAt: IntegrationTimestampSchema,
     source: MarketSourceSchema,
     items: z.array(MarketItemReportSchema),
     warnings: z.array(IntegrationWarningSchema)
@@ -302,6 +311,24 @@ export const MarketSyncReportSchema = z
         code: "custom",
         path: ["items"],
         message: "items length must equal requested"
+      });
+    }
+    const seenItemIds = new Set<string>();
+    value.items.forEach((item, index) => {
+      if (seenItemIds.has(item.itemId)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["items", index, "itemId"],
+          message: `duplicate market report item '${item.itemId}'`
+        });
+      }
+      seenItemIds.add(item.itemId);
+    });
+    if (Date.parse(value.finishedAt) < Date.parse(value.startedAt)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["finishedAt"],
+        message: "finishedAt must not precede startedAt"
       });
     }
   });
@@ -329,6 +356,7 @@ export const MarketSourceMappingsSchema = z
   .array(MarketSourceMappingSchema)
   .superRefine((mappings, ctx) => {
     const seenItemIds = new Set<string>();
+    const seenSourceSlugs = new Set<string>();
     for (const [index, mapping] of mappings.entries()) {
       if (seenItemIds.has(mapping.itemId)) {
         ctx.addIssue({
@@ -338,6 +366,14 @@ export const MarketSourceMappingsSchema = z
         });
       }
       seenItemIds.add(mapping.itemId);
+      if (seenSourceSlugs.has(mapping.sourceSlug)) {
+        ctx.addIssue({
+          code: "custom",
+          path: [index, "sourceSlug"],
+          message: `duplicate market source slug '${mapping.sourceSlug}'`
+        });
+      }
+      seenSourceSlugs.add(mapping.sourceSlug);
     }
   });
 

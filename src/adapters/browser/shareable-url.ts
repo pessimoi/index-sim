@@ -13,6 +13,8 @@ export interface ClipboardWriter {
   writeText(value: string): Promise<void>;
 }
 
+export const SHAREABLE_SETUP_FRAGMENT_MAX_CHARS = 16_384;
+
 let capturedBrowserShareableSetupFragment: string | null | undefined;
 
 export function createShareableSetupUrl(payload: string, location: ShareableLocation): string {
@@ -25,6 +27,11 @@ export function captureShareableSetupFragment(
 ): string | null {
   const hash = location.hash.startsWith("#") ? location.hash.slice(1) : location.hash;
   if (!hash) return null;
+  if (hash.length > SHAREABLE_SETUP_FRAGMENT_MAX_CHARS) {
+    if (!/(?:^|&)setup=/.test(hash)) return null;
+    history.replaceState(null, "", `${location.pathname}${location.search}`);
+    return "a".repeat(SHAREABLE_SETUP_FRAGMENT_MAX_CHARS + 1);
+  }
   const params = new URLSearchParams(hash);
   const payload = params.get("setup");
   if (payload === null) return null;

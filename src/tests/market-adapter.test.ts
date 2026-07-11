@@ -1,6 +1,7 @@
 import {
   MarketAdapterError,
   createScheduledStaticPriceSnapshotStatus,
+  fetchPriceSet,
   fetchMarketStatus,
   loadScheduledStaticPriceSnapshot,
   syncMarketPrices
@@ -162,6 +163,39 @@ describe("market browser adapter", () => {
     ).rejects.toMatchObject({ code: "bad-request" });
   });
 
+  it("bounds live and imported price response streams before parsing them", async () => {
+    const statusFetcher: typeof fetch = async () => responseJson(statusFixture);
+    await expect(
+      fetchMarketStatus({
+        fetcher: statusFetcher,
+        baseUrl: "http://app.local/",
+        maxBytes: 32
+      })
+    ).rejects.toMatchObject({
+      code: "upstream-invalid",
+      message: "Invalid market API response"
+    });
+
+    const priceFetcher: typeof fetch = async () =>
+      new Response(
+        JSON.stringify({
+          id: "too-large",
+          label: "Too large",
+          source: "manual",
+          createdAt: "2026-07-11T00:00:00.000Z",
+          itemPrices: { lobster: 200 },
+          alchValues: { lobster: 0 }
+        })
+      );
+    await expect(
+      fetchPriceSet("/prices.json", {
+        fetcher: priceFetcher,
+        baseUrl: "http://app.local/",
+        maxBytes: 32
+      })
+    ).rejects.toMatchObject({ name: "ResponseBodyTooLargeError" });
+  });
+
   it("builds scheduled price candidates from prices plus canonical generated alch", async () => {
     const seenPaths: string[] = [];
     const fetcher: typeof fetch = async (input) => {
@@ -198,6 +232,40 @@ describe("market browser adapter", () => {
     expect(status.sharedPriceHistory).toEqual([
       { t: 1783512900, prices: { lobster: 205, big_bones: 400 } }
     ]);
+  });
+
+  it("bounds scheduled static responses without misclassifying oversized files as missing", async () => {
+    const oversizedPrices = await loadScheduledStaticPriceSnapshot({
+      fetcher: async (input) => {
+        const path = new URL(String(input)).pathname;
+        if (path === "/prices.json") {
+          return new Response(scheduledPricesJson(), { headers: { "Content-Length": "1000" } });
+        }
+        return new Response("[]");
+      },
+      baseUrl: "http://app.local/",
+      canonicalAlchValues: { lobster: 12 },
+      maxBytes: 32
+    });
+    expect(oversizedPrices).toMatchObject({
+      status: "invalid",
+      validationCode: "body_too_large",
+      files: { prices: "invalid" }
+    });
+
+    const oversizedHistory = await loadScheduledStaticPriceSnapshot({
+      fetcher: async (input) => {
+        const path = new URL(String(input)).pathname;
+        if (path === "/prices.json") return new Response(scheduledPricesJson());
+        return new Response("[]", { headers: { "Content-Length": "1000" } });
+      },
+      baseUrl: "http://app.local/",
+      canonicalAlchValues: { lobster: 12, big_bones: 1 },
+      maxHistoryBytes: 32
+    });
+    expect(oversizedHistory.status).toBe("loaded");
+    expect(oversizedHistory.files.priceHistory).toBe("invalid");
+    expect(oversizedHistory.warnings).toContain("Scheduled price history metadata was ignored.");
   });
 
   it("classifies missing scheduled static files without exposing paths", () => {

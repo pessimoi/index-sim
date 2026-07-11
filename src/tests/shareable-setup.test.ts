@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import {
   captureShareableSetupFragment,
   createShareableSetupUrl,
+  SHAREABLE_SETUP_FRAGMENT_MAX_CHARS,
   writeShareableSetupToClipboard
 } from "../adapters/browser/shareable-url";
 import { loadGeneratedRuntimeContext } from "../adapters/generated";
@@ -219,6 +220,25 @@ describe("shareable setup browser URL adapter", () => {
 
     expect(payload).toBe("abc");
     expect(replaceState).toHaveBeenCalledWith(null, "", "/sim/?mode=test#pane=trip");
+  });
+
+  it("bounds an oversized setup fragment before URLSearchParams parsing", () => {
+    const replaceState = vi.fn();
+    const payload = captureShareableSetupFragment(
+      {
+        origin: "https://example.test",
+        pathname: "/sim/",
+        search: "?mode=test",
+        hash: `#setup=${"a".repeat(SHAREABLE_SETUP_FRAGMENT_MAX_CHARS)}`
+      },
+      { replaceState }
+    );
+
+    expect(payload?.length).toBeGreaterThan(SHAREABLE_SETUP_MAX_ENCODED_CHARS);
+    expect(replaceState).toHaveBeenCalledWith(null, "", "/sim/?mode=test");
+    expect(() => decodeShareableSetupEnvelope(payload ?? "")).toThrowError(
+      expect.objectContaining({ code: "body_too_large" })
+    );
   });
 
   it("uses the Clipboard API when available and keeps failures non-fatal", async () => {

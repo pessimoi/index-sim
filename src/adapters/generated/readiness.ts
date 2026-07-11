@@ -14,6 +14,7 @@ export type RuntimeCoverageSection =
   | "items.runtimeFields"
   | "monsters"
   | "monsters.combatStats"
+  | "monsters.incomingAttacks"
   | "monsters.loot"
   | "weapons"
   | "weapons.runtimeFields"
@@ -64,6 +65,7 @@ const BLOCKING_SECTIONS = new Set<RuntimeCoverageSection>([
   "items.runtimeFields",
   "monsters",
   "monsters.combatStats",
+  "monsters.incomingAttacks",
   "monsters.loot",
   "weapons",
   "weapons.runtimeFields",
@@ -208,6 +210,7 @@ function idsForSection(context: SimulationContext, section: RuntimeCoverageSecti
     case "monsters":
       return sortedIds(context.gameData.monsters);
     case "monsters.combatStats":
+    case "monsters.incomingAttacks":
     case "monsters.loot":
       return sortedIds(context.gameData.monsters);
     case "weapons":
@@ -351,6 +354,42 @@ function coverageForMonsterLoot(
   };
 }
 
+function coverageForMonsterIncomingAttacks(
+  reference: SimulationContext,
+  candidate: SimulationContext,
+  exampleLimit: number
+): RuntimeCoverageSummary {
+  const referenceIds = sortedIds(reference.gameData.monsters);
+  const candidateIds = sortedIds(candidate.gameData.monsters);
+  const referenceIdSet = new Set(referenceIds);
+  const matchingIds = referenceIds.filter((id) => {
+    const monster = candidate.gameData.monsters[id];
+    return (
+      !!monster?.incomingAttackCoverage &&
+      !!monster.incomingAttacks?.length &&
+      monster.incomingAttacks.every(
+        (profile) => profile.coverage === monster.incomingAttackCoverage
+      )
+    );
+  });
+  const matchingIdSet = new Set(matchingIds);
+  const missingOrMismatched = referenceIds.filter((id) => !matchingIdSet.has(id));
+  const extra = candidateIds.filter((id) => !referenceIdSet.has(id));
+  return {
+    section: "monsters.incomingAttacks",
+    blocking: BLOCKING_SECTIONS.has("monsters.incomingAttacks"),
+    referenceCount: referenceIds.length,
+    candidateCount: matchingIds.length,
+    matchedCount: matchingIds.length,
+    missingCount: missingOrMismatched.length,
+    extraCount: extra.length,
+    missingIds: missingOrMismatched,
+    extraIds: extra,
+    missingExamples: missingOrMismatched.slice(0, exampleLimit),
+    extraExamples: extra.slice(0, exampleLimit)
+  };
+}
+
 function coverageForRuntimeFields(
   reference: SimulationContext,
   candidate: SimulationContext,
@@ -429,6 +468,9 @@ function coverageForSection(
   if (section === "monsters.loot") {
     return coverageForMonsterLoot(reference, candidate, exampleLimit);
   }
+  if (section === "monsters.incomingAttacks") {
+    return coverageForMonsterIncomingAttacks(reference, candidate, exampleLimit);
+  }
   if (section === "items.runtimeFields") {
     return coverageForItemRuntimeFields(reference, candidate, exampleLimit);
   }
@@ -468,7 +510,11 @@ function coverageForSection(
 
 function blockerForSection(section: RuntimeCoverageSummary): string | null {
   if (!section.blocking || section.missingCount === 0) return null;
-  if (section.section === "monsters.combatStats" || section.section === "monsters.loot") {
+  if (
+    section.section === "monsters.combatStats" ||
+    section.section === "monsters.incomingAttacks" ||
+    section.section === "monsters.loot"
+  ) {
     return `${section.section} is missing or incomplete for ${section.missingCount} of ${section.referenceCount} legacy-runtime monsters in the generated runtime candidate.`;
   }
   if (section.section.endsWith(".runtimeFields")) {
@@ -481,11 +527,15 @@ export function createGeneratedRuntimeReadinessReport(
   input: ReadinessReportInput
 ): GeneratedRuntimeReadinessReport {
   const exampleLimit = input.exampleLimit ?? 5;
+  const source = input.source ?? "generated-static-snapshot";
   const sections: RuntimeCoverageSection[] = [
     "items",
     "items.runtimeFields",
     "monsters",
     "monsters.combatStats",
+    ...(source === "generated-static-snapshot"
+      ? (["monsters.incomingAttacks"] as RuntimeCoverageSection[])
+      : []),
     "monsters.loot",
     "weapons",
     "weapons.runtimeFields",
@@ -509,7 +559,7 @@ export function createGeneratedRuntimeReadinessReport(
 
   return {
     ready: blockers.length === 0,
-    source: input.source ?? "generated-static-snapshot",
+    source,
     referenceSnapshotId: input.reference.gameData.id,
     candidateSnapshotId: input.candidate.gameData.id,
     referencePriceSetId: input.reference.priceSet.id,

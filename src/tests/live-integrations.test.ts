@@ -71,6 +71,16 @@ describe("hiscores integration schemas", () => {
 
   it("sanitizes invalid JSON and invalid skill levels", () => {
     expectLiveIntegrationError(() => parseHiscoresResponseJson("{not-json"), "invalid_json");
+    expectLiveIntegrationError(
+      () =>
+        parseHiscoresResponseJson(
+          readFixtureText("hiscores-api-success.json").replace(
+            '"player": "Fixture Player"',
+            '"player": "Fixture Player", "player": "Shadowed Player"'
+          )
+        ),
+      "invalid_json"
+    );
 
     const successFixture = readFixture("hiscores-api-success.json") as Record<string, unknown>;
     const validationError = expectLiveIntegrationError(
@@ -174,6 +184,38 @@ describe("market integration schemas", () => {
     });
   });
 
+  it("rejects duplicate market report rows and invalid report chronology", () => {
+    const fixture = readFixture("market-sync-response-partial.json") as {
+      report: {
+        updated: number;
+        skipped: number;
+        failed: number;
+        finishedAt: string;
+        items: Array<{ itemId: string; status: string }>;
+      };
+    };
+    const duplicate = structuredClone(fixture);
+    duplicate.report.items[1] = structuredClone(duplicate.report.items[0]!);
+    duplicate.report.updated = duplicate.report.items.filter(
+      (item) => item.status === "updated"
+    ).length;
+    duplicate.report.skipped = duplicate.report.items.filter(
+      (item) => item.status === "skipped"
+    ).length;
+    duplicate.report.failed = duplicate.report.items.filter(
+      (item) => item.status === "failed"
+    ).length;
+    expect(() => parseMarketSyncResponse(duplicate)).toThrowError(
+      expect.objectContaining({ code: "validation_failed" })
+    );
+
+    const reversed = structuredClone(fixture);
+    reversed.report.finishedAt = "2000-01-01T00:00:00.000Z";
+    expect(() => parseMarketSyncResponse(reversed)).toThrowError(
+      expect.objectContaining({ code: "validation_failed" })
+    );
+  });
+
   it("parses mocked market upstream fixtures into a PriceSet without live calls", () => {
     const upstreamItems = parseMarketUpstreamFixtureItems(
       readFixture("market-upstream-items.json")
@@ -240,5 +282,15 @@ describe("market source mapping foundation", () => {
     });
 
     expect(missing).toEqual(["dragonhide_black", "not_real_item"]);
+  });
+
+  it("rejects duplicate source slugs as ambiguous mappings", () => {
+    const source = MARKET_SOURCE_MAPPINGS[0]!;
+    const error = expectLiveIntegrationError(
+      () =>
+        parseMarketSourceMappings([source, { ...source, itemId: `${source.itemId}_duplicate` }]),
+      "validation_failed"
+    );
+    expect(error.issues.join("\n")).toContain("duplicate market source slug");
   });
 });

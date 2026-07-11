@@ -187,6 +187,12 @@ function combatRollMetrics(result: ReturnType<typeof createSimulationViewModel>)
 }
 
 describe("rewrite UI view models", () => {
+  it("distinguishes unlimited values from invalid number formatting", () => {
+    expect(formatNumber(Number.POSITIVE_INFINITY)).toBe("unlimited");
+    expect(formatNumber(Number.NaN)).toBe("-");
+    expect(formatNumber(Number.NEGATIVE_INFINITY)).toBe("-");
+  });
+
   it("keeps form state separate from SimulationRequest", async () => {
     const { context } = await loadBundledLegacyContext();
     const request = formToSimulationRequest(DEFAULT_FORM_STATE);
@@ -2474,6 +2480,10 @@ describe("rewrite UI view models", () => {
     expect(rows.get("safespot-state")?.value).toBe("Off");
     expect(rows.get("protection-state")?.label).toBe("Protection prayer");
     expect(rows.get("protection-state")?.value).toContain("active");
+    expect(rows.get("incoming-model")).toMatchObject({
+      label: "Incoming model",
+      value: result.trip.trip.incoming.descriptor.sourceLabel
+    });
   }, 15_000);
 
   it("builds duel comparison rows for live and snapshots on the current monster", async () => {

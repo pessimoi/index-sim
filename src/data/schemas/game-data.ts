@@ -148,6 +148,76 @@ export const DropDefinitionSchema = z
 
 export const DropEntrySchema = z.union([DropDefinitionSchema, z.array(DropDefinitionSchema)]);
 
+const IncomingAttackFormulaInputsSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("standard"),
+      level: z.number().int().min(0).max(1_000_000),
+      bonus: z.number().int().min(-64).max(1_000_000)
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("source-value"),
+      value: z.number().int().min(0).max(1_000_000)
+    })
+    .strict()
+]);
+
+const IncomingAttackAccuracySchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("standard"),
+      level: z.number().int().min(0).max(1_000_000),
+      bonus: z.number().int().min(-64).max(1_000_000)
+    })
+    .strict(),
+  z.object({ kind: z.literal("always") }).strict(),
+  z.object({ kind: z.literal("mean-only") }).strict()
+]);
+
+const IncomingAttackSelectionSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("always") }).strict(),
+  z
+    .object({
+      kind: z.literal("weighted"),
+      weight: z.number().finite().positive().max(1_000_000)
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("contextual"),
+      reason: z.enum([
+        "selection-policy-required",
+        "non-damaging-spell-selection",
+        "separate-overlay",
+        "unsupported-source-path"
+      ])
+    })
+    .strict()
+]);
+
+export const IncomingAttackProfileSchema = z
+  .object({
+    id: EntityIdSchema,
+    attackType: z.enum(["melee", "ranged", "magic"]),
+    attackSpeedTicks: z.number().int().positive().max(1_000_000),
+    maxHit: z.number().int().min(0).max(1_000_000),
+    formulaId: z.enum([
+      "standard-melee-v1",
+      "standard-ranged-v1",
+      "spell-row-v1",
+      "forced-max-hit-v1",
+      "scripted-fixed-v1"
+    ]),
+    formulaInputs: IncomingAttackFormulaInputsSchema,
+    accuracy: IncomingAttackAccuracySchema,
+    selection: IncomingAttackSelectionSchema,
+    coverage: z.enum(["exact", "partial", "fallback"]),
+    provenance: DataProvenanceSchema
+  })
+  .strict();
+
 export const MonsterDefinitionSchema = z
   .object({
     id: EntityIdSchema,
@@ -167,10 +237,58 @@ export const MonsterDefinitionSchema = z
     defCrush: NumericSchema.optional(),
     defRange: NumericSchema.optional(),
     defMagic: NumericSchema.optional(),
+    incomingAttacks: z.array(IncomingAttackProfileSchema).max(32).optional(),
+    incomingAttackCoverage: z.enum(["exact", "partial", "fallback"]).optional(),
     loot: z.array(DropEntrySchema).optional(),
     provenance: DataProvenanceSchema.optional()
   })
-  .passthrough();
+  .passthrough()
+  .superRefine((monster, ctx) => {
+    if (monster.incomingAttacks === undefined && monster.incomingAttackCoverage === undefined) {
+      return;
+    }
+    if (monster.incomingAttackCoverage === undefined) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["incomingAttackCoverage"],
+        message: "incoming attack profiles require an explicit coverage classification"
+      });
+      return;
+    }
+    if (!monster.incomingAttacks?.length) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["incomingAttacks"],
+        message: "classified incoming attacks require at least one profile"
+      });
+      return;
+    }
+    const ids = new Set<string>();
+    for (const [index, profile] of monster.incomingAttacks.entries()) {
+      if (ids.has(profile.id)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["incomingAttacks", index, "id"],
+          message: "incoming attack profile ids must be unique within a monster"
+        });
+      }
+      ids.add(profile.id);
+      if (profile.coverage !== monster.incomingAttackCoverage) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["incomingAttacks", index, "coverage"],
+          message: "profile coverage must match the monster incoming attack coverage"
+        });
+      }
+      if (monster.incomingAttackCoverage === "exact" && profile.selection.kind === "contextual") {
+        ctx.addIssue({
+          code: "custom",
+          path: ["incomingAttacks", index, "selection"],
+          message: "an exact incoming attack profile cannot use contextual selection"
+        });
+      }
+    }
+  });
 
 export const WeaponDefinitionSchema = z
   .object({
@@ -256,7 +374,24 @@ export const GameDataSnapshotSchema = z
     requirements: z.record(EntityIdSchema, ItemRequirementDefinitionSchema).optional(),
     provenance: DataProvenanceSchema.optional()
   })
+  .strict()
   .superRefine((snapshot, ctx) => {
+    for (const [itemId, item] of Object.entries(snapshot.items)) {
+      if (item.id === itemId) continue;
+      ctx.addIssue({
+        code: "custom",
+        path: ["items", itemId, "id"],
+        message: "item id must match record key"
+      });
+    }
+    for (const [monsterId, monster] of Object.entries(snapshot.monsters)) {
+      if (monster.id === monsterId) continue;
+      ctx.addIssue({
+        code: "custom",
+        path: ["monsters", monsterId, "id"],
+        message: "monster id must match record key"
+      });
+    }
     const requirements = snapshot.requirements;
     if (!requirements) return;
     for (const [itemId, requirement] of Object.entries(requirements)) {

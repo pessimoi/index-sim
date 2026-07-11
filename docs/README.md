@@ -12,6 +12,8 @@ This directory is the project memory layer for humans and AI agents. It keeps cu
 - UI parity specification: [technical/ui-parity-spec.md](technical/ui-parity-spec.md)
 - Duel setup diff specification: [technical/duel-setup-diff-spec.md](technical/duel-setup-diff-spec.md)
 - Stats source distribution specification: [technical/stats-source-distribution-spec.md](technical/stats-source-distribution-spec.md)
+- Risk and variability specification: [technical/risk-variability-spec.md](technical/risk-variability-spec.md)
+- Source-backed incoming damage specification: [technical/source-backed-incoming-damage-spec.md](technical/source-backed-incoming-damage-spec.md)
 - Accessibility and keyboard specification: [technical/accessibility-keyboard-spec.md](technical/accessibility-keyboard-spec.md)
 - Source-backed requirements and NPC size specification: [technical/source-backed-requirements-npc-size-spec.md](technical/source-backed-requirements-npc-size-spec.md)
 - Legacy Planner parity specification: [technical/legacy-planner-parity-spec.md](technical/legacy-planner-parity-spec.md)
@@ -26,6 +28,8 @@ This directory is the project memory layer for humans and AI agents. It keeps cu
 - Roadmap, backlog, decisions and ideas: [project/README.md](project/README.md)
 - Current worktree delivery specification: [project/worktree-delivery-spec.md](project/worktree-delivery-spec.md)
 - Repository handoff hardening specification: [project/handoff-hardening-spec.md](project/handoff-hardening-spec.md)
+- Current numeric user-path audit: [project/numeric-user-path-audit.md](project/numeric-user-path-audit.md)
+- Current Revision 274 NPC attack source audit: [project/npc-attack-source-audit.md](project/npc-attack-source-audit.md)
 
 ## Supporting audit snapshots
 
@@ -44,6 +48,8 @@ These files are useful evidence, but they are not the living source of truth. Pr
 - Legacy-to-rewrite UI layout and workflow parity requirements belong in [technical/ui-parity-spec.md](technical/ui-parity-spec.md).
 - Duel setup and calculated-impact comparison requirements belong in [technical/duel-setup-diff-spec.md](technical/duel-setup-diff-spec.md).
 - Special-attack and cannon event-distribution requirements belong in [technical/stats-source-distribution-spec.md](technical/stats-source-distribution-spec.md).
+- Kill, trip, food, timed-GP and target-probability distribution requirements belong in [technical/risk-variability-spec.md](technical/risk-variability-spec.md).
+- Source-backed NPC attack profiles and shared Trip/Risk incoming-damage requirements belong in [technical/source-backed-incoming-damage-spec.md](technical/source-backed-incoming-damage-spec.md).
 - Workbench and Dense keyboard interaction requirements belong in [technical/accessibility-keyboard-spec.md](technical/accessibility-keyboard-spec.md).
 - Generated item-requirement and NPC-size extraction/formula requirements belong in [technical/source-backed-requirements-npc-size-spec.md](technical/source-backed-requirements-npc-size-spec.md).
 - Optional archived Planner behavior comparison requirements belong in [technical/legacy-planner-parity-spec.md](technical/legacy-planner-parity-spec.md).
@@ -52,6 +58,8 @@ These files are useful evidence, but they are not the living source of truth. Pr
 - Scheduled market live evidence and public deployment execution work belong in [operations/market-live-evidence-spec.md](operations/market-live-evidence-spec.md) and [operations/public-deployment-spec.md](operations/public-deployment-spec.md).
 - Reviewable commit grouping and delivery of the current worktree belong in [project/worktree-delivery-spec.md](project/worktree-delivery-spec.md).
 - Validation commands belong in [technical/testing.md](technical/testing.md).
+- Generated numeric cross-path and legacy-delta evidence belongs in [project/numeric-user-path-audit.md](project/numeric-user-path-audit.md).
+- Generated Revision 274 NPC attack-handler evidence belongs in [project/npc-attack-source-audit.md](project/npc-attack-source-audit.md).
 - Accepted choices and open decision boundaries belong in [project/decisions.md](project/decisions.md).
 - Future work belongs in [project/roadmap.md](project/roadmap.md), [project/backlog.md](project/backlog.md) or [project/idea-inbox.md](project/idea-inbox.md).
 

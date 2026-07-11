@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { MARKET_SOURCE_ID } from "../src/data/schemas";
 import { NonNegativeNumberSchema } from "../src/data/schemas/game-data";
+import { parseJsonWithDuplicateKeyCheck } from "../src/data/reliability";
 import type { MarketSourceMapping } from "../src/domain/shared";
 import {
   ScheduledMarketWriterError,
@@ -86,7 +87,9 @@ function inertiaPayloadFromHtml(html: string): unknown {
   }
 
   try {
-    return JSON.parse(decodeHtmlAttribute(match[1] ?? match[2] ?? ""));
+    return parseJsonWithDuplicateKeyCheck(decodeHtmlAttribute(match[1] ?? match[2] ?? ""), {
+      source: "Market Inertia payload"
+    });
   } catch {
     throw new ScheduledMarketWriterError(
       "invalid_upstream",
@@ -98,7 +101,7 @@ function inertiaPayloadFromHtml(html: string): unknown {
 function itemPagePayload(text: string, contentType: string): unknown {
   if (contentType.toLowerCase().startsWith("application/json")) {
     try {
-      return JSON.parse(text);
+      return parseJsonWithDuplicateKeyCheck(text, { source: "Market item page response" });
     } catch {
       throw new ScheduledMarketWriterError(
         "invalid_upstream",

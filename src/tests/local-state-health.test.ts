@@ -96,7 +96,18 @@ describe("rewrite local state health", () => {
     });
   });
 
-  it("reports invalid JSON, invalid envelope, invalid data and version mismatch", () => {
+  it("reports duplicate keys, invalid JSON, invalid envelope, invalid data and version mismatch", () => {
+    const duplicateKeys = createLocalStateHealthReport(
+      createMemoryStorage({
+        [HIDDEN_GEAR_TIERS_STORAGE_KEY]: `{"version":${HIDDEN_GEAR_TIERS_VERSION},"version":${HIDDEN_GEAR_TIERS_VERSION},"savedAt":"2026-07-11T00:00:00.000Z","data":{}}`
+      })
+    );
+    expect(item(duplicateKeys, "hidden-gear-tiers")).toMatchObject({
+      status: "invalid",
+      reason: "duplicate_keys",
+      needsAttention: true
+    });
+
     const invalidJson = createLocalStateHealthReport(
       createMemoryStorage({ [HIDDEN_GEAR_TIERS_STORAGE_KEY]: "{" })
     );
@@ -142,6 +153,32 @@ describe("rewrite local state health", () => {
       status: "version-mismatch",
       foundVersion: 999,
       expectedVersion: HIDDEN_GEAR_TIERS_VERSION,
+      needsAttention: true
+    });
+  });
+
+  it("reports schema-valid state as invalid when runtime context rejects its entities", () => {
+    const storage = createMemoryStorage();
+    savePersisted(
+      {
+        key: HIDDEN_GEAR_TIERS_STORAGE_KEY,
+        version: HIDDEN_GEAR_TIERS_VERSION,
+        schema: HiddenGearTiersStateSchema,
+        storage
+      },
+      { bronze: true }
+    );
+
+    const report = createLocalStateHealthReport(storage, new Date(), {
+      contextInvalidItemIds: ["hidden-gear-tiers"]
+    });
+
+    expect(item(report, "hidden-gear-tiers")).toMatchObject({
+      status: "invalid",
+      reason: "invalid_data",
+      loaded: false,
+      defaultUsed: true,
+      clearable: true,
       needsAttention: true
     });
   });
@@ -198,6 +235,22 @@ describe("rewrite local state health", () => {
     );
 
     expect(saveFailure).toEqual({ status: "failed", reason: "save_failed" });
+  });
+
+  it("bounds persisted state before parsing", () => {
+    const result = loadPersisted({
+      key: HIDDEN_GEAR_TIERS_STORAGE_KEY,
+      version: HIDDEN_GEAR_TIERS_VERSION,
+      schema: HiddenGearTiersStateSchema,
+      storage: createMemoryStorage({
+        [HIDDEN_GEAR_TIERS_STORAGE_KEY]: persistedEnvelope(HIDDEN_GEAR_TIERS_VERSION, {
+          bronze: true
+        })
+      }),
+      maxBytes: 1
+    });
+
+    expect(result).toMatchObject({ status: "invalid", reason: "body_too_large" });
   });
 
   it("clears one allowlisted rewrite-owned key without touching other keys", () => {

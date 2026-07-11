@@ -490,26 +490,29 @@ export function supportedSpecialAttacksForCombatStyle(
 const SA_REGEN_PER_HOUR = (100 / 1000) * (3600 / (50 * TICK_SECONDS)) * 100;
 
 export function maxHitMelee(effectiveStrength: number, strengthBonus: number): number {
-  return Math.floor(0.5 + (effectiveStrength * (strengthBonus + 64)) / 640);
+  return Math.max(0, Math.floor(0.5 + (effectiveStrength * (strengthBonus + 64)) / 640));
 }
 
 export function maxHitRanged(effectiveRangedStrength: number, rangedStrengthBonus: number): number {
-  return Math.floor(0.5 + (effectiveRangedStrength * (rangedStrengthBonus + 64)) / 640);
+  return Math.max(
+    0,
+    Math.floor(0.5 + (effectiveRangedStrength * (rangedStrengthBonus + 64)) / 640)
+  );
 }
 
 export function maxHitMagic(spellBase: number, magicDamagePercent: number): number {
-  return Math.floor(spellBase * (1 + (magicDamagePercent || 0) / 100));
+  return Math.max(0, Math.floor(spellBase * (1 + (magicDamagePercent || 0) / 100)));
 }
 
 export function roll(effectiveLevel: number, equipmentBonus: number): number {
-  return effectiveLevel * (equipmentBonus + 64);
+  return Math.max(0, effectiveLevel * (equipmentBonus + 64));
 }
 
 export function hitChance(attackRoll: number, defenceRoll: number): number {
   if (attackRoll > defenceRoll) {
-    return 1 - (defenceRoll + 2) / (2 * (attackRoll + 1));
+    return clampProbability(1 - (defenceRoll + 2) / (2 * (attackRoll + 1)));
   }
-  return attackRoll / (2 * (defenceRoll + 1));
+  return clampProbability(attackRoll / (2 * (defenceRoll + 1)));
 }
 
 function clampProbability(value: number): number {
@@ -906,7 +909,10 @@ export function simulateCombat(
       : request.combatStyle === "ranged"
         ? "defRange"
         : "defMagic";
-  const defenceRoll = (defenceLevel + 9) * (monsterDefenceBonus(monster, defenceField) + 64);
+  const defenceRoll = Math.max(
+    0,
+    (defenceLevel + 9) * (monsterDefenceBonus(monster, defenceField) + 64)
+  );
   let hitChanceValue: number;
   let avgHit: number;
   if (offSamples.length > 1) {

@@ -20,9 +20,19 @@ import type {
   MarketSyncResponse,
   PriceSet
 } from "@/domain/shared";
+import {
+  ResponseBodyTooLargeError,
+  readBoundedResponseText
+} from "@/adapters/browser/bounded-response";
 
 export interface PriceSetImportOptions {
   maxBytes?: number;
+}
+
+export interface PriceSetFetchOptions extends PriceSetImportOptions {
+  allowedOrigin?: string;
+  baseUrl?: string;
+  fetcher?: Fetcher;
 }
 
 export const SCHEDULED_PRICE_HISTORY_MAX_BYTES = 5_000_000;
@@ -137,6 +147,9 @@ function validationToAdapterError(
   fallbackCode: IntegrationErrorResponse["error"]["code"]
 ) {
   if (error instanceof LiveIntegrationValidationError) {
+    return new MarketAdapterError(fallbackCode, "Invalid market API response");
+  }
+  if (error instanceof ResponseBodyTooLargeError) {
     return new MarketAdapterError(fallbackCode, "Invalid market API response");
   }
   return error;
@@ -399,12 +412,16 @@ export function createScheduledStaticPriceSnapshotStatus(
   }
 }
 
+type StaticTextFetchResult =
+  { status: "loaded"; text: string } | { status: "missing" | "not-requested" | "body-too-large" };
+
 async function fetchStaticText(
   path: string | null | undefined,
-  options: ScheduledStaticPriceSnapshotLoadOptions
-): Promise<string | null | undefined> {
-  if (path === null) return undefined;
-  if (path === undefined) return null;
+  options: ScheduledStaticPriceSnapshotLoadOptions,
+  maxBytes: number
+): Promise<StaticTextFetchResult> {
+  if (path === null) return { status: "not-requested" };
+  if (path === undefined) return { status: "missing" };
   const fetcher = options.fetcher ?? globalThis.fetch;
   const target = sameOriginUrl(path, options);
 
@@ -414,11 +431,26 @@ async function fetchStaticText(
       credentials: "same-origin",
       headers: { Accept: "application/json" }
     });
-    if (!response.ok) return null;
-    return await response.text();
-  } catch {
-    return null;
+    if (!response.ok) return { status: "missing" };
+    return { status: "loaded", text: await readBoundedResponseText(response, maxBytes) };
+  } catch (error) {
+    return {
+      status: error instanceof ResponseBodyTooLargeError ? "body-too-large" : "missing"
+    };
   }
+}
+
+function fetchedStaticText(result: StaticTextFetchResult): string | null | undefined {
+  if (result.status === "loaded") return result.text;
+  return result.status === "missing" ? null : undefined;
+}
+
+function fetchedStaticFileStatus(
+  result: StaticTextFetchResult
+): ScheduledStaticPriceSnapshotFileStatus {
+  if (result.status === "body-too-large") return "invalid";
+  if (result.status === "not-requested") return "not-requested";
+  return result.status;
 }
 
 export async function loadScheduledStaticPriceSnapshot(
@@ -436,20 +468,37 @@ export async function loadScheduledStaticPriceSnapshot(
       options.paths?.priceHistory === undefined ? "/price-history.json" : options.paths.priceHistory
   };
 
-  const [pricesText, alchText, priceHistoryText] = await Promise.all([
-    fetchStaticText(paths.prices, options),
-    fetchStaticText(paths.alch, options),
-    fetchStaticText(paths.priceHistory, options)
+  const maxBytes = options.maxBytes ?? PRICE_SET_IMPORT_MAX_BYTES;
+  const maxHistoryBytes = options.maxHistoryBytes ?? SCHEDULED_PRICE_HISTORY_MAX_BYTES;
+  const [pricesResult, alchResult, priceHistoryResult] = await Promise.all([
+    fetchStaticText(paths.prices, options, maxBytes),
+    fetchStaticText(paths.alch, options, maxBytes),
+    fetchStaticText(paths.priceHistory, options, maxHistoryBytes)
   ]);
 
-  return createScheduledStaticPriceSnapshotStatus(
+  const files: ScheduledStaticPriceSnapshotFiles = {
+    prices: fetchedStaticFileStatus(pricesResult),
+    alch: fetchedStaticFileStatus(alchResult),
+    priceHistory: fetchedStaticFileStatus(priceHistoryResult)
+  };
+  if (pricesResult.status === "body-too-large" || alchResult.status === "body-too-large") {
+    return invalidStatus(files, "body_too_large", [], options.fallbackPriceSet);
+  }
+
+  const status = createScheduledStaticPriceSnapshotStatus(
     {
-      pricesText,
-      alchText,
-      priceHistoryText
+      pricesText: fetchedStaticText(pricesResult),
+      alchText: fetchedStaticText(alchResult),
+      priceHistoryText: fetchedStaticText(priceHistoryResult)
     },
     options
   );
+  if (priceHistoryResult.status !== "body-too-large") return status;
+  return {
+    ...status,
+    files: { ...status.files, priceHistory: "invalid" },
+    warnings: [...status.warnings, "Scheduled price history metadata was ignored."]
+  };
 }
 
 async function errorFromResponse(
@@ -458,9 +507,13 @@ async function errorFromResponse(
 ): Promise<MarketAdapterError> {
   const fallbackCode = adapterErrorFromStatus(response.status);
   try {
-    const parsed = parseIntegrationErrorResponseJson(await response.text(), {
-      maxBytes: options.maxBytes ?? LIVE_INTEGRATION_JSON_MAX_BYTES
-    });
+    const maxBytes = options.maxBytes ?? LIVE_INTEGRATION_JSON_MAX_BYTES;
+    const parsed = parseIntegrationErrorResponseJson(
+      await readBoundedResponseText(response, maxBytes),
+      {
+        maxBytes
+      }
+    );
     return new MarketAdapterError(parsed.error.code, parsed.error.message, {
       status: response.status,
       retryAfterSeconds: parsed.error.retryAfterSeconds
@@ -496,15 +549,16 @@ export async function readPriceSetFile(
 
 export async function fetchPriceSet(
   url: string,
-  options: PriceSetImportOptions & { allowedOrigin?: string } = {}
+  options: PriceSetFetchOptions = {}
 ): Promise<PriceSet> {
-  const target = new URL(url, globalThis.location?.href);
-  const allowedOrigin = options.allowedOrigin ?? globalThis.location?.origin;
-  if (allowedOrigin && target.origin !== allowedOrigin) {
+  const baseUrl = options.baseUrl ?? globalThis.location?.href ?? "http://localhost/";
+  const target = new URL(url, baseUrl);
+  const allowedOrigin = options.allowedOrigin ?? new URL(baseUrl).origin;
+  if (target.origin !== allowedOrigin) {
     throw new Error("Refusing to fetch prices from an unapproved origin");
   }
 
-  const response = await fetch(target.href, {
+  const response = await (options.fetcher ?? globalThis.fetch)(target.href, {
     method: "GET",
     credentials: "same-origin",
     headers: { Accept: "application/json" }
@@ -512,7 +566,8 @@ export async function fetchPriceSet(
   if (!response.ok) {
     throw new Error(`Price fetch failed with HTTP ${response.status}`);
   }
-  return parsePriceSetFileText(await response.text(), options);
+  const maxBytes = options.maxBytes ?? PRICE_SET_IMPORT_MAX_BYTES;
+  return parsePriceSetFileText(await readBoundedResponseText(response, maxBytes), options);
 }
 
 export async function fetchMarketStatus(
@@ -531,8 +586,9 @@ export async function fetchMarketStatus(
   }
 
   try {
-    return parseMarketStatusResponseJson(await response.text(), {
-      maxBytes: options.maxBytes ?? LIVE_INTEGRATION_JSON_MAX_BYTES
+    const maxBytes = options.maxBytes ?? LIVE_INTEGRATION_JSON_MAX_BYTES;
+    return parseMarketStatusResponseJson(await readBoundedResponseText(response, maxBytes), {
+      maxBytes
     });
   } catch (error) {
     throw validationToAdapterError(error, "upstream-invalid");
@@ -561,8 +617,9 @@ export async function syncMarketPrices(
   }
 
   try {
-    return parseMarketSyncResponseJson(await response.text(), {
-      maxBytes: options.maxBytes ?? LIVE_INTEGRATION_JSON_MAX_BYTES
+    const maxBytes = options.maxBytes ?? LIVE_INTEGRATION_JSON_MAX_BYTES;
+    return parseMarketSyncResponseJson(await readBoundedResponseText(response, maxBytes), {
+      maxBytes
     });
   } catch (error) {
     throw validationToAdapterError(error, "upstream-invalid");

@@ -5,6 +5,12 @@ import { createScheduledStaticPriceSnapshotStatus } from "../../adapters/market"
 import { LOOT_PREFS_STORAGE_KEY, LOOT_PREFS_VERSION } from "../../app/state/loot-prefs";
 import { LOOT_SETTINGS_STORAGE_KEY, LOOT_SETTINGS_VERSION } from "../../app/state/loot-settings";
 import {
+  DUEL_SNAPSHOTS_STORAGE_KEY,
+  DUEL_SNAPSHOTS_VERSION,
+  createDuelSnapshot
+} from "../../app/state/duel-snapshots";
+import {
+  DEFAULT_FORM_STATE,
   REWRITE_SETUP_STORAGE_KEY,
   REWRITE_SETUP_VERSION,
   savedSetupFromForm
@@ -151,6 +157,10 @@ function activeMonsterDefence(card: Locator) {
 }
 
 async function denseNumericSnapshot(table: Locator, rowName: RegExp) {
+  const comparePanel = table.locator('xpath=ancestor::section[@aria-label="Monster comparison"]');
+  await expect(
+    comparePanel.getByRole("status", { name: /Compare calculation status/i })
+  ).toHaveText("Current", { timeout: 30_000 });
   const row = table.getByRole("row", { name: rowName });
   await expect(row).toBeVisible();
   const cells = (await row.locator("td").allTextContents()).map((text) => text.trim());
@@ -208,6 +218,82 @@ async function expectInsideBox(container: Locator, target: Locator) {
   );
 }
 
+function searchableCombobox(region: Page | Locator, label: string): Locator {
+  return region.getByRole("combobox", { name: label, exact: true });
+}
+
+async function selectCombatType(
+  page: Page,
+  combatStyle: "melee" | "ranged" | "magic"
+): Promise<void> {
+  const label = combatStyle.charAt(0).toUpperCase() + combatStyle.slice(1);
+  const button = page
+    .getByLabel("Combat type")
+    .getByRole("button", { name: combatStyle, exact: true });
+  await button.click();
+  await expect(button).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    page.getByLabel("Workbench tabs").getByRole("tab", { name: `${label} setup` })
+  ).toHaveAttribute("aria-selected", "true");
+}
+
+function accessibleNameStartingWith(value: string): RegExp {
+  return new RegExp(`^${value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:$|\\s|\\()`, "i");
+}
+
+async function chooseSearchableOption(
+  region: Page | Locator,
+  label: string,
+  optionLabel: string
+): Promise<Locator> {
+  const combobox = searchableCombobox(region, label);
+  await combobox.click();
+  const search = region.getByRole("searchbox", { name: `Search ${label} options`, exact: true });
+  await search.fill(optionLabel);
+  await region
+    .getByRole("listbox", { name: `${label} options`, exact: true })
+    .getByRole("option", { name: accessibleNameStartingWith(optionLabel) })
+    .click();
+  return combobox;
+}
+
+async function expectSearchableSelection(
+  region: Page | Locator,
+  label: string,
+  selectedId: string
+): Promise<void> {
+  await expect(searchableCombobox(region, label)).toHaveAttribute("data-selected-id", selectedId);
+}
+
+async function searchableOptionLabels(region: Page | Locator, label: string): Promise<string[]> {
+  await searchableCombobox(region, label).click();
+  const listbox = region.getByRole("listbox", { name: `${label} options`, exact: true });
+  const labels = await listbox
+    .getByRole("option")
+    .evaluateAll((options) =>
+      options.map((option) => option.getAttribute("aria-label") ?? option.textContent?.trim() ?? "")
+    );
+  await region.getByRole("searchbox", { name: `Search ${label} options` }).press("Escape");
+  return labels;
+}
+
+async function expectPopupSearch(region: Page | Locator, label: string): Promise<void> {
+  const combobox = searchableCombobox(region, label);
+  await combobox.click();
+  const search = region.getByRole("searchbox", { name: `Search ${label} options`, exact: true });
+  const listbox = region.getByRole("listbox", { name: `${label} options`, exact: true });
+  const popover = search.locator(
+    "xpath=ancestor::div[contains(@class, 'searchable-combobox-popover')]"
+  );
+  await expect(search).toBeFocused();
+  await expect(listbox).toBeVisible();
+  await expect(popover.getByText("Find", { exact: true })).toHaveCount(0);
+  await expect(popover.getByRole("status")).toHaveText(/\d+ of \d+ options/);
+  await search.press("Escape");
+  await expect(combobox).toBeFocused();
+  await expect(listbox).toHaveCount(0);
+}
+
 async function denseTableOverflowMetrics(wrap: Locator) {
   return wrap.evaluate((element) => {
     const style = window.getComputedStyle(element);
@@ -237,12 +323,11 @@ test("loads the dense combat spreadsheet root", async ({ page }) => {
   expect(cardBox!.x).toBeGreaterThan(centerBox!.x);
   await expect(page.getByLabel("Workbench tabs").getByRole("tab")).toHaveText([
     "Stats",
-    "Melee",
-    "Ranged",
-    "Magic",
+    "Melee setup",
     "Compare",
     "Loot",
     "Trip",
+    "Risk",
     "Cannon",
     "Duel",
     "Planner",
@@ -608,13 +693,13 @@ test("shows Stats XP routing trip summary and hit distribution", async ({ page }
   await expect(histogram.getByRole("listitem", { name: /max hit bucket/i })).toBeVisible();
   await expect(histogram).toContainText("max hit");
 
-  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Ranged" }).click();
+  await selectCombatType(page, "ranged");
   await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Stats" }).click();
   await expect(combatRoll).toContainText("Effective accuracy");
   await expect(combatRoll).toContainText("Attack cycle");
   await expect(combatRoll.getByRole("listitem", { name: /Hit chance:/ })).toBeVisible();
 
-  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Magic" }).click();
+  await selectCombatType(page, "magic");
   await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Stats" }).click();
   await expect(combatRoll).toContainText("Effective damage");
   await expect(
@@ -624,7 +709,7 @@ test("shows Stats XP routing trip summary and hit distribution", async ({ page }
   await expect(sourceDetails).not.toContainText("Cannon histogram");
 
   await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Compare" }).click();
-  await page.getByLabel("TYPE", { exact: true }).selectOption("ranged");
+  await selectCombatType(page, "ranged");
   await page.getByLabel("TARGET", { exact: true }).selectOption("dagannoth");
   await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Cannon" }).click();
   const cannon = page.locator('section[aria-label="Cannon"]');
@@ -677,7 +762,7 @@ test("switches the target through MonsterCard and keeps shell state in sync", as
 
   await expect(card.getByRole("heading", { name: "Giant" })).toBeVisible();
   await expect(card.getByLabel("Current setup state")).toContainText("Default setup");
-  await card.getByLabel("Target", { exact: true }).selectOption("rock_crab");
+  await chooseSearchableOption(card, "Target", "Rock Crab");
 
   await expect(
     page.getByLabel("Setup context").getByRole("heading", { name: "Rock Crab" })
@@ -703,10 +788,10 @@ test("updates MonsterCard active defence for melee stance, ranged and magic", as
   await page.getByLabel("STYLE", { exact: true }).selectOption("controlled");
   await expect(activeMonsterDefence(card)).toContainText("Stab defence");
 
-  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Ranged" }).click();
+  await selectCombatType(page, "ranged");
   await expect(activeMonsterDefence(card)).toContainText("Ranged defence");
 
-  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Magic" }).click();
+  await selectCombatType(page, "magic");
   await expect(activeMonsterDefence(card)).toContainText("Magic defence");
 });
 
@@ -723,7 +808,7 @@ test("places MonsterCard after the active pane on mobile", async ({ page }) => {
 
   const card = page.getByLabel("Monster card");
   await expect(card).toBeVisible();
-  await expect(card.getByLabel("Target", { exact: true })).toBeVisible();
+  await expect(searchableCombobox(card, "Target")).toBeVisible();
   await expect(activeMonsterDefence(card)).toBeVisible();
 
   await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Planner" }).click();
@@ -736,6 +821,396 @@ test("places MonsterCard after the active pane on mobile", async ({ page }) => {
   expect(plannerBox).not.toBeNull();
   expect(mobileCardBox).not.toBeNull();
   expect(mobileCardBox!.y).toBeGreaterThanOrEqual(plannerBox!.y + plannerBox!.height - 1);
+});
+
+test("keeps the desktop workbench inside one console viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.addInitScript(() => window.localStorage.clear());
+  await page.goto("/");
+  await selectCombatType(page, "melee");
+
+  const compactOverrides = page.locator(
+    ".compact-setup-strip .optional-number-field.compact .optional-number-control"
+  );
+  await expect(compactOverrides).toHaveCount(3);
+  const visibleOptionalControls = page.locator(".optional-number-control:visible");
+  await expect(visibleOptionalControls).toHaveCount(6);
+  const optionalControlMetrics = await visibleOptionalControls.evaluateAll((controls) =>
+    controls.map((control) => {
+      const input = control.querySelector("input");
+      const button = control.querySelector("button");
+      const inputRect = input?.getBoundingClientRect();
+      const buttonRect = button?.getBoundingClientRect();
+      return {
+        inputWidth: inputRect?.width ?? 0,
+        buttonWidth: buttonRect?.width ?? 0,
+        separated: inputRect && buttonRect ? inputRect.right <= buttonRect.left : false
+      };
+    })
+  );
+  for (const control of optionalControlMetrics) {
+    expect(control.inputWidth).toBeGreaterThanOrEqual(56);
+    expect(control.buttonWidth).toBeGreaterThanOrEqual(28);
+    expect(control.separated).toBe(true);
+  }
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Compare" }).click();
+
+  const shell = page.getByLabel("Workbench shell");
+  const player = page.getByLabel("Player sidebar");
+  const pane = shell.locator(".active-pane");
+  const monster = page.getByLabel("Monster card");
+  const table = page.getByRole("table", { name: "All monsters" });
+
+  await expect(shell).toBeVisible();
+  await expect(player).toBeVisible();
+  await expect(pane).toBeVisible();
+  await expect(monster).toBeVisible();
+  await expect.poll(async () => table.locator("tbody tr").count()).toBeGreaterThan(8);
+
+  const layout = await page.evaluate(() => {
+    const metrics = (element: Element | null) => {
+      if (!(element instanceof HTMLElement)) return null;
+      const style = window.getComputedStyle(element);
+      return {
+        clientHeight: element.clientHeight,
+        scrollHeight: element.scrollHeight,
+        overflowY: style.overflowY
+      };
+    };
+    return {
+      viewportHeight: window.innerHeight,
+      documentHeight: document.documentElement.scrollHeight,
+      bodyHeight: document.body.scrollHeight,
+      player: metrics(document.querySelector(".player-sidebar")),
+      pane: metrics(document.querySelector(".active-pane")),
+      monster: metrics(document.querySelector(".monster-rail"))
+    };
+  });
+
+  expect(layout.documentHeight).toBeLessThanOrEqual(layout.viewportHeight + 1);
+  expect(layout.bodyHeight).toBeLessThanOrEqual(layout.viewportHeight + 1);
+  expect(layout.player?.overflowY).toBe("auto");
+  expect(layout.pane?.overflowY).toBe("auto");
+  expect(layout.monster?.overflowY).toBe("auto");
+  expect(layout.pane!.scrollHeight).toBeGreaterThan(layout.pane!.clientHeight);
+  expect(layout.monster!.scrollHeight).toBeGreaterThan(layout.monster!.clientHeight);
+
+  const paneScrollTop = await pane.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+    return element.scrollTop;
+  });
+  const monsterScrollTop = await monster.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+    return element.scrollTop;
+  });
+  expect(paneScrollTop).toBeGreaterThan(0);
+  expect(monsterScrollTop).toBeGreaterThan(0);
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+});
+
+test("keeps long selected monster names readable in compact setup fields", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.addInitScript(() => window.localStorage.clear());
+  await page.goto("/");
+
+  const setupContext = page.getByLabel("Setup context");
+  const contextMonster = searchableCombobox(setupContext, "Monster");
+  const compactTarget = page.getByLabel("Combat setup").getByLabel("TARGET", { exact: true });
+  await chooseSearchableOption(setupContext, "Monster", "Water Elemental");
+
+  await expect(contextMonster).toHaveAttribute("data-selected-id", "water_elemental");
+  await expect(compactTarget).toHaveValue("water_elemental");
+  await expect(contextMonster).toHaveAttribute("title", "Water Elemental");
+  await expect(compactTarget).toHaveAttribute("title", "Water Elemental");
+
+  const contextFit = await contextMonster.evaluate((element) => {
+    const value = element.querySelector("span");
+    return value
+      ? {
+          clientWidth: value.clientWidth,
+          scrollWidth: value.scrollWidth,
+          selectedText: value.textContent?.trim() ?? ""
+        }
+      : null;
+  });
+  expect(contextFit?.selectedText).toBe("Water Elemental");
+  expect(contextFit!.scrollWidth).toBeLessThanOrEqual(contextFit!.clientWidth + 1);
+
+  const compactFit = await compactTarget.evaluate((element) => {
+    if (!(element instanceof HTMLSelectElement)) return null;
+    const style = window.getComputedStyle(element);
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+    if (!context) return null;
+    context.font = style.font;
+    const selectedText = element.selectedOptions[0]?.textContent?.trim() ?? "";
+    return {
+      availableWidth: element.clientWidth - 36,
+      selectedText,
+      textWidth: context.measureText(selectedText).width
+    };
+  });
+  expect(compactFit).not.toBeNull();
+  expect(compactFit?.selectedText).toBe("Water Elemental");
+  expect(compactFit!.availableWidth).toBeGreaterThanOrEqual(compactFit!.textWidth);
+
+  const guideSummary = page.getByLabel("Setup quick navigation").locator("button strong").first();
+  const guideStyle = await guideSummary.evaluate((element) => {
+    const style = window.getComputedStyle(element);
+    return {
+      overflowWrap: style.overflowWrap,
+      textOverflow: style.textOverflow,
+      whiteSpace: style.whiteSpace
+    };
+  });
+  expect(guideStyle.whiteSpace).toBe("normal");
+  expect(guideStyle.textOverflow).not.toBe("ellipsis");
+  expect(guideStyle.overflowWrap).toBe("anywhere");
+});
+
+test("keeps compact setup actions, Risk controls and Duel summaries readable", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.addInitScript(() => window.localStorage.clear());
+  await page.goto("/");
+
+  const setupActions = page.getByLabel("Setup actions");
+  await expect(setupActions.getByRole("button", { name: "Create custom setup" })).toHaveText("New");
+  await expect(setupActions.getByRole("button", { name: "Edit default" })).toHaveText("Edit");
+  await expect(setupActions.getByRole("button", { name: "Remove custom setup" })).toHaveText(
+    "Remove"
+  );
+  const actionMetrics = await setupActions.locator("button").evaluateAll((buttons) =>
+    buttons.map((button) => ({
+      clientWidth: button.clientWidth,
+      scrollWidth: button.scrollWidth,
+      whiteSpace: window.getComputedStyle(button).whiteSpace
+    }))
+  );
+  for (const action of actionMetrics) {
+    expect(action.scrollWidth).toBeLessThanOrEqual(action.clientWidth + 1);
+    expect(action.whiteSpace).toBe("nowrap");
+  }
+
+  const tabs = page.getByLabel("Workbench tabs");
+  const activePane = page.locator(".active-pane");
+  await tabs.getByRole("tab", { name: "Risk" }).click();
+  const risk = page.getByRole("region", { name: "Risk", exact: true });
+  const cancel = risk.getByRole("button", { name: "Cancel" });
+  await expect(cancel).toBeVisible();
+  await expectInsideBox(activePane, cancel);
+  const riskOverflow = await risk.evaluate((element) => ({
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth
+  }));
+  expect(riskOverflow.scrollWidth).toBeLessThanOrEqual(riskOverflow.clientWidth + 1);
+
+  await tabs.getByRole("tab", { name: "Duel" }).click();
+  const loadout = page
+    .getByRole("table", { name: "Duel comparison" })
+    .locator(".duel-loadout-cell");
+  await expect(loadout).toBeVisible();
+  const loadoutMetrics = await loadout.evaluate((element) => {
+    const style = window.getComputedStyle(element);
+    return {
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+      textOverflow: style.textOverflow,
+      whiteSpace: style.whiteSpace
+    };
+  });
+  expect(loadoutMetrics.scrollWidth).toBeLessThanOrEqual(loadoutMetrics.clientWidth + 1);
+  expect(loadoutMetrics.textOverflow).not.toBe("ellipsis");
+  expect(loadoutMetrics.whiteSpace).toBe("normal");
+});
+
+test("keeps every workbench tab inside a narrow mobile viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => window.localStorage.clear());
+  await page.goto("/");
+
+  const tabs = page.getByLabel("Workbench tabs");
+  const main = page.locator("main");
+  const setupContext = page.getByLabel("Setup context");
+  const setupTargets = [
+    searchableCombobox(setupContext, "Monster"),
+    setupContext.getByLabel("Setup actions"),
+    setupContext.locator(".setup-context-metrics")
+  ];
+  for (const tabName of [
+    "Stats",
+    "Melee setup",
+    "Compare",
+    "Loot",
+    "Trip",
+    "Risk",
+    "Cannon",
+    "Duel",
+    "Planner",
+    "Economy",
+    "Settings"
+  ]) {
+    await tabs.getByRole("tab", { name: tabName, exact: true }).click();
+    await expectPageWidthContained(page);
+    expect(await page.evaluate(() => window.scrollX), `${tabName} shifted the document`).toBe(0);
+    for (const target of setupTargets) await expectInsideBox(main, target);
+  }
+});
+
+test("keeps search inside the dropdown and supports keyboard selection", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.addInitScript(() => window.localStorage.clear());
+  await page.goto("/");
+
+  await selectCombatType(page, "magic");
+  const loadout = page.getByRole("region", { name: "Equipment loadout", exact: true });
+  const combobox = searchableCombobox(loadout, "Spell");
+
+  await expect(combobox).toHaveText(/Fire Bolt/);
+  await expect(loadout.getByRole("searchbox", { name: "Search Spell options" })).toHaveCount(0);
+  await combobox.click();
+  const search = loadout.getByRole("searchbox", { name: "Search Spell options" });
+  const listbox = loadout.getByRole("listbox", { name: "Spell options" });
+  await expect(search).toBeFocused();
+  await expect(listbox).toBeVisible();
+  await search.fill("fire wave");
+  await expect(listbox.getByRole("option")).toHaveCount(1);
+  await expect(listbox.getByRole("option", { name: "Fire Wave" })).toBeVisible();
+  await search.press("Enter");
+  await expectSearchableSelection(loadout, "Spell", "fire_wave");
+  await expect(combobox).toHaveText(/Fire Wave/);
+  await expect(listbox).toHaveCount(0);
+
+  await combobox.click();
+  await loadout.getByRole("searchbox", { name: "Search Spell options" }).fill("wind strike");
+  await loadout
+    .getByRole("listbox", { name: "Spell options" })
+    .getByRole("option", { name: "Wind Strike" })
+    .click();
+  await expectSearchableSelection(loadout, "Spell", "wind_strike");
+
+  await combobox.click();
+  await loadout.getByRole("searchbox", { name: "Search Spell options" }).press("Escape");
+  await expect(combobox).toBeFocused();
+  await expect(loadout.getByRole("listbox", { name: "Spell options" })).toHaveCount(0);
+});
+
+test("uses popup search for every primary long-choice field", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.addInitScript(() => window.localStorage.clear());
+  await page.goto("/");
+
+  await expectPopupSearch(page.getByLabel("Setup context"), "Monster");
+  await expectPopupSearch(page.getByLabel("Monster target controls"), "Target");
+
+  const tabs = page.getByLabel("Workbench tabs");
+  const loadout = page.getByRole("region", { name: "Equipment loadout", exact: true });
+  await selectCombatType(page, "melee");
+  for (const label of [
+    "Weapon",
+    "Helm",
+    "Amulet",
+    "Body",
+    "Legs",
+    "Shield",
+    "Gloves",
+    "Boots",
+    "Cape",
+    "Ring"
+  ]) {
+    await expectPopupSearch(loadout, label);
+  }
+
+  await selectCombatType(page, "ranged");
+  await expectPopupSearch(loadout, "Ammo");
+  await selectCombatType(page, "magic");
+  await expectPopupSearch(loadout, "Spell");
+  await expect(page.getByLabel("SPELL", { exact: true })).toHaveJSProperty("tagName", "SELECT");
+  await expect(page.getByLabel("TARGET", { exact: true })).toHaveJSProperty("tagName", "SELECT");
+
+  await tabs.getByRole("tab", { name: "Trip" }).click();
+  await expectPopupSearch(page.getByRole("region", { name: "Trip assumptions" }), "Food");
+  await tabs.getByRole("tab", { name: "Risk" }).click();
+  await expectPopupSearch(page.getByRole("region", { name: "Risk", exact: true }), "Target drop");
+  await tabs.getByRole("tab", { name: "Economy" }).click();
+  await expectPopupSearch(page, "Trend item");
+  await page.getByLabel("Baseline").selectOption("snapshot");
+  await expect(searchableCombobox(page, "Snapshot")).toBeEnabled();
+  await expectPopupSearch(page, "Snapshot");
+});
+
+test("keeps the Food dropdown search and results inside the mobile viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => window.localStorage.clear());
+  await page.goto("/");
+
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Trip" }).click();
+  const trip = page.getByRole("region", { name: "Trip assumptions" });
+  const food = searchableCombobox(trip, "Food");
+  await expect(food).toHaveText(/Lobster/);
+  await expect(trip.getByRole("searchbox", { name: "Search Food options" })).toHaveCount(0);
+
+  await food.click();
+  const search = trip.getByRole("searchbox", { name: "Search Food options" });
+  const listbox = trip.getByRole("listbox", { name: "Food options" });
+  await expect(search).toBeFocused();
+  await expect(listbox).toBeVisible();
+  await expectInsideBox(page.locator("main"), trip.locator(".searchable-combobox-popover"));
+  await expectPageWidthContained(page);
+  const optionDensity = await listbox
+    .getByRole("option")
+    .first()
+    .evaluate((option) => {
+      const label = option.querySelector("span");
+      return {
+        fontSize: label ? Number.parseFloat(getComputedStyle(label).fontSize) : Number.NaN,
+        rowHeight: option.getBoundingClientRect().height
+      };
+    });
+  expect(optionDensity.fontSize).toBeLessThanOrEqual(12);
+  expect(optionDensity.rowHeight).toBeLessThanOrEqual(35);
+
+  await search.fill("swordfish");
+  await listbox.getByRole("option", { name: "Swordfish" }).click();
+  await expectSearchableSelection(trip, "Food", "swordfish");
+  await expect(food).toHaveText(/Swordfish/);
+  await expect(listbox).toHaveCount(0);
+});
+
+test("explains setup ownership and links negative net GP to its controls", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.addInitScript(() => window.localStorage.clear());
+  await page.goto("/");
+
+  const guide = page.getByLabel("Setup quick navigation");
+  const tabs = page.getByLabel("Workbench tabs");
+  await expect(guide).toBeVisible();
+  await expect(guide.getByText("Where to edit", { exact: true })).toHaveCount(0);
+  await expect(
+    guide.getByText("Current values and their owning pane", { exact: true })
+  ).toHaveCount(0);
+  await expect(guide.getByRole("button")).toHaveCount(3);
+  await expect(guide).toContainText("ultimate + incredible");
+  await expect(guide).toContainText("super att + super str");
+  await expect(guide).toContainText("1 vials/type");
+  await expect(guide).toContainText("Prayer potions");
+
+  const explanation = page.getByLabel("Net GP explanation");
+  await expect(explanation).toBeVisible();
+  await expect(explanation).toContainText("Supplies");
+  await expect(explanation).toContainText("exceed loot");
+  await expect(explanation.getByRole("button", { name: "Edit prayers & boosts" })).toBeVisible();
+  await expect(explanation.getByRole("button", { name: "Review potion carry" })).toBeVisible();
+
+  await guide.getByRole("button", { name: "Edit potion carry and prayer restore" }).click();
+  await expect(tabs.getByRole("tab", { name: "Trip" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByLabel("Combat potion vials / type")).toBeVisible();
+
+  await guide.getByRole("button", { name: "Edit prayers and combat boosts" }).click();
+  await expect(tabs.getByRole("tab", { name: "Melee setup" })).toHaveAttribute(
+    "aria-selected",
+    "true"
+  );
+  await expect(page.getByRole("region", { name: "Equipment loadout", exact: true })).toBeVisible();
 });
 
 test("keeps Dense Compare mobile and tablet overflow contained", async ({ page }) => {
@@ -802,6 +1277,50 @@ test("keeps Dense Compare mobile and tablet overflow contained", async ({ page }
     await expect(activeRow.getByLabel("Current target kept visible for Hill Giant")).toBeVisible();
     await expectPageWidthContained(page);
   }
+});
+
+test("keeps long table headers pinned inside their desktop scroll area", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.addInitScript(() => window.localStorage.clear());
+  await page.goto("/");
+
+  const tabs = page.getByLabel("Workbench tabs");
+  await tabs.getByRole("tab", { name: "Compare" }).click();
+  const table = page.getByRole("table", { name: "All monsters" });
+  const wrap = table.locator("xpath=ancestor::div[contains(@class, 'dense-table-wrap')]");
+  const header = table.locator("thead th").first();
+  await expect(page.getByRole("status", { name: /Compare calculation status/i })).toHaveText(
+    "Current",
+    { timeout: 30_000 }
+  );
+  await expect(table.locator("tbody tr")).toHaveCount(63, { timeout: 30_000 });
+
+  const before = await wrap.evaluate((element) => ({
+    clientHeight: element.clientHeight,
+    scrollHeight: element.scrollHeight,
+    scrollTop: element.scrollTop
+  }));
+  expect(before.scrollHeight).toBeGreaterThan(before.clientHeight);
+  expect(before.scrollTop).toBe(0);
+
+  await wrap.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  await expect.poll(() => wrap.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+
+  const [wrapBox, headerBox] = await Promise.all([wrap.boundingBox(), header.boundingBox()]);
+  expect(wrapBox).not.toBeNull();
+  expect(headerBox).not.toBeNull();
+  expect(headerBox!.y).toBeGreaterThanOrEqual(wrapBox!.y - 1);
+  expect(headerBox!.y + headerBox!.height).toBeLessThanOrEqual(wrapBox!.y + wrapBox!.height + 1);
+
+  await tabs.getByRole("tab", { name: "Planner" }).click();
+  const plannerHeaderPosition = await page
+    .getByRole("table", { name: "Planner training order" })
+    .locator("thead th")
+    .first()
+    .evaluate((cell) => getComputedStyle(cell).position);
+  expect(plannerHeaderPosition).toBe("sticky");
 });
 
 test("recomputes the Planner tab workflow from visible planner controls", async ({ page }) => {
@@ -909,10 +1428,7 @@ test("uses the Duel tab to snapshot import export rename load delete and persist
   let reloadedTable = reloadedDuel.getByRole("table", { name: "Duel comparison" });
   await expect(reloadedTable.getByLabel("Rename snapshot Melee saved")).toBeVisible();
 
-  await page
-    .getByLabel("Setup context")
-    .getByLabel("Monster", { exact: true })
-    .selectOption("rock_crab");
+  await chooseSearchableOption(page.getByLabel("Setup context"), "Monster", "Rock Crab");
   const combatType = page.getByLabel("Combat type");
   await combatType.getByRole("button", { name: "ranged" }).click();
   await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Duel" }).click();
@@ -938,9 +1454,7 @@ test("uses the Duel tab to snapshot import export rename load delete and persist
     "aria-pressed",
     "true"
   );
-  await expect(page.getByLabel("Setup context").getByLabel("Monster", { exact: true })).toHaveValue(
-    "rock_crab"
-  );
+  await expectSearchableSelection(page.getByLabel("Setup context"), "Monster", "rock_crab");
 
   await page.evaluate(() => window.localStorage.setItem("duel_unrelated_key", "keep"));
   await reloadedTable.getByRole("button", { name: "Delete" }).click();
@@ -1002,7 +1516,7 @@ test("builds and filters the all-monster Duel setup matrix on demand", async ({ 
   await tabs.getByRole("tab", { name: "Duel" }).click();
   const duel = page.getByRole("region", { name: "Duel", exact: true });
   await duel.getByRole("button", { name: "Snapshot current setup" }).click();
-  await tabs.getByRole("tab", { name: "Ranged" }).click();
+  await selectCombatType(page, "ranged");
   await tabs.getByRole("tab", { name: "Duel" }).click();
 
   await expect(duel.getByRole("table", { name: "All-monster setup matrix" })).toHaveCount(0);
@@ -1021,6 +1535,86 @@ test("builds and filters the all-monster Duel setup matrix on demand", async ({ 
   await expect(matrix.locator("tbody tr")).toHaveCount(1);
   await expect(matrix.getByRole("row", { name: /Tribesman/ })).toBeVisible();
   await expectPageWidthContained(page);
+});
+
+test("keeps Compare, Planner and Duel worker calculations off the main event loop", async ({
+  page
+}) => {
+  await page.goto("/");
+  await page.evaluate(() => {
+    const state = { durations: [] as number[] };
+    const observer = new PerformanceObserver((list) => {
+      state.durations.push(...list.getEntries().map((entry) => entry.duration));
+    });
+    observer.observe({ entryTypes: ["longtask"] });
+    (window as unknown as { calculationTaskProbe: typeof state }).calculationTaskProbe = state;
+  });
+  await expect(
+    page.getByLabel("Compare calculation status: Current. Rows match the live setup.")
+  ).toBeVisible({ timeout: 30_000 });
+  await page.evaluate(() => {
+    (
+      window as unknown as { calculationTaskProbe: { durations: number[] } }
+    ).calculationTaskProbe.durations = [];
+  });
+  await page.getByLabel("Combat setup").getByLabel("ATT", { exact: true }).fill("61");
+  await expect(
+    page.getByLabel("Compare calculation status: Current. Rows match the live setup.")
+  ).toBeVisible({ timeout: 30_000 });
+  const compareLongTask = await page.evaluate(() =>
+    Math.max(
+      0,
+      ...(window as unknown as { calculationTaskProbe: { durations: number[] } })
+        .calculationTaskProbe.durations
+    )
+  );
+  expect(compareLongTask).toBeLessThan(200);
+
+  await page.evaluate(() => {
+    (
+      window as unknown as { calculationTaskProbe: { durations: number[] } }
+    ).calculationTaskProbe.durations = [];
+  });
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Planner" }).click();
+  await expect(page.getByLabel("Planner summary")).toBeVisible({ timeout: 30_000 });
+  const plannerLongTask = await page.evaluate(() =>
+    Math.max(
+      0,
+      ...(window as unknown as { calculationTaskProbe: { durations: number[] } })
+        .calculationTaskProbe.durations
+    )
+  );
+  expect(plannerLongTask).toBeLessThan(200);
+
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Duel" }).click();
+  await page
+    .getByRole("region", { name: "Duel", exact: true })
+    .getByRole("button", {
+      name: "Snapshot current setup"
+    })
+    .click();
+  await page.evaluate(() => {
+    (
+      window as unknown as { calculationTaskProbe: { durations: number[] } }
+    ).calculationTaskProbe.durations = [];
+  });
+  await page
+    .getByRole("region", { name: "Duel", exact: true })
+    .getByRole("button", {
+      name: "Monster matrix"
+    })
+    .click();
+  await expect(page.getByRole("table", { name: "All-monster setup matrix" })).toBeVisible({
+    timeout: 30_000
+  });
+  const duelLongTask = await page.evaluate(() =>
+    Math.max(
+      0,
+      ...(window as unknown as { calculationTaskProbe: { durations: number[] } })
+        .calculationTaskProbe.durations
+    )
+  );
+  expect(duelLongTask).toBeLessThan(200);
 });
 
 test("reviews and imports compatible legacy setup data", async ({ page }) => {
@@ -1218,7 +1812,7 @@ test("reviews and imports compatible legacy setup data", async ({ page }) => {
   await migration.getByRole("button", { name: "Import compatible data" }).click();
   await expect(migration).toHaveCount(0);
   await expect(page.locator(".topbar")).toContainText("Imported compatible legacy data");
-  await expect(page.getByLabel("TYPE", { exact: true })).toHaveValue("ranged");
+  await expect(page.getByLabel("TYPE", { exact: true })).toHaveText("ranged");
   await expect(page.getByLabel("TARGET", { exact: true })).toHaveValue("greater_demon");
   await page.waitForFunction(() => {
     const saved = window.localStorage.getItem("index-sim:rewrite-setup") ?? "";
@@ -1301,9 +1895,9 @@ test("updates manual combat overrides and resets to derived values", async ({ pa
   await page.goto("/");
 
   const setup = page.getByLabel("Combat setup");
-  await setup.getByLabel("ACC+").fill("120");
-  await setup.getByLabel("DMG+").fill("95");
-  await setup.getByLabel("SPD").fill("1.2");
+  await setup.getByLabel("ACC+", { exact: true }).fill("120");
+  await setup.getByLabel("DMG+", { exact: true }).fill("95");
+  await setup.getByLabel("SPD", { exact: true }).fill("1.2");
   const assumptions = page.getByLabel("Active assumptions");
   await expect(assumptions).toContainText("Manual combat overrides");
 
@@ -1320,7 +1914,7 @@ test("updates manual combat overrides and resets to derived values", async ({ pa
   await assumptions.getByRole("button", { name: "Reset manual combat overrides" }).click();
   await expect(assumptions).not.toContainText("Manual combat overrides");
 
-  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Melee" }).click();
+  await selectCombatType(page, "melee");
   const overrides = page.getByLabel("Manual combat overrides");
   await expect(overrides.getByLabel("Accuracy bonus")).toHaveValue("");
   await expect(overrides.getByLabel("Damage bonus")).toHaveValue("");
@@ -1348,7 +1942,7 @@ test("surfaces setup requirement warnings and reviews the active loadout", async
 
   await assumptions.getByRole("button", { name: "Review Setup requirements" }).click();
   await expect(
-    page.getByLabel("Workbench tabs").getByRole("tab", { name: "Melee" })
+    page.getByLabel("Workbench tabs").getByRole("tab", { name: "Melee setup" })
   ).toHaveAttribute("aria-selected", "true");
 
   const equipmentPane = page.getByLabel("Equipment loadout");
@@ -1403,7 +1997,18 @@ test("surfaces and clears invalid rewrite local state in Settings", async ({ pag
   });
 
   await page.goto("/");
-  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Settings" }).click();
+  const migrationNotice = page.getByLabel("Legacy setup migration");
+  const migrationMetrics = await migrationNotice.evaluate((element) => ({
+    clientHeight: element.clientHeight,
+    overflowY: window.getComputedStyle(element).overflowY,
+    scrollHeight: element.scrollHeight
+  }));
+  expect(migrationMetrics.overflowY).toBe("auto");
+  expect(migrationMetrics.scrollHeight).toBeGreaterThan(migrationMetrics.clientHeight);
+
+  const settingsTab = page.getByLabel("Workbench tabs").getByRole("tab", { name: "Settings" });
+  await settingsTab.focus();
+  await settingsTab.press("Enter");
 
   const recovery = page.getByLabel("Local state recovery");
   await expect(recovery).toBeVisible();
@@ -1425,6 +2030,104 @@ test("surfaces and clears invalid rewrite local state in Settings", async ({ pag
         window.localStorage.getItem("index-sim:hidden-gear-tiers") === null &&
         window.localStorage.getItem("sim_input_v3") !== null &&
         window.localStorage.getItem("index-sim:unknown-test") === "keep"
+    )
+  ).toBe(true);
+});
+
+test("falls back without overwriting a setup that references unavailable game data", async ({
+  page
+}) => {
+  const unavailableMonsterId = "removed_revision_monster";
+  const incompatibleSetup = savedSetupFromForm({
+    ...DEFAULT_FORM_STATE,
+    monsterId: unavailableMonsterId
+  });
+  await page.addInitScript(
+    ({ key, version, setup }) => {
+      window.localStorage.setItem(
+        key,
+        JSON.stringify({
+          version,
+          savedAt: "2026-07-11T00:00:00.000Z",
+          data: setup
+        })
+      );
+    },
+    {
+      key: REWRITE_SETUP_STORAGE_KEY,
+      version: REWRITE_SETUP_VERSION,
+      setup: incompatibleSetup
+    }
+  );
+
+  await page.goto("/");
+  await expect(page.getByLabel("Combat setup").getByLabel("TARGET", { exact: true })).toHaveValue(
+    DEFAULT_FORM_STATE.monsterId
+  );
+  await expect(page.locator(".topbar")).toContainText(
+    "Saved rewrite setup is incompatible; defaults are active"
+  );
+
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Settings" }).click();
+  const recovery = page.getByLabel("Local state recovery");
+  await expect(recovery).toBeVisible();
+  await expect(recovery).toContainText("Rewrite setup");
+  await expect(recovery).toContainText("Saved data failed validation");
+  await expect(recovery).toContainText("Needs attention 1");
+  await expect(recovery).not.toContainText(unavailableMonsterId);
+
+  expect(
+    await page.evaluate(
+      ({ key, unavailableId }) => (window.localStorage.getItem(key) ?? "").includes(unavailableId),
+      { key: REWRITE_SETUP_STORAGE_KEY, unavailableId: unavailableMonsterId }
+    )
+  ).toBe(true);
+});
+
+test("keeps incompatible saved Duel snapshots recoverable and out of the runtime", async ({
+  page
+}) => {
+  const unavailableMonsterId = "removed_duel_monster";
+  const snapshot = createDuelSnapshot("removed-duel", "Removed Duel target", {
+    ...DEFAULT_FORM_STATE,
+    monsterId: unavailableMonsterId
+  });
+  await page.addInitScript(
+    ({ key, version, savedSnapshot }) => {
+      window.localStorage.setItem(
+        key,
+        JSON.stringify({
+          version,
+          savedAt: "2026-07-11T00:00:00.000Z",
+          data: { snapshots: [savedSnapshot] }
+        })
+      );
+    },
+    {
+      key: DUEL_SNAPSHOTS_STORAGE_KEY,
+      version: DUEL_SNAPSHOTS_VERSION,
+      savedSnapshot: snapshot
+    }
+  );
+
+  await page.goto("/");
+  await expect(page.locator(".topbar")).toContainText(
+    "Saved Duel snapshots are incompatible; an empty list is active"
+  );
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Duel" }).click();
+  await expect(page.getByRole("region", { name: "Duel", exact: true })).toContainText(
+    "0 / 12 snapshots"
+  );
+
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Settings" }).click();
+  const recovery = page.getByLabel("Local state recovery");
+  await expect(recovery).toContainText("Duel snapshots");
+  await expect(recovery).toContainText("Needs attention 1");
+  await expect(recovery).not.toContainText(unavailableMonsterId);
+  expect(
+    await page.evaluate(
+      ({ key, unavailableId }) => (window.localStorage.getItem(key) ?? "").includes(unavailableId),
+      { key: DUEL_SNAPSHOTS_STORAGE_KEY, unavailableId: unavailableMonsterId }
     )
   ).toBe(true);
 });
@@ -1700,37 +2403,52 @@ test("keeps PriceSet import failures non-fatal and recoverable", async ({ page }
 
 test("updates results when the combat style changes", async ({ page }) => {
   await page.goto("/");
-  await page.getByLabel("TYPE", { exact: true }).selectOption("ranged");
-  await expect(page.getByLabel("Combat setup").getByLabel("RNG")).toBeVisible();
+  await selectCombatType(page, "ranged");
+  const tabs = page.getByLabel("Workbench tabs");
+  const combatSetup = page.getByLabel("Combat setup");
+  await expect(combatSetup.getByLabel("RNG")).toBeVisible();
+  await expect(combatSetup.getByLabel("TYPE", { exact: true })).toHaveJSProperty(
+    "tagName",
+    "OUTPUT"
+  );
+  await expect(tabs.getByRole("tab", { name: / setup$/ })).toHaveCount(1);
+  await expect(tabs.getByRole("tab", { name: "Ranged setup" })).toBeVisible();
+  await expect(tabs.getByRole("tab", { name: "Melee setup" })).toHaveCount(0);
+  await expect(tabs.getByRole("tab", { name: "Magic setup" })).toHaveCount(0);
   await expect(page.getByLabel("TARGET", { exact: true })).toHaveValue("giant");
   await expect(page.getByText("XP/HR").first()).toBeVisible();
+
+  await tabs.getByRole("tab", { name: "Compare" }).click();
+  await tabs.getByRole("tab", { name: "Ranged setup" }).click();
+  await expect(
+    page.getByLabel("Combat type").getByRole("button", { name: "ranged", exact: true })
+  ).toHaveAttribute("aria-pressed", "true");
 });
 
 test("restores per-combat-style loadout edits when switching styles", async ({ page }) => {
   test.setTimeout(60_000);
   await page.goto("/");
-  const tabs = page.getByLabel("Workbench tabs");
   const special = page.getByRole("region", { name: "Special attack", exact: true });
 
-  await tabs.getByRole("tab", { name: "Melee" }).click();
+  await selectCombatType(page, "melee");
   await special.getByLabel("Spec weapon").selectOption("dragon_dagger_p");
-  await page.getByLabel("PRAY", { exact: true }).selectOption("clarity");
+  await page.getByLabel("PRAYER", { exact: true }).selectOption("clarity");
 
-  await tabs.getByRole("tab", { name: "Ranged" }).click();
-  await expect(page.getByLabel("TYPE", { exact: true })).toHaveValue("ranged");
+  await selectCombatType(page, "ranged");
+  await expect(page.getByLabel("TYPE", { exact: true })).toHaveText("ranged");
   await special.getByLabel("Spec weapon").selectOption("magic_shortbow");
   await special.getByLabel("Spec ammo").selectOption("rune_arrow");
-  await page.getByLabel("POT", { exact: true }).selectOption("ranging");
+  await page.getByLabel("BOOST", { exact: true }).selectOption("ranging");
 
-  await tabs.getByRole("tab", { name: "Melee" }).click();
-  await expect(page.getByLabel("TYPE", { exact: true })).toHaveValue("melee");
+  await selectCombatType(page, "melee");
+  await expect(page.getByLabel("TYPE", { exact: true })).toHaveText("melee");
   await expect(special.getByLabel("Spec weapon")).toHaveValue("dragon_dagger_p");
-  await expect(page.getByLabel("PRAY", { exact: true })).toHaveValue("clarity");
+  await expect(page.getByLabel("PRAYER", { exact: true })).toHaveValue("clarity");
 
-  await tabs.getByRole("tab", { name: "Ranged" }).click();
+  await selectCombatType(page, "ranged");
   await expect(special.getByLabel("Spec weapon")).toHaveValue("magic_shortbow");
   await expect(special.getByLabel("Spec ammo")).toHaveValue("rune_arrow");
-  await expect(page.getByLabel("POT", { exact: true })).toHaveValue("ranging");
+  await expect(page.getByLabel("BOOST", { exact: true })).toHaveValue("ranging");
   await page.waitForFunction(() => {
     const raw = window.localStorage.getItem("index-sim:rewrite-setup");
     if (!raw) return false;
@@ -1750,38 +2468,37 @@ test("supports multi-prayer and multi-boost workbench controls with compact prim
   page
 }) => {
   await page.goto("/");
-  const tabs = page.getByLabel("Workbench tabs");
-  await tabs.getByRole("tab", { name: "Melee" }).click();
+  await selectCombatType(page, "melee");
 
   const compactSetup = page.getByLabel("Combat setup");
   const equipmentPane = page.getByLabel("Equipment loadout");
   const prayerSelections = equipmentPane.getByLabel("Prayer selections");
   const boostSelections = equipmentPane.getByLabel("Boost selections");
 
-  await expect(compactSetup.getByLabel("PRAY", { exact: true })).toHaveValue("ultimate");
-  await expect(compactSetup.getByLabel("POT", { exact: true })).toHaveValue("super_att");
+  await expect(compactSetup.getByLabel("PRAYER", { exact: true })).toHaveValue("ultimate");
+  await expect(compactSetup.getByLabel("BOOST", { exact: true })).toHaveValue("super_att");
   await expect(compactSetup).toContainText("+1");
 
   await prayerSelections.getByLabel(/steel skin/i).check();
   await expect(prayerSelections.getByLabel(/steel skin/i)).toBeChecked();
-  await expect(compactSetup.getByLabel("PRAY", { exact: true })).toHaveValue("ultimate");
+  await expect(compactSetup.getByLabel("PRAYER", { exact: true })).toHaveValue("ultimate");
   await expect(compactSetup).toContainText("+2");
 
-  await compactSetup.getByLabel("PRAY", { exact: true }).selectOption("reflexes");
+  await compactSetup.getByLabel("PRAYER", { exact: true }).selectOption("reflexes");
   await expect(prayerSelections.getByLabel(/reflexes/i)).toBeChecked();
   await expect(prayerSelections.getByLabel(/incredible/i)).not.toBeChecked();
   await expect(prayerSelections.getByLabel(/ultimate/i)).toBeChecked();
   await expect(prayerSelections.getByLabel(/steel skin/i)).toBeChecked();
-  await expect(compactSetup.getByLabel("PRAY", { exact: true })).toHaveValue("reflexes");
+  await expect(compactSetup.getByLabel("PRAYER", { exact: true })).toHaveValue("reflexes");
   await expect(compactSetup).toContainText("+2");
 
   await boostSelections.getByLabel(/magic/i).check();
-  await compactSetup.getByLabel("POT", { exact: true }).selectOption("ranging");
+  await compactSetup.getByLabel("BOOST", { exact: true }).selectOption("ranging");
   await expect(boostSelections.getByLabel(/ranging/i)).toBeChecked();
   await expect(boostSelections.getByLabel(/super att/i)).toBeChecked();
   await expect(boostSelections.getByLabel(/super str/i)).toBeChecked();
   await expect(boostSelections.getByLabel(/magic/i)).toBeChecked();
-  await expect(compactSetup.getByLabel("POT", { exact: true })).toHaveValue("ranging");
+  await expect(compactSetup.getByLabel("BOOST", { exact: true })).toHaveValue("ranging");
   await expect(compactSetup).toContainText("+3");
 
   await page.waitForFunction(() => {
@@ -1798,31 +2515,26 @@ test("supports multi-prayer and multi-boost workbench controls with compact prim
 test("edits combat equipment panes and persists style-specific selections", async ({ page }) => {
   test.setTimeout(90_000);
   await page.goto("/");
-  const tabs = page.getByLabel("Workbench tabs");
   const setupContext = page.getByLabel("Setup context");
   const setupDps = setupContext.locator(".metric", { hasText: "DPS" }).locator("strong");
 
-  await tabs.getByRole("tab", { name: "Melee" }).click();
+  await selectCombatType(page, "melee");
   const meleePane = page.getByLabel("Equipment loadout");
   const meleeDpsBefore = await setupDps.textContent();
-  await meleePane.getByLabel("Shield", { exact: true }).selectOption("unholy_book");
-  await meleePane.getByLabel("Weapon search").fill("dragon halberd");
-  await meleePane.getByLabel("Weapon", { exact: true }).selectOption("dragon_halberd");
-  await expect(meleePane.getByLabel("Shield", { exact: true })).toBeDisabled();
-  await expect(meleePane.getByLabel("Shield", { exact: true })).toHaveValue("none");
+  await chooseSearchableOption(meleePane, "Shield", "Unholy book");
+  await chooseSearchableOption(meleePane, "Weapon", "Dragon halberd");
+  await expect(searchableCombobox(meleePane, "Shield")).toBeDisabled();
+  await expectSearchableSelection(meleePane, "Shield", "none");
   await expect.poll(async () => setupDps.textContent()).not.toBe(meleeDpsBefore);
 
-  await tabs.getByRole("tab", { name: "Ranged" }).click();
+  await selectCombatType(page, "ranged");
   const rangedPane = page.getByLabel("Equipment loadout");
-  await rangedPane.getByLabel("Weapon search").fill("magic shortbow");
-  await rangedPane.getByLabel("Weapon", { exact: true }).selectOption("magic_shortbow");
-  await rangedPane.getByLabel("Ammo search").fill("adamant arrow");
-  await rangedPane.getByLabel("Ammo", { exact: true }).selectOption("addy_arrow");
+  await chooseSearchableOption(rangedPane, "Weapon", "Magic shortbow");
+  await chooseSearchableOption(rangedPane, "Ammo", "Adamant arrow");
 
-  await tabs.getByRole("tab", { name: "Magic" }).click();
+  await selectCombatType(page, "magic");
   const magicPane = page.getByLabel("Equipment loadout");
-  await magicPane.getByLabel("Spell search").fill("fire wave");
-  await magicPane.getByLabel("Spell", { exact: true }).selectOption("fire_wave");
+  await chooseSearchableOption(magicPane, "Spell", "Fire Wave");
   await expect(page.getByLabel("Equipment bonus summary")).toContainText("Magic");
 
   await page.waitForFunction(() => {
@@ -1841,47 +2553,36 @@ test("edits combat equipment panes and persists style-specific selections", asyn
   await page.reload();
   const reloadedTabs = page.getByLabel("Workbench tabs");
   await expect(reloadedTabs).toBeVisible();
-  await reloadedTabs.getByRole("tab", { name: "Melee" }).click();
-  await expect(
-    page.getByLabel("Equipment loadout").getByLabel("Weapon", { exact: true })
-  ).toHaveValue("dragon_halberd");
-  await expect(
-    page.getByLabel("Equipment loadout").getByLabel("Shield", { exact: true })
-  ).toBeDisabled();
-  await reloadedTabs.getByRole("tab", { name: "Ranged" }).click();
-  await expect(
-    page.getByLabel("Equipment loadout").getByLabel("Ammo", { exact: true })
-  ).toHaveValue("addy_arrow");
-  await reloadedTabs.getByRole("tab", { name: "Magic" }).click();
-  await expect(
-    page.getByLabel("Equipment loadout").getByLabel("Spell", { exact: true })
-  ).toHaveValue("fire_wave");
+  await selectCombatType(page, "melee");
+  await expectSearchableSelection(page.getByLabel("Equipment loadout"), "Weapon", "dragon_halberd");
+  await expect(searchableCombobox(page.getByLabel("Equipment loadout"), "Shield")).toBeDisabled();
+  await selectCombatType(page, "ranged");
+  await expectSearchableSelection(page.getByLabel("Equipment loadout"), "Ammo", "addy_arrow");
+  await selectCombatType(page, "magic");
+  await expectSearchableSelection(page.getByLabel("Equipment loadout"), "Spell", "fire_wave");
 });
 
 test("applies gear quick actions for the active combat style", async ({ page }) => {
   await page.goto("/");
-  const tabs = page.getByLabel("Workbench tabs");
-
-  await tabs.getByRole("tab", { name: "Melee" }).click();
+  await selectCombatType(page, "melee");
   const meleePane = page.getByLabel("Equipment loadout");
   await meleePane.getByRole("button", { name: "Best Helm" }).click();
-  await expect(meleePane.getByLabel("Helm", { exact: true })).toHaveValue("berserker_helm");
+  await expectSearchableSelection(meleePane, "Helm", "berserker_helm");
   await meleePane.getByRole("button", { name: "Best Shield" }).click();
-  await expect(meleePane.getByLabel("Shield", { exact: true })).toHaveValue("unholy_book");
-  await meleePane.getByLabel("Weapon search").fill("dragon halberd");
-  await meleePane.getByLabel("Weapon", { exact: true }).selectOption("dragon_halberd");
+  await expectSearchableSelection(meleePane, "Shield", "unholy_book");
+  await chooseSearchableOption(meleePane, "Weapon", "Dragon halberd");
   await expect(meleePane.getByRole("button", { name: "Best Shield" })).toBeDisabled();
-  await expect(meleePane.getByLabel("Shield", { exact: true })).toHaveValue("none");
+  await expectSearchableSelection(meleePane, "Shield", "none");
 
-  await tabs.getByRole("tab", { name: "Ranged" }).click();
+  await selectCombatType(page, "ranged");
   const rangedPane = page.getByLabel("Equipment loadout");
   await rangedPane.getByRole("button", { name: "Best Body" }).click();
-  await expect(rangedPane.getByLabel("Body", { exact: true })).toHaveValue("black_dhide_body");
+  await expectSearchableSelection(rangedPane, "Body", "black_dhide_body");
 
-  await tabs.getByRole("tab", { name: "Magic" }).click();
+  await selectCombatType(page, "magic");
   const magicPane = page.getByLabel("Equipment loadout");
   await magicPane.getByRole("button", { name: "Best Cape" }).click();
-  await expect(magicPane.getByLabel("Cape", { exact: true })).toHaveValue("god_cape");
+  await expectSearchableSelection(magicPane, "Cape", "god_cape");
 
   await page.waitForFunction(() => {
     const raw = window.localStorage.getItem("index-sim:rewrite-setup");
@@ -1898,24 +2599,22 @@ test("applies gear quick actions for the active combat style", async ({ page }) 
 
 test("optimizes the visible whole loadout and restores it with Undo", async ({ page }) => {
   await page.goto("/");
-  const tabs = page.getByLabel("Workbench tabs");
-  await tabs.getByRole("tab", { name: "Melee" }).click();
+  await selectCombatType(page, "melee");
 
   const setup = page.getByLabel("Setup context");
-  const monster = setup.getByLabel("Monster", { exact: true });
+  const monster = searchableCombobox(setup, "Monster");
   const loadout = page.getByLabel("Equipment loadout");
-  const weapon = loadout.getByLabel("Weapon", { exact: true });
+  const weapon = searchableCombobox(loadout, "Weapon");
   const style = loadout.getByLabel("Style", { exact: true });
-  const originalMonster = await monster.inputValue();
+  const originalMonster = await monster.getAttribute("data-selected-id");
   const originalStyle = await style.inputValue();
 
-  await loadout.getByLabel("Weapon search").fill("iron scimitar");
-  await weapon.selectOption("iron_scimitar");
-  await expect(weapon).toHaveValue("iron_scimitar");
+  await chooseSearchableOption(loadout, "Weapon", "Iron scimitar");
+  await expect(weapon).toHaveAttribute("data-selected-id", "iron_scimitar");
 
   await loadout.getByRole("button", { name: "Optimize loadout" }).click();
-  await expect(weapon).not.toHaveValue("iron_scimitar");
-  await expect(monster).toHaveValue(originalMonster);
+  await expect(weapon).not.toHaveAttribute("data-selected-id", "iron_scimitar");
+  await expect(monster).toHaveAttribute("data-selected-id", originalMonster ?? "");
   await expect(style).toHaveValue(originalStyle);
 
   const undo = page.getByLabel("Local state undo");
@@ -1923,8 +2622,8 @@ test("optimizes the visible whole loadout and restores it with Undo", async ({ p
   await expect(undo).toContainText("normal DPS");
   await undo.getByRole("button", { name: "Undo" }).click();
 
-  await expect(weapon).toHaveValue("iron_scimitar");
-  await expect(monster).toHaveValue(originalMonster);
+  await expect(weapon).toHaveAttribute("data-selected-id", "iron_scimitar");
+  await expect(monster).toHaveAttribute("data-selected-id", originalMonster ?? "");
   await expect(style).toHaveValue(originalStyle);
   await expect(page.locator(".topbar")).toContainText("Restored loadout for Hill Giant");
 });
@@ -1933,9 +2632,9 @@ test("filters hidden gear tiers while keeping current selections", async ({ page
   await page.goto("/");
   const tabs = page.getByLabel("Workbench tabs");
 
-  await tabs.getByRole("tab", { name: "Melee" }).click();
+  await selectCombatType(page, "melee");
   const meleePane = page.getByLabel("Equipment loadout");
-  await meleePane.getByLabel("Body", { exact: true }).selectOption("iron_platebody");
+  await chooseSearchableOption(meleePane, "Body", "Iron platebody");
 
   await tabs.getByRole("tab", { name: "Settings" }).click();
   const settings = page.locator('[aria-label="Hidden gear tiers"]');
@@ -1943,16 +2642,10 @@ test("filters hidden gear tiers while keeping current selections", async ({ page
   await settings.getByLabel("Hide iron gear").check();
   await expect(settings).toContainText("1 hidden");
 
-  await tabs.getByRole("tab", { name: "Melee" }).click();
-  await expect(meleePane.getByLabel("Body", { exact: true })).toHaveValue("iron_platebody");
-  const helmOptions = await meleePane
-    .getByLabel("Helm", { exact: true })
-    .locator("option")
-    .allTextContents();
-  const bodyOptions = await meleePane
-    .getByLabel("Body", { exact: true })
-    .locator("option")
-    .allTextContents();
+  await selectCombatType(page, "melee");
+  await expectSearchableSelection(meleePane, "Body", "iron_platebody");
+  const helmOptions = await searchableOptionLabels(meleePane, "Helm");
+  const bodyOptions = await searchableOptionLabels(meleePane, "Body");
   expect(helmOptions.join("\n")).not.toContain("Iron full helm");
   expect(bodyOptions.join("\n")).toContain("Iron platebody");
   expect(bodyOptions.join("\n")).toContain("None");
@@ -1968,13 +2661,10 @@ test("filters hidden gear tiers while keeping current selections", async ({ page
   await expect(
     page.locator('[aria-label="Hidden gear tiers"]').getByLabel("Hide iron gear")
   ).toBeChecked();
-  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Melee" }).click();
+  await selectCombatType(page, "melee");
   const reloadedMeleePane = page.getByLabel("Equipment loadout");
-  await expect(reloadedMeleePane.getByLabel("Body", { exact: true })).toHaveValue("iron_platebody");
-  const reloadedHelmOptions = await reloadedMeleePane
-    .getByLabel("Helm", { exact: true })
-    .locator("option")
-    .allTextContents();
+  await expectSearchableSelection(reloadedMeleePane, "Body", "iron_platebody");
+  const reloadedHelmOptions = await searchableOptionLabels(reloadedMeleePane, "Helm");
   expect(reloadedHelmOptions.join("\n")).not.toContain("Iron full helm");
 });
 
@@ -1987,36 +2677,31 @@ test("creates, restores and removes monster-specific custom setups", async ({ pa
   await setupContext.getByRole("button", { name: "Create custom setup" }).click();
   await expect(setupContext).toContainText("Custom setup");
 
-  await tabs.getByRole("tab", { name: "Melee" }).click();
+  await selectCombatType(page, "melee");
   const equipmentPane = page.getByLabel("Equipment loadout");
-  await equipmentPane.getByLabel("Weapon search").fill("dragon halberd");
-  await equipmentPane.getByLabel("Weapon", { exact: true }).selectOption("dragon_halberd");
-  await expect(equipmentPane.getByLabel("Weapon", { exact: true })).toHaveValue("dragon_halberd");
+  await chooseSearchableOption(equipmentPane, "Weapon", "Dragon halberd");
+  await expectSearchableSelection(equipmentPane, "Weapon", "dragon_halberd");
 
-  await setupContext.getByLabel("Monster", { exact: true }).selectOption("rock_crab");
+  await chooseSearchableOption(setupContext, "Monster", "Rock Crab");
   await expect(setupContext).toContainText("Default setup");
-  await expect(equipmentPane.getByLabel("Weapon", { exact: true })).toHaveValue("rune_scimitar");
+  await expectSearchableSelection(equipmentPane, "Weapon", "rune_scimitar");
 
-  await setupContext.getByLabel("Monster", { exact: true }).selectOption("giant");
+  await chooseSearchableOption(setupContext, "Monster", "Hill Giant");
   await expect(setupContext).toContainText("Custom setup");
-  await expect(equipmentPane.getByLabel("Weapon", { exact: true })).toHaveValue("dragon_halberd");
+  await expectSearchableSelection(equipmentPane, "Weapon", "dragon_halberd");
 
   await tabs.getByRole("tab", { name: "Compare" }).click();
   await expect(page.locator('tr[aria-selected="true"]')).toContainText("custom");
 
   await setupContext.getByRole("button", { name: "Remove custom setup" }).click();
   await expect(setupContext).toContainText("Default setup");
-  await tabs.getByRole("tab", { name: "Melee" }).click();
-  await expect(
-    page.getByLabel("Equipment loadout").getByLabel("Weapon", { exact: true })
-  ).toHaveValue("rune_scimitar");
+  await selectCombatType(page, "melee");
+  await expectSearchableSelection(page.getByLabel("Equipment loadout"), "Weapon", "rune_scimitar");
   const customSetupUndo = page.getByLabel("Local state undo");
   await expect(customSetupUndo).toContainText("Removed custom setup for Hill Giant");
   await customSetupUndo.getByRole("button", { name: "Undo" }).click();
   await expect(setupContext).toContainText("Custom setup");
-  await expect(
-    page.getByLabel("Equipment loadout").getByLabel("Weapon", { exact: true })
-  ).toHaveValue("dragon_halberd");
+  await expectSearchableSelection(page.getByLabel("Equipment loadout"), "Weapon", "dragon_halberd");
   await page.waitForFunction(() => {
     const raw = window.localStorage.getItem("index-sim:rewrite-setup");
     if (!raw) return false;
@@ -2030,9 +2715,7 @@ test("creates, restores and removes monster-specific custom setups", async ({ pa
 
   await setupContext.getByRole("button", { name: "Remove custom setup" }).click();
   await expect(setupContext).toContainText("Default setup");
-  await expect(
-    page.getByLabel("Equipment loadout").getByLabel("Weapon", { exact: true })
-  ).toHaveValue("rune_scimitar");
+  await expectSearchableSelection(page.getByLabel("Equipment loadout"), "Weapon", "rune_scimitar");
   await page.waitForFunction(() => {
     const raw = window.localStorage.getItem("index-sim:rewrite-setup");
     if (!raw) return false;
@@ -2048,7 +2731,7 @@ test("creates, restores and removes monster-specific custom setups", async ({ pa
 test("selects special attacks and shows special metrics", async ({ page }) => {
   test.setTimeout(90_000);
   await page.goto("/");
-  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Melee" }).click();
+  await selectCombatType(page, "melee");
   const special = page.getByRole("region", { name: "Special attack", exact: true });
 
   await expect(special).toBeVisible();
@@ -2101,9 +2784,9 @@ test("selects special attacks and shows special metrics", async ({ page }) => {
       .getByRole("region", { name: "Source breakdown", exact: true })
       .getByRole("listitem", { name: /Special attack: modeled/i })
   ).toContainText("DPS gain");
-  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Melee" }).click();
+  await selectCombatType(page, "melee");
 
-  await page.getByLabel("TYPE", { exact: true }).selectOption("ranged");
+  await selectCombatType(page, "ranged");
   await special.getByLabel("Spec weapon").selectOption("magic_shortbow");
   await expect(special.getByLabel("Spec ammo")).toBeVisible();
   await special.getByLabel("Spec ammo").selectOption("rune_arrow");
@@ -2113,7 +2796,7 @@ test("selects special attacks and shows special metrics", async ({ page }) => {
     return saved.includes('"weaponId":"magic_shortbow"') && saved.includes('"ammoId":"rune_arrow"');
   });
 
-  await page.getByLabel("TYPE", { exact: true }).selectOption("magic");
+  await selectCombatType(page, "magic");
   await expect(special.getByLabel("Spec weapon")).toBeDisabled();
   await expect(special.getByLabel("Spec weapon")).toHaveValue("none");
   await expect(special).toContainText("unsupported");
@@ -2132,9 +2815,9 @@ test("selects special attacks and shows special metrics", async ({ page }) => {
     .getByRole("listitem", { name: /Special attack detail: not modeled/i });
   await expect(magicSpecialDetail).toBeVisible();
   await expect(magicSpecialDetail.getByText(magicSpecialNote, { exact: true })).toBeVisible();
-  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Melee" }).click();
+  await selectCombatType(page, "melee");
 
-  await page.getByLabel("TYPE", { exact: true }).selectOption("melee");
+  await selectCombatType(page, "melee");
   const boostSelectId = await page
     .locator('section[aria-label="Equipment loadout"] .field > label', { hasText: /^Boost$/ })
     .getAttribute("for");
@@ -2160,6 +2843,7 @@ test("sorts the full monster table and selects a target row", async ({ page }) =
 
   await expect.poll(async () => table.locator("tbody tr").count()).toBeGreaterThan(8);
   await table.getByRole("button", { name: /Monster/ }).click();
+  await expect(table.locator("tbody tr td:first-child").first()).toContainText("Al-Kharid warrior");
 
   const names = (await table.locator("tbody tr td:first-child").allTextContents()).map((name) =>
     name
@@ -2275,11 +2959,10 @@ test("shows dense row markers for custom setup and per-monster loot settings", a
   const setupContext = page.getByLabel("Setup context");
 
   await setupContext.getByRole("button", { name: "Create custom setup" }).click();
-  await tabs.getByRole("tab", { name: "Melee" }).click();
+  await selectCombatType(page, "melee");
   const equipmentPane = page.getByLabel("Equipment loadout");
-  await equipmentPane.getByLabel("Weapon search").fill("dragon halberd");
-  await equipmentPane.getByLabel("Weapon", { exact: true }).selectOption("dragon_halberd");
-  await setupContext.getByLabel("Monster", { exact: true }).selectOption("green_dragon");
+  await chooseSearchableOption(equipmentPane, "Weapon", "Dragon halberd");
+  await chooseSearchableOption(setupContext, "Monster", "Green Dragon");
   await tabs.getByRole("tab", { name: "Loot" }).click();
 
   const loot = page.locator('section[aria-label="Current monster loot"]');
@@ -2300,6 +2983,16 @@ test("shows dense row markers for custom setup and per-monster loot settings", a
 test("matches browser-rendered result metrics for every golden fixture setup", async ({ page }) => {
   test.setTimeout(180_000);
   await page.goto("/");
+  await page.addInitScript(() => {
+    const pending = window.sessionStorage.getItem("index-sim:e2e-fixture-storage");
+    if (!pending) return;
+    const entries = JSON.parse(pending) as Record<string, string>;
+    window.localStorage.clear();
+    for (const [key, value] of Object.entries(entries)) {
+      window.localStorage.setItem(key, value);
+    }
+    window.sessionStorage.removeItem("index-sim:e2e-fixture-storage");
+  });
 
   for (const definition of LEGACY_GOLDEN_CASES) {
     const fixture = createRewriteFixtureCase(definition, GENERATED_BROWSER_FIXTURE_CONTEXT);
@@ -2327,16 +3020,13 @@ test("matches browser-rendered result metrics for every golden fixture setup", a
     };
 
     await page.evaluate((entries) => {
-      window.localStorage.clear();
-      for (const [key, value] of Object.entries(entries)) {
-        window.localStorage.setItem(key, value);
-      }
+      window.sessionStorage.setItem("index-sim:e2e-fixture-storage", JSON.stringify(entries));
     }, storageState);
     await page.reload();
 
     const resultStrip = page.getByLabel("Simulation results");
     await expect(resultStrip, definition.id).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByLabel("TYPE", { exact: true }), definition.id).toHaveValue(
+    await expect(page.getByLabel("TYPE", { exact: true }), definition.id).toHaveText(
       fixture.form.combatStyle
     );
     await expect(page.getByLabel("TARGET", { exact: true }), definition.id).toHaveValue(
@@ -2356,8 +3046,8 @@ test("matches browser-rendered dense numeric snapshots", async ({ page }) => {
   const defaultMelee = await denseNumericSnapshot(table, /Giant lvl 28/);
   const defaultMeleeResults = await resultMetricSnapshot(page);
 
-  await page.getByLabel("TYPE", { exact: true }).selectOption("ranged");
-  await expect(page.getByLabel("TYPE", { exact: true })).toHaveValue("ranged");
+  await selectCombatType(page, "ranged");
+  await expect(page.getByLabel("TYPE", { exact: true })).toHaveText("ranged");
   await page.getByLabel("TARGET", { exact: true }).selectOption("greater_demon");
   await expect(page.getByLabel("TARGET", { exact: true })).toHaveValue("greater_demon");
   await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Compare" }).click();
@@ -2382,6 +3072,12 @@ test("matches browser-rendered dense numeric snapshots", async ({ page }) => {
       .locator("td")
       .nth(3)
   ).toHaveText("2.24");
+  await expect(
+    table
+      .getByRole("row", { name: /Dagannoth \(lvl 74\)/ })
+      .locator("td")
+      .nth(5)
+  ).toHaveText("326");
   const cannonRanged = await denseNumericSnapshot(table, /Dagannoth \(lvl 74\)/);
   const cannonRangedResults = await resultMetricSnapshot(page);
 
@@ -2440,7 +3136,7 @@ test("matches browser-rendered dense numeric snapshots", async ({ page }) => {
       hit: "80.7%",
       max: "10.0",
       dps: "2.24",
-      ttk: "32.3s",
+      ttk: "8.5s",
       killsPerHour: "326",
       xpPerHour: "37,421",
       gpPerKill: "65",
@@ -2492,8 +3188,8 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
   const meleeAlchRelevantResults = await resultMetricSnapshot(page);
   await expectActiveDenseRow(table, /Chaos Dwarf/);
 
-  await page.getByLabel("TYPE", { exact: true }).selectOption("ranged");
-  await expect(page.getByLabel("TYPE", { exact: true })).toHaveValue("ranged");
+  await selectCombatType(page, "ranged");
+  await expect(page.getByLabel("TYPE", { exact: true })).toHaveText("ranged");
   await page.getByLabel("TARGET", { exact: true }).selectOption("greater_demon");
   await expect(page.getByLabel("TARGET", { exact: true })).toHaveValue("greater_demon");
   await tabs.getByRole("tab", { name: "Compare" }).click();
@@ -2509,17 +3205,22 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
   await cannon.getByLabel("Mobs at spot").fill("6");
   await cannon.getByLabel("Respawn").fill("30");
   await tabs.getByRole("tab", { name: "Compare" }).click();
+  await expect(
+    table
+      .getByRole("row", { name: /Dagannoth \(lvl 74\)/ })
+      .locator("td")
+      .nth(5)
+  ).toHaveText("326");
   const rangedCannon = await denseNumericSnapshot(table, /Dagannoth \(lvl 74\)/);
   const rangedCannonResults = await resultMetricSnapshot(page);
   await expectActiveDenseRow(table, /Dagannoth \(lvl 74\)/);
   expect(rangedCannon.netGpPerHour).toMatch(/^-/);
 
-  await page.getByLabel("TYPE", { exact: true }).selectOption("magic");
-  await expect(page.getByLabel("TYPE", { exact: true })).toHaveValue("magic");
-  await tabs.getByRole("tab", { name: "Magic" }).click();
+  await selectCombatType(page, "magic");
+  await expect(page.getByLabel("TYPE", { exact: true })).toHaveText("magic");
+  await selectCombatType(page, "magic");
   const magicPane = page.getByLabel("Equipment loadout");
-  await magicPane.getByLabel("Spell search").fill("fire wave");
-  await magicPane.getByLabel("Spell", { exact: true }).selectOption("fire_wave");
+  await chooseSearchableOption(magicPane, "Spell", "Fire Wave");
   await page.getByLabel("TARGET", { exact: true }).selectOption("blue_dragon");
   await tabs.getByRole("tab", { name: "Compare" }).click();
   await expect(
@@ -2535,11 +3236,10 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
   await page.getByLabel("TARGET", { exact: true }).selectOption("green_dragon");
   const setupContext = page.getByLabel("Setup context");
   await setupContext.getByRole("button", { name: "Create custom setup" }).click();
-  await tabs.getByRole("tab", { name: "Melee" }).click();
-  await expect(page.getByLabel("TYPE", { exact: true })).toHaveValue("melee");
+  await selectCombatType(page, "melee");
+  await expect(page.getByLabel("TYPE", { exact: true })).toHaveText("melee");
   const meleePane = page.getByLabel("Equipment loadout");
-  await meleePane.getByLabel("Weapon search").fill("dragon halberd");
-  await meleePane.getByLabel("Weapon", { exact: true }).selectOption("dragon_halberd");
+  await chooseSearchableOption(meleePane, "Weapon", "Dragon halberd");
   await tabs.getByRole("tab", { name: "Loot" }).click();
   const loot = page.locator('section[aria-label="Current monster loot"]');
   await loot.getByLabel("High alch").selectOption("disabled");
@@ -2648,7 +3348,7 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
       hit: "80.7%",
       max: "10.0",
       dps: "2.24",
-      ttk: "32.3s",
+      ttk: "8.5s",
       killsPerHour: "326",
       xpPerHour: "37,421",
       gpPerKill: "65",
@@ -2712,7 +3412,7 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
 
 test("enables cannon for the selected monster and shows cannon rates", async ({ page }) => {
   await page.goto("/");
-  await page.getByLabel("TYPE", { exact: true }).selectOption("ranged");
+  await selectCombatType(page, "ranged");
   await page.getByLabel("TARGET", { exact: true }).selectOption("dagannoth");
   await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Cannon" }).click();
 
@@ -2768,7 +3468,7 @@ test("enables cannon for the selected monster and shows cannon rates", async ({ 
   await page.reload();
   await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Cannon" }).click();
   const reloadedCannon = page.locator('section[aria-label="Cannon"]');
-  await expect(page.getByLabel("Monster", { exact: true })).toHaveValue("dagannoth");
+  await expectSearchableSelection(page.getByLabel("Setup context"), "Monster", "dagannoth");
   await expect(reloadedCannon.getByLabel("Set up cannon")).toBeChecked();
   await expect(reloadedCannon.getByLabel("Mobs at spot")).toHaveValue("6");
   await expect(reloadedCannon.getByLabel("Respawn")).toHaveValue("30");
@@ -2857,7 +3557,7 @@ test("updates manual food controls and recoil ring count", async ({ page }) => {
 
   const trip = page.locator('section[aria-label="Trip assumptions"]');
   const summary = page.locator('[aria-label="Trip summary"]');
-  await expect(page.getByLabel("Monster", { exact: true })).toHaveValue("firegiant");
+  await expectSearchableSelection(page.getByLabel("Setup context"), "Monster", "firegiant");
   await expect(trip.getByLabel("Recoil rings")).toBeEnabled();
 
   await trip.getByLabel("Food mode").selectOption("manual");
@@ -2903,7 +3603,7 @@ test("updates trip food, banking and inventory reserve controls across styles", 
   const trip = page.locator('section[aria-label="Trip assumptions"]');
   const summary = page.locator('[aria-label="Trip summary"]');
 
-  await expect(trip.getByLabel("Food", { exact: true })).toHaveValue("lobster");
+  await expectSearchableSelection(trip, "Food", "lobster");
   await expect(trip.getByLabel("Bank time")).toHaveValue("auto");
   await expect(trip.getByLabel("Bank sec")).toBeDisabled();
   await expect(trip.getByLabel("Recover ammo")).toBeDisabled();
@@ -2915,7 +3615,7 @@ test("updates trip food, banking and inventory reserve controls across styles", 
   await expect(summary).toContainText("Loot capacity");
   await expect(summary).toContainText("Effective K/hr");
 
-  await trip.getByLabel("Food", { exact: true }).selectOption("swordfish");
+  await chooseSearchableOption(trip, "Food", "Swordfish");
   await trip.getByLabel("Bank time").selectOption("manual");
   await expect(trip.getByLabel("Bank sec")).toBeEnabled();
   await trip.getByLabel("Bank sec").fill("120");
@@ -2926,20 +3626,20 @@ test("updates trip food, banking and inventory reserve controls across styles", 
   await expect(summary).toContainText("Teleport");
   await expect(summary).toContainText("Off");
 
-  await tabs.getByRole("tab", { name: "Ranged" }).click();
+  await selectCombatType(page, "ranged");
   await tabs.getByRole("tab", { name: "Trip" }).click();
   await expect(trip.getByLabel("Recover ammo")).toBeEnabled();
   await trip.getByLabel("Recover ammo").uncheck();
   await expect(summary).toContainText("Ammo recovery");
 
-  await tabs.getByRole("tab", { name: "Melee" }).click();
+  await selectCombatType(page, "melee");
   await page.getByLabel("Boost", { exact: true }).selectOption("dba_spec");
   await tabs.getByRole("tab", { name: "Trip" }).click();
   await expect(trip.getByLabel("DBA restore")).toBeEnabled();
   await trip.getByLabel("DBA restore").uncheck();
   await expect(summary).toContainText("DBA restore");
 
-  await tabs.getByRole("tab", { name: "Magic" }).click();
+  await selectCombatType(page, "magic");
   await tabs.getByRole("tab", { name: "Trip" }).click();
   await expect(trip.getByLabel("Rune slots")).toBeEnabled();
   await trip.getByLabel("Rune slots").fill("4");
@@ -2960,22 +3660,22 @@ test("updates trip food, banking and inventory reserve controls across styles", 
   await page.reload();
   await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Trip" }).click();
   const reloadedTrip = page.locator('section[aria-label="Trip assumptions"]');
-  await expect(reloadedTrip.getByLabel("Food", { exact: true })).toHaveValue("swordfish");
+  await expectSearchableSelection(reloadedTrip, "Food", "swordfish");
   await expect(reloadedTrip.getByLabel("Bank time")).toHaveValue("manual");
   await expect(reloadedTrip.getByLabel("Bank sec")).toHaveValue("120");
   await expect(reloadedTrip.getByLabel("Teleport item")).not.toBeChecked();
 
-  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Ranged" }).click();
+  await selectCombatType(page, "ranged");
   await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Trip" }).click();
   await expect(reloadedTrip.getByLabel("Recover ammo")).toBeEnabled();
   await expect(reloadedTrip.getByLabel("Recover ammo")).not.toBeChecked();
 
-  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Melee" }).click();
+  await selectCombatType(page, "melee");
   await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Trip" }).click();
   await expect(reloadedTrip.getByLabel("DBA restore")).toBeEnabled();
   await expect(reloadedTrip.getByLabel("DBA restore")).not.toBeChecked();
 
-  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Magic" }).click();
+  await selectCombatType(page, "magic");
   await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Trip" }).click();
   await expect(reloadedTrip.getByLabel("Rune slots")).toBeEnabled();
   await expect(reloadedTrip.getByLabel("Rune slots")).toHaveValue("4");
@@ -2985,7 +3685,7 @@ test("updates trip potion carry controls and grouped potion summary", async ({ p
   test.setTimeout(60_000);
   await page.goto("/");
   const tabs = page.getByLabel("Workbench tabs");
-  await tabs.getByRole("tab", { name: "Melee" }).click();
+  await selectCombatType(page, "melee");
   await page.getByLabel("Boost", { exact: true }).selectOption("super_att");
   await tabs.getByRole("tab", { name: "Trip" }).click();
 
@@ -2995,20 +3695,20 @@ test("updates trip potion carry controls and grouped potion summary", async ({ p
   const applyRecommendation = recommendation.getByRole("button", { name: "Apply recommendation" });
 
   await expect(trip.getByLabel("Single-dose")).not.toBeChecked();
-  await expect(trip.getByLabel("Potion vials")).toBeEnabled();
-  await expect(trip.getByLabel("Potion doses")).toBeDisabled();
+  await expect(trip.getByLabel("Combat potion vials / type")).toBeEnabled();
+  await expect(trip.getByLabel("Combat potion doses / type")).toBeDisabled();
   await expect(recommendation).toContainText("Potion recommendation");
   await expect(recommendation).toContainText("Recommended carry");
   await expect(recommendation).toContainText("Matches recommendation");
   await expect(applyRecommendation).toBeDisabled();
-  await trip.getByLabel("Potion vials").fill("0");
+  await trip.getByLabel("Combat potion vials / type").fill("0");
   await expect(recommendation).toContainText("Below recommendation");
   await expect(applyRecommendation).toBeEnabled();
   await applyRecommendation.click();
-  await expect(trip.getByLabel("Potion vials")).toHaveValue("1");
+  await expect(trip.getByLabel("Combat potion vials / type")).toHaveValue("1");
   await expect(recommendation).toContainText("Matches recommendation");
   await expect(applyRecommendation).toBeDisabled();
-  await trip.getByLabel("Potion vials").fill("2");
+  await trip.getByLabel("Combat potion vials / type").fill("2");
   await expect(recommendation).toContainText("Above recommendation");
 
   await expect(summary).toContainText("Potions");
@@ -3018,15 +3718,15 @@ test("updates trip potion carry controls and grouped potion summary", async ({ p
   await expect(summary).toContainText("Potion parts");
 
   await trip.getByLabel("Single-dose").check();
-  await expect(trip.getByLabel("Potion vials")).toBeDisabled();
-  await expect(trip.getByLabel("Potion doses")).toBeEnabled();
+  await expect(trip.getByLabel("Combat potion vials / type")).toBeDisabled();
+  await expect(trip.getByLabel("Combat potion doses / type")).toBeEnabled();
   await expect(recommendation).toContainText("Above recommendation");
   await expect(applyRecommendation).toBeEnabled();
   await applyRecommendation.click();
-  await expect(trip.getByLabel("Potion doses")).toHaveValue("1");
+  await expect(trip.getByLabel("Combat potion doses / type")).toHaveValue("1");
   await expect(recommendation).toContainText("Matches recommendation");
   await expect(applyRecommendation).toBeDisabled();
-  await trip.getByLabel("Potion doses").fill("6");
+  await trip.getByLabel("Combat potion doses / type").fill("6");
   await expect(summary).toContainText("6 doses/type");
   await page.waitForFunction(() => {
     const saved = window.localStorage.getItem("index-sim:rewrite-setup") ?? "";
@@ -3044,15 +3744,15 @@ test("updates trip potion carry controls and grouped potion summary", async ({ p
   await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Trip" }).click();
   const reloadedTrip = page.locator('section[aria-label="Trip assumptions"]');
   await expect(reloadedTrip.getByLabel("Single-dose")).toBeChecked();
-  await expect(reloadedTrip.getByLabel("Potion vials")).toBeDisabled();
-  await expect(reloadedTrip.getByLabel("Potion doses")).toHaveValue("6");
+  await expect(reloadedTrip.getByLabel("Combat potion vials / type")).toBeDisabled();
+  await expect(reloadedTrip.getByLabel("Combat potion doses / type")).toHaveValue("6");
   await expect(page.locator('[aria-label="Potions trip summary"]')).toContainText("6 doses/type");
 });
 
 test("shows inactive trip potion recommendation states", async ({ page }) => {
   await page.goto("/");
   const tabs = page.getByLabel("Workbench tabs");
-  await tabs.getByRole("tab", { name: "Melee" }).click();
+  await selectCombatType(page, "melee");
   await page.getByLabel("Boost", { exact: true }).selectOption("none");
   await tabs.getByRole("tab", { name: "Trip" }).click();
 
@@ -3064,7 +3764,7 @@ test("shows inactive trip potion recommendation states", async ({ page }) => {
   await expect(recommendation).toContainText("Select a general combat boost");
   await expect(applyRecommendation).toBeDisabled();
 
-  await tabs.getByRole("tab", { name: "Melee" }).click();
+  await selectCombatType(page, "melee");
   await page.getByLabel("Boost", { exact: true }).selectOption("super_att");
   await page.getByLabel("Sustained").uncheck();
   await tabs.getByRole("tab", { name: "Trip" }).click();
@@ -3358,7 +4058,7 @@ test("matches browser-rendered numeric snapshots for loot action and trip overri
   await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Trip" }).click();
 
   const trip = page.locator('section[aria-label="Trip assumptions"]');
-  await expect(page.getByLabel("Monster", { exact: true })).toHaveValue("firegiant");
+  await expectSearchableSelection(page.getByLabel("Setup context"), "Monster", "firegiant");
   await trip.getByLabel("Food mode").selectOption("manual");
   await trip.getByLabel("Food count").fill("4");
   await trip.getByLabel("F/KL override").selectOption("on");
@@ -3685,7 +4385,7 @@ test("analyzes and manages browser-local price history in Economy", async ({ pag
   await expect(page.getByRole("table", { name: "Price movers" })).toContainText("Lobster");
   await expect(page.getByRole("table", { name: "Price movers" })).toContainText("Big bones");
   await expect(page.getByRole("img", { name: /Big bones price trend/ })).toBeVisible();
-  await page.getByLabel("Trend item").selectOption("big_bones");
+  await chooseSearchableOption(page, "Trend item", "Big bones");
   const itemTrend = page.getByLabel("Item price trend");
   await expect(itemTrend).toContainText("Big bones");
   await expect(itemTrend).toContainText("Latest350");
@@ -3727,7 +4427,7 @@ test("analyzes and manages browser-local price history in Economy", async ({ pag
   ).not.toBe(null);
   await page.getByRole("button", { name: "Confirm clear local history" }).click();
   await expect(page.getByLabel("Price history summary")).toContainText("Snapshots 0");
-  await expect(page.getByLabel("Trend item")).toBeDisabled();
+  await expect(searchableCombobox(page, "Trend item")).toBeDisabled();
   await expect(page.getByLabel("Item price trend")).toContainText("No price points");
   expect(await page.evaluate(() => window.localStorage.getItem("index-sim:price-history"))).toBe(
     null
@@ -3760,7 +4460,7 @@ test("keeps shared scheduled price history read-only beside local comparisons", 
   await expect(summary).toContainText("Snapshots 3");
   await expect(summary).toContainText("Shared 3");
   await expect(summary).toContainText("Local 0");
-  await page.getByLabel("Trend item").selectOption("big_bones");
+  await chooseSearchableOption(page, "Trend item", "Big bones");
   await expect(page.getByRole("img", { name: "Big bones price trend", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Clear local history" })).toBeDisabled();
   expect(await page.evaluate(() => window.localStorage.getItem("index-sim:price-history"))).toBe(
@@ -3777,8 +4477,66 @@ test("keeps shared scheduled price history read-only beside local comparisons", 
   await expect(summary).toContainText("Snapshots 3");
   await expect(summary).toContainText("Shared 3");
   await expect(summary).toContainText("Local 0");
-  await expect(page.getByLabel("Trend item")).toBeEnabled();
+  await expect(searchableCombobox(page, "Trend item")).toBeEnabled();
   expect(await page.evaluate(() => window.localStorage.getItem("index-sim:price-history"))).toBe(
     null
   );
+});
+
+test("runs, invalidates and cancels modeled Risk analysis", async ({ page }) => {
+  await page.goto("/");
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Risk" }).click();
+
+  const risk = page.locator('section[aria-label="Risk"]');
+  await expect(risk).toBeVisible();
+  await expect(risk).toContainText("Run the analysis");
+  await risk.getByLabel("Target kills").fill("10");
+  await risk.getByLabel("Horizon min").fill("10");
+  await risk.getByLabel("GP target").fill("0");
+  await searchableCombobox(risk, "Target drop").click();
+  await risk
+    .getByRole("listbox", { name: "Target drop options" })
+    .getByRole("option")
+    .nth(1)
+    .click();
+  await risk.getByRole("button", { name: "Run analysis" }).click();
+
+  await expect(risk.getByText("Ready", { exact: true })).toBeVisible({ timeout: 30_000 });
+  const results = page.getByLabel("Modeled risk results");
+  await expect(results).toContainText("P10 / median / P90");
+  for (const label of [
+    "Kill time",
+    "Food runs out",
+    "Kills / trip",
+    "Trip cycle",
+    "10m net GP",
+    "Reach GP target",
+    "Target drop"
+  ]) {
+    await expect(results.locator(".metric").filter({ hasText: label })).toBeVisible();
+  }
+  await expect(results.getByLabel("Risk model coverage")).toContainText("Loot occurrence");
+  await expect(results.getByLabel("Risk model coverage")).toContainText("Source-backed");
+  await expect(page.locator('[aria-label="Trip summary"]')).toContainText("Source-backed");
+  await expect(results.getByLabel("Risk warnings")).toContainText("Monte Carlo probabilities");
+
+  await chooseSearchableOption(page.getByLabel("Setup context"), "Monster", "Black Dragon");
+  await expect(page.locator('[aria-label="Trip summary"]')).toContainText("Partial model");
+  await risk.getByRole("button", { name: "Run analysis" }).click();
+  await expect(risk.getByText("Ready", { exact: true })).toBeVisible({ timeout: 30_000 });
+  await expect(results.getByLabel("Risk model coverage")).toContainText("Partial model");
+  await expect(results.getByLabel("Risk model coverage")).toContainText("mean-only");
+  await expect(results.getByLabel("Risk warnings")).toContainText(
+    "Contextual or partial incoming attacks"
+  );
+
+  await risk.getByLabel("Target kills").fill("11");
+  await expect(risk.getByText("Stale", { exact: true })).toBeVisible();
+  await expect(results).toContainText("Results are stale");
+
+  await risk.getByLabel("Horizon min").fill("1440");
+  await risk.getByRole("button", { name: "Run analysis" }).click();
+  await expect(risk.getByRole("button", { name: "Cancel" })).toBeEnabled();
+  await risk.getByRole("button", { name: "Cancel" }).click();
+  await expect(risk.getByText("Cancelled", { exact: true })).toBeVisible();
 });

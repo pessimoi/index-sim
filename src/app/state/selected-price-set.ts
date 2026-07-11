@@ -39,7 +39,8 @@ export type LoadSelectedPriceSetResult =
   | {
       status: "invalid";
       value: null;
-      reason: "body_too_large" | "invalid_json" | "invalid_envelope" | "invalid_data";
+      reason:
+        "body_too_large" | "duplicate_keys" | "invalid_json" | "invalid_envelope" | "invalid_data";
     }
   | { status: "unavailable"; value: null; reason: "read_failed" };
 
@@ -85,6 +86,7 @@ export function loadSelectedPriceSet(storage: KeyValueStorage): LoadSelectedPric
       value: null,
       reason:
         loaded.reason === "invalid_json" ||
+        loaded.reason === "duplicate_keys" ||
         loaded.reason === "invalid_envelope" ||
         loaded.reason === "invalid_data"
           ? loaded.reason

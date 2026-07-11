@@ -227,6 +227,29 @@ describe("validated game data snapshots", () => {
     expect(generatedSnapshot).not.toHaveProperty("historicalSnapshots");
   });
 
+  it("rejects mismatched record ids and unknown top-level snapshot payloads", () => {
+    const generatedSnapshot = readJsonFile("src/data/generated/game-data.json") as Record<
+      string,
+      unknown
+    >;
+    const mismatchedItem = structuredClone(generatedSnapshot) as {
+      items: Record<string, { id: string }>;
+    };
+    mismatchedItem.items.lobster.id = "not_lobster";
+    expect(GameDataSnapshotSchema.safeParse(mismatchedItem).success).toBe(false);
+
+    const mismatchedMonster = structuredClone(generatedSnapshot) as {
+      monsters: Record<string, { id: string }>;
+    };
+    mismatchedMonster.monsters.giant.id = "not_giant";
+    expect(GameDataSnapshotSchema.safeParse(mismatchedMonster).success).toBe(false);
+
+    expect(
+      GameDataSnapshotSchema.safeParse({ ...generatedSnapshot, rawUpstream: { private: true } })
+        .success
+    ).toBe(false);
+  });
+
   it("rejects duplicate legacy monster ids before object conversion can hide them", () => {
     const runtime = createLegacyRuntime();
     const duplicatedMonster = { ...runtime.GameData.MONSTERS[0], id: "chicken" };

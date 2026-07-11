@@ -8,6 +8,9 @@ import {
   type DropEntry,
   type EntityId,
   type GameDataSnapshot,
+  type IncomingAttackFormulaId,
+  type IncomingAttackProfile,
+  type IncomingAttackType,
   type MonsterDefinition,
   type PriceSet,
   type SimulationContext,
@@ -184,6 +187,34 @@ export interface IncomingDamageResult {
   protected: boolean;
   safespot: boolean;
   safespotAuto: boolean;
+  descriptor: IncomingDamageDescriptor;
+}
+
+export type IncomingDamageCoverage = "source-backed" | "partial" | "compatibility-fallback";
+
+export interface NormalizedIncomingAttackProfile {
+  id: string;
+  attackType: IncomingAttackType;
+  attackSpeedTicks: number;
+  maxHit: number;
+  formulaId: IncomingAttackFormulaId | "compatibility-fallback-v1";
+  selectionProbability: number;
+  hitChance: number;
+  protected: boolean;
+  opportunitiesPerKill: number;
+  expectedDamagePerKill: number;
+}
+
+export interface IncomingDamageDescriptor {
+  coverage: IncomingDamageCoverage;
+  sourceLabel: "Source-backed" | "Partial model" | "Compatibility fallback";
+  meanOnly: boolean;
+  safespot: boolean;
+  profiles: NormalizedIncomingAttackProfile[];
+  attackDamagePerKill: number;
+  overlayDamagePerKill: number;
+  regenPerKill: number;
+  netDamagePerKill: number;
 }
 
 export interface TripComputationContext {
@@ -292,6 +323,7 @@ export interface TripLootSupplyResult {
   effectiveGpPerHour: number;
   effectiveNetGpPerHour: number;
   effectiveKph: number;
+  ttkSec: number;
   cycleSec: number;
   killsPerHour: number;
   prayerPerKill: number;
@@ -1623,6 +1655,260 @@ export function prayerPerKillForCycle(
   return prayerPointsPerSec * cycleSec;
 }
 
+const MAX_INCOMING_PROFILES = 32;
+const MAX_INCOMING_NUMERIC = 1_000_000;
+
+function finiteBounded(value: number, minimum: number, maximum: number): boolean {
+  return Number.isFinite(value) && value >= minimum && value <= maximum;
+}
+
+function protectionMatches(
+  protect: TripPolicy["protect"],
+  attackType: IncomingAttackType
+): boolean {
+  return (
+    (protect === "melee" && attackType === "melee") ||
+    (protect === "missiles" && attackType === "ranged") ||
+    (protect === "magic" && attackType === "magic")
+  );
+}
+
+function playerDefenceBonus(
+  attackType: IncomingAttackType,
+  totals: ReturnType<typeof sumEquipmentBonuses>
+): number {
+  return attackType === "magic"
+    ? totals.magDef
+    : attackType === "ranged"
+      ? totals.rngDef
+      : totals.slashDef;
+}
+
+function verifyResolvedMaxHit(profile: IncomingAttackProfile): void {
+  const inputs = profile.formulaInputs;
+  let resolved: number;
+  if (profile.formulaId === "standard-melee-v1" || profile.formulaId === "standard-ranged-v1") {
+    if (inputs.kind !== "standard") {
+      throw new Error(`Invalid exact incoming attack formula inputs for ${profile.id}.`);
+    }
+    resolved = Math.floor(((inputs.level + 9) * (inputs.bonus + 64) + 320) / 640);
+  } else {
+    if (inputs.kind !== "source-value") {
+      throw new Error(`Invalid exact incoming attack source value for ${profile.id}.`);
+    }
+    resolved = inputs.value;
+  }
+  if (resolved !== profile.maxHit) {
+    throw new Error(`Incoming attack max hit does not match its source formula for ${profile.id}.`);
+  }
+}
+
+function validateTypedIncomingProfiles(monster: MonsterDefinition): IncomingAttackProfile[] | null {
+  const profiles = monster.incomingAttacks;
+  const coverage = monster.incomingAttackCoverage;
+  if (profiles === undefined && coverage === undefined) return null;
+  if (!profiles?.length || profiles.length > MAX_INCOMING_PROFILES || !coverage) {
+    throw new Error(`Invalid generated incoming attack contract for ${monster.id}.`);
+  }
+  const ids = new Set<string>();
+  for (const profile of profiles) {
+    if (
+      ids.has(profile.id) ||
+      profile.coverage !== coverage ||
+      !Number.isSafeInteger(profile.attackSpeedTicks) ||
+      !finiteBounded(profile.attackSpeedTicks, 1, MAX_INCOMING_NUMERIC) ||
+      !Number.isSafeInteger(profile.maxHit) ||
+      !finiteBounded(profile.maxHit, 0, MAX_INCOMING_NUMERIC)
+    ) {
+      throw new Error(`Invalid generated incoming attack profile for ${monster.id}.`);
+    }
+    ids.add(profile.id);
+    verifyResolvedMaxHit(profile);
+  }
+  if (coverage === "exact") {
+    if (
+      profiles.some(
+        (profile) =>
+          profile.accuracy.kind === "mean-only" || profile.selection.kind === "contextual"
+      )
+    ) {
+      throw new Error(`Exact incoming attack coverage is incomplete for ${monster.id}.`);
+    }
+    const weighted = profiles.some((profile) => profile.selection.kind === "weighted");
+    if (
+      profiles.length > 1 &&
+      (!weighted || profiles.some((profile) => profile.selection.kind !== "weighted"))
+    ) {
+      throw new Error(`Exact multi-profile selection is ambiguous for ${monster.id}.`);
+    }
+    if (
+      profiles.length > 1 &&
+      profiles.some((profile) => profile.attackSpeedTicks !== profiles[0]!.attackSpeedTicks)
+    ) {
+      throw new Error(`Exact weighted attack speeds conflict for ${monster.id}.`);
+    }
+  }
+  return profiles;
+}
+
+function compatibilityProfile(monster: MonsterDefinition): {
+  profile: Omit<
+    NormalizedIncomingAttackProfile,
+    "hitChance" | "protected" | "opportunitiesPerKill" | "expectedDamagePerKill"
+  >;
+  attackLevel: number;
+  attackBonus: number;
+} {
+  const record = monster as unknown as Record<string, unknown>;
+  const rawType = record.atkType;
+  const attackType: IncomingAttackType =
+    rawType === "magic" || rawType === "ranged" ? rawType : "melee";
+  const strength = monster.strength ?? monster.attack ?? 1;
+  const maxHit =
+    asNumeric(record.maxHit) ??
+    Math.floor(((strength + 9) * ((monster.strBonus ?? 0) + 64) + 320) / 640);
+  return {
+    profile: {
+      id: "compatibility-fallback",
+      attackType,
+      attackSpeedTicks: monster.attackSpeed || 4,
+      maxHit,
+      formulaId: "compatibility-fallback-v1",
+      selectionProbability: 1
+    },
+    attackLevel: monster.attack ?? 1,
+    attackBonus: monster.attBonus ?? 0
+  };
+}
+
+export function createIncomingDamageDescriptor(
+  request: SimulationRequest,
+  context: SimulationContext,
+  trip: TripPolicy,
+  tripContext: Pick<
+    TripComputationContext,
+    "monster" | "combatStyle" | "ttkSec" | "cycleSec" | "prayerDef"
+  >
+): IncomingDamageDescriptor {
+  const monster = tripContext.monster;
+  const monsterRecord = monster as unknown as Record<string, unknown>;
+  const typedProfiles = validateTypedIncomingProfiles(monster);
+  const coverage: IncomingDamageCoverage =
+    monster.incomingAttackCoverage === "exact"
+      ? "source-backed"
+      : monster.incomingAttackCoverage === "partial" ||
+          monster.incomingAttackCoverage === "fallback"
+        ? "partial"
+        : "compatibility-fallback";
+  const sourceLabel: IncomingDamageDescriptor["sourceLabel"] =
+    coverage === "source-backed"
+      ? "Source-backed"
+      : coverage === "partial"
+        ? "Partial model"
+        : "Compatibility fallback";
+  const weapon = context.gameData.weapons[request.loadout.weaponId];
+  const safespotAuto =
+    tripContext.combatStyle === "ranged" ||
+    tripContext.combatStyle === "magic" ||
+    weapon?.wclass === "halberd";
+  const safespot = trip.safespot != null ? !!trip.safespot : safespotAuto;
+  const regenPerKill = Math.max(0, tripContext.cycleSec || 0) / 60;
+  const totals = sumEquipmentBonuses(request.loadout, context.gameData);
+  const playerDefLevel = request.levels.defence || 1;
+  const protect = trip.protect || "none";
+
+  const rawProfiles: Array<{
+    profile: IncomingAttackProfile | ReturnType<typeof compatibilityProfile>["profile"];
+    attackLevel: number;
+    attackBonus: number;
+    selectionWeight: number;
+  }> = [];
+  if (coverage === "source-backed") {
+    for (const profile of typedProfiles!) {
+      const selectionWeight = profile.selection.kind === "weighted" ? profile.selection.weight : 1;
+      if (!finiteBounded(selectionWeight, Number.MIN_VALUE, MAX_INCOMING_NUMERIC)) {
+        throw new Error(`Invalid generated incoming attack weight for ${monster.id}.`);
+      }
+      if (profile.accuracy.kind === "mean-only") {
+        throw new Error(`Exact incoming attack accuracy is unresolved for ${monster.id}.`);
+      }
+      rawProfiles.push({
+        profile,
+        attackLevel: profile.accuracy.kind === "standard" ? profile.accuracy.level : 0,
+        attackBonus: profile.accuracy.kind === "standard" ? profile.accuracy.bonus : 0,
+        selectionWeight
+      });
+    }
+  } else {
+    const compatibility = compatibilityProfile(monster);
+    rawProfiles.push({ ...compatibility, selectionWeight: 1 });
+  }
+  const totalWeight = rawProfiles.reduce((sum, entry) => sum + entry.selectionWeight, 0);
+  if (!finiteBounded(totalWeight, Number.MIN_VALUE, MAX_INCOMING_NUMERIC)) {
+    throw new Error(`Invalid incoming attack selection total for ${monster.id}.`);
+  }
+
+  const profiles = rawProfiles.map((entry): NormalizedIncomingAttackProfile => {
+    const profile = entry.profile;
+    const selectionProbability = entry.selectionWeight / totalWeight;
+    const protectedByPrayer = protectionMatches(protect, profile.attackType);
+    const defenceBonus = playerDefenceBonus(profile.attackType, totals) || 0;
+    const defenceRoll =
+      Math.floor(playerDefLevel * tripContext.prayerDef + 9) * (defenceBonus + 64);
+    const alwaysHits = "accuracy" in profile && profile.accuracy.kind === "always";
+    const attackRoll = (entry.attackLevel + 9) * (entry.attackBonus + 64);
+    const profileHitChance =
+      safespot || protectedByPrayer ? 0 : alwaysHits ? 1 : hitChance(attackRoll, defenceRoll);
+    const opportunitiesPerKill = safespot
+      ? 0
+      : Math.max(0, tripContext.ttkSec || 0) / (profile.attackSpeedTicks * TICK_SECONDS);
+    return {
+      id: profile.id,
+      attackType: profile.attackType,
+      attackSpeedTicks: profile.attackSpeedTicks,
+      maxHit: profile.maxHit,
+      formulaId: profile.formulaId,
+      selectionProbability,
+      hitChance: profileHitChance,
+      protected: protectedByPrayer,
+      opportunitiesPerKill,
+      expectedDamagePerKill:
+        opportunitiesPerKill * selectionProbability * profileHitChance * (profile.maxHit / 2)
+    };
+  });
+  const attackDamagePerKill = profiles.reduce(
+    (sum, profile) => sum + profile.expectedDamagePerKill,
+    0
+  );
+  let dragonfire = 0;
+  if (!safespot && monsterRecord.dragonfire) {
+    const hasAntiShield = request.loadout.gear.shield === "anti_dragon";
+    const antifire = !!trip.antifire;
+    if (hasAntiShield && antifire) dragonfire = 0;
+    else if (hasAntiShield) dragonfire = 3;
+    else if (antifire) dragonfire = 4;
+    else dragonfire = 20;
+  }
+  let poison = 0;
+  if (!safespot && monsterRecord.poisons) {
+    const onAntipoison = !!monsterRecord.antipoisonFromDrops || !!trip.antipoison;
+    poison = onAntipoison ? 0 : (asNumeric(monsterRecord.poisonMax) ?? 5);
+  }
+  const overlayDamagePerKill = dragonfire + poison;
+  const hpPerKill = attackDamagePerKill + overlayDamagePerKill;
+  return {
+    coverage,
+    sourceLabel,
+    meanOnly: coverage !== "source-backed",
+    safespot,
+    profiles,
+    attackDamagePerKill,
+    overlayDamagePerKill,
+    regenPerKill,
+    netDamagePerKill: Math.max(0, hpPerKill - regenPerKill)
+  };
+}
+
 export function computeIncomingDamage(
   request: SimulationRequest,
   context: SimulationContext,
@@ -1632,82 +1918,46 @@ export function computeIncomingDamage(
     "monster" | "combatStyle" | "ttkSec" | "cycleSec" | "prayerDef"
   >
 ): IncomingDamageResult {
-  const monster = tripContext.monster;
-  const monsterRecord = monster as unknown as Record<string, unknown>;
-  const atkType = typeof monsterRecord.atkType === "string" ? monsterRecord.atkType : "melee";
-  const monsterStrength = monster.strength ?? monster.attack ?? 1;
-  const monMax =
-    asNumeric(monsterRecord.maxHit) ??
-    Math.floor(((monsterStrength + 9) * ((monster.strBonus ?? 0) + 64) + 320) / 640);
-  const monsterAttackBonus = monster.attBonus ?? 0;
-  const monsterAttackRoll = ((monster.attack ?? 1) + 9) * (monsterAttackBonus + 64);
-  const weapon = context.gameData.weapons[request.loadout.weaponId];
-  const safespotAuto =
-    tripContext.combatStyle === "ranged" ||
-    tripContext.combatStyle === "magic" ||
-    weapon?.wclass === "halberd";
-  const safespot = trip.safespot != null ? !!trip.safespot : safespotAuto;
-  const regenPerKill = (tripContext.cycleSec || 0) / 60;
-
-  if (safespot) {
-    return {
-      hpPerKill: 0,
-      netHpPerKill: 0,
-      regenPerKill,
-      monMax,
-      hitChance: 0,
-      dragonfire: 0,
-      protected: false,
-      safespot: true,
-      safespotAuto
-    };
-  }
-
-  const totals = sumEquipmentBonuses(request.loadout, context.gameData);
-  const defKey = atkType === "magic" ? "magDef" : atkType === "ranged" ? "rngDef" : "slashDef";
-  const playerDefBonus = totals[defKey as keyof typeof totals] || 0;
-  const defLevel = request.levels.defence || 1;
-  const playerDefRoll = Math.floor(defLevel * tripContext.prayerDef + 9) * (playerDefBonus + 64);
-  const protect = trip.protect || "none";
-  const protectedByPrayer =
-    (protect === "melee" && atkType === "melee") ||
-    (protect === "missiles" && atkType === "ranged") ||
-    (protect === "magic" && atkType === "magic");
-  let monsterHitChance = hitChance(monsterAttackRoll, playerDefRoll);
-  if (protectedByPrayer) monsterHitChance = 0;
-  const attackInterval = (monster.attackSpeed || 4) * TICK_SECONDS;
-  const attacks = (tripContext.ttkSec || 0) / attackInterval;
-  let hpPerKill = attacks * monsterHitChance * (monMax / 2);
-  let dragonfire = 0;
-
-  if (monsterRecord.dragonfire) {
-    const hasAntiShield = request.loadout.gear.shield === "anti_dragon";
-    const antifire = !!trip.antifire;
-    if (hasAntiShield && antifire) dragonfire = 0;
-    else if (hasAntiShield) dragonfire = 3;
-    else if (antifire) dragonfire = 4;
-    else dragonfire = 20;
-    hpPerKill += dragonfire;
-  }
-
-  let poison = 0;
-  if (monsterRecord.poisons) {
-    const onAntipoison = !!monsterRecord.antipoisonFromDrops || !!trip.antipoison;
-    poison = onAntipoison ? 0 : (asNumeric(monsterRecord.poisonMax) ?? 5);
-    hpPerKill += poison;
-  }
-
+  const monsterRecord = tripContext.monster as unknown as Record<string, unknown>;
+  const descriptor = createIncomingDamageDescriptor(request, context, trip, tripContext);
+  const dragonfire = descriptor.safespot
+    ? 0
+    : monsterRecord.dragonfire
+      ? descriptor.overlayDamagePerKill -
+        (monsterRecord.poisons
+          ? descriptor.safespot || monsterRecord.antipoisonFromDrops || trip.antipoison
+            ? 0
+            : (asNumeric(monsterRecord.poisonMax) ?? 5)
+          : 0)
+      : 0;
+  const poison =
+    descriptor.safespot || !monsterRecord.poisons
+      ? 0
+      : monsterRecord.antipoisonFromDrops || trip.antipoison
+        ? 0
+        : (asNumeric(monsterRecord.poisonMax) ?? 5);
+  const hpPerKill = descriptor.attackDamagePerKill + descriptor.overlayDamagePerKill;
+  const selectionHitChance = descriptor.profiles.reduce(
+    (sum, profile) => sum + profile.selectionProbability * profile.hitChance,
+    0
+  );
   return {
     hpPerKill,
-    netHpPerKill: Math.max(0, hpPerKill - regenPerKill),
-    regenPerKill,
-    monMax,
-    hitChance: monsterHitChance,
+    netHpPerKill: descriptor.netDamagePerKill,
+    regenPerKill: descriptor.regenPerKill,
+    monMax: Math.max(0, ...descriptor.profiles.map((profile) => profile.maxHit)),
+    hitChance: selectionHitChance,
     dragonfire,
     poison,
-    protected: protectedByPrayer,
-    safespot: false,
-    safespotAuto
+    protected:
+      descriptor.profiles.length > 0 && descriptor.profiles.every((profile) => profile.protected),
+    safespot: descriptor.safespot,
+    safespotAuto:
+      trip.safespot == null &&
+      (tripContext.combatStyle === "ranged" ||
+        tripContext.combatStyle === "magic" ||
+        context.gameData.weapons[request.loadout.weaponId]?.wclass === "halberd"),
+    descriptor
   };
 }
 
@@ -1885,6 +2135,21 @@ export function computeTrip(
 
   const transientSlots = potionSlots + recoilSpares;
   const incoming = computeIncomingDamage(request, context, trip, tripContext);
+  if (incoming.descriptor.coverage === "partial") {
+    addWarningOnce(warnings, {
+      code: "incoming-attack-partial-model",
+      severity: "info",
+      message:
+        "Incoming damage uses the compatibility expected value because this source attack handler is contextual or only partially modeled."
+    });
+  } else if (incoming.descriptor.coverage === "compatibility-fallback") {
+    addWarningOnce(warnings, {
+      code: "incoming-attack-compatibility-fallback",
+      severity: "info",
+      message:
+        "Incoming damage uses the legacy compatibility model because this snapshot has no typed attack profile."
+    });
+  }
   const foodPerKill =
     trip.foodPerKillOverride != null
       ? Math.max(0, trip.foodPerKillOverride)
@@ -2494,6 +2759,7 @@ export function simulateTripLootSupply(
     effectiveNetGpPerHour:
       (gpPerHour * lootFraction - supply.supplyCostPerKill * killsPerHour) * efficiency,
     effectiveKph: tripResult.effectiveKph,
+    ttkSec,
     cycleSec,
     killsPerHour,
     prayerPerKill,

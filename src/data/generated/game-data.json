@@ -5345,6 +5345,36 @@
       "defStab": 12,
       "hp": 19,
       "id": "al_kharid_warrior",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 10,
+            "kind": "standard",
+            "level": 7
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 9,
+            "kind": "standard",
+            "level": 5
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 2,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 9,
       "loot": [
         {
@@ -5608,6 +5638,36 @@
       "defStab": 30,
       "hp": 50,
       "id": "baby_blue_dragon",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 40
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 40
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 5,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 48,
       "loot": [
         {
@@ -5649,6 +5709,36 @@
       "defStab": 0,
       "hp": 27,
       "id": "bandit",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 11,
+            "kind": "standard",
+            "level": 17
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 12,
+            "kind": "standard",
+            "level": 17
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 3,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 22,
       "loot": [
         {
@@ -5921,6 +6011,36 @@
       "defStab": 12,
       "hp": 14,
       "id": "barbarian",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 8,
+            "kind": "standard",
+            "level": 6
+          },
+          "attackSpeedTicks": 5,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 7,
+            "kind": "standard",
+            "level": 6
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 2,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/npc/scripts/barbarian.rs2:1#barbarian, scripts/npc/scripts/barbarian.rs2:4#barbarian_default_attack, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 7,
       "loot": [
         {
@@ -6208,6 +6328,36 @@
       "defStab": 0,
       "hp": 25,
       "id": "bear",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 15
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 16
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 3,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 19,
       "loot": [
         {
@@ -6273,6 +6423,36 @@
       "defStab": 0,
       "hp": 157,
       "id": "black_demon",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 145
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 148
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 16,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 172,
       "loot": [
         {
@@ -6582,6 +6762,37 @@
       "dragonfire": true,
       "hp": 190,
       "id": "black_dragon",
+      "incomingAttackCoverage": "partial",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 200
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "melee",
+          "coverage": "partial",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 200
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 21,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/npc/scripts/dragon.rs2:20#black_dragon, scripts/npc/scripts/dragon.rs2:42#dragon_ai_opplayer2, scripts/npc/scripts/dragon.rs2:67#dragon_melee, scripts/npc/scripts/dragon.rs2:99#dragon_fire, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:1#npc_magic_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "weighted",
+            "weight": 3
+          }
+        }
+      ],
       "level": 227,
       "loot": [
         {
@@ -6893,6 +7104,36 @@
       "defStab": 73,
       "hp": 42,
       "id": "black_knight",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 18,
+            "kind": "standard",
+            "level": 25
+          },
+          "attackSpeedTicks": 5,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 16,
+            "kind": "standard",
+            "level": 25
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 4,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 33,
       "loot": [
         {
@@ -7214,6 +7455,37 @@
       "dragonfire": true,
       "hp": 105,
       "id": "blue_dragon",
+      "incomingAttackCoverage": "partial",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 95
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "melee",
+          "coverage": "partial",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 95
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 10,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/npc/scripts/dragon.rs2:18#blue_dragon, scripts/npc/scripts/dragon.rs2:42#dragon_ai_opplayer2, scripts/npc/scripts/dragon.rs2:67#dragon_melee, scripts/npc/scripts/dragon.rs2:99#dragon_fire, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:1#npc_magic_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "weighted",
+            "weight": 3
+          }
+        }
+      ],
       "level": 111,
       "loot": [
         {
@@ -7525,6 +7797,64 @@
       "defStab": 0,
       "hp": 20,
       "id": "chaos_druid",
+      "incomingAttackCoverage": "partial",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 8
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "melee",
+          "coverage": "partial",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 8
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 2,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/npc/scripts/chaos_druid.rs2:1#chaos_druid, scripts/npc/scripts/chaos_druid.rs2:15#chaos_druid, scripts/npc/scripts/chaos_druid.rs2:33#chaos_druid_spell, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:108#npc_spell_success, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:148#npc_spell_fail, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:91#npc_spell_cast, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee, scripts/skill_magic/scripts/magic.rs2:1#get_spell_data",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "contextual",
+            "reason": "selection-policy-required"
+          }
+        },
+        {
+          "accuracy": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 10
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "magic",
+          "coverage": "partial",
+          "formulaId": "scripted-fixed-v1",
+          "formulaInputs": {
+            "kind": "source-value",
+            "value": 0
+          },
+          "id": "magic-scripted-2-1",
+          "maxHit": 0,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/npc/scripts/chaos_druid.rs2:1#chaos_druid, scripts/npc/scripts/chaos_druid.rs2:15#chaos_druid, scripts/npc/scripts/chaos_druid.rs2:33#chaos_druid_spell, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:108#npc_spell_success, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:148#npc_spell_fail, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:91#npc_spell_cast, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee, scripts/skill_magic/scripts/magic.rs2:1#get_spell_data",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "contextual",
+            "reason": "selection-policy-required"
+          }
+        }
+      ],
       "level": 13,
       "loot": [
         {
@@ -7789,6 +8119,36 @@
       "defStab": 13,
       "hp": 40,
       "id": "chaos_druid_warrior",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 9,
+            "kind": "standard",
+            "level": 32
+          },
+          "attackSpeedTicks": 5,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 5,
+            "kind": "standard",
+            "level": 34
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 5,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 37,
       "loot": [
         {
@@ -8072,6 +8432,36 @@
       "defStab": 40,
       "hp": 61,
       "id": "chaos_dwarf",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 13,
+            "kind": "standard",
+            "level": 38
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 9,
+            "kind": "standard",
+            "level": 42
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 6,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 48,
       "loot": [
         {
@@ -8389,6 +8779,36 @@
       "defStab": -42,
       "hp": 3,
       "id": "chicken",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": -47,
+            "kind": "standard",
+            "level": 1
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": -42,
+            "kind": "standard",
+            "level": 1
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 0,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 1,
       "loot": [
         {
@@ -8466,6 +8886,36 @@
       "defStab": -21,
       "hp": 8,
       "id": "cow",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": -15,
+            "kind": "standard",
+            "level": 1
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": -15,
+            "kind": "standard",
+            "level": 1
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 1,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 2,
       "loot": [
         {
@@ -8535,6 +8985,35 @@
       "defStab": 0,
       "hp": 70,
       "id": "dagannoth",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 1
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "ranged",
+          "coverage": "exact",
+          "formulaId": "scripted-fixed-v1",
+          "formulaInputs": {
+            "kind": "source-value",
+            "value": 8
+          },
+          "id": "ranged-scripted-1-1",
+          "maxHit": 8,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/quests/quest_horror/scripts/horror_dagannoth.rs2:259#horror_dagganoth_jr, scripts/quests/quest_horror/scripts/horror_dagannoth.rs2:260#horror_dagganoth_jr, scripts/quests/quest_horror/scripts/horror_dagannoth.rs2:78#dagannoth_rangeattack, scripts/skill_combat/scripts/npc/npc_combat_ranged.rs2:1#npc_ranged_attack_roll",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 74,
       "loot": [
         {
@@ -8887,6 +9366,36 @@
       "defStab": 0,
       "hp": 120,
       "id": "dagannoth_92",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 68
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 70
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 8,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 92,
       "loot": [
         {
@@ -9235,6 +9744,36 @@
       "defStab": 96,
       "hp": 17,
       "id": "dark_warrior",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 20,
+            "kind": "standard",
+            "level": 5
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 16,
+            "kind": "standard",
+            "level": 5
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 2,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 8,
       "loot": [
         {
@@ -9504,6 +10043,63 @@
       "defStab": 0,
       "hp": 12,
       "id": "dark_wizard",
+      "incomingAttackCoverage": "partial",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 6
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "magic",
+          "coverage": "partial",
+          "formulaId": "spell-row-v1",
+          "formulaInputs": {
+            "kind": "source-value",
+            "value": 0
+          },
+          "id": "magic-spell-1-1",
+          "maxHit": 0,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/npc/scripts/dark_wizard.rs2:36#dark_wizard_water_attack, scripts/npc/scripts/dark_wizard.rs2:6#young_dark_wizard, scripts/npc/scripts/dark_wizard.rs2:7#young_dark_wizard, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:108#npc_spell_success, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:14#npc_cast_spell, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:148#npc_spell_fail, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:17#npc_cast_spell_with_forced_max_hit, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:52#npc_combat_spell_checks, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:91#npc_spell_cast, scripts/skill_magic/scripts/magic.rs2:1#get_spell_data",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "contextual",
+            "reason": "non-damaging-spell-selection"
+          }
+        },
+        {
+          "accuracy": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 6
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "magic",
+          "coverage": "partial",
+          "formulaId": "spell-row-v1",
+          "formulaInputs": {
+            "kind": "source-value",
+            "value": 4
+          },
+          "id": "magic-spell-1-2",
+          "maxHit": 4,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/npc/scripts/dark_wizard.rs2:36#dark_wizard_water_attack, scripts/npc/scripts/dark_wizard.rs2:6#young_dark_wizard, scripts/npc/scripts/dark_wizard.rs2:7#young_dark_wizard, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:108#npc_spell_success, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:14#npc_cast_spell, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:148#npc_spell_fail, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:17#npc_cast_spell_with_forced_max_hit, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:52#npc_combat_spell_checks, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:91#npc_spell_cast, scripts/skill_magic/scripts/magic.rs2:1#get_spell_data",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "contextual",
+            "reason": "non-damaging-spell-selection"
+          }
+        }
+      ],
       "level": 7,
       "loot": [
         {
@@ -9895,6 +10491,63 @@
       "defStab": 0,
       "hp": 24,
       "id": "dark_wizard_20",
+      "incomingAttackCoverage": "partial",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 22
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "magic",
+          "coverage": "partial",
+          "formulaId": "spell-row-v1",
+          "formulaInputs": {
+            "kind": "source-value",
+            "value": 0
+          },
+          "id": "magic-spell-1-1",
+          "maxHit": 0,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/npc/scripts/dark_wizard.rs2:4#bearded_dark_wizard, scripts/npc/scripts/dark_wizard.rs2:5#bearded_dark_wizard, scripts/npc/scripts/dark_wizard.rs2:9#dark_wizard_earth_attack, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:108#npc_spell_success, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:14#npc_cast_spell, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:148#npc_spell_fail, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:17#npc_cast_spell_with_forced_max_hit, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:52#npc_combat_spell_checks, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:91#npc_spell_cast, scripts/skill_magic/scripts/magic.rs2:1#get_spell_data",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "contextual",
+            "reason": "non-damaging-spell-selection"
+          }
+        },
+        {
+          "accuracy": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 22
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "magic",
+          "coverage": "partial",
+          "formulaId": "spell-row-v1",
+          "formulaInputs": {
+            "kind": "source-value",
+            "value": 6
+          },
+          "id": "magic-spell-1-2",
+          "maxHit": 6,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/npc/scripts/dark_wizard.rs2:4#bearded_dark_wizard, scripts/npc/scripts/dark_wizard.rs2:5#bearded_dark_wizard, scripts/npc/scripts/dark_wizard.rs2:9#dark_wizard_earth_attack, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:108#npc_spell_success, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:14#npc_cast_spell, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:148#npc_spell_fail, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:17#npc_cast_spell_with_forced_max_hit, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:52#npc_combat_spell_checks, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:91#npc_spell_cast, scripts/skill_magic/scripts/magic.rs2:1#get_spell_data",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "contextual",
+            "reason": "non-damaging-spell-selection"
+          }
+        }
+      ],
       "level": 20,
       "loot": [
         {
@@ -10286,6 +10939,36 @@
       "defStab": 15,
       "hp": 35,
       "id": "deadly_red_spider",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 30
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 25
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 3,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 34,
       "loot": [],
       "magicLevel": 1,
@@ -10314,6 +10997,64 @@
       "defStab": 0,
       "hp": 30,
       "id": "druid",
+      "incomingAttackCoverage": "partial",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 28
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "melee",
+          "coverage": "partial",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 28
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 4,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/areas/area_taverly/scripts/druid.rs2:23#druid, scripts/areas/area_taverly/scripts/druid.rs2:34#npc_druid_entangle, scripts/areas/area_taverly/scripts/druid.rs2:6#druid, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:108#npc_spell_success, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:148#npc_spell_fail, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:52#npc_combat_spell_checks, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:91#npc_spell_cast, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee, scripts/skill_magic/scripts/magic.rs2:1#get_spell_data",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "contextual",
+            "reason": "selection-policy-required"
+          }
+        },
+        {
+          "accuracy": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 25
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "magic",
+          "coverage": "partial",
+          "formulaId": "scripted-fixed-v1",
+          "formulaInputs": {
+            "kind": "source-value",
+            "value": 4
+          },
+          "id": "magic-scripted-2-1",
+          "maxHit": 4,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/areas/area_taverly/scripts/druid.rs2:23#druid, scripts/areas/area_taverly/scripts/druid.rs2:34#npc_druid_entangle, scripts/areas/area_taverly/scripts/druid.rs2:6#druid, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:108#npc_spell_success, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:148#npc_spell_fail, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:52#npc_combat_spell_checks, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:91#npc_spell_cast, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee, scripts/skill_magic/scripts/magic.rs2:1#get_spell_data",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "contextual",
+            "reason": "selection-policy-required"
+          }
+        }
+      ],
       "level": 33,
       "loot": [
         {
@@ -10571,6 +11312,36 @@
       "defStab": 0,
       "hp": 16,
       "id": "dwarf",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 5,
+            "kind": "standard",
+            "level": 8
+          },
+          "attackSpeedTicks": 5,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 7,
+            "kind": "standard",
+            "level": 8
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 2,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 10,
       "loot": [
         {
@@ -10828,6 +11599,36 @@
       "defStab": 30,
       "hp": 54,
       "id": "earth_warrior",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 42
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 42
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 5,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 51,
       "loot": [
         {
@@ -11004,6 +11805,36 @@
       "defStab": 50,
       "hp": 105,
       "id": "elf_warrior_108",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 95
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 95
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 10,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/quests/quest_regicide/scripts/regicide_darkelf.rs2:6#regicide_darkelf2, scripts/quests/quest_regicide/scripts/regicide_darkelf.rs2:7#regicide_darkelf2, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 108,
       "loot": [
         {
@@ -11282,6 +12113,36 @@
       "defStab": 50,
       "hp": 105,
       "id": "elf_warrior_90",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 80
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "ranged",
+          "coverage": "exact",
+          "formulaId": "standard-ranged-v1",
+          "formulaInputs": {
+            "bonus": 8,
+            "kind": "standard",
+            "level": 80
+          },
+          "id": "ranged-standard-ranged-1-1",
+          "maxHit": 10,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/quests/quest_regicide/scripts/regicide_darkelf.rs2:2#regicide_darkelf, scripts/quests/quest_regicide/scripts/regicide_darkelf.rs2:3#regicide_darkelf, scripts/skill_combat/scripts/npc/npc_combat_ranged.rs2:1#npc_ranged_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_ranged.rs2:15#npc_rangeattack, scripts/skill_combat/scripts/npc/npc_combat_ranged.rs2:47#playerhit_n_ranged, scripts/skill_combat/scripts/npc/npc_combat_ranged.rs2:7#npc_ranged_maxhit",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 90,
       "loot": [
         {
@@ -11558,6 +12419,36 @@
       "defStab": 0,
       "hp": 12,
       "id": "farmer",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 5,
+            "kind": "standard",
+            "level": 3
+          },
+          "attackSpeedTicks": 6,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 6,
+            "kind": "standard",
+            "level": 4
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 1,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 7,
       "loot": [
         {
@@ -11803,6 +12694,36 @@
       "defStab": 0,
       "hp": 111,
       "id": "firegiant",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 29,
+            "kind": "standard",
+            "level": 65
+          },
+          "attackSpeedTicks": 5,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 31,
+            "kind": "standard",
+            "level": 65
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 11,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 86,
       "loot": [
         {
@@ -12096,6 +13017,36 @@
       "defStab": 0,
       "hp": 50,
       "id": "ghoul",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 30
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 40
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 5,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 42,
       "loot": [
         {
@@ -12137,6 +13088,36 @@
       "defStab": 0,
       "hp": 35,
       "id": "giant",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 18,
+            "kind": "standard",
+            "level": 18
+          },
+          "attackSpeedTicks": 6,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 16,
+            "kind": "standard",
+            "level": 22
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 4,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 28,
       "loot": [
         {
@@ -12469,6 +13450,36 @@
       "defStab": -15,
       "hp": 5,
       "id": "goblin",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": -21,
+            "kind": "standard",
+            "level": 1
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": -15,
+            "kind": "standard",
+            "level": 1
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 1,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 2,
       "loot": [
         {
@@ -12723,6 +13734,36 @@
       "defStab": 0,
       "hp": 87,
       "id": "greater_demon",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 76
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 78
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 9,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 92,
       "loot": [
         {
@@ -13014,6 +14055,37 @@
       "dragonfire": true,
       "hp": 75,
       "id": "green_dragon",
+      "incomingAttackCoverage": "partial",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 68
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "melee",
+          "coverage": "partial",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 68
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 8,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/npc/scripts/dragon.rs2:17#green_dragon, scripts/npc/scripts/dragon.rs2:42#dragon_ai_opplayer2, scripts/npc/scripts/dragon.rs2:67#dragon_melee, scripts/npc/scripts/dragon.rs2:99#dragon_fire, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:1#npc_magic_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "weighted",
+            "weight": 3
+          }
+        }
+      ],
       "level": 79,
       "loot": [
         {
@@ -13328,6 +14400,36 @@
       "defStab": 18,
       "hp": 22,
       "id": "guard",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 4,
+            "kind": "standard",
+            "level": 19
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 5,
+            "kind": "standard",
+            "level": 18
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 3,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 21,
       "loot": [
         {
@@ -13668,6 +14770,36 @@
       "defStab": 0,
       "hp": 116,
       "id": "hellhound",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 105
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 104
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 11,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 122,
       "loot": [
         {
@@ -13727,6 +14859,36 @@
       "defStab": 0,
       "hp": 13,
       "id": "highwayman",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 6,
+            "kind": "standard",
+            "level": 2
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 7,
+            "kind": "standard",
+            "level": 2
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 1,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/npc/scripts/highwayman.rs2:3#highwayman, scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 5,
       "loot": [
         {
@@ -13780,6 +14942,36 @@
       "defStab": 1,
       "hp": 49,
       "id": "hobgoblin_armed",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 8,
+            "kind": "standard",
+            "level": 33
+          },
+          "attackSpeedTicks": 6,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 10,
+            "kind": "standard",
+            "level": 31
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 5,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 42,
       "loot": [
         {
@@ -14085,6 +15277,36 @@
       "defStab": 0,
       "hp": 29,
       "id": "hobgoblin_unarmed",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 22
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 24
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 3,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 28,
       "loot": [
         {
@@ -14447,6 +15669,36 @@
       "defStab": 30,
       "hp": 59,
       "id": "ice_warrior",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 47
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 47
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 6,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 57,
       "loot": [
         {
@@ -14662,6 +15914,36 @@
       "defStab": 0,
       "hp": 70,
       "id": "icegiant",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 29,
+            "kind": "standard",
+            "level": 40
+          },
+          "attackSpeedTicks": 5,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 31,
+            "kind": "standard",
+            "level": 40
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 7,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 49,
       "loot": [
         {
@@ -15020,6 +16302,36 @@
       "defStab": 0,
       "hp": 60,
       "id": "jogre",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 22,
+            "kind": "standard",
+            "level": 43
+          },
+          "attackSpeedTicks": 6,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 20,
+            "kind": "standard",
+            "level": 43
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 7,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 53,
       "loot": [
         {
@@ -15271,6 +16583,36 @@
       "defStab": 20,
       "hp": 50,
       "id": "jungle_spider",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 35
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 37
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 5,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 44,
       "loot": [],
       "magicLevel": 1,
@@ -15299,6 +16641,36 @@
       "defStab": 0,
       "hp": 79,
       "id": "lesser_demon",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 68
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 70
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 8,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 82,
       "loot": [
         {
@@ -15582,6 +16954,36 @@
       "defStab": 10,
       "hp": 44,
       "id": "magicaxe",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 38
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 38
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 5,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 42,
       "loot": [
         {
@@ -15626,6 +17028,36 @@
       "defStab": -21,
       "hp": 7,
       "id": "man",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 1
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 1
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 1,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 2,
       "loot": [
         {
@@ -15889,6 +17321,36 @@
       "defStab": 0,
       "hp": 60,
       "id": "mossgiant",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 33,
+            "kind": "standard",
+            "level": 30
+          },
+          "attackSpeedTicks": 6,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 31,
+            "kind": "standard",
+            "level": 30
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 6,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 42,
       "loot": [
         {
@@ -16258,6 +17720,36 @@
       "defStab": 0,
       "hp": 90,
       "id": "mountain_troll",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 20,
+            "kind": "standard",
+            "level": 40
+          },
+          "attackSpeedTicks": 6,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 20,
+            "kind": "standard",
+            "level": 75
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 11,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 69,
       "loot": [
         {
@@ -16563,6 +18055,36 @@
       "defStab": 15,
       "hp": 66,
       "id": "otherworldly_being",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 56
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 56
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 7,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 64,
       "loot": [
         {
@@ -16739,6 +18261,36 @@
       "defStab": 87,
       "hp": 57,
       "id": "paladin",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 20,
+            "kind": "standard",
+            "level": 54
+          },
+          "attackSpeedTicks": 5,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 22,
+            "kind": "standard",
+            "level": 54
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 8,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 62,
       "loot": [
         {
@@ -16978,6 +18530,36 @@
       "defStab": 0,
       "hp": 20,
       "id": "pirate",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 10,
+            "kind": "standard",
+            "level": 20
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 9,
+            "kind": "standard",
+            "level": 20
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 3,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 23,
       "loot": [
         {
@@ -17271,6 +18853,36 @@
       "defStab": 20,
       "hp": 64,
       "id": "poison_spider",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 50
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 58
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 7,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 64,
       "loot": [],
       "magicLevel": 1,
@@ -17306,6 +18918,37 @@
       "dragonfire": true,
       "hp": 140,
       "id": "red_dragon",
+      "incomingAttackCoverage": "partial",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 130
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "melee",
+          "coverage": "partial",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 130
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 14,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/npc/scripts/dragon.rs2:19#red_dragon, scripts/npc/scripts/dragon.rs2:42#dragon_ai_opplayer2, scripts/npc/scripts/dragon.rs2:67#dragon_melee, scripts/npc/scripts/dragon.rs2:99#dragon_fire, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:1#npc_magic_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "weighted",
+            "weight": 3
+          }
+        }
+      ],
       "level": 152,
       "loot": [
         {
@@ -17620,6 +19263,36 @@
       "defStab": 0,
       "hp": 50,
       "id": "rock_crab",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 1
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 1
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 1,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 13,
       "loot": [
         {
@@ -17944,6 +19617,36 @@
       "defStab": 43,
       "hp": 67,
       "id": "shadow_warrior",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 20,
+            "kind": "standard",
+            "level": 36
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 26,
+            "kind": "standard",
+            "level": 33
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 6,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 48,
       "loot": [
         {
@@ -18153,6 +19856,36 @@
       "defStab": 9,
       "hp": 29,
       "id": "skeleton_armed",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 15,
+            "kind": "standard",
+            "level": 15
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 14,
+            "kind": "standard",
+            "level": 18
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 3,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 22,
       "loot": [
         {
@@ -18422,6 +20155,36 @@
       "defStab": 5,
       "hp": 17,
       "id": "skeleton_unarmed",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 24
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 24
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 3,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 25,
       "loot": [
         {
@@ -18730,6 +20493,36 @@
       "defStab": 2,
       "hp": 18,
       "id": "thug",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 5,
+            "kind": "standard",
+            "level": 7
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 5,
+            "kind": "standard",
+            "level": 5
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 2,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 10,
       "loot": [
         {
@@ -18985,6 +20778,36 @@
       "defStab": 4,
       "hp": 39,
       "id": "tribesman",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 8,
+            "kind": "standard",
+            "level": 23
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 5,
+            "kind": "standard",
+            "level": 27
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 4,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 32,
       "loot": [
         {
@@ -19322,6 +21145,36 @@
       "defStab": 35,
       "hp": 140,
       "id": "troll_general",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 60,
+            "kind": "standard",
+            "level": 70
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 100,
+            "kind": "standard",
+            "level": 140
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 38,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 113,
       "loot": [
         {
@@ -19646,6 +21499,36 @@
       "defStab": 0,
       "hp": 30,
       "id": "water_elemental",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 30
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 30
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 4,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 34,
       "loot": [
         {
@@ -19831,6 +21714,36 @@
       "defStab": 83,
       "hp": 52,
       "id": "white_knight",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 30,
+            "kind": "standard",
+            "level": 27
+          },
+          "attackSpeedTicks": 7,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 31,
+            "kind": "standard",
+            "level": 29
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 6,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 36,
       "loot": [
         {
@@ -20196,6 +22109,35 @@
       "defStab": 0,
       "hp": 14,
       "id": "wizard",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 10
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "magic",
+          "coverage": "exact",
+          "formulaId": "forced-max-hit-v1",
+          "formulaInputs": {
+            "kind": "source-value",
+            "value": 4
+          },
+          "id": "magic-forced-1-1",
+          "maxHit": 4,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/areas/area_wizard_tower/scripts/wizard.rs2:2#wizard, scripts/areas/area_wizard_tower/scripts/wizard.rs2:3#wizard, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:108#npc_spell_success, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:148#npc_spell_fail, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:17#npc_cast_spell_with_forced_max_hit, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:52#npc_combat_spell_checks, scripts/skill_combat/scripts/npc/npc_combat_magic.rs2:91#npc_spell_cast, scripts/skill_magic/scripts/magic.rs2:1#get_spell_data",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 9,
       "loot": [
         {
@@ -20551,6 +22493,36 @@
       "defStab": 9,
       "hp": 30,
       "id": "zombie_armed",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 5,
+            "kind": "standard",
+            "level": 19
+          },
+          "attackSpeedTicks": 5,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 7,
+            "kind": "standard",
+            "level": 21
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 3,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 24,
       "loot": [
         {
@@ -20832,6 +22804,36 @@
       "defStab": 0,
       "hp": 22,
       "id": "zombie_unarmed",
+      "incomingAttackCoverage": "exact",
+      "incomingAttacks": [
+        {
+          "accuracy": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 8
+          },
+          "attackSpeedTicks": 4,
+          "attackType": "melee",
+          "coverage": "exact",
+          "formulaId": "standard-melee-v1",
+          "formulaInputs": {
+            "bonus": 0,
+            "kind": "standard",
+            "level": 9
+          },
+          "id": "melee-standard-melee-1-1",
+          "maxHit": 2,
+          "provenance": {
+            "notes": "Parsed from the reviewed NPC attack handler. Source revision: 376072662e78a314bf35bb18815be39521491a6b.",
+            "source": "generated",
+            "sourceRef": "scripts/skill_combat/scripts/npc/npc_combat.rs2:4#_, scripts/skill_combat/scripts/npc/npc_combat.rs2:57#npc_default_attack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:12#npc_melee_attack_roll, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:2#npc_melee_maxhit, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:20#npc_meleeattack, scripts/skill_combat/scripts/npc/npc_combat_melee.rs2:34#playerhit_n_melee",
+            "verifiedAt": "2026-07-09T00:00:00.000Z"
+          },
+          "selection": {
+            "kind": "always"
+          }
+        }
+      ],
       "level": 13,
       "loot": [
         {

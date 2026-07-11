@@ -1,4 +1,7 @@
 import { z } from "zod";
+import { DataReliabilityError, parseJsonWithDuplicateKeyCheck } from "../../data/reliability";
+
+export const DEFAULT_PERSISTED_STATE_MAX_BYTES = 5_000_000;
 
 export interface PersistedEnvelope<T> {
   version: number;
@@ -18,13 +21,19 @@ export interface VersionedStorageOptions<T> {
   schema: z.ZodType<T>;
   storage: KeyValueStorage;
   now?: () => Date;
+  maxBytes?: number;
 }
 
 export type LoadPersistedResult<T> =
   | { status: "missing"; value: null }
   | { status: "loaded"; value: T; envelope: PersistedEnvelope<T> }
   | { status: "version-mismatch"; value: null; foundVersion: number }
-  | { status: "invalid"; value: null; reason: string }
+  | {
+      status: "invalid";
+      value: null;
+      reason:
+        "body_too_large" | "duplicate_keys" | "invalid_json" | "invalid_envelope" | "invalid_data";
+    }
   | { status: "unavailable"; value: null; reason: "read_failed" };
 
 export type SavePersistedResult<T> =
@@ -41,6 +50,10 @@ const EnvelopeSchema = z
   })
   .strict();
 
+function byteLength(text: string): number {
+  return new TextEncoder().encode(text).byteLength;
+}
+
 export function loadPersisted<T>(options: VersionedStorageOptions<T>): LoadPersistedResult<T> {
   let raw: string | null;
   try {
@@ -49,11 +62,17 @@ export function loadPersisted<T>(options: VersionedStorageOptions<T>): LoadPersi
     return { status: "unavailable", value: null, reason: "read_failed" };
   }
   if (!raw) return { status: "missing", value: null };
+  if (byteLength(raw) > (options.maxBytes ?? DEFAULT_PERSISTED_STATE_MAX_BYTES)) {
+    return { status: "invalid", value: null, reason: "body_too_large" };
+  }
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(raw);
-  } catch {
+    parsed = parseJsonWithDuplicateKeyCheck(raw, { source: "Persisted browser state" });
+  } catch (error) {
+    if (error instanceof DataReliabilityError && error.code === "duplicate_keys") {
+      return { status: "invalid", value: null, reason: "duplicate_keys" };
+    }
     return { status: "invalid", value: null, reason: "invalid_json" };
   }
 

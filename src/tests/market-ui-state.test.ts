@@ -372,6 +372,29 @@ describe("market sync UI state helpers", () => {
     });
   });
 
+  it("recognizes the matching scheduled PriceSet as the active shared-history snapshot", () => {
+    const capturedAt = "2026-07-03T14:59:19.000Z";
+    const history = createSharedPriceHistoryAnalysis([
+      { t: Date.parse(capturedAt) / 1000, prices: { lobster: 200 } }
+    ]);
+    const scheduled: PriceSet = {
+      id: "scheduled-static-prices-2026-07-03T14-59-19-000Z",
+      label: "Scheduled static prices + generated item fallbacks",
+      source: "scraped",
+      createdAt: capturedAt,
+      itemPrices: { lobster: 200, generated_fallback: 42 },
+      alchValues: {}
+    };
+
+    expect(summarizePriceHistory(history, scheduled).activeMatchesLatest).toBe(true);
+    expect(
+      summarizePriceHistory(history, {
+        ...scheduled,
+        itemPrices: { ...scheduled.itemPrices, lobster: 201 }
+      }).activeMatchesLatest
+    ).toBe(false);
+  });
+
   it("merges shared scheduled history with local comparisons without mutating local state", () => {
     const local = appendAcceptedPriceSetToHistory(
       DEFAULT_PRICE_HISTORY_STATE,

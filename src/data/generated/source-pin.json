@@ -3,7 +3,7 @@
   "generator": {
     "command": "npm run data:generate -- --source-dir .sources/lostcity-content --output-root . --generated-at 2026-07-09T00:00:00.000Z --impact-outlier-limit 25",
     "name": "index-sim-data-generator",
-    "version": "raw-lostcity-runtime-catalog-3"
+    "version": "raw-lostcity-runtime-catalog-4"
   },
   "outputs": {
     "gameData": "src/data/generated/game-data.json",
