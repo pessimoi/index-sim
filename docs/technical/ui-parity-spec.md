@@ -28,7 +28,8 @@ The rewrite should first replicate the `CombatSpreadsheet` workflow from `views.
 
 The dense spreadsheet is the default `Compare` pane inside the accepted
 three-zone workbench. D-075 keeps that desktop workbench viewport-bound like the
-legacy console instead of letting the table define the document height.
+legacy console instead of letting the table define the document height, and
+D-082 extends the same scroll ownership to compact landscape workspaces.
 
 ### Dense Spreadsheet Layout
 
@@ -44,13 +45,16 @@ Scrollable dense table: one row per monster, sortable columns, row click selects
 
 The view must use strips and tables, not dashboard cards. It should fit the first viewport with the current target, active combat type, key metrics and the first rows of the monster table visible.
 
-At desktop widths and normal laptop heights, the header and three-zone shell
-fit one viewport. PlayerSidebar, the active center pane and MonsterCard have
-independent, visible scroll boundaries; the document itself must not become the
-scroll owner for a long Compare table. Auto-sized grid rows align to the start
-so short Player content cannot stretch across the table height. Tablet and
-mobile keep normal document flow, with the existing pane order and contained
-horizontal table overflow.
+At desktop widths, normal laptop heights and compact landscape workspaces from
+621 px wide, the header and three-zone shell fit one viewport. PlayerSidebar,
+the active center pane and MonsterCard have independent, visible scroll
+boundaries; the document itself must not become the scroll owner for a long
+Compare table. Compact landscape narrows the side tracks and lets the setup
+context scroll horizontally instead of stacking the entire workbench. Auto-
+sized grid rows align to the start so short Player content cannot stretch
+across the table height. Portrait tablet widths through 980 px and mobile widths
+through 620 px keep normal document flow, with the existing pane order and
+contained horizontal table overflow.
 
 ### Compact Setup Strip
 

@@ -90,6 +90,13 @@ test.describe("repository visual regression", () => {
     await captureFullPage(page, "root-shell-desktop.png");
   });
 
+  test("root shell compact landscape", async ({ page }) => {
+    await bootVisualApp(page, "compactLandscape");
+    await expect(page.getByLabel("Player sidebar")).toBeVisible();
+    await expect(page.getByLabel("Monster card")).toBeVisible();
+    await captureFullPage(page, "root-shell-compact-landscape.png");
+  });
+
   test("root shell mobile", async ({ page }) => {
     await bootVisualApp(page, "mobile");
     await captureFullPage(page, "root-shell-mobile.png");

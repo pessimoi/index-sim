@@ -28,6 +28,7 @@ export const VISUAL_NOW = "2026-07-10T12:00:00.000Z";
 
 export const VISUAL_VIEWPORTS = {
   desktop: { width: 1440, height: 1000 },
+  compactLandscape: { width: 640, height: 360 },
   tablet: { width: 768, height: 1024 },
   mobile: { width: 390, height: 844 }
 } as const;

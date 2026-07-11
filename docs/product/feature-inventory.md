@@ -17,8 +17,10 @@
 Desktop workbench layout is `Valmis` under D-075: the root app now matches the
 legacy console shape with one viewport-bound three-zone shell, compact
 monospace controls and independent Player, active-pane and MonsterCard
-scrolling. The 1280x720 browser contract keeps document scroll at zero while
-tablet/mobile retain normal document flow and the accepted pane order.
+scrolling. D-082 extends that contract to 640x360-style compact landscape
+workspaces: document scroll stays at zero and the three pane owners remain
+side-by-side. Portrait tablet widths through 980 px and mobile widths through
+620 px retain normal document flow and the accepted pane order.
 
 Setup discoverability is `Valmis` under D-076: an always-visible `Where to
 edit` bar shows current prayers/combat boosts, potion carry/prayer restore and

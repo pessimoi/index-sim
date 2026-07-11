@@ -908,6 +908,62 @@ test("keeps the desktop workbench inside one console viewport", async ({ page })
   expect(await page.evaluate(() => window.scrollY)).toBe(0);
 });
 
+test("keeps a compact landscape workbench inside one console viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 640, height: 360 });
+  await page.addInitScript(() => window.localStorage.clear());
+  await page.goto("/");
+
+  const shell = page.getByLabel("Workbench shell");
+  const player = page.getByLabel("Player sidebar");
+  const pane = shell.locator(".active-pane");
+  const monster = page.getByLabel("Monster card");
+
+  await expect(shell).toBeVisible();
+  await expect(player).toBeVisible();
+  await expect(pane).toBeVisible();
+  await expect(monster).toBeVisible();
+
+  const layout = await page.evaluate(() => {
+    const metrics = (selector: string) => {
+      const element = document.querySelector<HTMLElement>(selector);
+      if (!element) return null;
+      const rect = element.getBoundingClientRect();
+      const style = window.getComputedStyle(element);
+      return {
+        clientHeight: element.clientHeight,
+        scrollHeight: element.scrollHeight,
+        overflowY: style.overflowY,
+        x: rect.x,
+        y: rect.y
+      };
+    };
+    return {
+      viewportHeight: window.innerHeight,
+      documentHeight: document.documentElement.scrollHeight,
+      bodyHeight: document.body.scrollHeight,
+      bodyOverflow: window.getComputedStyle(document.body).overflow,
+      player: metrics(".player-sidebar"),
+      center: metrics(".workbench-center"),
+      pane: metrics(".active-pane"),
+      monster: metrics(".monster-rail")
+    };
+  });
+
+  expect(layout.documentHeight).toBeLessThanOrEqual(layout.viewportHeight + 1);
+  expect(layout.bodyHeight).toBeLessThanOrEqual(layout.viewportHeight + 1);
+  expect(layout.bodyOverflow).toBe("hidden");
+  expect(layout.player?.overflowY).toBe("auto");
+  expect(layout.pane?.overflowY).toBe("auto");
+  expect(layout.monster?.overflowY).toBe("auto");
+  expect(layout.pane!.clientHeight).toBeGreaterThan(0);
+  expect(layout.pane!.scrollHeight).toBeGreaterThan(layout.pane!.clientHeight);
+  expect(layout.player!.y).toBe(layout.center!.y);
+  expect(layout.monster!.y).toBe(layout.center!.y);
+  expect(layout.player!.x).toBeLessThan(layout.center!.x);
+  expect(layout.center!.x).toBeLessThan(layout.monster!.x);
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+});
+
 test("keeps long selected monster names readable in compact setup fields", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.addInitScript(() => window.localStorage.clear());

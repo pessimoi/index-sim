@@ -20,10 +20,10 @@ without redefining functional parity or legacy CSS as the product truth.
   `process.platform` snapshot paths and the production Vite build/preview path.
 - `src/tests/e2e/helpers/visual-state.ts` freezes time, seeds bounded fixture
   state, disables live integration calls and waits for app/fonts readiness.
-- `src/tests/e2e/visual-regression.visual.spec.ts` implements 19 scenarios over
+- `src/tests/e2e/visual-regression.visual.spec.ts` implements 20 scenarios over
   root, Compare, loadouts, Stats, Trip, Loot, Economy, Cannon, Planner, Duel and
   Settings. D-075 scroll coverage and focused Loot details bring the reviewed
-  Darwin set to 30 snapshots.
+  Darwin set to 31 snapshots.
 - Reviewed Darwin baselines live in
   `src/tests/e2e/__screenshots__/darwin/`.
 - `npm run test:e2e:visual` compares only; baseline writes require
@@ -131,11 +131,12 @@ must have a comment explaining why.
 
 Use these fixed CSS viewports:
 
-| Name    | Width | Height | Purpose                                      |
-| ------- | ----: | -----: | -------------------------------------------- |
-| desktop |  1440 |   1000 | Primary dense workbench and pane composition |
-| tablet  |   768 |   1024 | Dense overflow and workbench containment     |
-| mobile  |   390 |    844 | Stacking, controls and right-rail placement  |
+| Name              | Width | Height | Purpose                                      |
+| ----------------- | ----: | -----: | -------------------------------------------- |
+| desktop           |  1440 |   1000 | Primary dense workbench and pane composition |
+| compact landscape |   640 |    360 | D-082 in-app legacy-console containment      |
+| tablet            |   768 |   1024 | Dense overflow and workbench containment     |
+| mobile            |   390 |    844 | Stacking, controls and right-rail placement  |
 
 Do not scale font size based on viewport. The tests must use the production
 responsive CSS at each viewport.
@@ -144,21 +145,21 @@ responsive CSS at each viewport.
 
 The first accepted baseline set must cover:
 
-| Scenario       | Required state                                                      | Snapshots                       |
-| -------------- | ------------------------------------------------------------------- | ------------------------------- |
-| Root shell     | Default generated runtime and scheduled prices                      | desktop full page, mobile page  |
-| Dense Compare  | Filtered rows, current target and row markers                       | desktop pane, tablet pane       |
-| Melee loadout  | Equipment selectors and generated/fallback requirement warning      | desktop top and details         |
-| Ranged loadout | Ammo, multi-prayer/boost state and visible manual overrides         | desktop top and details         |
-| Magic loadout  | Spell and equipment state                                           | desktop top and details         |
-| Stats          | Combat roll detail, XP routing and hit distribution                 | desktop top, roll and lower     |
-| Trip           | Manual food/prayer/reserve state and grouped summary                | desktop pane, mobile pane       |
-| Loot           | Value composition, action impact and one expanded nested drop table | desktop pane, mobile pane       |
-| Economy        | Fixed local history, movers and selected item trend                 | desktop top and trend           |
-| Cannon         | Enabled Dagannoth path with expanded output                         | desktop pane                    |
-| Planner        | Deterministically recomputed plan with chart and timeline           | desktop pane, mobile pane       |
-| Duel           | Fixed snapshots and built monster matrix                            | desktop pane, mobile pane       |
-| Settings       | Price data plus sanitized legacy/local-state review notices         | desktop recovery, price, legacy |
+| Scenario       | Required state                                                      | Snapshots                          |
+| -------------- | ------------------------------------------------------------------- | ---------------------------------- |
+| Root shell     | Default generated runtime and scheduled prices                      | desktop, compact landscape, mobile |
+| Dense Compare  | Filtered rows, current target and row markers                       | desktop pane, tablet pane          |
+| Melee loadout  | Equipment selectors and generated/fallback requirement warning      | desktop top and details            |
+| Ranged loadout | Ammo, multi-prayer/boost state and visible manual overrides         | desktop top and details            |
+| Magic loadout  | Spell and equipment state                                           | desktop top and details            |
+| Stats          | Combat roll detail, XP routing and hit distribution                 | desktop top, roll and lower        |
+| Trip           | Manual food/prayer/reserve state and grouped summary                | desktop pane, mobile pane          |
+| Loot           | Value composition, action impact and one expanded nested drop table | desktop pane, mobile pane          |
+| Economy        | Fixed local history, movers and selected item trend                 | desktop top and trend              |
+| Cannon         | Enabled Dagannoth path with expanded output                         | desktop pane                       |
+| Planner        | Deterministically recomputed plan with chart and timeline           | desktop pane, mobile pane          |
+| Duel           | Fixed snapshots and built monster matrix                            | desktop pane, mobile pane          |
+| Settings       | Price data plus sanitized legacy/local-state review notices         | desktop recovery, price, legacy    |
 
 Use locator screenshots for pane-level cases. Full-page screenshots are limited
 to the root desktop/mobile shell because very tall full-page baselines make
@@ -197,27 +198,28 @@ candidate baseline write. `Accept candidate` means the observed change is
 explained by an accepted product decision and may enter the explicit update
 step; it is not a claim that an unreviewed generated PNG is already accepted.
 
-| Scenario               | Reviewed change and decision source                                                                                                                                                                   | Candidate disposition |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
-| Root shell desktop     | D-075 makes the three-zone shell viewport-bound at 1440×1000; D-076–D-080 change ownership copy, compact sizing and the dynamic setup tab. No overlap or unintended document scroll was visible.      | Accept candidate      |
-| Root shell mobile      | Normal document flow remains intact; D-076–D-081 add ownership summaries and source-backed Trip/Stats labels. The full fixture-only page remained contained.                                          | Accept candidate      |
-| Dense Compare desktop  | D-075 widens the center pane from 780 to 859 px; D-078/D-079 change filter controls. Rows, focus outline and horizontal containment remained legible.                                                 | Accept candidate      |
-| Dense Compare tablet   | D-079 popup-combobox styling and compact filter wrapping explain the bounded diff. The table keeps its intended horizontal overflow.                                                                  | Accept candidate      |
-| Melee loadout desktop  | D-075 requires the active scroll viewport; D-079/D-080 explain selector and setup ownership changes. Top and lower equipment-detail captures preserve the prior coverage.                             | Accept candidate      |
-| Ranged loadout desktop | Same scroll/selector migration as melee; manual overrides remain visible and the lower detail capture covers equipment bonuses and warnings.                                                          | Accept candidate      |
-| Magic loadout desktop  | Same scroll/selector migration as melee; spell state remains visible and the lower detail capture preserves equipment coverage.                                                                       | Accept candidate      |
-| Stats desktop          | D-075 changes capture ownership and D-081 adds source-backed incoming-model evidence. Top, combat-roll and lower hit-distribution captures retain the complete required surface.                      | Accept candidate      |
-| Trip desktop           | D-075 changes the visible pane boundary and D-081 adds `Source-backed` incoming-model output without changing the fixed fixture inputs.                                                               | Accept candidate      |
-| Trip mobile            | D-081 adds the incoming-model label in normal flow. The unfocused fixed skip link was made visually inert after the first review exposed a screenshot-stitch artifact; the corrected actual is clean. | Accept candidate      |
-| Loot desktop           | D-075 changes the visible pane boundary; D-077–D-079 explain compact control/table wrapping. Value composition remains readable.                                                                      | Accept candidate      |
-| Loot mobile            | Responsive controls and tables remain contained; fixture-only warnings and nested-drop content are unchanged in ownership.                                                                            | Accept candidate      |
-| Economy desktop        | D-075 changes the visible pane boundary and D-078/D-079 replace the stale native-select assumption with the shared combobox. Top movers and the lower trend capture retain required coverage.         | Accept candidate      |
-| Cannon desktop         | D-075 widens the visible center viewport. The enabled Dagannoth fixture, output metrics and inventory reserve remain complete.                                                                        | Accept candidate      |
-| Planner desktop        | D-075 makes the gear-pool view scroll inside the center pane; the mobile companion still covers the full chart and timeline surface.                                                                  | Accept candidate      |
-| Planner mobile         | Normal-flow full content remains complete; compact wrapping changes align with D-077–D-080 and no chart or table overflow was visible.                                                                | Accept candidate      |
-| Duel desktop           | D-075 widens the matrix viewport and D-078/D-079 update search presentation. The four filtered rows and setup columns remain readable.                                                                | Accept candidate      |
-| Duel mobile            | Normal-flow matrix controls remain contained; intentional horizontal table overflow preserves the comparison columns.                                                                                 | Accept candidate      |
-| Settings desktop       | D-075 bounds the recovery pane and D-078 bounds migration notices. Recovery, lower Price data and legacy-review captures preserve all required evidence.                                              | Accept candidate      |
+| Scenario                     | Reviewed change and decision source                                                                                                                                                                   | Candidate disposition |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
+| Root shell desktop           | D-075 makes the three-zone shell viewport-bound at 1440×1000; D-076–D-080 change ownership copy, compact sizing and the dynamic setup tab. No overlap or unintended document scroll was visible.      | Accept candidate      |
+| Root shell compact landscape | D-082 keeps the 640×360 three-zone workbench viewport-bound with independent scroll owners instead of a long tablet-flow document.                                                                    | Accept candidate      |
+| Root shell mobile            | Normal document flow remains intact; D-076–D-081 add ownership summaries and source-backed Trip/Stats labels. The full fixture-only page remained contained.                                          | Accept candidate      |
+| Dense Compare desktop        | D-075 widens the center pane from 780 to 859 px; D-078/D-079 change filter controls. Rows, focus outline and horizontal containment remained legible.                                                 | Accept candidate      |
+| Dense Compare tablet         | D-079 popup-combobox styling and compact filter wrapping explain the bounded diff. The table keeps its intended horizontal overflow.                                                                  | Accept candidate      |
+| Melee loadout desktop        | D-075 requires the active scroll viewport; D-079/D-080 explain selector and setup ownership changes. Top and lower equipment-detail captures preserve the prior coverage.                             | Accept candidate      |
+| Ranged loadout desktop       | Same scroll/selector migration as melee; manual overrides remain visible and the lower detail capture covers equipment bonuses and warnings.                                                          | Accept candidate      |
+| Magic loadout desktop        | Same scroll/selector migration as melee; spell state remains visible and the lower detail capture preserves equipment coverage.                                                                       | Accept candidate      |
+| Stats desktop                | D-075 changes capture ownership and D-081 adds source-backed incoming-model evidence. Top, combat-roll and lower hit-distribution captures retain the complete required surface.                      | Accept candidate      |
+| Trip desktop                 | D-075 changes the visible pane boundary and D-081 adds `Source-backed` incoming-model output without changing the fixed fixture inputs.                                                               | Accept candidate      |
+| Trip mobile                  | D-081 adds the incoming-model label in normal flow. The unfocused fixed skip link was made visually inert after the first review exposed a screenshot-stitch artifact; the corrected actual is clean. | Accept candidate      |
+| Loot desktop                 | D-075 changes the visible pane boundary; D-077–D-079 explain compact control/table wrapping. Value composition remains readable.                                                                      | Accept candidate      |
+| Loot mobile                  | Responsive controls and tables remain contained; fixture-only warnings and nested-drop content are unchanged in ownership.                                                                            | Accept candidate      |
+| Economy desktop              | D-075 changes the visible pane boundary and D-078/D-079 replace the stale native-select assumption with the shared combobox. Top movers and the lower trend capture retain required coverage.         | Accept candidate      |
+| Cannon desktop               | D-075 widens the visible center viewport. The enabled Dagannoth fixture, output metrics and inventory reserve remain complete.                                                                        | Accept candidate      |
+| Planner desktop              | D-075 makes the gear-pool view scroll inside the center pane; the mobile companion still covers the full chart and timeline surface.                                                                  | Accept candidate      |
+| Planner mobile               | Normal-flow full content remains complete; compact wrapping changes align with D-077–D-080 and no chart or table overflow was visible.                                                                | Accept candidate      |
+| Duel desktop                 | D-075 widens the matrix viewport and D-078/D-079 update search presentation. The four filtered rows and setup columns remain readable.                                                                | Accept candidate      |
+| Duel mobile                  | Normal-flow matrix controls remain contained; intentional horizontal table overflow preserves the comparison columns.                                                                                 | Accept candidate      |
+| Settings desktop             | D-075 bounds the recovery pane and D-078 bounds migration notices. Recovery, lower Price data and legacy-review captures preserve all required evidence.                                              | Accept candidate      |
 
 All reviewed content came from the repository's fixed visual fixtures. No real
 player name, imported user file, browser profile data, secret, token, absolute
@@ -282,12 +284,14 @@ it must not double because the visual project reruns functional files.
 
 ### Current local evidence
 
-The 2026-07-12 reviewed update completed 19/19 scenarios. Two immediately
-following read-only runs passed 19/19 and 19/19 against the resulting 30 Darwin
-snapshots. The focused keyboard-navigation test passed 1/1 after the skip-link
-hidden-state fix. Typecheck, lint, format check and `git diff --check` also
-passed before the baseline candidate was committed. The preview/build emitted
-only the existing large-chunk warning.
+The 2026-07-12 reviewed D-075–D-081 update completed 19/19 scenarios. Two
+immediately following read-only runs passed 19/19 and 19/19 against its 30
+Darwin snapshots. D-082 then added the reviewed 640x360 snapshot: its focused
+functional case passed 1/1 and the complete gates passed 74/74 functional and
+20/20 visual against 31 snapshots. The focused keyboard-navigation test passed
+1/1 after the skip-link hidden-state fix. Typecheck, lint, format check and
+`git diff --check` also passed. The preview/build emitted only the existing
+large-chunk warning.
 
 ## Rollout
 
