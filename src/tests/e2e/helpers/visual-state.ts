@@ -199,6 +199,19 @@ export async function openWorkbenchTab(page: Page, name: string) {
   await page.getByLabel("Workbench tabs").getByRole("tab", { name, exact: true }).click();
 }
 
+export async function openCombatSetup(page: Page, combatStyle: "melee" | "ranged" | "magic") {
+  const label = combatStyle.charAt(0).toUpperCase() + combatStyle.slice(1);
+  const combatType = page
+    .getByLabel("Combat type")
+    .getByRole("button", { name: combatStyle, exact: true });
+
+  await combatType.click();
+  await expect(combatType).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    page.getByLabel("Workbench tabs").getByRole("tab", { name: `${label} setup`, exact: true })
+  ).toHaveAttribute("aria-selected", "true");
+}
+
 export async function capturePane(locator: Locator, name: string) {
   await expect(locator).toBeVisible();
   await locator.page().evaluate(() => document.fonts.ready);

@@ -68,6 +68,29 @@ The visual config must use the same production build and `vite preview` server
 as the functional gate. It must not reuse an arbitrary running development
 server.
 
+## Workbench selector contract
+
+Decision D-080 makes the Player sidebar's `Combat type` control the only
+combat-style mutator. The workbench exposes one dynamic setup tab, named
+`Melee setup`, `Ranged setup` or `Magic setup` for the selected style; separate
+`Melee`, `Ranged` and `Magic` tabs are not part of the current UI contract.
+
+Loadout visual scenarios must select the style through the semantic
+`Combat type` button, assert its `aria-pressed` state and assert that the
+matching dynamic setup tab is selected before locating the equipment pane.
+This selector-contract repair does not authorize baseline writes. Screenshot
+changes remain subject to the explicit diff review and update policy below.
+
+### Selector remediation evidence
+
+On 2026-07-12, the focused functional scenario
+`updates results when the combat style changes` passed (1/1). A read-only run
+of the three desktop loadout visual scenarios then reached screenshot
+comparison for melee, ranged and magic without selector timeouts. All three
+reported the expected stale-baseline size mismatch (780 px expected pane width
+versus 859 px actual pane width). No baseline file was written or accepted in
+this remediation step; image review remains a separate goal.
+
 ## Baseline environment
 
 Use Playwright's installed Chromium and `scale: "css"`. Baselines are

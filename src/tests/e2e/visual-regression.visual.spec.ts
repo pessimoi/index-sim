@@ -4,6 +4,7 @@ import {
   bootVisualApp,
   captureFullPage,
   capturePane,
+  openCombatSetup,
   openWorkbenchTab
 } from "./helpers/visual-state";
 
@@ -105,7 +106,7 @@ test.describe("repository visual regression", () => {
 
   test("Melee loadout desktop", async ({ page }) => {
     await bootVisualApp(page, "desktop");
-    await openWorkbenchTab(page, "Melee");
+    await openCombatSetup(page, "melee");
     const loadout = page.getByRole("region", { name: "Equipment loadout", exact: true });
     await expect(loadout.getByRole("heading", { name: "melee loadout" })).toBeVisible();
     await capturePane(loadout, "loadout-melee-desktop.png");
@@ -113,7 +114,7 @@ test.describe("repository visual regression", () => {
 
   test("Ranged loadout desktop", async ({ page }) => {
     await bootVisualApp(page, "desktop");
-    await openWorkbenchTab(page, "Ranged");
+    await openCombatSetup(page, "ranged");
     const loadout = page.getByRole("region", { name: "Equipment loadout", exact: true });
     await loadout.getByLabel("Accuracy bonus").fill("44");
     await loadout.getByLabel("Damage bonus").fill("31");
@@ -124,7 +125,7 @@ test.describe("repository visual regression", () => {
 
   test("Magic loadout desktop", async ({ page }) => {
     await bootVisualApp(page, "desktop");
-    await openWorkbenchTab(page, "Magic");
+    await openCombatSetup(page, "magic");
     const loadout = page.getByRole("region", { name: "Equipment loadout", exact: true });
     await expect(loadout.getByLabel("Spell", { exact: true })).toBeVisible();
     await capturePane(loadout, "loadout-magic-desktop.png");
