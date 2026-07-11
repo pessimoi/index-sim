@@ -32,16 +32,16 @@ Status: raw LostCity source report.
 
 | Section | Added | Removed | Changed |
 | --- | ---: | ---: | ---: |
-| items | 15 | 0 | 371 |
+| items | 19 | 0 | 371 |
 | monsters | 0 | 0 | 63 |
 | weapons | 0 | 0 | 17 |
 | ammo | 0 | 0 | 10 |
 | spells | 0 | 0 | 0 |
 | requirements | 94 | 0 | 0 |
 | equipment | 0 | 0 | 6 |
-| drops | 66 | 51 | 1048 |
+| drops | 91 | 51 | 1048 |
 
-- items added: `2dose2antipoison`, `3dose2antipoison`, `adamant_javelin`, `black_dagger_p`, `black_mace`, `black_med_helm`, `black_robe`, `blackwizhat`, +7 more
+- items added: `2dose2antipoison`, `3dose2antipoison`, `adamant_javelin`, `black_dagger_p`, `black_mace`, `black_med_helm`, `black_robe`, `blackwizhat`, +11 more
 - items removed: none
 - items changed: `1dose2defense`, `2dose1strength`, `3dose1defense`, `3doseantipoison`, `adamant_arrow`, `adamant_axe`, `adamant_dart`, `adamant_dart_p`, +363 more
 
@@ -65,7 +65,7 @@ Status: raw LostCity source report.
 - equipment removed: none
 - equipment changed: `amulet.unholy_symbol`, `body.monk_robe_top`, `gloves.chaos_gauntlets`, `legs.monk_robe_bottom`, `ring.ring_of_recoil`, `ring.ring_of_wealth`
 
-- drops added: `bandit.19`, `black_demon.21`, `black_dragon.20`, `black_knight.23`, `blue_dragon.21`, `chaos_druid.16`, `chaos_druid.8.0`, `chaos_druid.8.1`, +58 more
+- drops added: `al_kharid_warrior.18`, `bandit.19`, `barbarian.20`, `black_demon.21`, `black_dragon.20`, `black_dragon.22`, `black_knight.23`, `blue_dragon.21`, +83 more
 - drops removed: `bandit.19.0`, `black_demon.21.0`, `black_dragon.20.0`, `black_knight.23.0`, `blue_dragon.21.0`, `chaos_druid.16.0`, `chaos_druid.8`, `chaos_druid_warrior.19.0`, +43 more
 - drops changed: `al_kharid_warrior.0`, `al_kharid_warrior.1`, `al_kharid_warrior.10`, `al_kharid_warrior.11`, `al_kharid_warrior.12`, `al_kharid_warrior.13`, `al_kharid_warrior.14`, `al_kharid_warrior.15`, +1040 more
 
@@ -131,9 +131,9 @@ Status: raw LostCity source report.
 
 ## Current Scope
 
-- Runtime monster combat fields and reviewed core loot are parsed directly from pinned LostCity NPC config and RuneScript handlers.
+- Runtime monster combat fields and reviewed loot are parsed directly from pinned LostCity NPC config and RuneScript handlers.
 - Runtime item, weapon, ammo, spell and equipment calculation fields are parsed directly from pinned LostCity object, param and dbrow configs.
-- Simulator-only synthetic identities remain explicitly app-owned; quest-gated drops and clue tertiaries remain outside the raw candidate.
+- Simulator-only synthetic identities remain explicitly app-owned; four quest-gated rows and 21 clue tertiaries carry typed eligibility and stay excluded from default valuation until exact player state is modeled.
 - Item skill requirements are parsed from pinned levelrequire triggers/definitions; quest completion clauses remain outside the generated contract, and NPC size comes from config with the source default of 1.
 - The root browser runtime consumes this committed source-backed generated snapshot; the legacy-derived static bridge remains reference and rollback evidence.
 - Source object costs provide item/alch fallbacks; scheduled PriceSet values remain outside this generator and take precedence in the staged generated runtime adapter.

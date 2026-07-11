@@ -110,6 +110,24 @@ export const DropExpansionEntrySchema = z
     }
   });
 
+const DropEligibilitySchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("quest"),
+      policyId: EntityIdSchema,
+      description: z.string().min(1).max(240)
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("clue"),
+      tier: z.enum(["easy", "medium", "hard"]),
+      membersOnly: z.literal(true),
+      requiresNoClue: z.literal(true)
+    })
+    .strict()
+]);
+
 export const DropDefinitionSchema = z
   .object({
     name: z.string().min(1),
@@ -121,6 +139,7 @@ export const DropDefinitionSchema = z
     tag: z.string().min(1).optional(),
     slotFrac: NonNegativeNumberSchema.optional(),
     prayerXp: NonNegativeNumberSchema.optional(),
+    eligibility: DropEligibilitySchema.optional(),
     provenance: DataProvenanceSchema.optional(),
     notes: z.string().min(1).optional(),
     _expand: z.array(DropExpansionEntrySchema).optional()

@@ -3141,6 +3141,23 @@ test("updates per-monster loot settings and keeps them after reload", async ({ p
   await expect(reloadedLoot.getByLabel("Talisman spot")).toHaveValue("overground");
 });
 
+test("shows source-backed conditional clue loot without allowing a value action", async ({
+  page
+}) => {
+  await page.goto("/");
+  await page.getByLabel("TARGET", { exact: true }).selectOption("greater_demon");
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Loot" }).click();
+
+  const table = page.getByRole("table", { name: "Current monster drops" });
+  const row = table.getByRole("row", { name: /Clue scroll \(hard\)/ });
+  const action = row.getByLabel(/Action for Clue scroll \(hard\)/);
+  await expect(row).toBeVisible();
+  await expect(row).toContainText("Clue eligibility not modeled");
+  await expect(action).toHaveValue("skip");
+  await expect(action).toBeDisabled();
+  await expect(row).not.toContainText("trail_hardcluedrop");
+});
+
 test("resets one Active modifiers loot row while preserving neighboring loot state", async ({
   page
 }) => {

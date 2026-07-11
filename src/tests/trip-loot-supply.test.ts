@@ -13,6 +13,7 @@ import {
   defaultLootAction,
   evaluateLoot,
   isStackable,
+  lootPreferenceKey,
   normalizeLootName,
   recommendPotionCarry,
   simulateTripLootSupply,
@@ -203,6 +204,80 @@ describe("trip/loot/supply unit rules", () => {
     );
     expect(result.lootBreakdown[1]?._expand).toEqual(
       expect.arrayContaining([expect.objectContaining({ name: "Uncut sapphire", weight: 32 })])
+    );
+  });
+
+  it("keeps conditional quest and clue rows visible but outside every default calculation", () => {
+    const runtime = createLegacyRuntime();
+    const baseContext = domainContextFromLegacy(runtime);
+    const questDrop = {
+      name: "Quest reward key",
+      key: "quest_reward_key",
+      chance: 1,
+      qtyAvg: 1,
+      eligibility: {
+        kind: "quest" as const,
+        policyId: "quest_reward_key_missing",
+        description: "Requires an exact quest stage and no existing key."
+      }
+    };
+    const clueDrop = {
+      name: "Clue scroll (hard)",
+      tag: "clue_hard",
+      chance: 1 / 64,
+      qtyAvg: 1,
+      eligibility: {
+        kind: "clue" as const,
+        tier: "hard" as const,
+        membersOnly: true as const,
+        requiresNoClue: true as const
+      }
+    };
+    const monster = {
+      ...baseContext.gameData.monsters.chicken,
+      loot: [questDrop, clueDrop]
+    };
+    const context: SimulationContext = {
+      ...baseContext,
+      gameData: {
+        ...baseContext.gameData,
+        items: {
+          ...baseContext.gameData.items,
+          quest_reward_key: { id: "quest_reward_key", name: "Quest reward key", alch: 5000 }
+        },
+        monsters: { ...baseContext.gameData.monsters, chicken: monster }
+      },
+      priceSet: {
+        ...baseContext.priceSet,
+        itemPrices: { ...baseContext.priceSet.itemPrices, quest_reward_key: 10000 },
+        alchValues: { ...baseContext.priceSet.alchValues, quest_reward_key: 5000 }
+      }
+    };
+    const result = evaluateLoot(monster, context, {
+      alching: true,
+      lootPrefs: {
+        [lootPreferenceKey(questDrop, 0)]: "alch",
+        [lootPreferenceKey(clueDrop, 1)]: "loot"
+      }
+    });
+
+    expect(result).toMatchObject({
+      gpPerKill: 0,
+      prayerXpPerKill: 0,
+      alchCastsPerKill: 0,
+      alchTimePerKill: 0,
+      warnings: []
+    });
+    expect(result.lootBreakdown).toHaveLength(2);
+    expect(result.lootBreakdown).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          pref: "skip",
+          evGp: 0,
+          slotFrac: 0,
+          eligibilityActive: false
+        })
+      ])
     );
   });
 

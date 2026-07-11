@@ -200,6 +200,29 @@ describe("validated game data snapshots", () => {
     expect(Object.values(generatedSnapshot.monsters).every((monster) => monster.size != null)).toBe(
       true
     );
+    const conditionalDrops = Object.values(generatedSnapshot.monsters)
+      .flatMap((monster) =>
+        (monster.loot ?? []).flatMap((entry) => (Array.isArray(entry) ? entry : [entry]))
+      )
+      .filter((drop) => drop.eligibility != null);
+    expect(conditionalDrops).toHaveLength(25);
+    expect(conditionalDrops.filter((drop) => drop.eligibility?.kind === "quest")).toHaveLength(4);
+    expect(conditionalDrops.filter((drop) => drop.eligibility?.kind === "clue")).toHaveLength(21);
+    expect(conditionalDrops).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          tag: "clue_hard",
+          eligibility: { kind: "clue", tier: "hard", membersOnly: true, requiresNoClue: true }
+        }),
+        expect.objectContaining({
+          key: "unholy_symbol_mould",
+          eligibility: expect.objectContaining({
+            kind: "quest",
+            policyId: "observatory_quest_complete"
+          })
+        })
+      ])
+    );
     expect(generatedSnapshot).not.toHaveProperty("priceHistory");
     expect(generatedSnapshot).not.toHaveProperty("historicalSnapshots");
   });

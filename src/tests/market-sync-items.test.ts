@@ -52,6 +52,17 @@ describe("market sync item expansion", () => {
               { name: "Coins", key: "coins", chance: 0.5, qtyAvg: 10 }
             ],
             { name: "Random herb", tag: "herb", chance: 0.25, qtyAvg: 1 },
+            {
+              name: "Quest item",
+              key: "conditional_not_mapped",
+              chance: 1,
+              qtyAvg: 1,
+              eligibility: {
+                kind: "quest",
+                policyId: "quest_item_missing",
+                description: "Requires exact player state."
+              }
+            },
             { name: "Unsupported", key: "not_mapped", chance: 0.25, qtyAvg: 1 }
           ]
         }

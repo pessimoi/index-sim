@@ -51,7 +51,7 @@ function dropWithProvenance(
       sourceRef,
       sourceRevision,
       generatedAt,
-      "Parsed from the reviewed core-loot RuneScript path; quest-gated and clue tertiary rows stay explicitly excluded."
+      "Parsed from the reviewed RuneScript loot path; conditional quest and clue rows are retained with typed eligibility and excluded from default valuation."
     )
   };
 }
@@ -112,7 +112,7 @@ export function createLostCityRawSnapshot(input: {
           [combatSource?.sourceRef, extraction.sourceRef].filter(Boolean).join(", "),
           input.sourceRevision,
           input.generatedAt,
-          "Combat fields and reviewed core loot are parsed from the pinned LostCity content revision."
+          "Combat fields and reviewed loot, including typed conditional rows, are parsed from the pinned LostCity content revision."
         )
       };
       return [runtimeId, definition];

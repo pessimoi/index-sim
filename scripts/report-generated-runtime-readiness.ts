@@ -294,7 +294,7 @@ export function formatSourceSliceCoveragePlanMarkdown(
     ? [
         "- Runtime coverage gaps are closed for this candidate.",
         "- Keep the committed source pin, revision-impact evidence and root bootstrap in sync for each reviewed revision bump.",
-        "- Treat requirements, quest/clue exclusions and legacy deletion as separate decision boundaries."
+        "- Treat requirement quest state, conditional-loot activation and legacy deletion as separate decision boundaries."
       ]
     : [
         "- Expand the accepted raw parser or normalized contract fixtures until blocking sections have zero missing ids.",

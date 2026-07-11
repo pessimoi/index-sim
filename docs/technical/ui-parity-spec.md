@@ -600,7 +600,7 @@ Required content:
 - Prayer XP from burying.
 - Loot value composition section.
 
-Current implementation note: the root rewrite UI exposes the full current-target loot workflow, meaningful action controls, per-monster settings, composition/nested/action-impact detail and price-history context from the same merged shared/local analysis used by Economy. Generated high alch controls alch profitability. Economy owns the read-only shared plus local comparison workflow; D-049 still keeps full legacy history migration out of V1, while root-variable and scheduled-run evidence remain operations work after the successful live dry-run.
+Current implementation note: the root rewrite UI exposes the full current-target loot workflow, meaningful action controls, per-monster settings, composition/nested/action-impact detail and price-history context from the same merged shared/local analysis used by Economy. Generated high alch controls alch profitability. D-072 conditional quest/clue rows remain visible with their source chance, sanitized eligibility state and one disabled Skip action; they contribute no value or trip effect while exact player state is unavailable. Economy owns the read-only shared plus local comparison workflow; D-049 still keeps full legacy history migration out of V1, while root-variable and scheduled-run evidence remain operations work after the successful live dry-run.
 
 #### Loot/Economy nested workflow parity slice
 
@@ -617,9 +617,10 @@ Source and status:
   visible V1 replacement workflow.
 - Current state: the drop table, action selection, per-action net GP/hr impact,
   full nested drop detail, loot value composition, trip-state row labels,
-  merged shared/local history context in Loot row detail and Economy exist. This
-  visible slice is closed; configured scheduled-run evidence, backend/account
-  history and full legacy history migration remain outside the slice.
+  conditional eligibility labels, merged shared/local history context in Loot
+  row detail and Economy exist. This visible slice is closed; exact player-state
+  activation, configured scheduled-run evidence, backend/account history and
+  full legacy history migration remain outside the slice.
 
 In scope:
 

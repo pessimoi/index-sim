@@ -1,4 +1,4 @@
-import type { DropDefinition, DropEntry } from "../src/domain/shared";
+import type { DropDefinition, DropEligibility, DropEntry } from "../src/domain/shared";
 import {
   configParamValue,
   lastConfigValue,
@@ -50,6 +50,78 @@ interface RandomAssignment {
   lineIndex: number;
   variable: string;
   denominator: number;
+}
+
+interface QuestDropPolicy {
+  runtimeId: string;
+  itemId: string;
+  requiredConditionParts: readonly string[];
+  eligibility: DropEligibility & { kind: "quest" };
+}
+
+const QUEST_DROP_POLICIES: readonly QuestDropPolicy[] = [
+  {
+    runtimeId: "chaos_druid",
+    itemId: "unholy_symbol_mould",
+    requiredConditionParts: ["%itgronigen >= ^itgronigen_complete"],
+    eligibility: {
+      kind: "quest",
+      policyId: "observatory_quest_complete",
+      description: "Requires the Observatory Quest source state to be complete."
+    }
+  },
+  {
+    runtimeId: "mountain_troll",
+    itemId: "troll_key_godric",
+    requiredConditionParts: [
+      "npc_type = troll_prison_guard1 | npc_type = troll_prison_guard1_awake",
+      "%troll_quest < ^troll_freed_godric",
+      "~obj_gettotal(troll_key_godric) = 0"
+    ],
+    eligibility: {
+      kind: "quest",
+      policyId: "troll_stronghold_godric_key_missing",
+      description: "Requires the matching Troll Stronghold stage and no Godric prison key."
+    }
+  },
+  {
+    runtimeId: "mountain_troll",
+    itemId: "troll_key_eadgar",
+    requiredConditionParts: ["%troll_freed_eadgar = ^false", "~obj_gettotal(troll_key_eadgar) = 0"],
+    eligibility: {
+      kind: "quest",
+      policyId: "troll_stronghold_eadgar_key_missing",
+      description: "Requires the matching Troll Stronghold stage and no Eadgar cell key."
+    }
+  },
+  {
+    runtimeId: "troll_general",
+    itemId: "troll_key_prison",
+    requiredConditionParts: [
+      "npc_type = troll_general | npc_type = troll_general2 | npc_type = troll_general3",
+      "%troll_quest < ^troll_entered_prison",
+      "~obj_gettotal(troll_key_prison) = 0"
+    ],
+    eligibility: {
+      kind: "quest",
+      policyId: "troll_stronghold_prison_key_missing",
+      description: "Requires the pre-prison Troll Stronghold stage and no prison key."
+    }
+  }
+];
+
+function questDropPolicy(
+  runtimeId: string,
+  call: ParsedDropCall,
+  conditions: readonly string[]
+): QuestDropPolicy | undefined {
+  const conditionText = conditions.join(" ");
+  return QUEST_DROP_POLICIES.find(
+    (policy) =>
+      policy.runtimeId === runtimeId &&
+      policy.itemId === call.itemExpression &&
+      policy.requiredConditionParts.every((part) => conditionText.includes(part))
+  );
 }
 
 function splitTopLevelArgs(value: string): string[] {
@@ -175,6 +247,7 @@ function randomAssignment(lines: string[]): RandomAssignment | undefined {
 }
 
 function directDropsBeforeRandom(input: {
+  runtimeId: string;
   lines: string[];
   end: number;
   npc: LostCityConfigEntry;
@@ -182,6 +255,7 @@ function directDropsBeforeRandom(input: {
   params: LostCityConfigCatalog;
   issues: LostCityLootExtractionIssue[];
   exclusions: LostCityLootExtractionExclusion[];
+  conditionalLoot: DropDefinition[];
 }): DropEntry[] {
   const loot: DropEntry[] = [];
   const conditions: string[] = [];
@@ -197,9 +271,20 @@ function directDropsBeforeRandom(input: {
       (value) => value.includes("npc_findhero") || value.includes("map_members")
     );
     if (!supportedCondition) {
+      const policy = questDropPolicy(input.runtimeId, call, conditions);
+      if (!policy) {
+        input.issues.push({
+          code: "unsupported_drop_condition",
+          message: "Unreviewed conditional direct drop requires an explicit policy."
+        });
+        continue;
+      }
+      const drop = dropFromCall({ ...input, call, chance: 1 });
+      if (drop) input.conditionalLoot.push({ ...drop, eligibility: policy.eligibility });
       input.exclusions.push({
         code: "quest_gated_drop",
-        message: "Quest- or NPC-state-gated drop is outside the current snapshot scope."
+        message:
+          "Modeled quest drop is excluded from default valuation until exact player state is available."
       });
       continue;
     }
@@ -273,6 +358,7 @@ function thresholdBranches(lines: string[], variable: string): ThresholdBranch[]
 }
 
 function randomDrops(input: {
+  runtimeId: string;
   assignment: RandomAssignment;
   lines: string[];
   npc: LostCityConfigEntry;
@@ -280,6 +366,7 @@ function randomDrops(input: {
   params: LostCityConfigCatalog;
   issues: LostCityLootExtractionIssue[];
   exclusions: LostCityLootExtractionExclusion[];
+  conditionalLoot: DropDefinition[];
 }): DropEntry[] {
   const branches = thresholdBranches(
     input.lines.slice(input.assignment.lineIndex + 1),
@@ -306,9 +393,30 @@ function randomDrops(input: {
       continue;
     }
     if (branch.condition) {
+      const calls = branch.lines
+        .map(parseDropCall)
+        .filter((call): call is ParsedDropCall => !!call);
+      const policy =
+        calls.length === 1
+          ? questDropPolicy(input.runtimeId, calls[0], [branch.condition])
+          : undefined;
+      if (!policy) {
+        input.issues.push({
+          code: "unsupported_drop_condition",
+          message: "Unreviewed conditional weighted drop requires an explicit policy."
+        });
+        continue;
+      }
+      const drop = dropFromCall({
+        ...input,
+        call: calls[0],
+        chance: weight / input.assignment.denominator
+      });
+      if (drop) input.conditionalLoot.push({ ...drop, eligibility: policy.eligibility });
       input.exclusions.push({
         code: "quest_gated_drop",
-        message: "Quest-gated weighted drop is outside the current snapshot scope."
+        message:
+          "Modeled quest drop is excluded from default valuation until exact player state is available."
       });
       continue;
     }
@@ -338,6 +446,53 @@ function randomDrops(input: {
     }
   }
   return loot;
+}
+
+function clueDrops(
+  lines: readonly string[],
+  issues: LostCityLootExtractionIssue[],
+  exclusions: LostCityLootExtractionExclusion[]
+): DropDefinition[] {
+  const clueLines = lines.filter((line) => /~trail_[A-Za-z0-9_]*cluedrop\(/.test(line));
+  if (clueLines.length > 1) {
+    issues.push({
+      code: "unsupported_drop_condition",
+      message: "Multiple clue tertiary calls in one resolved handler require review."
+    });
+    return [];
+  }
+  return clueLines.flatMap((rawLine) => {
+    const line = rawLine.replace(/\/\/.*$/, "").trim();
+    const match = line.match(/^~trail_(easy|medium|hard)cluedrop\(([1-9][0-9]*),\s*npc_coord\);$/);
+    if (!match) {
+      issues.push({
+        code: "unsupported_drop_condition",
+        message: "Unreviewed clue tertiary call requires an explicit policy."
+      });
+      return [];
+    }
+    const tier = match[1] as "easy" | "medium" | "hard";
+    const rarity = Number(match[2]);
+    exclusions.push({
+      code: "tertiary_clue_drop",
+      message:
+        "Modeled clue drop is excluded from default valuation until exact player state is available."
+    });
+    return [
+      {
+        name: `Clue scroll (${tier})`,
+        tag: `clue_${tier}`,
+        chance: 1 / rarity,
+        qtyAvg: 1,
+        eligibility: {
+          kind: "clue" as const,
+          tier,
+          membersOnly: true as const,
+          requiresNoClue: true as const
+        }
+      }
+    ];
+  });
 }
 
 export function extractLostCityMonsterLootSource(input: {
@@ -409,31 +564,31 @@ export function extractLostCityMonsterLootSource(input: {
       });
   const lines = [...block.lines, ...delegatedProcedureLines];
   const issues: LostCityLootExtractionIssue[] = [];
-  const exclusions: LostCityLootExtractionExclusion[] = lines
-    .filter((line) => /~trail_(?:easy|medium|hard)cluedrop\(/.test(line))
-    .map(() => ({
-      code: "tertiary_clue_drop" as const,
-      message: "Clue-scroll tertiary expected value is outside the current snapshot scope."
-    }));
+  const exclusions: LostCityLootExtractionExclusion[] = [];
+  const conditionalLoot = clueDrops(lines, issues, exclusions);
   const assignment = randomAssignment(lines);
   const direct = directDropsBeforeRandom({
+    runtimeId: input.runtimeId,
     lines,
     end: assignment?.lineIndex ?? lines.length,
     npc,
     objects: input.objects,
     params: input.params,
     issues,
-    exclusions
+    exclusions,
+    conditionalLoot
   });
   const random = assignment
     ? randomDrops({
+        runtimeId: input.runtimeId,
         assignment,
         lines,
         npc,
         objects: input.objects,
         params: input.params,
         issues,
-        exclusions
+        exclusions,
+        conditionalLoot
       })
     : [];
   return {
@@ -445,7 +600,7 @@ export function extractLostCityMonsterLootSource(input: {
         ? "partial"
         : "unsupported"
       : "complete",
-    loot: [...direct, ...random],
+    loot: [...direct, ...random, ...conditionalLoot],
     issues,
     exclusions
   };

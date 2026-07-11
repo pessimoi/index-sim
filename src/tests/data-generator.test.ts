@@ -178,6 +178,42 @@ afterEach(() => {
 });
 
 describe("game data generator foundation", () => {
+  it("validates strict quest and clue drop eligibility contracts", () => {
+    const valid = rawReferenceSnapshot();
+    valid.monsters.giant.loot = [
+      {
+        name: "Quest key",
+        key: "quest_key",
+        chance: 1,
+        qtyAvg: 1,
+        eligibility: {
+          kind: "quest",
+          policyId: "quest_key_missing",
+          description: "Requires an exact quest stage and no existing key."
+        }
+      },
+      {
+        name: "Clue scroll (easy)",
+        tag: "clue_easy",
+        chance: 1 / 128,
+        qtyAvg: 1,
+        eligibility: {
+          kind: "clue",
+          tier: "easy",
+          membersOnly: true,
+          requiresNoClue: true
+        }
+      }
+    ];
+
+    expect(GameDataSnapshotSchema.parse(valid).monsters.giant.loot).toHaveLength(2);
+    const invalid = structuredClone(valid) as unknown as Record<string, unknown>;
+    const invalidMonster = (invalid.monsters as Record<string, Record<string, unknown>>).giant;
+    const invalidDrop = (invalidMonster.loot as Array<Record<string, unknown>>)[1];
+    (invalidDrop.eligibility as Record<string, unknown>).membersOnly = false;
+    expect(GameDataSnapshotSchema.safeParse(invalid).success).toBe(false);
+  });
+
   it("reports a clear missing default source path without dumping absolute paths", () => {
     const repoRoot = join(TEST_ROOT, "missing-default");
     mkdirSync(repoRoot, { recursive: true });

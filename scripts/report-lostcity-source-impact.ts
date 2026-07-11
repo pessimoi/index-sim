@@ -479,7 +479,7 @@ export function formatLostCitySourceImpactMarkdown(report: LostCitySourceImpactR
       `Weapon fields replaced: ${report.includeCombatCatalog ? report.weaponFields.join(", ") : "no"}`,
       `Ammo fields replaced: ${report.includeCombatCatalog ? report.ammoFields.join(", ") : "no"}`,
       `Spell fields replaced: ${report.includeCombatCatalog ? report.spellFields.join(", ") : "no"}`,
-      `Loot replaced: ${report.includeLoot ? `yes (${report.lootExclusionCount} scoped exclusions)` : "no"}`,
+      `Loot replaced: ${report.includeLoot ? `yes (${report.lootExclusionCount} modeled conditional rows excluded from default valuation)` : "no"}`,
       "Scope: in-memory evidence only; sections not listed as replaced remain at reference values.",
       "This read-only report neither accepts new source differences nor changes the committed runtime.",
       "",
@@ -507,7 +507,7 @@ export function formatLostCitySourceImpactMarkdown(report: LostCitySourceImpactR
       "",
       "- Revision 274 combat, core-loot, equipment and combat-catalog deltas are accepted by D-055, D-056 and D-057; future source changes require fresh review.",
       "- The committed generator report, not this read-only diagnostic, owns accepted-delta notes for the active runtime.",
-      "- Requirement skill inference and quest/clue exclusions remain separate decision boundaries.",
+      "- Quest/clue eligibility activation and requirement quest-state inference remain separate player-state decision boundaries.",
       "- Loot, equipment, weapon/ammo and monster-combat extraction remain independently selectable evidence slices."
     ].join("\n") + "\n"
   );

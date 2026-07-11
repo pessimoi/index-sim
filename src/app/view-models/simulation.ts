@@ -496,6 +496,7 @@ export interface LootDropRowViewModel {
   evGp: number;
   effectiveEvGp: number;
   stateLabel: string | null;
+  eligibilityDescription: string | null;
   pref: LootAction;
   prefLabel: string;
   defaultPref: LootAction;
@@ -1047,6 +1048,7 @@ function availableLootActions(
   alching: boolean,
   natureRuneCost: number
 ): LootAction[] {
+  if (!drop.eligibilityActive) return ["skip"];
   const actions: LootAction[] = ["loot", "skip"];
   if (drop.isBone) actions.push("bury");
   if (alching && drop.alchValue - natureRuneCost > 0) actions.push("alch");
@@ -1060,7 +1062,15 @@ function lootActionLabel(action: LootAction): string {
   return action === "unid" ? "Unid" : action.charAt(0).toUpperCase() + action.slice(1);
 }
 
-function lootRowStateLabel(drop: Pick<LootBreakdownEntry, "_eaten" | "_displaced">): string | null {
+function lootRowStateLabel(
+  drop: Pick<LootBreakdownEntry, "_eaten" | "_displaced" | "eligibility" | "eligibilityActive">
+): string | null {
+  if (!drop.eligibilityActive && drop.eligibility?.kind === "quest") {
+    return "Quest state not modeled";
+  }
+  if (!drop.eligibilityActive && drop.eligibility?.kind === "clue") {
+    return "Clue eligibility not modeled";
+  }
   if (drop._eaten) return "Eaten as food";
   if (drop._displaced) return "Displaced by inventory";
   return null;
@@ -1148,6 +1158,17 @@ function lootValueDetails(drop: LootBreakdownEntry): LootDropValueDetailViewMode
     { label: "Alch value", value: `${formatNumber(drop.alchValue)} gp`, tone: "muted" },
     { label: "Slot fraction", value: formatNumber(drop.slotFrac, 2), tone: "muted" }
   ];
+
+  if (!drop.eligibilityActive && drop.eligibility) {
+    rows.push({
+      label: "Eligibility",
+      value:
+        drop.eligibility.kind === "quest"
+          ? drop.eligibility.description
+          : "Requires a members area and no existing clue scroll.",
+      tone: "warning"
+    });
+  }
 
   if (drop._displaced) {
     rows.push({
@@ -1977,13 +1998,22 @@ function createLootRows(
       evGp: drop.evGp,
       effectiveEvGp: effectiveDropEvGp(drop),
       stateLabel: lootRowStateLabel(drop),
+      eligibilityDescription:
+        drop.eligibility?.kind === "quest"
+          ? drop.eligibility.description
+          : drop.eligibility?.kind === "clue"
+            ? "Requires a members area and no existing clue scroll."
+            : null,
       pref: drop.pref,
       prefLabel: lootActionLabel(drop.pref),
       defaultPref: defaultDrop.pref,
       availableActions,
       actionImpacts,
       selectedDeltaNetGpPerHour: selectedImpact?.deltaNetGpPerHour ?? 0,
-      isOverride: lootPrefs[drop.rowId] != null && lootPrefs[drop.rowId] !== defaultDrop.pref,
+      isOverride:
+        drop.eligibilityActive &&
+        lootPrefs[drop.rowId] != null &&
+        lootPrefs[drop.rowId] !== defaultDrop.pref,
       prayerXp: drop.prayerXp,
       alchValue: drop.alchValue,
       slotFrac: drop.slotFrac,

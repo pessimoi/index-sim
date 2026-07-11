@@ -2891,9 +2891,9 @@ function createRevisionImpactReport(
   const currentScopeLines =
     outputs.plan.parserStatus === "raw-lostcity"
       ? [
-          "- Runtime monster combat fields and reviewed core loot are parsed directly from pinned LostCity NPC config and RuneScript handlers.",
+          "- Runtime monster combat fields and reviewed loot are parsed directly from pinned LostCity NPC config and RuneScript handlers.",
           "- Runtime item, weapon, ammo, spell and equipment calculation fields are parsed directly from pinned LostCity object, param and dbrow configs.",
-          "- Simulator-only synthetic identities remain explicitly app-owned; quest-gated drops and clue tertiaries remain outside the raw candidate.",
+          "- Simulator-only synthetic identities remain explicitly app-owned; four quest-gated rows and 21 clue tertiaries carry typed eligibility and stay excluded from default valuation until exact player state is modeled.",
           "- Item skill requirements are parsed from pinned levelrequire triggers/definitions; quest completion clauses remain outside the generated contract, and NPC size comes from config with the source default of 1.",
           "- The root browser runtime consumes this committed source-backed generated snapshot; the legacy-derived static bridge remains reference and rollback evidence.",
           "- Source object costs provide item/alch fallbacks; scheduled PriceSet values remain outside this generator and take precedence in the staged generated runtime adapter."

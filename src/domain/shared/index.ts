@@ -134,6 +134,19 @@ export interface ItemRequirementDefinition {
   notes?: string;
 }
 
+export type DropEligibility =
+  | {
+      kind: "quest";
+      policyId: EntityId;
+      description: string;
+    }
+  | {
+      kind: "clue";
+      tier: "easy" | "medium" | "hard";
+      membersOnly: true;
+      requiresNoClue: true;
+    };
+
 export interface DropDefinition {
   name: string;
   key?: EntityId;
@@ -144,6 +157,7 @@ export interface DropDefinition {
   tag?: string;
   slotFrac?: number;
   prayerXp?: number;
+  eligibility?: DropEligibility;
   provenance?: DataProvenance;
   notes?: string;
   _expand?: Array<Record<string, unknown>>;

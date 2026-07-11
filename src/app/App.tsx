@@ -6033,6 +6033,7 @@ export function App() {
                                 aria-label={`Action for ${row.name} ${row.rowId}`}
                                 className="action-select"
                                 value={row.pref}
+                                disabled={row.availableActions.length === 1}
                                 onChange={(event) =>
                                   setLootActionForCurrentMonster(row, event.target.value)
                                 }

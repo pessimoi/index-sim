@@ -159,6 +159,7 @@ export interface LootBreakdownEntry extends DropDefinition {
   prayerXp: number;
   alchValue: number;
   bulkDead: boolean;
+  eligibilityActive: boolean;
   _eaten?: boolean;
   _displaced?: boolean;
 }
@@ -1455,6 +1456,24 @@ export function evaluateLoot(
 
   for (const [rowIndex, rawDrop] of flattenLoot(monster.loot).entries()) {
     const rowId = lootPreferenceKey(rawDrop, rowIndex);
+    if (rawDrop.eligibility) {
+      lootBreakdown.push({
+        ...rawDrop,
+        rowId,
+        price: 0,
+        saleValue: 0,
+        evGp: 0,
+        pref: "skip",
+        isBone: false,
+        isHerb: false,
+        slotFrac: 0,
+        prayerXp: 0,
+        alchValue: 0,
+        bulkDead: false,
+        eligibilityActive: false
+      });
+      continue;
+    }
     const drop = adjustDropPrices(rawDrop, priceSet, options, warnings);
     const isBone = bonePrayerXp(drop.name) > 0;
     const isHerb = drop.tag === "herb";
@@ -1547,7 +1566,8 @@ export function evaluateLoot(
       slotFrac,
       prayerXp: isBone ? bonePrayerXp(drop.name) : 0,
       alchValue: dropAlch,
-      bulkDead
+      bulkDead,
+      eligibilityActive: true
     });
   }
 

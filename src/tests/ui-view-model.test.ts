@@ -2612,6 +2612,57 @@ describe("rewrite UI view models", () => {
     expect(skipImpact?.gpPerKillContribution).toBe(0);
   });
 
+  it("shows generated conditional loot as a locked, sanitized zero-value row", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const conditionalContext: SimulationContext = {
+      ...context,
+      gameData: {
+        ...context.gameData,
+        monsters: {
+          ...context.gameData.monsters,
+          greater_demon: {
+            ...context.gameData.monsters.greater_demon,
+            loot: [
+              ...(context.gameData.monsters.greater_demon.loot ?? []),
+              {
+                name: "Clue scroll (hard)",
+                tag: "clue_hard",
+                chance: 1 / 128,
+                qtyAvg: 1,
+                eligibility: {
+                  kind: "clue",
+                  tier: "hard",
+                  membersOnly: true,
+                  requiresNoClue: true
+                }
+              }
+            ]
+          }
+        }
+      }
+    };
+    const result = createSimulationViewModel(
+      { ...DEFAULT_FORM_STATE, monsterId: "greater_demon" },
+      conditionalContext,
+      {},
+      { "Clue scroll (hard)": "loot" }
+    );
+    const clue = result.lootRows.find((row) => row.tag === "clue_hard");
+
+    expect(clue).toMatchObject({
+      name: "Clue scroll (hard)",
+      pref: "skip",
+      availableActions: ["skip"],
+      effectiveEvGp: 0,
+      stateLabel: "Clue eligibility not modeled",
+      eligibilityDescription: "Requires a members area and no existing clue scroll.",
+      isOverride: false
+    });
+    expect(clue?.valueDetails).toEqual(
+      expect.arrayContaining([expect.objectContaining({ label: "Eligibility", tone: "warning" })])
+    );
+  });
+
   it("labels trip-layer eaten or displaced loot rows in the view model when present", async () => {
     const { context } = await loadBundledLegacyContext();
     const result = createSimulationViewModel(

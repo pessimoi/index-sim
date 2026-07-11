@@ -119,14 +119,14 @@ describe("generated runtime adapter", () => {
       extraCount: 0
     });
     expect(itemCoverage).toMatchObject({
-      candidateCount: 386,
+      candidateCount: 390,
       missingCount: 0,
-      extraCount: 15
+      extraCount: 19
     });
     expect(itemFieldCoverage).toMatchObject({
       candidateCount: 371,
       missingCount: 0,
-      extraCount: 15
+      extraCount: 19
     });
     expect(monsterCombatStatCoverage).toMatchObject({
       blocking: true,

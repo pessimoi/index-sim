@@ -169,6 +169,34 @@ function writeRequirementSource(name: string, files: Record<string, string>): st
   return sourceDir;
 }
 
+function writeLootPolicySource(
+  name: string,
+  handlers: Record<string, string>,
+  npcSource = "",
+  objectSource = ""
+): string {
+  const sourceDir = join(TEST_ROOT, name);
+  cpSync(FIXTURE_SOURCE, sourceDir, { recursive: true });
+  const scriptsDir = join(sourceDir, "scripts", "conditional-loot", "scripts");
+  mkdirSync(scriptsDir, { recursive: true });
+  for (const [filename, source] of Object.entries(handlers)) {
+    const target =
+      filename === "giant.rs2"
+        ? join(sourceDir, "scripts", "drop tables", "scripts", filename)
+        : join(scriptsDir, filename);
+    writeFileSync(target, source);
+  }
+  if (npcSource) {
+    const npcFile = join(sourceDir, "scripts", "_unpack", "225", "all.npc");
+    writeFileSync(npcFile, `${readFileSync(npcFile, "utf8")}\n${npcSource}\n`);
+  }
+  if (objectSource) {
+    const objectFile = join(sourceDir, "scripts", "skill_combat", "configs", "items.obj");
+    writeFileSync(objectFile, `${readFileSync(objectFile, "utf8")}\n${objectSource}\n`);
+  }
+  return sourceDir;
+}
+
 function requirementReference(itemIds: string[]): GameDataSnapshot {
   const reference = referenceSnapshot();
   const template = reference.weapons.rune_scimitar;
@@ -370,6 +398,106 @@ describe("LostCity content source parser", () => {
       alch: 15360,
       provenance: { source: "generated", revision: "fixture-274" }
     });
+  });
+
+  it.each([
+    ["easy", 64],
+    ["medium", 128],
+    ["hard", 129]
+  ] as const)("models a reviewed %s clue tertiary at its source rarity", (tier, rarity) => {
+    const sourceDir = writeLootPolicySource(`clue-${tier}`, {
+      "giant.rs2": `[ai_queue3,giant]\nobj_add(npc_coord, npc_param(death_drop), 1, ^lootdrop_duration);\n~trail_${tier}cluedrop(${rarity}, npc_coord);`
+    });
+    const result = extractLostCityMonsterLootSource({
+      runtimeId: "giant",
+      npcs: readLostCityConfigCatalog({ sourceDir, extension: ".npc" }),
+      objects: readLostCityConfigCatalog({ sourceDir, extension: ".obj" }),
+      params: readLostCityConfigCatalog({ sourceDir, extension: ".param" }),
+      handlers: readLostCityLootHandlerCatalog({ sourceDir })
+    });
+
+    expect(result.status).toBe("complete");
+    expect(result.loot.at(-1)).toMatchObject({
+      name: `Clue scroll (${tier})`,
+      tag: `clue_${tier}`,
+      chance: 1 / rarity,
+      qtyAvg: 1,
+      eligibility: { kind: "clue", tier, membersOnly: true, requiresNoClue: true }
+    });
+    expect(result.exclusions).toEqual([expect.objectContaining({ code: "tertiary_clue_drop" })]);
+  });
+
+  it("models only the four reviewed runtime quest-drop policies", () => {
+    const sourceDir = writeLootPolicySource(
+      "quest-policies",
+      {
+        "chaos_druid.rs2":
+          "[ai_queue3,chaos_druid]\ndef_int $random = random(128);\nif ($random < 1 & %itgronigen >= ^itgronigen_complete) obj_add(npc_coord, unholy_symbol_mould, 1, ^lootdrop_duration);",
+        "mountain_troll.rs2":
+          "[ai_queue3,death_troll_melee1]\nif (npc_findhero = ^true) {\nif(npc_type = troll_prison_guard1 | npc_type = troll_prison_guard1_awake) {\nif(%troll_quest < ^troll_freed_godric & ~obj_gettotal(troll_key_godric) = 0) {\nobj_add(npc_coord, troll_key_godric, 1, ^lootdrop_duration);\n}\n} else if(npc_type = troll_prison_guard2 | npc_type = troll_prison_guard2_awake) {\nif(%troll_freed_eadgar = ^false & ~obj_gettotal(troll_key_eadgar) = 0) {\nobj_add(npc_coord, troll_key_eadgar, 1, ^lootdrop_duration);\n}\n}\n}",
+        "troll_general.rs2":
+          "[ai_queue3,troll_general]\nif (npc_findhero = ^true) {\nif(npc_type = troll_general | npc_type = troll_general2 | npc_type = troll_general3) {\nif(%troll_quest < ^troll_entered_prison & ~obj_gettotal(troll_key_prison) = 0) {\nobj_add(npc_coord, troll_key_prison, 1, ^lootdrop_duration);\n}\n}\n}"
+      },
+      "[chaos_druid]\nname=Chaos druid\n[death_troll_melee1]\nname=Mountain troll\n[troll_general]\nname=Troll general",
+      "[unholy_symbol_mould]\nname=Unholy symbol mould\n[troll_key_godric]\nname=Prison key\n[troll_key_eadgar]\nname=Cell key\n[troll_key_prison]\nname=Prison key"
+    );
+    const catalogs = {
+      npcs: readLostCityConfigCatalog({ sourceDir, extension: ".npc" }),
+      objects: readLostCityConfigCatalog({ sourceDir, extension: ".obj" }),
+      params: readLostCityConfigCatalog({ sourceDir, extension: ".param" }),
+      handlers: readLostCityLootHandlerCatalog({ sourceDir })
+    };
+    const rows = ["chaos_druid", "mountain_troll", "troll_general"].flatMap((runtimeId) => {
+      const result = extractLostCityMonsterLootSource({ runtimeId, ...catalogs });
+      expect(result.status).toBe("complete");
+      return result.loot.filter(
+        (drop) => !Array.isArray(drop) && drop.eligibility?.kind === "quest"
+      );
+    });
+
+    expect(rows).toHaveLength(4);
+    expect(rows.map((row) => (!Array.isArray(row) ? row.key : null))).toEqual([
+      "unholy_symbol_mould",
+      "troll_key_godric",
+      "troll_key_eadgar",
+      "troll_key_prison"
+    ]);
+    expect(rows.map((row) => (!Array.isArray(row) ? row.eligibility : null))).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ policyId: "observatory_quest_complete" }),
+        expect.objectContaining({ policyId: "troll_stronghold_godric_key_missing" }),
+        expect.objectContaining({ policyId: "troll_stronghold_eadgar_key_missing" }),
+        expect.objectContaining({ policyId: "troll_stronghold_prison_key_missing" })
+      ])
+    );
+  });
+
+  it.each([
+    ["invalid rarity", "~trail_easycluedrop(0, npc_coord);"],
+    [
+      "duplicate calls",
+      "~trail_easycluedrop(128, npc_coord);\n~trail_mediumcluedrop(128, npc_coord);"
+    ],
+    [
+      "unknown conditional row",
+      "if (%unknown = ^true) {\nobj_add(npc_coord, bronze_arrow, 1, ^lootdrop_duration);\n}"
+    ]
+  ])("fails closed for %s", (_label, source) => {
+    const sourceDir = writeLootPolicySource("invalid-conditional", {
+      "giant.rs2": `[ai_queue3,giant]\n${source}`
+    });
+    const result = extractLostCityMonsterLootSource({
+      runtimeId: "giant",
+      npcs: readLostCityConfigCatalog({ sourceDir, extension: ".npc" }),
+      objects: readLostCityConfigCatalog({ sourceDir, extension: ".obj" }),
+      params: readLostCityConfigCatalog({ sourceDir, extension: ".param" }),
+      handlers: readLostCityLootHandlerCatalog({ sourceDir })
+    });
+
+    expect(result.status).not.toBe("complete");
+    expect(result.issues).toEqual([
+      expect.objectContaining({ code: "unsupported_drop_condition" })
+    ]);
   });
 
   it("reports direct runtime ids separately from mapping-needed ids", () => {

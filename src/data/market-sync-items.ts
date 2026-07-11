@@ -80,6 +80,7 @@ function addDropItems(
   missingMappingItemIds: Set<EntityId>,
   drop: DropDefinition
 ): void {
+  if (drop.eligibility) return;
   const tagItems = drop.tag ? MARKET_SYNC_TAG_ITEM_IDS[drop.tag] : undefined;
   if (tagItems) {
     for (const itemId of tagItems) addSupportedItem(itemIds, missingMappingItemIds, itemId);

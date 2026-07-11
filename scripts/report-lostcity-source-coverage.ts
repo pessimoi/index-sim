@@ -969,7 +969,7 @@ export function formatLostCitySourceCoverageMarkdown(report: LostCitySourceCover
       ...Object.entries(report.monsterLootExtraction.issueExamples).map(
         ([code, examples]) => `- ${code} examples: ${examples.join("; ")}`
       ),
-      `- Scoped exclusions: ${
+      `- Conditional default-valuation exclusions: ${
         Object.entries(report.monsterLootExtraction.exclusionCounts)
           .map(([code, count]) => `${code}=${count}`)
           .join(", ") || "none"
@@ -1000,9 +1000,9 @@ export function formatLostCitySourceCoverageMarkdown(report: LostCitySourceCover
       `- First unresolved keys: ${report.monsterLootItemKeys.unresolvedExamples.join(", ") || "none"}`,
       "",
       "## Next Work",
-      "- Keep parser mappings and explicit exclusions in sync with reviewed source revisions.",
+      "- Keep parser mappings and conditional default-valuation exclusions in sync with reviewed source revisions.",
       "- Run the generator, readiness and calculation-impact gates before accepting a revision bump.",
-      "- Treat requirement skill inference, quest/clue rows and legacy deletion as separate decision boundaries."
+      "- Treat requirement quest state, conditional-loot activation and legacy deletion as separate decision boundaries."
     ].join("\n") + "\n"
   );
 }
