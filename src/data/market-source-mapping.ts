@@ -3,6 +3,8 @@ import { MARKET_SOURCE_ID, parseMarketSourceMappings } from "./schemas";
 
 const CATALOG_AUDITED_NOTE =
   "Source slug reviewed against the markets.lostcity.rs item catalog on 2026-07-10.";
+const DYNAMIC_LOOT_PAGE_AUDITED_NOTE =
+  "High-impact dynamic-loot source slug reviewed against the public markets.lostcity.rs item page on 2026-07-12.";
 
 const slugMapEntries: ReadonlyArray<[string, string]> = [
   ["sapphire", "sapphire"],
@@ -90,6 +92,21 @@ const specialKeyEntries: ReadonlyArray<[string, string]> = [
   ["unidentified_guam", "unidentified_guam"]
 ];
 
+export const HIGH_IMPACT_DYNAMIC_LOOT_MARKET_ENTRIES: ReadonlyArray<readonly [string, string]> = [
+  ["adamant_javelin", "adamant_javelin"],
+  ["dragon_med_helm", "dragon_med_helm"],
+  ["dragon_spear", "dragon_spear"],
+  ["dragonshield_a", "dragonshield_a"],
+  ["rune_2h", "rune_2h_sword"],
+  ["rune_battleaxe", "rune_battleaxe"],
+  ["rune_javelin", "rune_javelin"],
+  ["rune_kiteshield", "rune_kiteshield"],
+  ["rune_spear", "rune_spear"],
+  ["rune_sq_shield", "rune_sq_shield"],
+  ["runite_bar", "runite_bar"],
+  ["silver_ore", "silver_ore"]
+];
+
 function mapping(itemId: string, sourceSlug: string, notes: string): MarketSourceMapping {
   return {
     itemId,
@@ -107,7 +124,16 @@ export const MARKET_SOURCE_MAPPING_PROVENANCE = {
   sourceRef: "markets.lostcity.rs/api/items catalog lookup",
   verifiedAt: "2026-07-10",
   notes:
-    "The bounded allowlist was matched to current catalog slugs by generated item name, with ambiguous dragonhide and half-key identities resolved from canonical item ids/source identities."
+    "The bounded allowlist was matched to current catalog slugs by generated item name, with ambiguous dragonhide and half-key identities resolved from canonical item ids/source identities.",
+  extensions: [
+    {
+      sourceRef: "markets.lostcity.rs/items/{slug} bounded item-page status and identity review",
+      verifiedAt: "2026-07-12",
+      itemIds: HIGH_IMPACT_DYNAMIC_LOOT_MARKET_ENTRIES.map(([itemId]) => itemId),
+      notes:
+        "Twelve identified high-impact dynamic-loot dependencies were admitted. rune_2h maps to the source slug rune_2h_sword; ten species-specific unidentified-herb item pages returned 404 and remain outside the allowlist."
+    }
+  ]
 } as const;
 
 export const MARKET_SOURCE_MAPPINGS = parseMarketSourceMappings([
@@ -116,6 +142,9 @@ export const MARKET_SOURCE_MAPPINGS = parseMarketSourceMappings([
   ),
   ...specialKeyEntries.map(([itemId, sourceSlug]) =>
     mapping(itemId, sourceSlug, CATALOG_AUDITED_NOTE)
+  ),
+  ...HIGH_IMPACT_DYNAMIC_LOOT_MARKET_ENTRIES.map(([itemId, sourceSlug]) =>
+    mapping(itemId, sourceSlug, DYNAMIC_LOOT_PAGE_AUDITED_NOTE)
   )
 ]);
 

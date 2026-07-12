@@ -1,8 +1,11 @@
 import {
   createHitDistribution,
+  createHitDistributionMixture,
+  createIndependentHitDistribution,
   simulateCombat,
   weaponStances,
-  type CombatXpKey
+  type CombatXpKey,
+  type HitDistribution
 } from "@/domain/combat";
 import {
   buildPlan,
@@ -95,6 +98,7 @@ export interface SimulationViewModel {
   result: FullSimulationResult;
   combat: ReturnType<typeof simulateCombat>;
   hitDistribution: HitDistributionViewModel;
+  hitDistributionComparison: HitDistributionComparisonViewModel;
   combatRollDetail: StatsCombatRollDetailViewModel;
   xpRouting: XpRoutingViewModel;
   tripBankingSummary: StatsTripBankingSummaryViewModel;
@@ -134,7 +138,12 @@ export interface HitDistributionBucketViewModel {
   probability: number;
   percentLabel: string;
   widthPercent: number;
+  heightPercent: number;
+  damage: number | null;
+  cumulativeAtLeast: number | null;
+  cumulativeAtLeastLabel: string | null;
   isMiss: boolean;
+  isAccurateZero: boolean;
   isMaxHit: boolean;
 }
 
@@ -148,6 +157,50 @@ export interface HitDistributionViewModel {
   averageHitLabel: string;
   maxHitLabel: string;
   buckets: HitDistributionBucketViewModel[];
+}
+
+export interface HitDistributionComparisonPointViewModel {
+  probability: number;
+  percentLabel: string;
+  cumulativeAtLeast: number | null;
+  cumulativeAtLeastLabel: string | null;
+  heightPercent: number;
+  isMaxHit: boolean;
+}
+
+export interface HitDistributionComparisonBucketViewModel {
+  id: string;
+  label: string;
+  damage: number | null;
+  isMiss: boolean;
+  isAccurateZero: boolean;
+  ariaLabel: string;
+  normal: HitDistributionComparisonPointViewModel;
+  special: HitDistributionComparisonPointViewModel | null;
+}
+
+export interface HitDistributionComparisonSeriesViewModel {
+  id: "normal" | "special";
+  label: string;
+  scopeLabel: string;
+  distribution: HitDistributionViewModel;
+  expectedMarkerPercent: number;
+  expectedDamageLabel: string;
+  koChance: number;
+  koChanceLabel: string;
+}
+
+export interface HitDistributionComparisonViewModel {
+  series: HitDistributionComparisonSeriesViewModel[];
+  buckets: HitDistributionComparisonBucketViewModel[];
+  axisMaxDamage: number;
+  maxProbability: number;
+  maxProbabilityLabel: string;
+  middleProbabilityLabel: string;
+  targetHp: number | null;
+  targetHpLabel: string | null;
+  targetMarkerPercent: number | null;
+  koRegionStartPercent: number | null;
 }
 
 export interface StatsCombatRollMetricViewModel {
@@ -394,6 +447,7 @@ export interface MonsterCardViewModelOptions {
 
 export interface SimulationViewModelOptions {
   includeLootRows?: boolean;
+  includeHitDistributionAnalysis?: boolean;
   monsterCard?: MonsterCardViewModelOptions;
   lootPriceHistoryByItem?: Record<string, LootPriceHistoryItemContext | undefined>;
   activeAssumptions?: {
@@ -484,6 +538,7 @@ export interface LootPriceHistoryContextViewModel {
   latestLabel: string | null;
   baselineLabel: string | null;
   statusLabel: string;
+  emptyMessage: string;
 }
 
 export interface LootDropRowViewModel {
@@ -1372,6 +1427,8 @@ function expandedRows(drop: LootBreakdownEntry): LootExpandedRowViewModel[] {
     const chance = finiteNumberField(record, "chance");
     const qty = finiteNumberField(record, "qtyAvg") ?? finiteNumberField(record, "qty");
     const price = finiteNumberField(record, "price");
+    const rowValue = finiteNumberField(record, "rowValue") ?? price;
+    const note = stringField(record, "note");
 
     return {
       label: typeof record.name === "string" ? record.name : `Row ${index + 1}`,
@@ -1384,25 +1441,27 @@ function expandedRows(drop: LootBreakdownEntry): LootExpandedRowViewModel[] {
       qty,
       qtyLabel: qty !== null ? formatNumber(qty, 2) : null,
       price,
+      rowValue,
       evGp: null,
       shareOfParentPct: null,
       notes: [
         record.talisman === true ? "Talisman band" : null,
-        record.mega === true ? "Nested mega-rare table" : null
+        record.mega === true ? "Nested mega-rare table" : null,
+        record.proxy === true ? "Uses generic unidentified-herb price proxy" : null,
+        note
       ].filter((note): note is string => note !== null)
     };
   });
 
   const totalWeight = normalized.reduce((sum, row) => sum + (row.weight ?? 0), 0);
   const weightedValues = normalized.map((row) =>
-    row.weight !== null && row.price !== null ? row.weight * row.price : 0
+    row.weight !== null && row.rowValue !== null ? row.weight * row.rowValue : 0
   );
   const totalWeightedValue = weightedValues.reduce((sum, value) => sum + value, 0);
   const canDeriveWeightedShare =
     totalWeight > 0 &&
     totalWeightedValue > 0 &&
     effectiveDropEvGp(drop) > 0 &&
-    drop.pref !== "unid" &&
     drop.pref !== "alch" &&
     drop.pref !== "bury" &&
     drop.pref !== "skip";
@@ -1431,6 +1490,10 @@ function lootValueDetails(drop: LootBreakdownEntry): LootDropValueDetailViewMode
     { label: "Alch value", value: `${formatNumber(drop.alchValue)} gp`, tone: "muted" },
     { label: "Slot fraction", value: formatNumber(drop.slotFrac, 2), tone: "muted" }
   ];
+
+  if (drop._compositePrice === "opened-casket") {
+    rows.unshift({ label: "Valuation", value: "Opened contents EV", tone: "default" });
+  }
 
   if (!drop.eligibilityActive && drop.eligibility) {
     rows.push({
@@ -1471,6 +1534,21 @@ function lootPriceHistoryContext(
   drop: LootBreakdownEntry,
   historyByItem: SimulationViewModelOptions["lootPriceHistoryByItem"] = {}
 ): LootPriceHistoryContextViewModel {
+  if (drop._compositePrice === "opened-casket") {
+    return {
+      itemId: null,
+      itemLabel: drop.name,
+      tracked: false,
+      latestPrice: null,
+      baselinePrice: null,
+      gpDelta: null,
+      percentDelta: null,
+      latestLabel: null,
+      baselineLabel: null,
+      statusLabel: "Component-derived",
+      emptyMessage: "Opened contents EV uses component prices; parent casket history is not used."
+    };
+  }
   const itemId = drop.key ?? null;
   if (!itemId) {
     return {
@@ -1483,7 +1561,8 @@ function lootPriceHistoryContext(
       percentDelta: null,
       latestLabel: null,
       baselineLabel: null,
-      statusLabel: "No item key"
+      statusLabel: "No item key",
+      emptyMessage: "This parent row has no item key."
     };
   }
 
@@ -1499,7 +1578,8 @@ function lootPriceHistoryContext(
       percentDelta: null,
       latestLabel: null,
       baselineLabel: null,
-      statusLabel: "No history"
+      statusLabel: "No history",
+      emptyMessage: `Item ${itemId} is not in local history.`
     };
   }
 
@@ -1513,7 +1593,8 @@ function lootPriceHistoryContext(
     percentDelta: cleanNullableNumber(history.percentDelta),
     latestLabel: history.latestLabel,
     baselineLabel: history.baselineLabel,
-    statusLabel: "Tracked"
+    statusLabel: "Tracked",
+    emptyMessage: ""
   };
 }
 
@@ -1532,7 +1613,9 @@ function actionImpactNotes(
     notes.push(`${formatNumber(Math.max(0, drop.alchValue - natureRuneCost))} gp/item after rune`);
     notes.push(`${formatNumber(rollsPerKill, 2)} casts/kill`);
   }
-  if (action === "unid" && drop.isHerb) notes.push("Uses unidentified herb value");
+  if (action === "unid" && drop.isHerb) {
+    notes.push("Uses source-weighted unidentified herb values");
+  }
   if (action === "value" && drop.isHerb) notes.push("Keeps high-value herb rolls");
   if (action === "value" && drop.tag === "gem") notes.push("Keeps high-value jewel rolls");
   if (action === "skip") notes.push("Leaves the parent row out");
@@ -1600,7 +1683,11 @@ const MONEY_WARNING_CODES = new Set([
   "missing-alch-value",
   "price-alias-used",
   "price-fallback-used",
-  "approximate-data-source"
+  "price-generated-fallback",
+  "price-market-retained",
+  "price-freshness-unknown",
+  "approximate-data-source",
+  "unidentified-herb-price-approximation"
 ]);
 const SPECIAL_WARNING_CODES = new Set(["dragon-halberd-npc-size-fallback"]);
 const ACTIVE_ASSUMPTIONS_VISIBLE_LIMIT = 5;
@@ -2662,6 +2749,7 @@ function createStatsSourceBreakdownViewModel(input: {
   specialWarnings: readonly CalculationWarningViewModel[];
   moneyWarnings: readonly CalculationWarningViewModel[];
   hitDistribution: HitDistributionViewModel;
+  includeHistograms?: boolean;
 }): StatsSourceBreakdownViewModel {
   const combat = input.result.combat;
   const trip = input.result.trip;
@@ -2703,16 +2791,17 @@ function createStatsSourceBreakdownViewModel(input: {
       ? "inactive"
       : "modeled"
     : "inactive";
-  const specialHistogram = special
-    ? createHitDistributionFromValues({
-        hitChance: special.hitChance,
-        averageHit: special.hits > 0 ? special.expPerSpec / special.hits : Number.NaN,
-        maxHit: special.maxHit,
-        peakMaxHit: special.maxHit
-      })
-    : null;
+  const specialHistogram =
+    input.includeHistograms !== false && special
+      ? createHitDistributionFromValues({
+          hitChance: special.hitChance,
+          averageHit: special.hits > 0 ? special.expPerSpec / special.hits : Number.NaN,
+          maxHit: special.maxHit,
+          peakMaxHit: special.maxHit
+        })
+      : null;
   const cannonHistogram =
-    cannon && !cannon.idle && cannon.ballsPerSec > 0
+    input.includeHistograms !== false && cannon && !cannon.idle && cannon.ballsPerSec > 0
       ? createHitDistributionFromValues({
           hitChance: combat.hitChance,
           averageHit: cannon.cannonDps / cannon.ballsPerSec,
@@ -2862,8 +2951,8 @@ function createStatsSourceBreakdownViewModel(input: {
       statsSourceDetail({
         row: normalRow,
         warnings: input.moneyWarnings,
-        histogram: input.hitDistribution,
-        histogramScopeLabel: "Per normal attack"
+        histogram: input.includeHistograms === false ? null : input.hitDistribution,
+        histogramScopeLabel: input.includeHistograms === false ? null : "Per normal attack"
       }),
       statsSourceDetail({
         row: specialRow,
@@ -3020,8 +3109,20 @@ function createHitDistributionFromValues(input: {
   ) {
     return null;
   }
-  const distribution = createHitDistribution(input);
+  return createHitDistributionPresentation(createHitDistribution(input));
+}
+
+function createHitDistributionPresentation(
+  distribution: HitDistribution
+): HitDistributionViewModel {
   const maxProbability = Math.max(...distribution.buckets.map((bucket) => bucket.probability), 0);
+  const cumulativeById = new Map<string, number>();
+  let cumulative = 0;
+  for (const bucket of [...distribution.buckets].reverse()) {
+    if (bucket.isMiss) continue;
+    cumulative += bucket.probability;
+    cumulativeById.set(bucket.id, cumulative);
+  }
 
   return {
     hitChance: distribution.hitChance,
@@ -3031,23 +3132,33 @@ function createHitDistributionFromValues(input: {
     probabilityTotal: distribution.probabilityTotal,
     hitChanceLabel: `${formatNumber(distribution.hitChance * 100, 1)}%`,
     averageHitLabel: formatNumber(distribution.averageHit, 2),
-    maxHitLabel: formatNumber(distribution.maxHit, 1),
+    maxHitLabel: formatNumber(distribution.maxHit),
     buckets: distribution.buckets.map((bucket) => {
       const percentLabel = `${formatNumber(bucket.probability * 100, 1)}%`;
+      const cumulativeAtLeast = bucket.isMiss ? null : (cumulativeById.get(bucket.id) ?? 0);
+      const cumulativeAtLeastLabel =
+        cumulativeAtLeast == null ? null : `${formatNumber(cumulativeAtLeast * 100, 1)}%`;
       const damageText = bucket.isMiss
-        ? "miss or zero damage"
-        : bucket.minDamage === bucket.maxDamage
-          ? `${bucket.minDamage} damage`
-          : `${bucket.minDamage} to ${bucket.maxDamage} damage`;
+        ? "miss"
+        : bucket.isAccurateZero
+          ? "accurate zero damage"
+          : `${bucket.minDamage} damage`;
       return {
         id: bucket.id,
         label: bucket.label,
-        ariaLabel: `${damageText}: ${percentLabel}${bucket.isMaxHit ? ", max hit bucket" : ""}`,
+        ariaLabel: `${damageText}: ${percentLabel}${
+          cumulativeAtLeastLabel ? `; at least this damage: ${cumulativeAtLeastLabel}` : ""
+        }${bucket.isMaxHit ? "; max hit bucket" : ""}`,
         probability: bucket.probability,
         percentLabel,
         widthPercent:
           maxProbability > 0 ? Math.max(3, (bucket.probability / maxProbability) * 100) : 0,
+        heightPercent: maxProbability > 0 ? (bucket.probability / maxProbability) * 100 : 0,
+        damage: bucket.isMiss ? null : bucket.minDamage,
+        cumulativeAtLeast,
+        cumulativeAtLeastLabel,
         isMiss: bucket.isMiss,
+        isAccurateZero: bucket.isAccurateZero,
         isMaxHit: bucket.isMaxHit
       };
     })
@@ -3057,16 +3168,191 @@ function createHitDistributionFromValues(input: {
 function createHitDistributionViewModel(
   combat: ReturnType<typeof simulateCombat>
 ): HitDistributionViewModel {
-  const distribution = createHitDistributionFromValues({
-    hitChance: combat.hitChance,
-    averageHit: combat.avgHit,
-    maxHit: combat.maxHit,
-    peakMaxHit: combat.peakMaxHit
-  });
-  if (!distribution) {
+  if (!combat.debug.normalHitRolls.length) {
     throw new Error("Current combat result has invalid hit distribution values.");
   }
-  return distribution;
+  return createHitDistributionPresentation(
+    createHitDistributionMixture(combat.debug.normalHitRolls)
+  );
+}
+
+function createHitDistributionSummaryViewModel(
+  combat: ReturnType<typeof simulateCombat>
+): HitDistributionViewModel {
+  const maxHit = Math.max(0, Math.round(combat.peakMaxHit));
+  return {
+    hitChance: combat.hitChance,
+    averageHit: combat.avgHit,
+    maxHit,
+    peakMaxHit: maxHit,
+    probabilityTotal: 0,
+    hitChanceLabel: `${formatNumber(combat.hitChance * 100, 1)}%`,
+    averageHitLabel: formatNumber(combat.avgHit, 2),
+    maxHitLabel: formatNumber(maxHit),
+    buckets: []
+  };
+}
+
+function createOmittedHitDistributionComparisonViewModel(
+  targetHpInput: number | undefined
+): HitDistributionComparisonViewModel {
+  const targetHp =
+    Number.isFinite(targetHpInput) && targetHpInput! > 0 ? Math.round(targetHpInput!) : null;
+  return {
+    series: [],
+    buckets: [],
+    axisMaxDamage: 0,
+    maxProbability: 0,
+    maxProbabilityLabel: "0.0%",
+    middleProbabilityLabel: "0.0%",
+    targetHp,
+    targetHpLabel: targetHp == null ? null : `Full target HP ${targetHp}`,
+    targetMarkerPercent: null,
+    koRegionStartPercent: null
+  };
+}
+
+function hitDistributionPoint(
+  bucket: HitDistributionBucketViewModel | undefined,
+  maxProbability: number
+): HitDistributionComparisonPointViewModel {
+  const probability = bucket?.probability ?? 0;
+  return {
+    probability,
+    percentLabel: bucket?.percentLabel ?? "0.0%",
+    cumulativeAtLeast: bucket?.cumulativeAtLeast ?? 0,
+    cumulativeAtLeastLabel: bucket?.cumulativeAtLeastLabel ?? "0.0%",
+    heightPercent: maxProbability > 0 ? (probability / maxProbability) * 100 : 0,
+    isMaxHit: bucket?.isMaxHit ?? false
+  };
+}
+
+function distributionExpectedMarkerPercent(averageHit: number, axisMaxDamage: number): number {
+  const bucketCount = axisMaxDamage + 2;
+  const boundedAverage = Math.max(0, Math.min(axisMaxDamage, averageHit));
+  return ((boundedAverage + 1.5) / bucketCount) * 100;
+}
+
+function distributionKoChance(distribution: HitDistributionViewModel, targetHp: number): number {
+  return distribution.buckets.reduce(
+    (sum, bucket) =>
+      bucket.damage != null && bucket.damage >= targetHp ? sum + bucket.probability : sum,
+    0
+  );
+}
+
+function createHitDistributionComparisonViewModel(
+  combat: ReturnType<typeof simulateCombat>,
+  normal: HitDistributionViewModel,
+  targetHpInput: number | undefined
+): HitDistributionComparisonViewModel {
+  const special = combat.specialAttack
+    ? createHitDistributionPresentation(
+        createIndependentHitDistribution(
+          { hitChance: combat.specialAttack.hitChance, maxHit: combat.specialAttack.maxHit },
+          combat.specialAttack.hits
+        )
+      )
+    : null;
+  const axisMaxDamage = Math.max(normal.maxHit, special?.maxHit ?? 0);
+  const allProbabilities = [
+    ...normal.buckets.map((bucket) => bucket.probability),
+    ...(special?.buckets.map((bucket) => bucket.probability) ?? [])
+  ];
+  const maxProbability = Math.max(...allProbabilities, 0);
+  const normalById = new Map(normal.buckets.map((bucket) => [bucket.id, bucket]));
+  const specialById = new Map(special?.buckets.map((bucket) => [bucket.id, bucket]) ?? []);
+  const targetHp =
+    Number.isFinite(targetHpInput) && targetHpInput! > 0 ? Math.round(targetHpInput!) : null;
+  const bucketInputs = [
+    { id: "miss", label: "Miss", damage: null, isMiss: true, isAccurateZero: false },
+    ...Array.from({ length: axisMaxDamage + 1 }, (_, damage) => ({
+      id: `damage-${damage}`,
+      label: `${damage}`,
+      damage,
+      isMiss: false,
+      isAccurateZero: damage === 0
+    }))
+  ];
+  const specialLabel = combat.specialAttack
+    ? `Special: ${combat.specialAttack.weaponName} (switch)`
+    : null;
+  const buckets = bucketInputs.map((bucket) => {
+    const normalPoint = hitDistributionPoint(normalById.get(bucket.id), maxProbability);
+    const specialPoint = special
+      ? hitDistributionPoint(specialById.get(bucket.id), maxProbability)
+      : null;
+    const outcomeLabel = bucket.isMiss
+      ? "Miss"
+      : bucket.isAccurateZero
+        ? "Accurate zero damage"
+        : `${bucket.damage} damage`;
+    const normalCumulative = bucket.isMiss
+      ? ""
+      : `; Normal at least ${bucket.damage}: ${normalPoint.cumulativeAtLeastLabel}`;
+    const specialText = specialPoint
+      ? `; ${specialLabel} exact: ${specialPoint.percentLabel}${
+          bucket.isMiss ? "" : `; at least ${bucket.damage}: ${specialPoint.cumulativeAtLeastLabel}`
+        }`
+      : "";
+    const maxHitText = `${normalPoint.isMaxHit ? "; normal max hit" : ""}${
+      specialPoint?.isMaxHit ? "; special max hit" : ""
+    }`;
+    return {
+      ...bucket,
+      ariaLabel: `${outcomeLabel}; Normal exact: ${normalPoint.percentLabel}${normalCumulative}${specialText}${maxHitText}`,
+      normal: normalPoint,
+      special: specialPoint
+    };
+  });
+  const series: HitDistributionComparisonSeriesViewModel[] = [
+    {
+      id: "normal",
+      label: "Normal attack",
+      scopeLabel: "One normal attack",
+      distribution: normal,
+      expectedMarkerPercent: distributionExpectedMarkerPercent(normal.averageHit, axisMaxDamage),
+      expectedDamageLabel: normal.averageHitLabel,
+      koChance: targetHp == null ? 0 : distributionKoChance(normal, targetHp),
+      koChanceLabel:
+        targetHp == null ? "-" : `${formatNumber(distributionKoChance(normal, targetHp) * 100, 1)}%`
+    },
+    ...(special && specialLabel
+      ? [
+          {
+            id: "special" as const,
+            label: specialLabel,
+            scopeLabel: "One complete special attack",
+            distribution: special,
+            expectedMarkerPercent: distributionExpectedMarkerPercent(
+              special.averageHit,
+              axisMaxDamage
+            ),
+            expectedDamageLabel: special.averageHitLabel,
+            koChance: targetHp == null ? 0 : distributionKoChance(special, targetHp),
+            koChanceLabel:
+              targetHp == null
+                ? "-"
+                : `${formatNumber(distributionKoChance(special, targetHp) * 100, 1)}%`
+          }
+        ]
+      : [])
+  ];
+  const bucketCount = axisMaxDamage + 2;
+  const targetInRange = targetHp != null && targetHp <= axisMaxDamage;
+
+  return {
+    series,
+    buckets,
+    axisMaxDamage,
+    maxProbability,
+    maxProbabilityLabel: `${formatNumber(maxProbability * 100, 1)}%`,
+    middleProbabilityLabel: `${formatNumber(maxProbability * 50, 1)}%`,
+    targetHp,
+    targetHpLabel: targetHp == null ? null : `Full target HP ${targetHp}`,
+    targetMarkerPercent: targetInRange ? ((targetHp + 1) / bucketCount) * 100 : null,
+    koRegionStartPercent: targetInRange ? ((targetHp + 1) / bucketCount) * 100 : null
+  };
 }
 
 function finiteNumberOrNull(value: number): number | null {
@@ -3318,7 +3604,14 @@ export function createSimulationViewModel(
   const moneyWarnings = calculationWarnings.filter((warning) =>
     MONEY_WARNING_CODES.has(warning.code)
   );
-  const hitDistribution = createHitDistributionViewModel(combat);
+  const includeHitDistributionAnalysis = options.includeHitDistributionAnalysis !== false;
+  const hitDistribution = includeHitDistributionAnalysis
+    ? createHitDistributionViewModel(combat)
+    : createHitDistributionSummaryViewModel(combat);
+  const targetHp = context.gameData.monsters[request.monsterId]?.hp;
+  const hitDistributionComparison = includeHitDistributionAnalysis
+    ? createHitDistributionComparisonViewModel(combat, hitDistribution, targetHp)
+    : createOmittedHitDistributionComparisonViewModel(targetHp);
   const setupRequirements = createSetupRequirementSummaryViewModel(request, context);
   const activeAssumptions = createActiveAssumptionsSummaryViewModel({
     form,
@@ -3340,6 +3633,7 @@ export function createSimulationViewModel(
     result: fullResult,
     combat,
     hitDistribution,
+    hitDistributionComparison,
     combatRollDetail: createStatsCombatRollDetailViewModel({
       combat,
       trip,
@@ -3354,7 +3648,8 @@ export function createSimulationViewModel(
       result: fullResult,
       specialWarnings,
       moneyWarnings,
-      hitDistribution
+      hitDistribution,
+      includeHistograms: includeHitDistributionAnalysis
     }),
     setupRequirements,
     activeAssumptions,
@@ -3775,7 +4070,7 @@ export function createDuelComparisonViewModel(
     cannonByMonster,
     currentLootPrefs,
     lootSettingsByMonster,
-    { includeLootRows: false }
+    { includeLootRows: false, includeHitDistributionAnalysis: false }
   );
   const liveBaseRow = duelBaseRowFromSimulation("duel-live", "live", null, "Live loadout", liveVm);
   const snapshotEntries = normalizedSnapshots.map((snapshot) => {
@@ -3789,7 +4084,7 @@ export function createDuelComparisonViewModel(
       cannonByMonster,
       currentLootPrefs,
       lootSettingsByMonster,
-      { includeLootRows: false }
+      { includeLootRows: false, includeHitDistributionAnalysis: false }
     );
     return {
       row: duelBaseRowFromSimulation(
@@ -3887,7 +4182,7 @@ export function createDuelMatrixViewModel(
       cannonByMonster,
       lootPrefsByMonster[currentForm.monsterId] ?? {},
       lootSettingsByMonster,
-      { includeLootRows: false }
+      { includeLootRows: false, includeHitDistributionAnalysis: false }
     );
     const rowsByMonster = new Map(
       createDenseCompareRows(
@@ -4030,7 +4325,7 @@ export function createDenseCompareRows(
       cannonByMonster,
       lootPrefsByMonster[monster.id] ?? {},
       lootSettingsByMonster,
-      { includeLootRows: false }
+      { includeLootRows: false, includeHitDistributionAnalysis: false }
     );
     return {
       monsterId: monster.id,

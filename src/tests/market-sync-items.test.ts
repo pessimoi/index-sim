@@ -1,11 +1,18 @@
 import { loadBundledLegacyContext } from "../adapters/browser";
 import {
+  auditDynamicLootMarketDependencies,
   expandAllSupportedMarketSyncItemIds,
   expandMarketSyncItemIdsForMonster,
   expandMarketSyncRequestItems,
   marketMappingsForItemIds
 } from "../data/market-sync-items";
-import { MARKET_SOURCE_MAPPINGS } from "../data/market-source-mapping";
+import {
+  HIGH_IMPACT_DYNAMIC_LOOT_MARKET_ENTRIES,
+  MARKET_SOURCE_MAPPINGS,
+  MARKET_SOURCE_MAPPING_BY_ITEM_ID
+} from "../data/market-source-mapping";
+import { createGeneratedRuntimeContext } from "../adapters/generated";
+import { DYNAMIC_LOOT_PRICE_DEPENDENCIES } from "../domain/trip";
 import type { GameDataSnapshot } from "../domain/shared";
 
 describe("market sync item expansion", () => {
@@ -74,7 +81,50 @@ describe("market sync item expansion", () => {
     expect(expansion.itemIds).toEqual(
       expect.arrayContaining(["lobster", "herb_guam", "herb_ranarr", "ring_of_recoil"])
     );
-    expect(expansion.missingMappingItemIds).toEqual(["not_mapped"]);
+    expect(expansion.missingMappingItemIds).toEqual(
+      [
+        "not_mapped",
+        ...DYNAMIC_LOOT_PRICE_DEPENDENCIES.herb.filter(
+          (itemId) => !MARKET_SOURCE_MAPPING_BY_ITEM_ID.has(itemId)
+        )
+      ].sort()
+    );
+  });
+
+  it("derives every active dynamic-table dependency from the Trip valuation contract", () => {
+    const { context } = createGeneratedRuntimeContext();
+    const audit = auditDynamicLootMarketDependencies(context.gameData);
+
+    expect(audit.unrecognizedActiveTags).toEqual([]);
+    expect(audit.rows.map((row) => [row.tag, row.dropCount])).toEqual([
+      ["casket", 3],
+      ["gem", 38],
+      ["herb", 41],
+      ["ultrarare", 3]
+    ]);
+    expect(audit.rows.find((row) => row.tag === "casket")?.missingMappingItemIds).toEqual([]);
+    expect(audit.rows.find((row) => row.tag === "gem")?.missingMappingItemIds).toEqual([]);
+    expect(audit.rows.find((row) => row.tag === "herb")?.missingMappingItemIds).toEqual([
+      "unidentified_avantoe",
+      "unidentified_cadantine",
+      "unidentified_dwarf_weed",
+      "unidentified_harralander",
+      "unidentified_irit",
+      "unidentified_kwuarm",
+      "unidentified_lantadyme",
+      "unidentified_marentill",
+      "unidentified_ranarr",
+      "unidentified_tarromin"
+    ]);
+    expect(audit.rows.find((row) => row.tag === "ultrarare")?.missingMappingItemIds).toEqual([]);
+    expect(audit.mappedItemIds).toHaveLength(39);
+    expect(audit.missingMappingItemIds).toEqual(
+      audit.rows.find((row) => row.tag === "herb")?.missingMappingItemIds
+    );
+    expect(HIGH_IMPACT_DYNAMIC_LOOT_MARKET_ENTRIES).toHaveLength(12);
+    expect(audit.dependencyItemIds).toEqual(
+      [...new Set(Object.values(DYNAMIC_LOOT_PRICE_DEPENDENCIES).flat())].sort()
+    );
   });
 
   it("expands all-supported to the current market mapping allowlist", () => {

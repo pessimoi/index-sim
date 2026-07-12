@@ -2,6 +2,12 @@
 
 Status: accepted for implementation on 2026-07-11.
 
+The implemented event-scoped source-detail histograms in this document remain
+current-state truth. The discrete vertical normal-versus-special main
+comparison and the D-083 whole-special event contract are implemented as
+specified in
+[hit-distribution-visualization-spec.md](hit-distribution-visualization-spec.md).
+
 ## Purpose
 
 Add the bounded next phase of the existing `Valmis` Stats source-detail workflow:
@@ -11,7 +17,9 @@ parity documents without introducing a second combat formula path.
 
 ## Existing behavior
 
-- Stats already shows a normal-player-attack hit distribution.
+- The active setup tab ends with the normal-versus-selected-special main
+  `Damage distribution`; Stats keeps the separately scoped source-detail
+  distributions owned by this document.
 - Special source detail already exposes hit chance, per-hit max hit, hit count
   and expected damage per special through `SpecialAttackResult`.
 - Cannon source detail already exposes the player hit chance used by the

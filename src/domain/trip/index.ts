@@ -314,6 +314,7 @@ export interface SupplyResult {
   runeCostPerCast: number;
   chargePerCast: number;
   castsPerKill: number;
+  warnings: SimulationWarning[];
 }
 
 export interface TripLootSupplyResult {
@@ -758,28 +759,171 @@ const EQUIP_SUFFIXES = [
 ];
 
 const HERB_TABLE = [
-  { name: "Guam", weight: 32, keys: ["herb_guam", "guam_leaf", "unidentified_guam"], fallback: 15 },
+  {
+    name: "Guam",
+    weight: 32,
+    keys: ["herb_guam", "guam_leaf", "unidentified_guam"],
+    unidentifiedKey: "unidentified_guam",
+    fallback: 15
+  },
   {
     name: "Marrentill",
     weight: 24,
     keys: ["herb_marrentill", "marentill", "unidentified_guam"],
+    unidentifiedKey: "unidentified_marentill",
     fallback: 12
   },
-  { name: "Tarromin", weight: 18, keys: ["herb_tarromin", "unidentified_guam"], fallback: 25 },
+  {
+    name: "Tarromin",
+    weight: 18,
+    keys: ["herb_tarromin", "unidentified_guam"],
+    unidentifiedKey: "unidentified_tarromin",
+    fallback: 25
+  },
   {
     name: "Harralander",
     weight: 14,
     keys: ["herb_harralander", "unidentified_guam"],
+    unidentifiedKey: "unidentified_harralander",
     fallback: 45
   },
-  { name: "Ranarr", weight: 11, keys: ["herb_ranarr", "unidentified_guam"], fallback: 5000 },
-  { name: "Irit", weight: 8, keys: ["herb_irit", "unidentified_guam"], fallback: 80 },
-  { name: "Avantoe", weight: 6, keys: ["herb_avantoe", "unidentified_guam"], fallback: 1500 },
-  { name: "Kwuarm", weight: 5, keys: ["herb_kwuarm", "unidentified_guam"], fallback: 1200 },
-  { name: "Cadantine", weight: 4, keys: ["herb_cadantine", "unidentified_guam"], fallback: 1500 },
-  { name: "Lantadyme", weight: 3, keys: ["herb_lantadyme", "unidentified_guam"], fallback: 1800 },
-  { name: "Dwarf weed", weight: 3, keys: ["herb_dwarf_weed", "unidentified_guam"], fallback: 2000 }
+  {
+    name: "Ranarr",
+    weight: 11,
+    keys: ["herb_ranarr", "unidentified_guam"],
+    unidentifiedKey: "unidentified_ranarr",
+    fallback: 5000
+  },
+  {
+    name: "Irit",
+    weight: 8,
+    keys: ["herb_irit", "unidentified_guam"],
+    unidentifiedKey: "unidentified_irit",
+    fallback: 80
+  },
+  {
+    name: "Avantoe",
+    weight: 6,
+    keys: ["herb_avantoe", "unidentified_guam"],
+    unidentifiedKey: "unidentified_avantoe",
+    fallback: 1500
+  },
+  {
+    name: "Kwuarm",
+    weight: 5,
+    keys: ["herb_kwuarm", "unidentified_guam"],
+    unidentifiedKey: "unidentified_kwuarm",
+    fallback: 1200
+  },
+  {
+    name: "Cadantine",
+    weight: 4,
+    keys: ["herb_cadantine", "unidentified_guam"],
+    unidentifiedKey: "unidentified_cadantine",
+    fallback: 1500
+  },
+  {
+    name: "Lantadyme",
+    weight: 3,
+    keys: ["herb_lantadyme", "unidentified_guam"],
+    unidentifiedKey: "unidentified_lantadyme",
+    fallback: 1800
+  },
+  {
+    name: "Dwarf weed",
+    weight: 3,
+    keys: ["herb_dwarf_weed", "unidentified_guam"],
+    unidentifiedKey: "unidentified_dwarf_weed",
+    fallback: 2000
+  }
 ];
+
+const UNIDENTIFIED_HERB_PROXY_ID = "unidentified_guam";
+const UNIDENTIFIED_HERB_PROXY_FALLBACK = 15;
+
+export const CASKET_ROLL_DENOMINATOR = 128;
+export const CASKET_COIN_AMOUNTS = [20, 40, 80, 160, 320, 640] as const;
+export const CASKET_COIN_AVERAGE =
+  CASKET_COIN_AMOUNTS.reduce((sum: number, amount) => sum + amount, 0) / CASKET_COIN_AMOUNTS.length;
+
+export interface CasketRewardDefinition {
+  name: string;
+  sourceItemId: EntityId;
+  itemId: EntityId | null;
+  weight: number;
+  quantity: number;
+}
+
+export const CASKET_REWARD_TABLE = [
+  {
+    name: "20-640 coins (210 average)",
+    sourceItemId: "coins",
+    itemId: null,
+    weight: 60,
+    quantity: CASKET_COIN_AVERAGE
+  },
+  {
+    name: "Uncut sapphire",
+    sourceItemId: "uncut_sapphire",
+    itemId: "uncut_sapphire",
+    weight: 32,
+    quantity: 1
+  },
+  {
+    name: "Uncut emerald",
+    sourceItemId: "uncut_emerald",
+    itemId: "uncut_emerald",
+    weight: 16,
+    quantity: 1
+  },
+  {
+    name: "Uncut ruby",
+    sourceItemId: "uncut_ruby",
+    itemId: "uncut_ruby",
+    weight: 8,
+    quantity: 1
+  },
+  {
+    name: "Cosmic talisman",
+    sourceItemId: "cosmic_talisman",
+    itemId: "cosmic_talisman",
+    weight: 8,
+    quantity: 1
+  },
+  {
+    name: "Uncut diamond",
+    sourceItemId: "uncut_diamond",
+    itemId: "uncut_diamond",
+    weight: 2,
+    quantity: 1
+  },
+  {
+    name: "Tooth half of key",
+    sourceItemId: "keyhalf1",
+    itemId: "tooth_half_key",
+    weight: 1,
+    quantity: 1
+  },
+  {
+    name: "Loop half of key",
+    sourceItemId: "keyhalf2",
+    itemId: "loop_half_key",
+    weight: 1,
+    quantity: 1
+  }
+] as const satisfies readonly CasketRewardDefinition[];
+
+export interface CasketRewardRow extends CasketRewardDefinition {
+  key: EntityId;
+  unitPrice: number;
+  rowValue: number;
+  fallbackUnitPrice: number;
+}
+
+export interface CasketStats {
+  ev: number;
+  rows: CasketRewardRow[];
+}
 
 const JEWEL_BANDS = [
   { name: "Uncut sapphire", lo: 0, hi: 32, keys: ["uncut_sapphire", "sapphire"], fallback: 450 },
@@ -796,6 +940,49 @@ const MEGA_TABLE = [
   { keys: ["dragonshield_a"], fallback: 50000, weight: 4 },
   { keys: ["dragon_spear"], fallback: 39000, weight: 3 }
 ];
+
+const ULTRA_RARE_PRICE_ROWS = [
+  { itemId: "naturerune", fallback: 180, quantity: 67, weight: 3 },
+  { itemId: "adamant_javelin", fallback: 50, quantity: 20, weight: 2 },
+  { itemId: "deathrune", fallback: 200, quantity: 45, weight: 2 },
+  { itemId: "lawrune", fallback: 240, quantity: 45, weight: 2 },
+  { itemId: "rune_arrow", fallback: 160, quantity: 42, weight: 2 },
+  { itemId: "steel_arrow", fallback: 18, quantity: 150, weight: 2 },
+  { itemId: "rune_2h", fallback: 38000, quantity: 1, weight: 3 },
+  { itemId: "rune_battleaxe", fallback: 25000, quantity: 1, weight: 3 },
+  { itemId: "rune_sq_shield", fallback: 21000, quantity: 1, weight: 2 },
+  { itemId: "dragon_med_helm", fallback: 60000, quantity: 1, weight: 1 },
+  { itemId: "rune_kiteshield", fallback: 32000, quantity: 1, weight: 1 },
+  { itemId: "tooth_half_key", fallback: 110000, quantity: 1, weight: 20 },
+  { itemId: "loop_half_key", fallback: 81200, quantity: 1, weight: 20 },
+  { itemId: "runite_bar", fallback: 6500, quantity: 1, weight: 5 },
+  { itemId: "dragonstone", fallback: 16000, quantity: 1, weight: 2 },
+  { itemId: "silver_ore", fallback: 62, quantity: 100, weight: 2 }
+] as const;
+
+function sortedUniqueItemIds(itemIds: Iterable<EntityId | null | undefined>): EntityId[] {
+  return [...new Set([...itemIds].filter((itemId): itemId is EntityId => !!itemId))].sort();
+}
+
+const JEWEL_PRICE_DEPENDENCIES = sortedUniqueItemIds([
+  ...JEWEL_BANDS.map((band) => band.keys[0]),
+  ...MEGA_TABLE.map((row) => row.keys[0]),
+  "chaos_talisman",
+  "nature_talisman"
+]);
+
+export const DYNAMIC_LOOT_PRICE_DEPENDENCIES = {
+  herb: sortedUniqueItemIds([
+    ...HERB_TABLE.map((row) => row.keys[0]),
+    ...HERB_TABLE.map((row) => row.unidentifiedKey)
+  ]),
+  gem: JEWEL_PRICE_DEPENDENCIES,
+  casket: sortedUniqueItemIds(CASKET_REWARD_TABLE.map((row) => row.itemId)),
+  ultrarare: sortedUniqueItemIds([
+    ...JEWEL_PRICE_DEPENDENCIES,
+    ...ULTRA_RARE_PRICE_ROWS.map((row) => row.itemId)
+  ])
+} as const satisfies Record<string, readonly EntityId[]>;
 
 function asNumeric(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
@@ -824,6 +1011,13 @@ function priceFromKeys(
   for (const key of new Set(lookupKeys)) {
     const price = priceSet.itemPrices[key];
     if (asNumeric(price) !== undefined) {
+      if (warnings) {
+        addPriceLookupMetadataWarnings(warnings, {
+          itemId: key,
+          value: price,
+          metadata: priceSet.itemPriceMetadata?.[key]
+        });
+      }
       if (warnings && key !== canonicalKey && canonicalKey) {
         addWarningOnce(warnings, {
           code: "price-alias-used",
@@ -864,19 +1058,62 @@ function addPriceAliasWarning(
   });
 }
 
-function itemPrice(priceSet: PriceSet, itemId: EntityId): number | undefined {
-  return lookupItemPrice(priceSet, itemId).value ?? undefined;
+function itemPrice(
+  priceSet: PriceSet,
+  itemId: EntityId,
+  warnings?: SimulationWarning[]
+): number | undefined {
+  const lookup = lookupItemPrice(priceSet, itemId);
+  if (warnings) addPriceLookupMetadataWarnings(warnings, lookup);
+  return lookup.value ?? undefined;
 }
 
 function addWarningOnce(warnings: SimulationWarning[], warning: SimulationWarning): void {
   if (
     warnings.some(
-      (existing) => existing.code === warning.code && existing.message === warning.message
+      (existing) =>
+        existing.code === warning.code &&
+        (warning.itemId ? existing.itemId === warning.itemId : existing.message === warning.message)
     )
   ) {
     return;
   }
   warnings.push(warning);
+}
+
+function addPriceLookupMetadataWarnings(
+  warnings: SimulationWarning[],
+  lookup: Pick<ReturnType<typeof lookupItemPrice>, "itemId" | "value" | "metadata">
+): void {
+  if (lookup.value === null || !lookup.metadata) return;
+  const metadata = lookup.metadata;
+  if (metadata.valueOrigin === "generated-object-cost") {
+    addWarningOnce(warnings, {
+      code: "price-generated-fallback",
+      severity: "warning",
+      itemId: lookup.itemId,
+      message: `Price '${lookup.itemId}' uses a generated object-cost fallback instead of a market observation.`
+    });
+  }
+  if (metadata.refreshStatus === "retained") {
+    addWarningOnce(warnings, {
+      code: "price-market-retained",
+      severity: "warning",
+      itemId: lookup.itemId,
+      message: `Price '${lookup.itemId}' was retained because its latest market evaluation could not replace it.`
+    });
+  }
+  if (
+    !metadata.valueObservedAt &&
+    ["legacy-static", "imported", "unknown"].includes(metadata.valueOrigin)
+  ) {
+    addWarningOnce(warnings, {
+      code: "price-freshness-unknown",
+      severity: "info",
+      itemId: lookup.itemId,
+      message: `Price '${lookup.itemId}' has no verified market observation time.`
+    });
+  }
 }
 
 function priceOrFallback(
@@ -890,6 +1127,7 @@ function priceOrFallback(
   const lookup = lookupItemPrice(priceSet, itemId);
   if (lookup.value !== null) {
     addPriceAliasWarning(warnings, lookup, label);
+    addPriceLookupMetadataWarnings(warnings, lookup);
     return lookup.value;
   }
   addWarningOnce(warnings, {
@@ -898,6 +1136,44 @@ function priceOrFallback(
     message: `Missing price '${lookup.canonicalItemId ?? itemId}' for ${label}; using fallback ${fallback}.`
   });
   return fallback;
+}
+
+export function casketStats(
+  priceSet: PriceSet,
+  gameData: GameDataSnapshot,
+  warnings: SimulationWarning[] = []
+): CasketStats {
+  const rows = CASKET_REWARD_TABLE.map((definition): CasketRewardRow => {
+    if (definition.itemId === null) {
+      return {
+        ...definition,
+        key: "coins",
+        unitPrice: 1,
+        rowValue: definition.quantity,
+        fallbackUnitPrice: 1
+      };
+    }
+
+    const fallbackUnitPrice = asNumeric(gameData.items[definition.itemId]?.price) ?? 0;
+    const unitPrice = priceOrFallback(
+      priceSet,
+      definition.itemId,
+      fallbackUnitPrice,
+      warnings,
+      `${definition.name} casket reward`
+    );
+    return {
+      ...definition,
+      key: definition.itemId,
+      unitPrice,
+      rowValue: unitPrice * definition.quantity,
+      fallbackUnitPrice
+    };
+  });
+  return {
+    ev: rows.reduce((sum, row) => sum + row.weight * row.rowValue, 0) / CASKET_ROLL_DENOMINATOR,
+    rows
+  };
 }
 
 function itemApproximationWarning(
@@ -1033,6 +1309,36 @@ function herbStats(priceSet: PriceSet, warnings?: SimulationWarning[]) {
   return { ev, highEv, keepFrac, rows };
 }
 
+function unidentifiedHerbStats(priceSet: PriceSet, warnings?: SimulationWarning[]) {
+  const proxyPrice =
+    asNumeric(priceSet.itemPrices[UNIDENTIFIED_HERB_PROXY_ID]) ?? UNIDENTIFIED_HERB_PROXY_FALLBACK;
+  const proxyRows: string[] = [];
+  const rows = HERB_TABLE.map((row) => {
+    const exactPrice = asNumeric(priceSet.itemPrices[row.unidentifiedKey]);
+    if (exactPrice === undefined) proxyRows.push(row.name);
+    return {
+      name: row.name,
+      weight: row.weight,
+      key: row.unidentifiedKey,
+      price: exactPrice ?? proxyPrice,
+      proxy: exactPrice === undefined
+    };
+  });
+
+  if (warnings && proxyRows.length > 0) {
+    addWarningOnce(warnings, {
+      code: "unidentified-herb-price-approximation",
+      severity: "info",
+      message: `Species-specific unidentified herb prices are unavailable for ${proxyRows.length} of ${rows.length} table rows; using '${UNIDENTIFIED_HERB_PROXY_ID}' as their shared price proxy.`
+    });
+  }
+
+  return {
+    ev: rows.reduce((sum, row) => sum + row.weight * row.price, 0) / 128,
+    rows
+  };
+}
+
 function megaEv(priceSet: PriceSet, warnings?: SimulationWarning[]): number {
   return (
     MEGA_TABLE.reduce(
@@ -1125,71 +1431,18 @@ function ultraRareEv(
   warnings?: SimulationWarning[]
 ): number {
   const rows = [
-    {
-      weight: 3,
-      price: priceFromKeys(priceSet, ["naturerune"], 180, 67, warnings, "ultra-rare table")
-    },
-    {
-      weight: 2,
-      price: priceFromKeys(priceSet, ["adamant_javelin"], 50, 20, warnings, "ultra-rare table")
-    },
-    {
-      weight: 2,
-      price: priceFromKeys(priceSet, ["deathrune"], 200, 45, warnings, "ultra-rare table")
-    },
-    {
-      weight: 2,
-      price: priceFromKeys(priceSet, ["lawrune"], 240, 45, warnings, "ultra-rare table")
-    },
-    {
-      weight: 2,
-      price: priceFromKeys(priceSet, ["rune_arrow"], 160, 42, warnings, "ultra-rare table")
-    },
-    {
-      weight: 2,
-      price: priceFromKeys(priceSet, ["steel_arrow"], 18, 150, warnings, "ultra-rare table")
-    },
-    {
-      weight: 3,
-      price: priceFromKeys(priceSet, ["rune_2h"], 38000, 1, warnings, "ultra-rare table")
-    },
-    {
-      weight: 3,
-      price: priceFromKeys(priceSet, ["rune_battleaxe"], 25000, 1, warnings, "ultra-rare table")
-    },
-    {
-      weight: 2,
-      price: priceFromKeys(priceSet, ["rune_sq_shield"], 21000, 1, warnings, "ultra-rare table")
-    },
-    {
-      weight: 1,
-      price: priceFromKeys(priceSet, ["dragon_med_helm"], 60000, 1, warnings, "ultra-rare table")
-    },
-    {
-      weight: 1,
-      price: priceFromKeys(priceSet, ["rune_kiteshield"], 32000, 1, warnings, "ultra-rare table")
-    },
+    ...ULTRA_RARE_PRICE_ROWS.map((row) => ({
+      weight: row.weight,
+      price: priceFromKeys(
+        priceSet,
+        [row.itemId],
+        row.fallback,
+        row.quantity,
+        warnings,
+        "ultra-rare table"
+      )
+    })),
     { weight: 21, price: 3000 },
-    {
-      weight: 20,
-      price: priceFromKeys(priceSet, ["tooth_half_key"], 110000, 1, warnings, "ultra-rare table")
-    },
-    {
-      weight: 20,
-      price: priceFromKeys(priceSet, ["loop_half_key"], 81200, 1, warnings, "ultra-rare table")
-    },
-    {
-      weight: 5,
-      price: priceFromKeys(priceSet, ["runite_bar"], 6500, 1, warnings, "ultra-rare table")
-    },
-    {
-      weight: 2,
-      price: priceFromKeys(priceSet, ["dragonstone"], 16000, 1, warnings, "ultra-rare table")
-    },
-    {
-      weight: 2,
-      price: priceFromKeys(priceSet, ["silver_ore"], 62, 100, warnings, "ultra-rare table")
-    },
     { weight: 20, price: jewelBaseEv },
     { weight: 15, price: mega }
   ];
@@ -1200,6 +1453,7 @@ function adjustDropPrices(
   drop: DropDefinition,
   priceSet: PriceSet,
   options: LootContextOptions,
+  gameData: GameDataSnapshot,
   warnings?: SimulationWarning[]
 ): DropDefinition {
   if (drop.tag === "gem") {
@@ -1231,6 +1485,27 @@ function adjustDropPrices(
       _expand:
         drop._expand ??
         herbs.rows.map((row) => ({ name: row.name, weight: row.weight, price: row.price }))
+    };
+  }
+  if (drop.tag === "casket") {
+    const casket = casketStats(priceSet, gameData, warnings);
+    return {
+      ...drop,
+      price: casket.ev,
+      _compositePrice: "opened-casket",
+      _expand: casket.rows.map((row) => ({
+        name: row.name,
+        key: row.key,
+        weight: row.weight,
+        chance: row.weight / CASKET_ROLL_DENOMINATOR,
+        qtyAvg: row.quantity,
+        price: row.unitPrice,
+        rowValue: row.rowValue,
+        note:
+          row.itemId === null
+            ? "Face value; six equiprobable coin amounts"
+            : `Opened-casket component (${row.sourceItemId})`
+      }))
     };
   }
   if (drop.tag === "ultrarare") {
@@ -1464,13 +1739,22 @@ export function evaluateLoot(
   const priceSet = context.priceSet;
   const lootPrefs = options.lootPrefs ?? {};
   const alchAllowed = !!options.alching;
-  const natCost = itemPrice(priceSet, "naturerune") ?? NATURE_RUNE_FALLBACK;
-  const herbUnidGp = itemPrice(priceSet, "unidentified_guam") ?? 15;
+  let cachedNatureRuneCost: number | undefined;
+  const getNatureRuneCost = () => {
+    cachedNatureRuneCost ??=
+      itemPrice(priceSet, "naturerune", alchAllowed ? warnings : undefined) ?? NATURE_RUNE_FALLBACK;
+    return cachedNatureRuneCost;
+  };
   let cachedHerbs: ReturnType<typeof herbStats> | undefined;
+  let cachedUnidentifiedHerbs: ReturnType<typeof unidentifiedHerbStats> | undefined;
   let cachedJewels: ReturnType<typeof jewelStats> | undefined;
   const getHerbs = () => {
     cachedHerbs ??= herbStats(priceSet, warnings);
     return cachedHerbs;
+  };
+  const getUnidentifiedHerbs = () => {
+    cachedUnidentifiedHerbs ??= unidentifiedHerbStats(priceSet, warnings);
+    return cachedUnidentifiedHerbs;
   };
   const getJewels = () => {
     cachedJewels ??= jewelStats(
@@ -1506,14 +1790,19 @@ export function evaluateLoot(
       });
       continue;
     }
-    const drop = adjustDropPrices(rawDrop, priceSet, options, warnings);
+    const drop = adjustDropPrices(rawDrop, priceSet, options, context.gameData, warnings);
     const isBone = bonePrayerXp(drop.name) > 0;
     const isHerb = drop.tag === "herb";
     itemApproximationWarning(context.gameData, drop.key, warnings);
-    const livePriceLookup = drop.key ? lookupItemPrice(priceSet, drop.key) : null;
-    const livePrice = livePriceLookup?.value ?? drop.price ?? 0;
+    const usesCompositePrice = drop._compositePrice === "opened-casket";
+    const livePriceLookup =
+      !usesCompositePrice && drop.key ? lookupItemPrice(priceSet, drop.key) : null;
+    const livePrice = usesCompositePrice
+      ? (drop.price ?? 0)
+      : (livePriceLookup?.value ?? drop.price ?? 0);
     if (livePriceLookup && livePriceLookup.value !== null) {
       addPriceAliasWarning(warnings, livePriceLookup, drop.name);
+      addPriceLookupMetadataWarnings(warnings, livePriceLookup);
     } else if (drop.key && drop.price == null) {
       const missingItemId = livePriceLookup?.warning?.itemId ?? drop.key;
       addWarningOnce(warnings, {
@@ -1531,6 +1820,7 @@ export function evaluateLoot(
       drop.key && priceSet.alchValues[drop.key] != null
         ? priceSet.alchValues[drop.key]
         : (drop.alchValue ?? priceSet.alchValues[drop.name] ?? 0);
+    const natCost = getNatureRuneCost();
     const alchProfit = Math.max(0, dropAlch - natCost);
     const noMarketPrice = !saleValue || saleValue <= 0;
     const gdDefault = defaultLootAction(
@@ -1559,7 +1849,7 @@ export function evaluateLoot(
 
     let unitGp: number;
     if (pref === "skip" || pref === "bury") unitGp = 0;
-    else if (pref === "unid") unitGp = isHerb ? herbUnidGp : saleValue;
+    else if (pref === "unid") unitGp = isHerb ? getUnidentifiedHerbs().ev : saleValue;
     else if (pref === "value") {
       unitGp = isHerb
         ? getHerbs().highEv
@@ -1586,11 +1876,23 @@ export function evaluateLoot(
       prayerXpPerKill += drop.chance * drop.qtyAvg * bonePrayerXp(drop.name);
     }
 
+    const evaluatedPrice = pref === "unid" && isHerb ? unitGp : livePrice;
+    const evaluatedExpansion =
+      pref === "unid" && isHerb
+        ? getUnidentifiedHerbs().rows.map((row) => ({
+            name: row.name,
+            key: row.key,
+            weight: row.weight,
+            price: row.price,
+            proxy: row.proxy
+          }))
+        : drop._expand;
+
     lootBreakdown.push({
       ...drop,
       rowId,
-      price: livePrice,
-      saleValue,
+      price: evaluatedPrice,
+      saleValue: pref === "unid" && isHerb ? unitGp : saleValue,
       evGp,
       pref,
       isBone,
@@ -1599,7 +1901,8 @@ export function evaluateLoot(
       prayerXp: isBone ? bonePrayerXp(drop.name) : 0,
       alchValue: dropAlch,
       bulkDead,
-      eligibilityActive: true
+      eligibilityActive: true,
+      _expand: evaluatedExpansion
     });
   }
 
@@ -2425,18 +2728,22 @@ export function computeTrip(
   };
 }
 
-function ammoPrice(ammoId: EntityId, context: SimulationContext): number {
+function ammoPrice(
+  ammoId: EntityId,
+  context: SimulationContext,
+  warnings: SimulationWarning[]
+): number {
   const ammo = context.gameData.ammo[ammoId];
   if (!ammo) return 0;
   const record = ammo as unknown as Record<string, unknown>;
   const priceKey = typeof record.priceKey === "string" ? record.priceKey : ammoId;
-  const live = itemPrice(context.priceSet, priceKey);
+  const live = itemPrice(context.priceSet, priceKey, warnings);
   const numericLive = asNumeric(live);
   if (numericLive !== undefined && numericLive > 0) return numericLive;
   const family = typeof record.fam === "string" ? record.fam : null;
   const tier = asNumeric(record.tier);
   if (family === "knife" && typeof record.barKey === "string") {
-    const bar = itemPrice(context.priceSet, record.barKey);
+    const bar = itemPrice(context.priceSet, record.barKey, warnings);
     const numericBar = asNumeric(bar);
     if (numericBar !== undefined && numericBar > 0) return Math.round(numericBar / 5);
   }
@@ -2449,7 +2756,7 @@ function ammoPrice(ammoId: EntityId, context: SimulationContext): number {
       const candidatePriceKey =
         typeof candidateRecord.priceKey === "string" ? candidateRecord.priceKey : undefined;
       const candidatePrice = candidatePriceKey
-        ? itemPrice(context.priceSet, candidatePriceKey)
+        ? itemPrice(context.priceSet, candidatePriceKey, warnings)
         : undefined;
       const numericCandidatePrice = asNumeric(candidatePrice);
       if (
@@ -2490,23 +2797,32 @@ function ammoPrice(ammoId: EntityId, context: SimulationContext): number {
   return ammo.price || 0;
 }
 
-function spellRuneCost(spellId: EntityId, weaponId: EntityId, context: SimulationContext): number {
+function spellRuneCost(
+  spellId: EntityId,
+  weaponId: EntityId,
+  context: SimulationContext,
+  warnings: SimulationWarning[]
+): number {
   const spell = context.gameData.spells[spellId];
   if (!spell?.runes) return 0;
   const provided = context.gameData.weapons[weaponId]?.provides;
   let cost = 0;
   for (const [rune, qty] of Object.entries(spell.runes)) {
     if (rune === provided) continue;
-    cost += (itemPrice(context.priceSet, rune) || 0) * qty;
+    cost += (itemPrice(context.priceSet, rune, warnings) || 0) * qty;
   }
   return cost;
 }
 
-function chargeCostPerCast(castIntervalSec: number, context: SimulationContext): number {
+function chargeCostPerCast(
+  castIntervalSec: number,
+  context: SimulationContext,
+  warnings: SimulationWarning[]
+): number {
   const fullCost =
-    (itemPrice(context.priceSet, "airrune") || 0) * 3 +
-    (itemPrice(context.priceSet, "firerune") || 0) * 3 +
-    (itemPrice(context.priceSet, "bloodrune") || 0) * 3;
+    (itemPrice(context.priceSet, "airrune", warnings) || 0) * 3 +
+    (itemPrice(context.priceSet, "firerune", warnings) || 0) * 3 +
+    (itemPrice(context.priceSet, "bloodrune", warnings) || 0) * 3;
   const castsPerCharge = Math.max(1, CHARGE_DURATION_SEC / (castIntervalSec || 3));
   return fullCost / castsPerCharge;
 }
@@ -2519,6 +2835,7 @@ export function computeSupplyCosts(
   cannon: CannonOverlayResult | null
 ): SupplyResult {
   const request = input.request;
+  const warnings: SimulationWarning[] = [];
   let ammoCostPerKill = 0;
   let ammoPerKill = 0;
   let ammoKeyUsed: EntityId | null = null;
@@ -2536,7 +2853,7 @@ export function computeSupplyCosts(
           : 0;
       const recover = input.trip?.recoverAmmo !== false;
       const destroyFraction = recover ? 1 / 5 : 1;
-      ammoUnitPrice = ammoPrice(ammoKeyUsed, context);
+      ammoUnitPrice = ammoPrice(ammoKeyUsed, context, warnings);
       ammoPerKill = shotsPerKill * destroyFraction;
       ammoCostPerKill = ammoPerKill * ammoUnitPrice;
     }
@@ -2547,10 +2864,10 @@ export function computeSupplyCosts(
   let runeCostPerCast = 0;
   let chargePerCast = 0;
   if (request.combatStyle === "magic" && request.spellId) {
-    runeCostPerCast = spellRuneCost(request.spellId, request.loadout.weaponId, context);
+    runeCostPerCast = spellRuneCost(request.spellId, request.loadout.weaponId, context, warnings);
     const spell = context.gameData.spells[request.spellId];
     if (spell?.god && request.charge !== false) {
-      chargePerCast = chargeCostPerCast(input.combat.attackSpeedSec, context);
+      chargePerCast = chargeCostPerCast(input.combat.attackSpeedSec, context, warnings);
     }
     castsPerKill =
       input.combat.attackSpeedSec > 0
@@ -2581,7 +2898,8 @@ export function computeSupplyCosts(
     ammoUnitPrice,
     runeCostPerCast,
     chargePerCast,
-    castsPerKill
+    castsPerKill,
+    warnings
   };
 }
 
@@ -2774,6 +3092,6 @@ export function simulateTripLootSupply(
     trip: tripResult,
     supply,
     incoming: tripResult.incoming,
-    warnings: [...lootEvaluation.warnings, ...cannonWarnings]
+    warnings: [...lootEvaluation.warnings, ...supply.warnings, ...cannonWarnings]
   };
 }

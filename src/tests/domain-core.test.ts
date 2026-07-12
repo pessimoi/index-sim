@@ -10,6 +10,8 @@ import {
 } from "./helpers/legacy-sim";
 import {
   createHitDistribution,
+  createHitDistributionMixture,
+  createIndependentHitDistribution,
   hitChance,
   maxHitMagic,
   maxHitMelee,
@@ -181,7 +183,7 @@ describe("pure combat formulas", () => {
     expect(result.ttkSec).toBe(Number.POSITIVE_INFINITY);
   });
 
-  it("builds a bounded hit distribution with miss and max-hit buckets", () => {
+  it("builds an exact hit distribution with separate miss, accurate-zero and max-hit buckets", () => {
     const distribution = createHitDistribution({
       hitChance: 0.75,
       averageHit: 7.5,
@@ -189,18 +191,59 @@ describe("pure combat formulas", () => {
       peakMaxHit: 20
     });
     const miss = distribution.buckets[0]!;
+    const zero = distribution.buckets[1]!;
     const max = distribution.buckets.at(-1)!;
 
     expect(miss).toMatchObject({
-      id: "miss-zero",
-      label: "Miss / 0",
+      id: "miss",
+      label: "Miss",
       minDamage: 0,
       maxDamage: 0,
       isMiss: true
     });
-    expect(miss.probability).toBeCloseTo(0.25 + 0.75 / 21);
+    expect(miss.probability).toBeCloseTo(0.25);
+    expect(zero).toMatchObject({
+      id: "damage-0",
+      label: "0",
+      isMiss: false,
+      isAccurateZero: true
+    });
+    expect(zero.probability).toBeCloseTo(0.75 / 21);
     expect(max).toMatchObject({ label: "20", isMaxHit: true });
     expect(max.probability).toBeCloseTo(0.75 / 21);
+    expect(distribution.averageHit).toBeCloseTo(7.5);
+    expect(distribution.probabilityTotal).toBeCloseTo(1);
+  });
+
+  it("mixes sustained single-hit rolls without losing exact damage outcomes", () => {
+    const distribution = createHitDistributionMixture([
+      { hitChance: 0.5, maxHit: 2 },
+      { hitChance: 1, maxHit: 4 }
+    ]);
+
+    expect(distribution.buckets.map((bucket) => bucket.label)).toEqual([
+      "Miss",
+      "0",
+      "1",
+      "2",
+      "3",
+      "4"
+    ]);
+    expect(distribution.missChance).toBeCloseTo(0.25);
+    expect(distribution.averageHit).toBeCloseTo(1.25);
+    expect(distribution.probabilityTotal).toBeCloseTo(1);
+  });
+
+  it("convolves independent multi-hit specials into a truthful whole-event distribution", () => {
+    const distribution = createIndependentHitDistribution({ hitChance: 0.75, maxHit: 2 }, 2);
+    const miss = distribution.buckets[0]!;
+    const zero = distribution.buckets[1]!;
+
+    expect(distribution.maxHit).toBe(4);
+    expect(distribution.hitChance).toBeCloseTo(1 - 0.25 ** 2);
+    expect(miss.probability).toBeCloseTo(0.25 ** 2);
+    expect(zero.probability).toBeCloseTo((0.25 + 0.75 / 3) ** 2 - 0.25 ** 2);
+    expect(distribution.averageHit).toBeCloseTo(1.5);
     expect(distribution.probabilityTotal).toBeCloseTo(1);
   });
 

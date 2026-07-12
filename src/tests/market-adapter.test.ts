@@ -76,6 +76,25 @@ function scheduledAlchJson(overrides: Record<string, unknown> = {}): string {
   });
 }
 
+function scheduledProvenanceJson(): string {
+  return JSON.stringify({
+    version: 1,
+    capturedAt: "2026-07-08T12:15:00.000Z",
+    refreshSource: "markets.lostcity.rs",
+    items: Object.fromEntries(
+      ["big_bones", "lobster"].map((itemId) => [
+        itemId,
+        {
+          valueOrigin: "legacy-static",
+          refreshStatus: "not-evaluated",
+          quality: "unknown",
+          reasonCode: "legacy-metadata-unavailable"
+        }
+      ])
+    )
+  });
+}
+
 describe("market browser adapter", () => {
   it("fetches market status from same-origin", async () => {
     const seenUrls: string[] = [];
@@ -202,6 +221,7 @@ describe("market browser adapter", () => {
       const path = new URL(String(input)).pathname;
       seenPaths.push(path);
       if (path === "/prices.json") return new Response(scheduledPricesJson());
+      if (path === "/price-provenance.json") return new Response(scheduledProvenanceJson());
       if (path === "/price-history.json") {
         return new Response(
           JSON.stringify([{ t: 1783512900, prices: { lobster: 205, big_bones: 400 } }])
@@ -216,7 +236,9 @@ describe("market browser adapter", () => {
       canonicalAlchValues: { lobster: 12, big_bones: 1 }
     });
 
-    expect(new Set(seenPaths)).toEqual(new Set(["/prices.json", "/price-history.json"]));
+    expect(new Set(seenPaths)).toEqual(
+      new Set(["/prices.json", "/price-provenance.json", "/price-history.json"])
+    );
     expect(status.status).toBe("loaded");
     expect(status.reason).toBe("Scheduled price snapshot loaded.");
     expect(status.scheduledPriceSet).toMatchObject({
@@ -229,9 +251,17 @@ describe("market browser adapter", () => {
     });
     expect(status.files.alch).toBe("not-requested");
     expect(status.latestHistoryAt).toBe("2026-07-08T12:15:00.000Z");
-    expect(status.sharedPriceHistory).toEqual([
-      { t: 1783512900, prices: { lobster: 205, big_bones: 400 } }
-    ]);
+    expect(status.sharedPriceHistory).toEqual({
+      version: 2,
+      snapshots: [
+        {
+          t: 1783512900,
+          kind: "legacy-unknown",
+          prices: { lobster: 205, big_bones: 400 },
+          evaluations: {}
+        }
+      ]
+    });
   });
 
   it("bounds scheduled static responses without misclassifying oversized files as missing", async () => {
@@ -240,6 +270,9 @@ describe("market browser adapter", () => {
         const path = new URL(String(input)).pathname;
         if (path === "/prices.json") {
           return new Response(scheduledPricesJson(), { headers: { "Content-Length": "1000" } });
+        }
+        if (path === "/price-provenance.json") {
+          return new Response(scheduledProvenanceJson());
         }
         return new Response("[]");
       },
@@ -257,6 +290,9 @@ describe("market browser adapter", () => {
       fetcher: async (input) => {
         const path = new URL(String(input)).pathname;
         if (path === "/prices.json") return new Response(scheduledPricesJson());
+        if (path === "/price-provenance.json") {
+          return new Response(scheduledProvenanceJson());
+        }
         return new Response("[]", { headers: { "Content-Length": "1000" } });
       },
       baseUrl: "http://app.local/",
@@ -271,6 +307,7 @@ describe("market browser adapter", () => {
   it("classifies missing scheduled static files without exposing paths", () => {
     const status = createScheduledStaticPriceSnapshotStatus({
       pricesText: scheduledPricesJson(),
+      priceProvenanceText: scheduledProvenanceJson(),
       alchText: null
     });
 
@@ -281,6 +318,7 @@ describe("market browser adapter", () => {
       fallbackPriceSet: null,
       files: {
         prices: "loaded",
+        priceProvenance: "loaded",
         alch: "missing",
         priceHistory: "not-requested"
       }
@@ -302,6 +340,7 @@ describe("market browser adapter", () => {
     (_caseName, pricesText, alchText, validationCode) => {
       const status = createScheduledStaticPriceSnapshotStatus({
         pricesText,
+        priceProvenanceText: scheduledProvenanceJson(),
         alchText
       });
 
@@ -320,6 +359,7 @@ describe("market browser adapter", () => {
     const status = createScheduledStaticPriceSnapshotStatus(
       {
         pricesText: "{bad",
+        priceProvenanceText: scheduledProvenanceJson(),
         alchText: scheduledAlchJson()
       },
       { fallbackPriceSet: syncFixture.priceSet }
@@ -338,6 +378,7 @@ describe("market browser adapter", () => {
   it("treats optional invalid shared price history as metadata only", () => {
     const status = createScheduledStaticPriceSnapshotStatus({
       pricesText: scheduledPricesJson(),
+      priceProvenanceText: scheduledProvenanceJson(),
       alchText: scheduledAlchJson(),
       priceHistoryText: "{bad"
     });
@@ -346,5 +387,22 @@ describe("market browser adapter", () => {
     expect(status.files.priceHistory).toBe("invalid");
     expect(status.latestHistoryAt).toBeNull();
     expect(status.warnings).toContain("Scheduled price history metadata was ignored.");
+  });
+
+  it("rejects a scheduled provenance sidecar whose capture time does not match prices", () => {
+    const provenance = JSON.parse(scheduledProvenanceJson());
+    provenance.capturedAt = "2026-01-01T00:00:00.000Z";
+
+    const status = createScheduledStaticPriceSnapshotStatus({
+      pricesText: scheduledPricesJson(),
+      priceProvenanceText: JSON.stringify(provenance),
+      alchText: scheduledAlchJson()
+    });
+
+    expect(status).toMatchObject({
+      status: "invalid",
+      validationCode: "validation_failed",
+      files: { priceProvenance: "invalid" }
+    });
   });
 });

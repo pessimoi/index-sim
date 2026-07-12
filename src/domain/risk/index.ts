@@ -1,4 +1,4 @@
-import { createHitDistribution } from "../combat";
+import { createHitDistributionMixture } from "../combat";
 import { simulateFullSimulation, type FullSimulationInput } from "../simulation";
 import type { EntityId, SimulationContext, SimulationWarning } from "../shared";
 import {
@@ -340,15 +340,7 @@ function buildModel(
   const fullResult = simulateFullSimulation(input, context);
   const combatResult = fullResult.combat;
   const monster = context.gameData.monsters[input.request.monsterId];
-  const distribution = createHitDistribution(
-    {
-      hitChance: combatResult.hitChance,
-      averageHit: combatResult.avgHit,
-      maxHit: combatResult.maxHit,
-      peakMaxHit: combatResult.peakMaxHit
-    },
-    Math.max(30, Math.ceil(combatResult.peakMaxHit))
-  );
+  const distribution = createHitDistributionMixture(combatResult.debug.normalHitRolls);
   const modeledNormalDps = distribution.averageHit / Math.max(0.001, combatResult.attackSpeedSec);
   const calibratedKillDps =
     trip.ttkSec > 0 && monster

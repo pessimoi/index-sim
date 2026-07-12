@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  HIGH_IMPACT_DYNAMIC_LOOT_MARKET_ENTRIES,
   MARKET_SOURCE_ITEM_ALLOWLIST,
   MARKET_SOURCE_MAPPINGS,
   MARKET_SOURCE_MAPPING_PROVENANCE
@@ -259,9 +260,11 @@ describe("market source mapping foundation", () => {
     const mappings = parseMarketSourceMappings(MARKET_SOURCE_MAPPINGS);
 
     expect(MARKET_SOURCE_MAPPING_PROVENANCE.sourceRef).toContain("api/items");
-    expect(mappings.length).toBeGreaterThan(70);
+    expect(mappings).toHaveLength(92);
+    expect(HIGH_IMPACT_DYNAMIC_LOOT_MARKET_ENTRIES).toHaveLength(12);
     expect(MARKET_SOURCE_ITEM_ALLOWLIST.has("lobster")).toBe(true);
     expect(MARKET_SOURCE_ITEM_ALLOWLIST.has("herb_guam")).toBe(true);
+    expect(MARKET_SOURCE_ITEM_ALLOWLIST.has("unidentified_ranarr")).toBe(false);
     expect(mappings.find((mapping) => mapping.itemId === "herb_guam")).toMatchObject({
       sourceSlug: "guam_leaf",
       notes: expect.stringContaining("item catalog")
@@ -272,6 +275,13 @@ describe("market source mapping foundation", () => {
     );
     expect(mappings.find((mapping) => mapping.itemId === "tooth_half_key")?.sourceSlug).toBe(
       "keyhalf1"
+    );
+    expect(mappings.find((mapping) => mapping.itemId === "rune_2h")).toMatchObject({
+      sourceSlug: "rune_2h_sword",
+      notes: expect.stringContaining("2026-07-12")
+    });
+    expect(MARKET_SOURCE_MAPPING_PROVENANCE.extensions[0]?.itemIds).toEqual(
+      HIGH_IMPACT_DYNAMIC_LOOT_MARKET_ENTRIES.map(([itemId]) => itemId)
     );
   });
 

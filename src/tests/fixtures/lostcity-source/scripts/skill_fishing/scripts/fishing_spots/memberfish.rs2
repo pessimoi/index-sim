@@ -1,0 +1,21 @@
+[opheld1,casket]
+inv_delslot(inv, last_slot);
+sound_synth(lever, 1, 0);
+def_int $random = random(128);
+if ($random < 60) {
+    inv_add(inv, coins, multiply(pow(2, add(random(6), 1)), 10));
+} else if ($random < 92) {
+    inv_add(inv, uncut_sapphire, 1);
+} else if ($random < 108) {
+    inv_add(inv, uncut_emerald, 1);
+} else if ($random < 116) {
+    inv_add(inv, uncut_ruby, 1);
+} else if ($random < 124) {
+    inv_add(inv, cosmic_talisman, 1);
+} else if ($random < 126) {
+    inv_add(inv, uncut_diamond, 1);
+} else if ($random < 127) {
+    inv_add(inv, keyhalf1, 1);
+} else if ($random < 128) {
+    inv_add(inv, keyhalf2, 1);
+}

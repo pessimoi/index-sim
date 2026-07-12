@@ -9,6 +9,7 @@ import {
   parseMarketSyncRequest,
   parseMarketSyncResponseJson,
   PriceMapSchema,
+  ScheduledPriceProvenanceArtifactSchema,
   parsePriceHistory,
   parsePriceSetJson
 } from "@/data/schemas";
@@ -20,6 +21,7 @@ import type {
   MarketSyncResponse,
   PriceSet
 } from "@/domain/shared";
+import type { PriceHistoryArtifactV2 } from "@/data/schemas";
 import {
   ResponseBodyTooLargeError,
   readBoundedResponseText
@@ -57,6 +59,7 @@ export type ScheduledStaticPriceSnapshotValidationCode =
 
 export interface ScheduledStaticPriceSnapshotFiles {
   prices: ScheduledStaticPriceSnapshotFileStatus;
+  priceProvenance: ScheduledStaticPriceSnapshotFileStatus;
   alch: ScheduledStaticPriceSnapshotFileStatus;
   priceHistory: ScheduledStaticPriceSnapshotFileStatus;
 }
@@ -72,12 +75,13 @@ export interface ScheduledStaticPriceSnapshotStatus {
   itemCount: number | null;
   alchCount: number | null;
   latestHistoryAt: string | null;
-  sharedPriceHistory: Array<{ t: number; prices: Record<string, number> }> | null;
+  sharedPriceHistory: PriceHistoryArtifactV2 | null;
   warnings: string[];
 }
 
 export interface ScheduledStaticPriceSnapshotContent {
   pricesText?: string | null;
+  priceProvenanceText?: string | null;
   alchText?: string | null;
   priceHistoryText?: string | null;
 }
@@ -94,6 +98,7 @@ export interface ScheduledStaticPriceSnapshotLoadOptions
   extends Omit<MarketFetchOptions, "endpoint">, ScheduledStaticPriceSnapshotOptions {
   paths?: {
     prices?: string;
+    priceProvenance?: string;
     alch?: string;
     priceHistory?: string | null;
   };
@@ -194,7 +199,10 @@ function createdAtFromPriceMetadata(value: unknown): string | null {
 
 function latestHistoryTimestamp(value: unknown): string | null {
   const history = parsePriceHistory(value);
-  const latestSeconds = history.reduce((latest, snapshot) => Math.max(latest, snapshot.t), 0);
+  const latestSeconds = history.snapshots.reduce(
+    (latest, snapshot) => Math.max(latest, snapshot.t),
+    0
+  );
   return latestSeconds > 0 ? new Date(latestSeconds * 1000).toISOString() : null;
 }
 
@@ -301,6 +309,7 @@ export function createScheduledStaticPriceSnapshotStatus(
   const maxBytes = options.maxBytes ?? PRICE_SET_IMPORT_MAX_BYTES;
   const files: ScheduledStaticPriceSnapshotFiles = {
     prices: content.pricesText == null ? "missing" : "loaded",
+    priceProvenance: content.priceProvenanceText == null ? "missing" : "loaded",
     alch: options.canonicalAlchValues
       ? "not-requested"
       : content.alchText == null
@@ -314,7 +323,11 @@ export function createScheduledStaticPriceSnapshotStatus(
           : "loaded"
   };
 
-  if (content.pricesText == null || (!options.canonicalAlchValues && content.alchText == null)) {
+  if (
+    content.pricesText == null ||
+    content.priceProvenanceText == null ||
+    (!options.canonicalAlchValues && content.alchText == null)
+  ) {
     return missingStatus(files, options.fallbackPriceSet);
   }
 
@@ -323,6 +336,24 @@ export function createScheduledStaticPriceSnapshotStatus(
   if (prices.status === "invalid") {
     files.prices = "invalid";
     return invalidStatus(files, prices.code, warnings, options.fallbackPriceSet);
+  }
+
+  const priceProvenance = parseStaticJson(
+    content.priceProvenanceText,
+    "Scheduled price provenance",
+    maxBytes
+  );
+  if (priceProvenance.status === "invalid") {
+    files.priceProvenance = "invalid";
+    return invalidStatus(files, priceProvenance.code, warnings, options.fallbackPriceSet);
+  }
+
+  const parsedPriceProvenance = ScheduledPriceProvenanceArtifactSchema.safeParse(
+    priceProvenance.value
+  );
+  if (!parsedPriceProvenance.success) {
+    files.priceProvenance = "invalid";
+    return invalidStatus(files, "validation_failed", warnings, options.fallbackPriceSet);
   }
 
   let alchValues: Record<string, number>;
@@ -347,7 +378,7 @@ export function createScheduledStaticPriceSnapshotStatus(
   }
 
   let latestHistoryAt: string | null = null;
-  let sharedPriceHistory: Array<{ t: number; prices: Record<string, number> }> | null = null;
+  let sharedPriceHistory: PriceHistoryArtifactV2 | null = null;
   if (content.priceHistoryText !== undefined && content.priceHistoryText !== null) {
     const history = parseStaticJson(
       content.priceHistoryText,
@@ -376,6 +407,23 @@ export function createScheduledStaticPriceSnapshotStatus(
     options.loadedAt ??
     new Date().toISOString();
 
+  const numericPrices = PriceMapSchema.safeParse(
+    Object.fromEntries(
+      Object.entries(prices.value as Record<string, unknown>).filter(
+        ([key]) => !key.startsWith("_")
+      )
+    )
+  );
+  if (
+    !numericPrices.success ||
+    parsedPriceProvenance.data.capturedAt !== createdAt ||
+    JSON.stringify(Object.keys(numericPrices.data).sort()) !==
+      JSON.stringify(Object.keys(parsedPriceProvenance.data.items).sort())
+  ) {
+    files.priceProvenance = "invalid";
+    return invalidStatus(files, "validation_failed", warnings, options.fallbackPriceSet);
+  }
+
   try {
     const scheduledPriceSet = createPriceSetFromLegacyRecords({
       id: `scheduled-static-prices-${safeIdSegment(createdAt)}`,
@@ -383,12 +431,13 @@ export function createScheduledStaticPriceSnapshotStatus(
       source: "scraped",
       createdAt,
       itemPrices: prices.value,
+      itemPriceMetadata: parsedPriceProvenance.data.items,
       alchValues,
       provenance: {
         source: options.canonicalAlchValues ? "generated" : "scraped",
         sourceRef: options.canonicalAlchValues
-          ? "prices.json + generated game-data high-alch values"
-          : "prices.json + compatibility alch values",
+          ? "prices.json + price-provenance.json + generated game-data high-alch values"
+          : "prices.json + price-provenance.json + compatibility alch values",
         verifiedAt: createdAt,
         notes:
           "Read-only scheduled static snapshot candidate validated by the current PriceSet schema."
@@ -458,6 +507,7 @@ export async function loadScheduledStaticPriceSnapshot(
 ): Promise<ScheduledStaticPriceSnapshotStatus> {
   const paths = {
     prices: options.paths?.prices ?? "/prices.json",
+    priceProvenance: options.paths?.priceProvenance ?? "/price-provenance.json",
     alch:
       options.paths?.alch === undefined
         ? options.canonicalAlchValues
@@ -470,24 +520,31 @@ export async function loadScheduledStaticPriceSnapshot(
 
   const maxBytes = options.maxBytes ?? PRICE_SET_IMPORT_MAX_BYTES;
   const maxHistoryBytes = options.maxHistoryBytes ?? SCHEDULED_PRICE_HISTORY_MAX_BYTES;
-  const [pricesResult, alchResult, priceHistoryResult] = await Promise.all([
+  const [pricesResult, priceProvenanceResult, alchResult, priceHistoryResult] = await Promise.all([
     fetchStaticText(paths.prices, options, maxBytes),
+    fetchStaticText(paths.priceProvenance, options, maxBytes),
     fetchStaticText(paths.alch, options, maxBytes),
     fetchStaticText(paths.priceHistory, options, maxHistoryBytes)
   ]);
 
   const files: ScheduledStaticPriceSnapshotFiles = {
     prices: fetchedStaticFileStatus(pricesResult),
+    priceProvenance: fetchedStaticFileStatus(priceProvenanceResult),
     alch: fetchedStaticFileStatus(alchResult),
     priceHistory: fetchedStaticFileStatus(priceHistoryResult)
   };
-  if (pricesResult.status === "body-too-large" || alchResult.status === "body-too-large") {
+  if (
+    pricesResult.status === "body-too-large" ||
+    priceProvenanceResult.status === "body-too-large" ||
+    alchResult.status === "body-too-large"
+  ) {
     return invalidStatus(files, "body_too_large", [], options.fallbackPriceSet);
   }
 
   const status = createScheduledStaticPriceSnapshotStatus(
     {
       pricesText: fetchedStaticText(pricesResult),
+      priceProvenanceText: fetchedStaticText(priceProvenanceResult),
       alchText: fetchedStaticText(alchResult),
       priceHistoryText: fetchedStaticText(priceHistoryResult)
     },

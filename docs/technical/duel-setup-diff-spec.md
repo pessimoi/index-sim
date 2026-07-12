@@ -1,25 +1,25 @@
-# Duel setup diff and impact explanation specification
+# Setup comparison diff and impact explanation specification
 
 - Status: accepted for implementation
 - Date: 2026-07-11
 - Owner: technical docs
 - Source: approved post-V1 extension Goal 1
-- Feature-inventory parent: `Duel snapshots` (`Valmis`)
+- Feature-inventory parent: `Setup comparison` (`Valmis`)
 - Related decisions: D-031, D-042, D-049, D-059 and D-067
 
 ## Purpose
 
-Extend the completed Duel workflow so a user can understand both what differs
-between a saved snapshot and the active setup and how the calculated outputs
+Extend the completed Setups workflow so a user can understand both what differs
+between a saved setup and the active setup and how the calculated outputs
 differ on the current target.
 
 This is a bounded next phase of the existing `Valmis` feature. It does not
 create another snapshot model, change simulation formulas or reopen account-
-backed/shared Duel collections.
+backed/shared saved-setup collections.
 
 ## Existing behavior
 
-The current Duel pane already:
+The current Setups pane already:
 
 - stores normalized `CombatSetupFormState` snapshots in a separate version 1
   local persistence envelope;
@@ -115,7 +115,11 @@ or unavailable metrics render as unavailable, not fake zero.
 
 ## UI behavior
 
-- Keep the current dense Duel table and persistence/actions unchanged.
+- Keep the current dense setup comparison table and persistence contract unchanged.
+- Keep the active target in the heading/live row instead of repeating it in a
+  read-only toolbar field. The primary action is `Save current setup`; backup
+  import/export lives under `Manage saved setups` and controls must not overlap
+  at compact desktop widths.
 - Render the already-computed DPS delta in the DPS cell.
 - Add one `Review diff` action for snapshot rows.
 - The action toggles an accessible detail row linked with `aria-expanded` and
@@ -142,7 +146,7 @@ or unavailable metrics render as unavailable, not fake zero.
 ## Documentation updates
 
 - Add this spec to the technical documentation map.
-- Extend the `Duel snapshots` feature-inventory note without changing `Valmis`.
+- Extend the `Setup comparison` feature-inventory note without changing `Valmis`.
 - Update UI parity, testing, rewrite parity and backlog evidence.
 - Record the accepted comparison/shared-context boundary as D-068.
 

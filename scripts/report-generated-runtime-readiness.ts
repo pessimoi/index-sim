@@ -15,7 +15,12 @@ import {
   type LegacySnapshotInput
 } from "../src/data";
 import { parseGameDataSnapshot } from "../src/data/schemas/game-data";
-import { createPriceSetFromLegacyRecords, PriceSetSchema } from "../src/data/schemas/price-set";
+import {
+  ScheduledPriceProvenanceArtifactSchema,
+  createPriceSetFromLegacyRecords,
+  normalizePriceSetItemMetadata,
+  PriceSetSchema
+} from "../src/data/schemas/price-set";
 import type { SimulationContext } from "../src/domain/shared";
 
 export interface CliOptions {
@@ -176,18 +181,25 @@ function loadGeneratedCandidateContext(candidate: CliOptions["candidate"]): Simu
       gameData: parseGameDataSnapshot(
         readRepoJson("src/data/generated/legacy-derived-runtime-game-data.json")
       ),
-      priceSet: PriceSetSchema.parse(
-        readRepoJson("src/data/generated/legacy-derived-runtime-price-set.json")
+      priceSet: normalizePriceSetItemMetadata(
+        PriceSetSchema.parse(
+          readRepoJson("src/data/generated/legacy-derived-runtime-price-set.json")
+        ),
+        { fallbackOrigin: "legacy-static", fallbackReasonCode: "legacy-metadata-unavailable" }
       )
     };
   }
 
   const gameData = parseGameDataSnapshot(readRepoJson("src/data/generated/game-data.json"));
+  const priceProvenance = ScheduledPriceProvenanceArtifactSchema.parse(
+    readRepoJson("price-provenance.json")
+  );
   const scheduledPriceSet = createPriceSetFromLegacyRecords({
     id: "runtime-readiness-static-prices",
     label: "Runtime readiness static prices",
     source: "scraped",
     itemPrices: readRepoJson("prices.json"),
+    itemPriceMetadata: priceProvenance.items,
     alchValues: {},
     provenance: {
       source: "generated",
@@ -230,6 +242,8 @@ export function formatGeneratedRuntimeReadinessMarkdown(
     `Reference PriceSet: ${report.referencePriceSetId}`,
     `Candidate PriceSet: ${report.candidatePriceSetId}`,
     "Scope: coverage evidence only; source authority and runtime bootstrap approval are separate reviews.",
+    `Price metadata: ${report.priceMetadata.metadataCount}/${report.priceMetadata.numericCount} rows; ${report.priceMetadata.generatedFallbackCount} generated fallbacks; ${report.priceMetadata.marketMappingsMissingNumeric.length} mapped prices missing.`,
+    `Dynamic loot prices: ${report.dynamicLootPriceDependencies.mappedCount}/${report.dynamicLootPriceDependencies.dependencyCount} dependencies mapped; ${report.dynamicLootPriceDependencies.missingMappingCount} missing mappings; ${report.dynamicLootPriceDependencies.unrecognizedActiveTags.length} unrecognized active tags.`,
     "",
     "| Section | Blocking | Reference | Candidate | Matched | Missing | Extra | Examples |",
     "| --- | --- | ---: | ---: | ---: | ---: | ---: | --- |",

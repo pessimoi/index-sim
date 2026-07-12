@@ -8,8 +8,13 @@ import {
   type LegacyRuntime
 } from "./helpers/legacy-sim";
 import { simulateCombat } from "../domain/combat";
+import { createGeneratedRuntimeContext } from "../adapters/generated";
 import {
   bonePrayerXp,
+  CASKET_COIN_AVERAGE,
+  CASKET_REWARD_TABLE,
+  CASKET_ROLL_DENOMINATOR,
+  casketStats,
   defaultLootAction,
   evaluateLoot,
   createIncomingDamageDescriptor,
@@ -32,8 +37,10 @@ import {
   type MonsterDefinition,
   type PriceSet,
   type SimulationContext,
-  type SimulationRequest
+  type SimulationRequest,
+  type SimulationWarning
 } from "../domain/shared";
+import { MARKET_SYNC_TAG_ITEM_IDS } from "../data/market-sync-items";
 
 interface GoldenFixture {
   tolerances: {
@@ -84,6 +91,21 @@ function domainContextFromLegacy(runtime: LegacyRuntime): SimulationContext {
   });
   const priceSet = createPriceSetFromLegacyGameData({ gameData: runtime.GameData });
   return { gameData, priceSet };
+}
+
+function sourceBackedCasketGpPerKillDelta(
+  monster: MonsterDefinition,
+  context: SimulationContext
+): number {
+  const sourceBackedUnitValue = casketStats(context.priceSet, context.gameData).ev;
+  const legacyUnitValue = context.priceSet.itemPrices.casket ?? 0;
+  return (monster.loot ?? [])
+    .flatMap((entry) => (Array.isArray(entry) ? entry : [entry]))
+    .filter((drop) => drop.tag === "casket")
+    .reduce(
+      (sum, drop) => sum + drop.chance * drop.qtyAvg * (sourceBackedUnitValue - legacyUnitValue),
+      0
+    );
 }
 
 function domainRequestFromLegacyInput(input: LegacyInput): SimulationRequest {
@@ -212,6 +234,257 @@ describe("trip/loot/supply unit rules", () => {
     expect(result.lootBreakdown[1]?._expand).toEqual(
       expect.arrayContaining([expect.objectContaining({ name: "Uncut sapphire", weight: 32 })])
     );
+  });
+
+  it("values unidentified random herbs by their source item ids before using the generic proxy", () => {
+    const runtime = createLegacyRuntime();
+    const baseContext = domainContextFromLegacy(runtime);
+    const drop = { name: "Random herb", tag: "herb", chance: 1, qtyAvg: 1 };
+    const monster: MonsterDefinition = {
+      ...baseContext.gameData.monsters.chicken,
+      loot: [drop]
+    };
+    const exactUnidentifiedPrices = {
+      unidentified_guam: 100,
+      unidentified_marentill: 200,
+      unidentified_tarromin: 300,
+      unidentified_harralander: 400,
+      unidentified_ranarr: 500,
+      unidentified_irit: 600,
+      unidentified_avantoe: 700,
+      unidentified_kwuarm: 800,
+      unidentified_cadantine: 900,
+      unidentified_lantadyme: 1000,
+      unidentified_dwarf_weed: 1100
+    };
+    const exactContext: SimulationContext = {
+      ...baseContext,
+      priceSet: {
+        ...baseContext.priceSet,
+        itemPrices: { ...baseContext.priceSet.itemPrices, ...exactUnidentifiedPrices }
+      }
+    };
+    const exactResult = evaluateLoot(monster, exactContext, {
+      lootPrefs: { [lootPreferenceKey(drop, 0)]: "unid" }
+    });
+    const expectedExactEv =
+      (32 * 100 +
+        24 * 200 +
+        18 * 300 +
+        14 * 400 +
+        11 * 500 +
+        8 * 600 +
+        6 * 700 +
+        5 * 800 +
+        4 * 900 +
+        3 * 1000 +
+        3 * 1100) /
+      128;
+
+    expect(exactResult.gpPerKill).toBe(expectedExactEv);
+    expect(exactResult.lootBreakdown[0]).toMatchObject({
+      pref: "unid",
+      price: expectedExactEv,
+      saleValue: expectedExactEv,
+      evGp: expectedExactEv
+    });
+    expect(exactResult.lootBreakdown[0]?._expand).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "Ranarr",
+          key: "unidentified_ranarr",
+          price: 500,
+          proxy: false
+        })
+      ])
+    );
+    expect(exactResult.warnings.map((warning) => warning.code)).not.toContain(
+      "unidentified-herb-price-approximation"
+    );
+
+    const proxyContext: SimulationContext = {
+      ...baseContext,
+      priceSet: {
+        ...baseContext.priceSet,
+        itemPrices: { ...baseContext.priceSet.itemPrices, unidentified_guam: 1234 }
+      }
+    };
+    for (const itemId of Object.keys(exactUnidentifiedPrices)) {
+      if (itemId !== "unidentified_guam") delete proxyContext.priceSet.itemPrices[itemId];
+    }
+    const proxyResult = evaluateLoot(monster, proxyContext, {
+      lootPrefs: { [lootPreferenceKey(drop, 0)]: "unid" }
+    });
+
+    expect(proxyResult.gpPerKill).toBe(1234);
+    expect(proxyResult.warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "unidentified-herb-price-approximation",
+          severity: "info",
+          message: expect.stringContaining("10 of 11")
+        })
+      ])
+    );
+    expect(proxyResult.lootBreakdown[0]?._expand).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: "unidentified_ranarr",
+          price: 1234,
+          proxy: true
+        })
+      ])
+    );
+  });
+
+  it("values one ordinary casket from the exact opened-content table instead of its parent cost", () => {
+    const { context } = createGeneratedRuntimeContext();
+    const componentPrices = {
+      uncut_sapphire: 100,
+      uncut_emerald: 200,
+      uncut_ruby: 300,
+      cosmic_talisman: 400,
+      uncut_diamond: 500,
+      tooth_half_key: 600,
+      loop_half_key: 700,
+      casket: 50
+    };
+    const priceSet: PriceSet = {
+      ...context.priceSet,
+      itemPrices: { ...context.priceSet.itemPrices, ...componentPrices }
+    };
+    const pricedContext: SimulationContext = { ...context, priceSet };
+    const drop = {
+      name: "Casket",
+      key: "casket",
+      tag: "casket",
+      chance: 1 / 128,
+      qtyAvg: 1
+    };
+    const monster: MonsterDefinition = {
+      ...context.gameData.monsters.rock_crab,
+      loot: [drop]
+    };
+    const expectedUnitEv =
+      (60 * CASKET_COIN_AVERAGE +
+        32 * componentPrices.uncut_sapphire +
+        16 * componentPrices.uncut_emerald +
+        8 * componentPrices.uncut_ruby +
+        8 * componentPrices.cosmic_talisman +
+        2 * componentPrices.uncut_diamond +
+        componentPrices.tooth_half_key +
+        componentPrices.loop_half_key) /
+      CASKET_ROLL_DENOMINATOR;
+    const result = evaluateLoot(monster, pricedContext);
+    const row = result.lootBreakdown[0];
+
+    expect(CASKET_REWARD_TABLE.reduce((sum, reward) => sum + reward.weight, 0)).toBe(
+      CASKET_ROLL_DENOMINATOR
+    );
+    expect(CASKET_COIN_AVERAGE).toBe(210);
+    expect(row).toMatchObject({
+      price: expectedUnitEv,
+      saleValue: expectedUnitEv,
+      evGp: expectedUnitEv / 128,
+      slotFrac: 1,
+      _compositePrice: "opened-casket"
+    });
+    expect(row?.price).not.toBe(componentPrices.casket);
+    expect(row?._expand).toHaveLength(8);
+    expect(
+      (row?._expand ?? []).reduce(
+        (sum, reward) =>
+          sum +
+          Number(reward.weight ?? 0) *
+            Number(reward.rowValue ?? Number(reward.price ?? 0) * Number(reward.qtyAvg ?? 1)),
+        0
+      ) / CASKET_ROLL_DENOMINATOR
+    ).toBe(expectedUnitEv);
+  });
+
+  it("uses exact casket component prices before aliases and generated source-cost fallback", () => {
+    const { context } = createGeneratedRuntimeContext();
+    const exactPriceSet: PriceSet = {
+      ...context.priceSet,
+      itemPrices: {
+        ...context.priceSet.itemPrices,
+        uncut_sapphire: 1_000,
+        sapphire: 9_000
+      }
+    };
+    const exactWarnings: SimulationWarning[] = [];
+    const exact = casketStats(exactPriceSet, context.gameData, exactWarnings);
+    const exactSapphire = exact.rows.find((row) => row.itemId === "uncut_sapphire");
+    expect(exactSapphire?.unitPrice).toBe(1_000);
+    expect(exactWarnings.map((warning) => warning.code)).not.toContain("price-alias-used");
+
+    const changedPriceSet: PriceSet = {
+      ...exactPriceSet,
+      itemPrices: { ...exactPriceSet.itemPrices, uncut_sapphire: 1_128 }
+    };
+    expect(casketStats(changedPriceSet, context.gameData).ev - exact.ev).toBe(32);
+
+    const aliasPrices = { ...exactPriceSet.itemPrices };
+    delete aliasPrices.uncut_sapphire;
+    const aliasWarnings: SimulationWarning[] = [];
+    const alias = casketStats(
+      { ...exactPriceSet, itemPrices: aliasPrices },
+      context.gameData,
+      aliasWarnings
+    );
+    expect(alias.rows.find((row) => row.itemId === "uncut_sapphire")?.unitPrice).toBe(9_000);
+    expect(aliasWarnings.map((warning) => warning.code)).toContain("price-alias-used");
+
+    delete aliasPrices.sapphire;
+    const fallbackWarnings: SimulationWarning[] = [];
+    const fallback = casketStats(
+      { ...exactPriceSet, itemPrices: aliasPrices },
+      context.gameData,
+      fallbackWarnings
+    );
+    expect(fallback.rows.find((row) => row.itemId === "uncut_sapphire")?.unitPrice).toBe(
+      context.gameData.items.uncut_sapphire?.price
+    );
+    expect(fallbackWarnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "price-fallback-used",
+          message: expect.stringContaining("uncut_sapphire")
+        })
+      ])
+    );
+  });
+
+  it("covers every production casket row and its exact market dependencies", () => {
+    const { context } = createGeneratedRuntimeContext();
+    const stats = casketStats(context.priceSet, context.gameData);
+    const casketComponentIds = CASKET_REWARD_TABLE.flatMap((row) =>
+      row.itemId === null ? [] : [row.itemId]
+    ).sort();
+
+    expect([...MARKET_SYNC_TAG_ITEM_IDS.casket].sort()).toEqual(casketComponentIds);
+    for (const monsterId of ["dagannoth", "dagannoth_92", "rock_crab"] as const) {
+      const monster = context.gameData.monsters[monsterId];
+      const sourceRow = monster.loot
+        ?.flatMap((entry) => (Array.isArray(entry) ? entry : [entry]))
+        .find((entry) => entry.tag === "casket");
+      expect(sourceRow).toMatchObject({
+        key: "casket",
+        tag: "casket",
+        chance: 1 / 128,
+        qtyAvg: 1
+      });
+
+      const evaluated = evaluateLoot(monster, context);
+      const row = evaluated.lootBreakdown.find((entry) => entry.tag === "casket");
+      expect(row).toMatchObject({
+        price: stats.ev,
+        saleValue: stats.ev,
+        evGp: stats.ev / 128,
+        slotFrac: 1
+      });
+      expect(row?.price).not.toBe(context.priceSet.itemPrices.casket);
+    }
   });
 
   it("keeps conditional quest and clue rows visible but outside every default calculation", () => {
@@ -995,14 +1268,28 @@ describe("trip/loot/supply parity with legacy golden fixtures", () => {
       expect(fixture, `Missing golden fixture for ${caseId}`).toBeDefined();
       if (!definition || !fixture) throw new Error(`Missing test data for ${caseId}`);
 
-      const result = simulateTripLootSupply(buildTripInput(runtime, definition, context), context);
+      const input = buildTripInput(runtime, definition, context);
+      const result = simulateTripLootSupply(input, context);
       const expected = fixture.expected;
       const expectedTrip = expected.trip as Record<string, unknown> | null;
+      const casketCorrection = sourceBackedCasketGpPerKillDelta(
+        context.gameData.monsters[input.request.monsterId],
+        context
+      );
 
-      expectCloseLoose(result.gpPerKill, expected.gpPerKill);
-      expectCloseLoose(result.gpPerHour, expected.gpPerHour);
-      expectCloseLoose(result.netGpPerHour, expected.netGpPerHour);
-      expectCloseLoose(result.effectiveNetGpPerHour, expected.effectiveNetGpPerHour);
+      expectCloseLoose(result.gpPerKill, Number(expected.gpPerKill) + casketCorrection);
+      expectCloseLoose(
+        result.gpPerHour,
+        Number(expected.gpPerHour) + casketCorrection * result.killsPerHour
+      );
+      expectCloseLoose(
+        result.netGpPerHour,
+        Number(expected.netGpPerHour) + casketCorrection * result.killsPerHour
+      );
+      expectCloseLoose(
+        result.effectiveNetGpPerHour,
+        Number(expected.effectiveNetGpPerHour) + casketCorrection * result.trip.effectiveKph
+      );
       expectCloseLoose(result.supply.supplyCostPerKill, expected.supplyCostPerKill);
       expectCloseLoose(result.supply.foodCostPerKill, expected.foodCostPerKill);
       expectCloseLoose(result.supply.potionCostPerKill, expected.potionCostPerKill);
@@ -1060,7 +1347,10 @@ describe("trip/loot/supply parity with legacy golden fixtures", () => {
         if (actualLoot) {
           expect(actualLoot.name).toBe(expectedLoot.name);
           expect(actualLoot.pref).toBe(expectedLoot.pref);
-          expectCloseLoose(actualLoot.evGp, expectedLoot.evGp);
+          expectCloseLoose(
+            actualLoot.evGp,
+            Number(expectedLoot.evGp) + (actualLoot.tag === "casket" ? casketCorrection : 0)
+          );
           expectCloseLoose(actualLoot.prayerXp, expectedLoot.prayerXp);
           expectCloseLoose(actualLoot.slotFrac, expectedLoot.slotFrac);
           expectCloseLoose(actualLoot.alchValue, expectedLoot.alchValue);

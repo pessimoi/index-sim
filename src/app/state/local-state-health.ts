@@ -34,9 +34,9 @@ import {
 } from "./loot-settings";
 import { PLANNER_UI_STORAGE_KEY, PLANNER_UI_VERSION, PlannerUiStateSchema } from "./planner";
 import {
-  BrowserPriceHistoryStateSchema,
   PRICE_HISTORY_STORAGE_KEY,
-  PRICE_HISTORY_VERSION
+  PRICE_HISTORY_VERSION,
+  loadBrowserPriceHistory
 } from "./price-history";
 import {
   SELECTED_PRICE_SET_STORAGE_KEY,
@@ -191,16 +191,18 @@ export const LOCAL_STATE_HEALTH_DESCRIPTORS: readonly LocalStateHealthDescriptor
     version: HIDDEN_GEAR_TIERS_VERSION,
     schema: HiddenGearTiersStateSchema
   }),
-  persistedDescriptor("duel-snapshots", "Duel snapshots", {
+  persistedDescriptor("duel-snapshots", "Saved setups", {
     key: DUEL_SNAPSHOTS_STORAGE_KEY,
     version: DUEL_SNAPSHOTS_VERSION,
     schema: DuelSnapshotsStateSchema
   }),
-  persistedDescriptor("price-history", "Price history", {
+  {
+    id: "price-history",
+    label: "Price history",
     key: PRICE_HISTORY_STORAGE_KEY,
     version: PRICE_HISTORY_VERSION,
-    schema: BrowserPriceHistoryStateSchema
-  }),
+    load: (storage) => loadBrowserPriceHistory(storage)
+  },
   {
     id: "selected-price-set",
     label: "Selected PriceSet",

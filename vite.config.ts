@@ -11,7 +11,12 @@ const projectRoot = fileURLToPath(new URL(".", import.meta.url));
 const publicDir = fileURLToPath(new URL("./public", import.meta.url));
 const outDir = fileURLToPath(new URL("./dist", import.meta.url));
 const cacheDir = fileURLToPath(new URL("./node_modules/.vite", import.meta.url));
-const scheduledPriceAssetFiles = ["prices.json", "alch.json", "price-history.json"] as const;
+const scheduledPriceAssetFiles = [
+  "prices.json",
+  "price-provenance.json",
+  "alch.json",
+  "price-history.json"
+] as const;
 const archivedLegacyJsxFiles = new Set(["planner.jsx", "views.jsx"]);
 const hiscoresProvider = createLostCityHiscoresProvider();
 

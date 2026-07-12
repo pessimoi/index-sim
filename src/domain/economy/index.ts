@@ -1,8 +1,36 @@
-import { type EntityId, type PriceSet, type SimulationWarning } from "../shared";
+import {
+  type EntityId,
+  type ItemPriceMetadata,
+  type PriceSet,
+  type SimulationWarning
+} from "../shared";
 import { aliasesForCanonicalItemId, resolveCanonicalItemId } from "./canonical-item-id";
 export * from "./canonical-item-id";
 
 export type PriceLookupKind = "item-price" | "alch-value";
+
+export type ItemPriceFreshnessDisplay =
+  "observed-current" | "retained" | "observed-stale" | "unknown" | "not-market-priced";
+
+export function deriveItemPriceFreshness(
+  metadata: ItemPriceMetadata | undefined,
+  now: Date
+): ItemPriceFreshnessDisplay {
+  if (!metadata) return "unknown";
+  if (metadata.valueOrigin !== "market-observation") {
+    return ["generated-object-cost", "manual"].includes(metadata.valueOrigin) ||
+      metadata.refreshStatus === "not-applicable"
+      ? "not-market-priced"
+      : metadata.refreshStatus === "retained"
+        ? "retained"
+        : "unknown";
+  }
+  if (metadata.refreshStatus === "retained") return "retained";
+  const observedAt = metadata.valueObservedAt ? Date.parse(metadata.valueObservedAt) : NaN;
+  if (!Number.isFinite(observedAt)) return "unknown";
+  const ageMs = Math.max(0, now.getTime() - observedAt);
+  return ageMs > 30 * 24 * 60 * 60 * 1000 ? "observed-stale" : "observed-current";
+}
 
 export interface PriceLookupWarning extends SimulationWarning {
   code: "missing-price" | "missing-alch-value";
@@ -18,6 +46,7 @@ export interface PriceLookupResult {
   lookupSource?: "identity" | "canonical" | "alias";
   aliasItemId?: EntityId;
   value: number | null;
+  metadata?: ItemPriceMetadata;
   warning?: PriceLookupWarning;
 }
 
@@ -68,7 +97,8 @@ export function lookupItemPrice(priceSet: PriceSet, itemId: EntityId): PriceLook
       requestedItemId: itemId,
       canonicalItemId,
       lookupSource: "identity",
-      value: directValue
+      value: directValue,
+      metadata: priceSet.itemPriceMetadata?.[itemId]
     };
   }
   const candidateIds = [
@@ -90,7 +120,8 @@ export function lookupItemPrice(priceSet: PriceSet, itemId: EntityId): PriceLook
               ? "canonical"
               : "alias",
         ...(candidateId !== canonicalItemId ? { aliasItemId: candidateId } : {}),
-        value
+        value,
+        metadata: priceSet.itemPriceMetadata?.[candidateId]
       };
     }
   }

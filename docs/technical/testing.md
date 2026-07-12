@@ -12,6 +12,19 @@ privacy review.
 
 The root app path uses the Vite/React rewrite and has npm scripts for TypeScript, Vite, Vitest, Playwright, ESLint and Prettier. The archived legacy app in `legacy/index.html` still transforms JSX in the browser by Babel Standalone and has no local JSX typecheck/build step.
 
+The D-083 Hit distribution comparison adds focused domain/view-model coverage
+for separate miss and accurate-zero outcomes, sustained-roll mixtures,
+independent whole-special convolution, probability totals, expected values,
+shared normal/special axes, cumulative thresholds and full-target-HP KO
+context. Browser coverage owns the vertical bars, normal-only and selected-spec
+states, accessible bucket names/exact table and chart-local responsive overflow.
+Rates-only Dense/Duel view-model paths explicitly omit chart presentation data.
+The calculation-task structured-clone integration case combines Dense, Planner,
+Duel and Risk in one test and therefore uses a 15-second runner timeout; this is
+test scheduling headroom, not a product performance budget. The separate
+`ui-performance.test.ts` suite continues to own the accepted performance
+boundaries.
+
 Use [rewrite-parity-report.md](rewrite-parity-report.md) to interpret which user-visible calculation areas are currently legacy-parity certified, partially covered or not ported.
 
 Accepted parity policy: legacy results are regression evidence, not the final truth source. Keep golden tests to catch accidental changes, but allow documented intentional deltas when the current accepted LostCityRS/Content revision or another accepted source shows the legacy app should be replaced.
@@ -133,7 +146,7 @@ npm run deploy:verify-artifact
 ```
 
 The artifact command requires root `index.html`, Cloudflare `_headers`, hashed
-Vite JavaScript/CSS references, `prices.json`, `alch.json` and
+Vite JavaScript/CSS references, `prices.json`, `price-provenance.json`, `alch.json` and
 `price-history.json`; validates the static security/cache policy, market schemas
 and `_scraped_at`; rejects unexpected files, source maps, symlinks, local paths
 and common secret material; and prints only bounded metadata plus SHA-256.
@@ -206,10 +219,13 @@ The command evaluates the default setup for all 189 generated
 monster/combat-style combinations and 18 legacy golden setup variants. It
 compares Result, Dense Compare, calculation worker, Duel live, Duel matrix and
 saved-setup round-trip values at absolute and relative tolerance `1e-9`. The
-2026-07-11 baseline contains 5,958 current-path comparisons and zero
+2026-07-12 baseline contains 5,958 current-path comparisons and zero
 mismatches. It also reports legacy-to-rewrite changes only when both the
 metric-specific absolute and relative thresholds are exceeded; those findings
-must be classified rather than silently treated as rewrite truth.
+must be classified rather than silently treated as rewrite truth. Its focused
+casket section reports Dagannoth 74, Dagannoth 92 and Rock Crab separately as
+`source-backed-casket`, comparing the prior generated parent cost with the
+opened-content EV and GP/kill correction.
 
 Regenerate the committed evidence after an intentional reviewed change with:
 
@@ -221,6 +237,20 @@ The report is [../project/numeric-user-path-audit.md](../project/numeric-user-pa
 The audit is local and deterministic: it does not call live upstreams or read
 real browser storage. Browser formatting remains covered by the Playwright
 all-fixture and release-path numeric snapshot cases.
+
+For ordinary-casket valuation or source-contract changes, run:
+
+```sh
+npm run test -- src/tests/lostcity-source-parser.test.ts src/tests/data-generator.test.ts src/tests/trip-loot-supply.test.ts src/tests/ui-view-model.test.ts
+npm run data:generate -- --source-dir .sources/lostcity-content --dry-run --skip-calculation-impact
+npm run numeric:audit
+npm run test:e2e -- --workers=1 --grep "source-backed opened-casket value composition"
+```
+
+The parser test locks the focused source contract to the domain table and
+includes an intentional threshold-drift failure. The data-generator dry run is
+optional when the repository-local raw checkout is absent; committed fixtures
+keep the normal clean-checkout gate independent of `.sources`.
 
 For live integration release-copy audits, also run the narrower command below and classify every hit as production code, typed same-origin contract/test, archived legacy evidence or documentation:
 
@@ -350,25 +380,35 @@ npm run test -- src/tests/data-economy.test.ts src/tests/market-adapter.test.ts 
 npm run test:e2e -- src/tests/e2e/scaffold.spec.ts
 ```
 
-Focused writer tests validate the normalized fixture contract and first-page Inertia item adapter used by `--upstream-url`: exact root/origin checks, sequential request delay, redirect/timeout/size/content failures, allowlisted item-id diagnostics, mapping-specific 404 retention, all-retained freshness rejection, username removal, explicit/coin-only unit prices, item/mixed/ambiguous-offer skipping, buy/sell inclusion, unweighted quantity, MAD and median-ratio outlier filtering, sparse/stale prior-price retention, missing/unknown/duplicate mapping gates, catalog-audited source slugs, 90-day 12-hour plus older daily history retention, two-file idempotence and unchanged `alch.json`. A local dry-run fixture check needs no network:
+Focused writer tests validate the normalized fixture contract and first-page Inertia item adapter used by `--upstream-url`: exact root/origin checks, sequential request delay, redirect/timeout/size/content failures, allowlisted item-id diagnostics, mapping-specific 404 retention, all-retained freshness rejection, username removal, coin-only observations, MAD/median filtering, sparse/stale retention, preserved value origin/observation time/quality, legacy-static initialization without invented observation timestamps, version-2 history migration/compaction, three-file idempotence and unchanged `alch.json`. A local dry-run fixture check needs no network:
 
 ```sh
 npm run prices:write-scheduled -- --input src/tests/fixtures/market-writer/upstream-valid.json --item-ids lobster,rune_scimitar,dragon_bones --now 2026-07-08T00:15:00.000Z --dry-run
 ```
 
-The scheduled workflow runs only at 00:15 and 12:15 UTC, has no `workflow_dispatch`, requires `MARKET_PRICES_UPSTREAM_URL` to be the exact reviewed root, validates focused tests/JSON/diffs, rejects changes outside `prices.json` and `price-history.json`, and commits only real two-file diffs. The opt-in 2026-07-10 live dry-run passed for all 80 mappings with 69 updated plus 11 retained/skipped rows and no writes. The exact repository variable was configured and read back on 2026-07-10. Under D-067, a future operator collects first-successful-run evidence before using scheduled-current copy; it is not a repository test gap.
+D-086 dynamic dependency checks live in `src/tests/market-sync-items.test.ts`,
+`src/tests/trip-loot-supply.test.ts` and generated readiness. They assert the
+active Revision 274 tag counts, exact Trip-derived dependency union, zero
+unrecognized active tags and explicit mapped/missing separation. Missing
+allowlist rows are advisory. D-087 locks the twelve source-reviewed identified
+additions, the `rune_2h → rune_2h_sword` exception and the exact remaining ten
+unsupported unidentified-herb ids. Its 2026-07-12 no-write live parser check
+reported eight updated plus four retained/skipped rows without committing the
+candidate values.
+
+The scheduled workflow runs only at 00:15 and 12:15 UTC, has no `workflow_dispatch`, requires `MARKET_PRICES_UPSTREAM_URL` to be the exact reviewed root, validates focused tests/JSON/diffs, rejects changes outside `prices.json`, `price-provenance.json` and `price-history.json`, and commits only real three-file diffs. The opt-in 2026-07-10 live dry-run passed for the original 80 mappings with 69 updated plus 11 retained/skipped rows and no writes. The D-087 twelve-row expansion separately passed its parser dry-run on 2026-07-12; a complete 92-row configured cron is still adopter evidence. The exact repository variable was configured and read back on 2026-07-10. Under D-067, a future operator collects first-successful-run evidence before using scheduled-current copy; it is not a repository test gap.
 
 Freshness and release-evidence checks for the scheduled market path:
 
 ```sh
-node -e "const fs=require('fs'); const prices=JSON.parse(fs.readFileSync('prices.json','utf8')); const history=JSON.parse(fs.readFileSync('price-history.json','utf8')); const last=history.at(-1); console.log({pricesScrapedAt: new Date(prices._scraped_at*1000).toISOString(), lastHistoryAt: last ? new Date(last.t*1000).toISOString() : null, historySnapshots: history.length});"
-git log -1 --format="%h %cI %s" -- prices.json price-history.json
+node -e "const fs=require('fs'); const prices=JSON.parse(fs.readFileSync('prices.json','utf8')); const provenance=JSON.parse(fs.readFileSync('price-provenance.json','utf8')); const history=JSON.parse(fs.readFileSync('price-history.json','utf8')); const last=history.snapshots.at(-1); console.log({pricesCapturedAt:new Date(prices._scraped_at*1000).toISOString(),provenanceCapturedAt:provenance.capturedAt,lastHistoryAt:last?new Date(last.t*1000).toISOString():null,historySnapshots:history.snapshots.length});"
+git log -1 --format="%h %cI %s" -- prices.json price-provenance.json price-history.json
 git diff --check
 ```
 
 For release-copy evidence, also run the live integration release-copy audit below and classify every hit. D-053 keeps live scheduled-market workflow evidence out of the V1/trusted-tester gate when the release is described as static/bundled/imported price limited. Scheduled-current market-price copy requires the latest successful `Update market prices` GitHub Actions run on the release branch after `MARKET_PRICES_UPSTREAM_URL` is configured. A failed run leaves the previous committed snapshot active; a no-op successful run is freshness evidence but does not change `_scraped_at` or create a commit.
 
-Other focused tests validate committed market files, generated alch composition, same-origin price/history loading, fallback order, import/legacy alch replacement and the rule that shared loading writes neither selected state nor local history. Playwright checks shared history without localStorage writes, local capture/clear isolation, scheduled status, import/reset and stale backend-copy absence.
+Other focused tests validate committed market/provenance/history files, capture/key parity, generated fallback metadata, selected/local v1 migrations, alias metadata, same-origin logical-set loading and the rule that shared loading writes neither selected state nor local history. Playwright checks shared history without localStorage writes, local capture/clear isolation, scheduled status, provenance detail, import/reset and stale backend-copy absence.
 
 ## Generated game data tests
 
@@ -460,6 +500,10 @@ The latest functional and repository-local visual release-evidence checks were r
 | `npm run build`                                             | `pass`                                                                    | The D-073 Vite build passed with only the known chunk-size warning. Artifact validation passed 7 files/2 assets, 1,502,549 bytes, 13 history snapshots and SHA-256 `b50e40eb6edc76f34922ed3c84783db7dffe6f91daf42c714bb7cc9805d67522`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | Cloudflare focused checks                                   | `repository pass; adopter upload gated`                                   | `npm run test -- src/tests/cloudflare-worker.test.ts src/tests/deployment-readiness.test.ts src/tests/hiscores-server.test.ts src/tests/lostcity-hiscores-provider.test.ts` passed 32/32. Evidence covers API-first routing, same-origin status/lookup, ephemeral client key, sanitized 404/500, security/no-store headers, static delegation, disabled observability/Logpush and exact Wrangler/static routing. D-067 leaves first bundle/version upload and deployed smoke to a future operator.                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | Generated/runtime evidence                                  | `pass`                                                                    | Deterministic raw Revision 274 generation produced 390 items, 63 monsters with size, 94 numeric requirement rows and 25 typed conditional loot rows. Generated and legacy-reference readiness are `ready`, coverage has no blockers, source audit has zero unresolved identities, and focused parser/domain/Planner/UI checks pass. The committed report owns D-055/D-057/D-071/D-072 deltas and passes 11/11 representative cases with 22 advisory outliers across 189 evaluations.                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Source-backed ordinary-casket focused checks                | `pass`                                                                    | The focused parser/generator/Trip/UI suite passes 189/189, the full Vitest suite passes 606/606, legacy golden stays unchanged at 19/19, the current raw Revision 274 data-generator dry run passes without writes and the focused production-preview casket workflow passes 1/1. Domain coverage proves the exact 128-weight/210-coin formula, exact-before-alias-before-generated fallback, parent-price override, one parent slot, all three active monster rows and exact market dependency set. The numeric audit stays cross-path clean at 5,958 comparisons and classifies all three production changes as `source-backed-casket` (+25.87 GP/kill at the audited prices). Typecheck, build, lint, Prettier and diff checks pass.                                                                                                                                                                                        |
+| Per-item price provenance/freshness focused checks          | `pass; unrelated full-browser failures remain`                            | D-085 passes 613/613 Vitest tests, 19/19 golden tests, typecheck, runtime readiness with 381/381 active metadata rows and no blocker, build, artifact validation, lint, format and diff checks. The artifact contains the required price sidecar and validates at 9 files/2 assets, 10 history snapshots and SHA-256 `0fddf34dfe36a7d824adf2332c7c53af3ca3bb3a32844e378bff224b53de06dc`. Focused scheduled/import/local-history and accepted D-084 numeric browser paths pass 5/5. The complete Playwright attempt passed 66/75 before the two now-verified D-084 expectations were updated; the remaining seven failures are existing topbar-status locator and permalink strict-locator mismatches outside this pricing change.                                                                                                                                                                                              |
+| Dynamic loot market dependency focused checks               | `pass`                                                                    | D-086 focused market-sync/server/Trip/readiness tests pass 62/62. The generated audit covers 41 herb, 38 gem, three casket and three ultra-rare active rows with zero unrecognized tags, derives 49 unique calculation dependencies, reports 27 approved mappings and 22 missing mappings, and leaves numeric/golden behavior unchanged.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| High-impact dynamic-loot allowlist focused checks           | `pass`                                                                    | D-087 expands the allowlist from 80 to 92 source-reviewed rows. The twelve-row no-write live parser run reported eight updated plus four retained/skipped. After rebasing the latest scheduled snapshot, the full suite passes 614/614, legacy golden passes 19/19, and readiness is 39/49 mapped with exactly ten unsupported unidentified-herb gaps and no blocker. Six committed legacy-static price rows name their approved source slug without observation timestamps; typecheck, build, lint, format, diff and the nine-file/two-asset artifact check pass with 11 history snapshots at SHA-256 `b4f1813512d9f43e43a82e15eeffb9b31c42abbc149ff11119b8569cb728e83b`.                                                                                                                                                                                                                                                     |
 | Source-backed requirements/NPC size focused checks          | `pass`                                                                    | Focused parser/generator/runtime/domain/Planner/UI tests passed 190/190; refreshed Planner parity passed 13/13 with 16 cases/32 comparisons, zero review rows and zero rewrite gaps. Legacy golden stayed 19/19. Focused production-preview Planner/setup copy passed 2/2 and dragon-halberd size behavior 1/1. Full `npm run verify` passed 528 unit tests and artifact SHA-256 `acb785ea914a29cacbe33a8514d8a5e7be9b69c412aebbb64db75942610c2f8c`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | Bounded whole-loadout optimizer focused checks              | `pass`                                                                    | `src/tests/ui-view-model.test.ts` passed 87/87 with deterministic improvement/no-regression, candidate-policy, cap, requirement and performance coverage. The focused production-preview apply/Undo smoke passed 1/1 after sandbox-external localhost execution and retained the active monster/style. Full `npm run verify` passed 543 unit tests, 19 golden tests, typecheck, build/artifact, lint, format and diff checks; the artifact SHA-256 is `b50e40eb6edc76f34922ed3c84783db7dffe6f91daf42c714bb7cc9805d67522`.                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `npm run test:e2e -- --workers=1`                           | `pass`                                                                    | The complete 2026-07-12 D-082 production-preview gate passed 74/74 in Chromium. It includes the 640x360 compact-landscape no-document-scroll contract, the 1280x720 desktop console, all 11 workbench tabs at 390x844 and all prior simulation, storage, import, Planner, Duel, Loot, Trip, Economy, Risk and permalink workflows. The run used sandbox-external localhost permission because the managed sandbox rejects preview binds.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
@@ -717,7 +761,7 @@ npm run test -- src/tests/data-economy.test.ts
 They cover:
 
 - adapting the legacy runtime data into a validated `GameDataSnapshot`
-- validating committed `prices.json`, `alch.json` and `price-history.json`
+- validating committed `prices.json`, `price-provenance.json`, `alch.json` and `price-history.json`
 - duplicate raw JSON key detection before `JSON.parse` can drop earlier values
 - duplicate legacy monster id detection before object conversion
 - malformed loot entry rejection for missing/invalid names, chances, quantities and nested `_expand` rows
@@ -977,13 +1021,16 @@ They cover:
 - extended trip-control state to `TripPolicy` mapping without leaking trip fields into `SimulationRequest`
 - scarce/AFK Trip controls, inventory reserve details, prayer restore capacity, Trip summary Auto/Manual wording and derived general potion recommendation status/`canApply` state in the UI view model
 - domain-backed result, compare and planner view models
-- Stats combat roll detail metrics for melee/ranged/magic paths, fallback rendering for unavailable roll values, TTK/kills/hr/GP/kill mapping and hit distribution view-model labels, bucket accessibility text and probability-total invariants
+- Stats combat roll detail metrics for melee/ranged/magic paths and fallback rendering for unavailable roll values; active setup `Damage distribution` view-model labels, bucket accessibility text and probability-total invariants; and TTK/kills/hr/GP/kill mapping
 - Stats source breakdown view-model rows and source-detail records for normal attack, special attack and cannon statuses, including normal and event-scoped source histograms, melee/ranged modeled special detail, magic/DBA fallback detail, dragon-halberd partial warning detail, cannon-enabled metrics and idle cannon detail; plus XP routing rows, cannon-only XP row visibility, modeled Prayer/Magic-alch total-XP rows and Trip/banking summary mapping
 - Stats event-scoped special-hit and fired-cannonball histograms, probability totals, partial-special support and inactive/idle null states
 - active assumptions/modifiers summary view-model rows for empty/default state, manual combat overrides, enabled cannon settings, loot settings, loot action overrides, imported/synced PriceSet modifiers, money warnings, dragon-halberd special warning, explicit safespot and protection-prayer split rows, targeted reset metadata, review-only boundaries, reset scoping and stable priority order/five-row overflow
 - Duel comparison view-model rows for live setup and saved snapshots against the current monster, including deltas and best-marker fields
 - Duel structured setup diffs, shared-context exclusions and expanded combat/trip/XP/economy impact deltas
 - structured money warning view models for price alias and fallback surfacing
+- random-herb `Unid` valuation through all eleven source item ids, exact-price
+  precedence, weighted EV, selected-row/nested-row presentation and the visible
+  generic `unidentified_guam` proxy warning when species prices are absent
 - dense compare monster/drop filters, irrelevant monster state, active-target forced visibility and derived row state markers
 - dense compare XP/hr and net GP/hr visible-row scale affordance model, including separate positive and negative net GP/hr scaling
 - special attack result metrics in the UI view model
@@ -1212,7 +1259,7 @@ node --check planner-core.js
 Run this after changing JSON data files:
 
 ```sh
-node -e "for (const f of ['prices.json','alch.json','price-history.json']) JSON.parse(require('fs').readFileSync(f,'utf8'))"
+node -e "for (const f of ['prices.json','price-provenance.json','alch.json','price-history.json']) JSON.parse(require('fs').readFileSync(f,'utf8'))"
 ```
 
 ## What to test by change type

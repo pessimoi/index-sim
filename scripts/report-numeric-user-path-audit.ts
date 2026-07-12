@@ -24,12 +24,13 @@ import {
   type SimulationViewModel
 } from "../src/app/view-models/simulation";
 import type { CombatStyle, SimulationContext } from "../src/domain/shared";
+import { casketStats } from "../src/domain/trip";
 import { LEGACY_GOLDEN_CASES } from "../src/tests/fixtures/legacy-case-definitions";
 import legacyGolden from "../src/tests/fixtures/legacy-golden.json";
 import { createRewriteFixtureCase } from "../src/tests/helpers/rewrite-fixture";
 
 const REPORT_PATH = resolve("docs/project/numeric-user-path-audit.md");
-const AUDIT_DATE = "2026-07-11";
+const AUDIT_DATE = "2026-07-12";
 const CROSS_PATH_ABS_TOLERANCE = 1e-9;
 const CROSS_PATH_REL_TOLERANCE = 1e-9;
 const COMBAT_STYLES = ["melee", "ranged", "magic"] as const satisfies readonly CombatStyle[];
@@ -74,6 +75,16 @@ interface LegacyFinding {
   note: string;
 }
 
+interface CasketImpactFinding {
+  monsterId: string;
+  monsterName: string;
+  chance: number;
+  previousParentValue: number;
+  openedContentsValue: number;
+  gpPerKillDelta: number;
+  classification: "source-backed-casket";
+}
+
 interface AuditSummary {
   generatedCases: number;
   fixtureCases: number;
@@ -81,6 +92,7 @@ interface AuditSummary {
   crossPathMismatches: CrossPathMismatch[];
   legacyComparisons: number;
   legacyFindings: LegacyFinding[];
+  casketImpacts: CasketImpactFinding[];
 }
 
 const LEGACY_THRESHOLDS: Record<string, LegacyThreshold> = {
@@ -436,6 +448,18 @@ function renderReport(summary: AuditSummary): string {
     "",
     "- `FullSimulationResult.rates.ttkSec` now uses the Trip path's cannon/poison/recoil-adjusted kill time. The prior combat-only value disagreed with the same result's kills/hr, XP/hr and economy rates when auxiliary damage was active.",
     "- Stats combat-roll detail continues to expose the normal player-combat TTK separately.",
+    "- Ordinary caskets use the exact Revision 274 opened-content table; the generated parent object cost cannot override the component EV.",
+    "",
+    "## Source-backed casket correction",
+    "",
+    "The focused correction compares the prior generated parent object cost with the current component-derived opened value. It is classified separately from generic market-price differences.",
+    "",
+    "| Monster | Drop chance | Previous parent value | Opened contents EV | GP/kill delta | Classification |",
+    "| --- | ---: | ---: | ---: | ---: | --- |",
+    ...summary.casketImpacts.map(
+      (finding) =>
+        `| ${markdownEscape(`${finding.monsterName} (${finding.monsterId})`)} | ${formatPercent(finding.chance)} | ${formatNumber(finding.previousParentValue)} | ${formatNumber(finding.openedContentsValue)} | ${formatNumber(finding.gpPerKillDelta)} | ${finding.classification} |`
+    ),
     "",
     "## Large legacy-to-rewrite observations",
     "",
@@ -483,8 +507,30 @@ function runAudit(): AuditSummary {
     crossPathComparisons: 0,
     crossPathMismatches: [],
     legacyComparisons: 0,
-    legacyFindings: []
+    legacyFindings: [],
+    casketImpacts: []
   };
+
+  const openedContentsValue = casketStats(context.priceSet, context.gameData).ev;
+  const previousParentValue =
+    context.priceSet.itemPrices.casket ?? context.gameData.items.casket?.price ?? 0;
+  for (const [monsterId, monster] of Object.entries(context.gameData.monsters)) {
+    for (const drop of (monster.loot ?? []).flatMap((entry) =>
+      Array.isArray(entry) ? entry : [entry]
+    )) {
+      if (drop.tag !== "casket") continue;
+      summary.casketImpacts.push({
+        monsterId,
+        monsterName: monster.name,
+        chance: drop.chance,
+        previousParentValue,
+        openedContentsValue,
+        gpPerKillDelta: drop.chance * drop.qtyAvg * (openedContentsValue - previousParentValue),
+        classification: "source-backed-casket"
+      });
+    }
+  }
+  summary.casketImpacts.sort((left, right) => left.monsterId.localeCompare(right.monsterId));
 
   for (const combatStyle of COMBAT_STYLES) {
     const baseForm = switchCombatStyleLoadout(DEFAULT_FORM_STATE, combatStyle);

@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { MARKET_SOURCE_MAPPINGS } from "../src/data/market-source-mapping";
@@ -19,7 +19,7 @@ import {
   type ScheduledMarketUpstreamResponse
 } from "./scheduled-market-writer-core";
 
-type PriceFileName = "prices.json" | "price-history.json";
+type PriceFileName = "prices.json" | "price-provenance.json" | "price-history.json";
 export const SCHEDULED_MARKET_UPSTREAM_TIMEOUT_MS = 15_000;
 export const SCHEDULED_MARKET_REQUEST_DELAY_MS = 350;
 
@@ -70,7 +70,7 @@ export function usage(): string {
     "Options:",
     "  --input <path>          Read a repository-local normalized upstream fixture/response.",
     "  --upstream-url <url>    Fetch approved markets.lostcity.rs item pages from this root URL.",
-    "  --output-dir <path>     Directory containing prices.json and price-history.json.",
+    "  --output-dir <path>     Directory containing prices, provenance and history JSON files.",
     "  --item-ids <ids>        Optional comma-separated allowlisted item ids for fixture/dev checks.",
     "  --now <iso>             Override capture time for repeatable local checks.",
     "  --dry-run               Validate and report changed files without writing.",
@@ -348,6 +348,10 @@ function readJsonFile(outputDir: string, fileName: PriceFileName): unknown {
   });
 }
 
+function readOptionalJsonFile(outputDir: string, fileName: PriceFileName): unknown {
+  return existsSync(resolve(outputDir, fileName)) ? readJsonFile(outputDir, fileName) : undefined;
+}
+
 function selectMappings(itemIds: string[] | undefined) {
   if (!itemIds?.length) return MARKET_SOURCE_MAPPINGS;
   const requested = new Set(itemIds);
@@ -392,6 +396,7 @@ export async function runScheduledMarketWriter(
   const outputs = createScheduledMarketSnapshotOutputs({
     upstream,
     previousPrices: readJsonFile(outputDir, "prices.json"),
+    previousPriceProvenance: readOptionalJsonFile(outputDir, "price-provenance.json"),
     previousPriceHistory: readJsonFile(outputDir, "price-history.json"),
     mappings,
     capturedAt: options.now
@@ -400,6 +405,13 @@ export async function runScheduledMarketWriter(
   const changedFiles = [
     writeIfChanged(resolve(outputDir, "prices.json"), outputs.pricesText, options.dryRun)
       ? "prices.json"
+      : null,
+    writeIfChanged(
+      resolve(outputDir, "price-provenance.json"),
+      outputs.priceProvenanceText,
+      options.dryRun
+    )
+      ? "price-provenance.json"
       : null,
     writeIfChanged(
       resolve(outputDir, "price-history.json"),

@@ -4,6 +4,7 @@ import { parseGameDataSnapshot } from "../../data/schemas/game-data";
 import type { SimulationContext } from "../../domain/shared";
 import { createGeneratedRuntimePriceSet, generatedItemValues } from "./price-fallback";
 import priceHistoryText from "../../../price-history.json?raw";
+import priceProvenanceText from "../../../price-provenance.json?raw";
 import pricesText from "../../../prices.json?raw";
 export {
   createGeneratedRuntimeReadinessReport,
@@ -21,6 +22,7 @@ export {
 export interface GeneratedRuntimeContextOptions {
   gameData?: unknown;
   pricesText?: string | null;
+  priceProvenanceText?: string | null;
   alchText?: string | null;
   priceHistoryText?: string | null;
   loadedAt?: string;
@@ -38,6 +40,7 @@ export function createGeneratedRuntimeContext(
   const priceStatus = createScheduledStaticPriceSnapshotStatus(
     {
       pricesText: options.pricesText ?? pricesText,
+      priceProvenanceText: options.priceProvenanceText ?? priceProvenanceText,
       alchText: options.alchText,
       priceHistoryText: options.priceHistoryText ?? priceHistoryText
     },

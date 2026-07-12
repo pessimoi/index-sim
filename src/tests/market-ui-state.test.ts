@@ -21,8 +21,10 @@ import {
   createSharedPriceHistoryAnalysis,
   DEFAULT_PRICE_HISTORY_STATE,
   keepPriceHistoryOnFailure,
+  loadBrowserPriceHistory,
   PRICE_HISTORY_MAX_SNAPSHOTS,
   PRICE_HISTORY_STORAGE_KEY,
+  PRICE_HISTORY_VERSION,
   mergePriceHistoryForAnalysis,
   priceHistorySnapshotKey,
   summarizePriceHistory
@@ -103,6 +105,25 @@ function importedPriceSet(id = "manual-prices"): PriceSet {
       alchValues: { lobster: 0, big_bones: 0 }
     })
   );
+}
+
+function scheduledProvenanceText(itemIds: string[] = ["lobster"]): string {
+  return JSON.stringify({
+    version: 1,
+    capturedAt: "2026-07-08T12:15:00.000Z",
+    refreshSource: "markets.lostcity.rs",
+    items: Object.fromEntries(
+      itemIds.map((itemId) => [
+        itemId,
+        {
+          valueOrigin: "legacy-static",
+          refreshStatus: "not-evaluated",
+          quality: "unknown",
+          reasonCode: "legacy-metadata-unavailable"
+        }
+      ])
+    )
+  });
 }
 
 describe("market sync UI state helpers", () => {
@@ -238,7 +259,8 @@ describe("market sync UI state helpers", () => {
       rune_sword: { id: "rune_sword", name: "Rune sword", price: 12_345, alch: 8_320 }
     };
     const scheduledStatus = createScheduledStaticPriceSnapshotStatus({
-      pricesText: JSON.stringify({ lobster: 210 }),
+      pricesText: JSON.stringify({ _scraped_at: 1783512900, lobster: 210 }),
+      priceProvenanceText: scheduledProvenanceText(),
       alchText: JSON.stringify({ lobster: 15 })
     });
 
@@ -266,6 +288,7 @@ describe("market sync UI state helpers", () => {
     const bundled = fixtureContext().priceSet;
     const scheduled = createScheduledStaticPriceSnapshotStatus({
       pricesText: JSON.stringify({ _scraped_at: 1783512900, lobster: 220 }),
+      priceProvenanceText: scheduledProvenanceText(),
       alchText: JSON.stringify({ lobster: 0 })
     });
     const resolution = resolveActivePriceSetFallback({
@@ -295,6 +318,7 @@ describe("market sync UI state helpers", () => {
     const selected = importedPriceSet("selected-over-scheduled");
     const scheduled = createScheduledStaticPriceSnapshotStatus({
       pricesText: JSON.stringify({ _scraped_at: 1783512900, lobster: 220 }),
+      priceProvenanceText: scheduledProvenanceText(),
       alchText: JSON.stringify({ lobster: 0 })
     });
     const resolution = resolveActivePriceSetFallback({
@@ -313,14 +337,22 @@ describe("market sync UI state helpers", () => {
     [
       "missing",
       createScheduledStaticPriceSnapshotStatus(
-        { pricesText: JSON.stringify({ lobster: 220 }), alchText: null },
+        {
+          pricesText: JSON.stringify({ _scraped_at: 1783512900, lobster: 220 }),
+          priceProvenanceText: scheduledProvenanceText(),
+          alchText: null
+        },
         { fallbackPriceSet: fixtureContext().priceSet }
       )
     ],
     [
       "invalid",
       createScheduledStaticPriceSnapshotStatus(
-        { pricesText: "{bad", alchText: JSON.stringify({ lobster: 0 }) },
+        {
+          pricesText: "{bad",
+          priceProvenanceText: scheduledProvenanceText(),
+          alchText: JSON.stringify({ lobster: 0 })
+        },
         { fallbackPriceSet: fixtureContext().priceSet }
       )
     ]
@@ -456,6 +488,83 @@ describe("market sync UI state helpers", () => {
       expect(loaded.value.priceSet.id).toBe("selected-manual");
       expect(loaded.value.selectedAt).toBe("2026-07-05T13:01:00.000Z");
     }
+  });
+
+  it("migrates selected PriceSet v1 rows to imported provenance without inventing observations", () => {
+    const storage = createMemoryStorage({
+      [SELECTED_PRICE_SET_STORAGE_KEY]: JSON.stringify({
+        version: 1,
+        savedAt: "2026-07-05T13:00:00.000Z",
+        data: {
+          selectedAt: "2026-07-05T13:00:00.000Z",
+          priceSet: {
+            id: "legacy-selected",
+            label: "Legacy selected",
+            source: "manual",
+            createdAt: "2026-07-05T12:00:00.000Z",
+            itemPrices: { lobster: 205 },
+            alchValues: { lobster: 0 }
+          }
+        }
+      })
+    });
+
+    const loaded = loadSelectedPriceSet(storage);
+
+    expect(loaded.status).toBe("loaded");
+    if (loaded.status === "loaded") {
+      expect(loaded.value.priceSet.itemPriceMetadata?.lobster).toEqual({
+        valueOrigin: "imported",
+        refreshStatus: "not-evaluated",
+        quality: "unknown",
+        reasonCode: "import-metadata-unavailable"
+      });
+      expect(loaded.value.priceSet.itemPriceMetadata?.lobster).not.toHaveProperty(
+        "valueObservedAt"
+      );
+    }
+    expect(JSON.parse(storage.getItem(SELECTED_PRICE_SET_STORAGE_KEY) ?? "{}").version).toBe(
+      SELECTED_PRICE_SET_VERSION
+    );
+  });
+
+  it("migrates browser price history v1 with unknown row metadata and keeps numeric values", () => {
+    const storage = createMemoryStorage({
+      [PRICE_HISTORY_STORAGE_KEY]: JSON.stringify({
+        version: 1,
+        savedAt: "2026-07-05T13:00:00.000Z",
+        data: {
+          snapshots: [
+            {
+              capturedAt: "2026-07-05T12:00:00.000Z",
+              sourcePriceSetId: "legacy-history",
+              label: "Legacy history",
+              itemPrices: { lobster: 205 }
+            }
+          ]
+        }
+      })
+    });
+
+    const loaded = loadBrowserPriceHistory(storage);
+
+    expect(loaded.status).toBe("loaded");
+    if (loaded.status === "loaded") {
+      expect(loaded.value.snapshots[0]).toMatchObject({
+        itemPrices: { lobster: 205 },
+        itemPriceMetadata: {
+          lobster: {
+            valueOrigin: "unknown",
+            refreshStatus: "not-evaluated",
+            quality: "unknown"
+          }
+        },
+        itemPriceStatuses: { lobster: "legacy-unknown" }
+      });
+    }
+    expect(JSON.parse(storage.getItem(PRICE_HISTORY_STORAGE_KEY) ?? "{}").version).toBe(
+      PRICE_HISTORY_VERSION
+    );
   });
 
   it("classifies invalid selected PriceSet persisted payloads", () => {
@@ -617,11 +726,13 @@ describe("market sync UI state helpers", () => {
 
     const loaded = createScheduledStaticPriceSnapshotStatus({
       pricesText: JSON.stringify({ _scraped_at: 1783512900, lobster: 220 }),
+      priceProvenanceText: scheduledProvenanceText(),
       alchText: JSON.stringify({ lobster: 0 })
     });
     const fallback = createScheduledStaticPriceSnapshotStatus(
       {
         pricesText: "{bad",
+        priceProvenanceText: scheduledProvenanceText(),
         alchText: JSON.stringify({ lobster: 0 })
       },
       { fallbackPriceSet: fixtureContext().priceSet }

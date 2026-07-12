@@ -17,6 +17,7 @@ import {
   generatedIncomingAttacksFromAuditRow
 } from "./lostcity-content-npc-attacks";
 import { readLostCityItemRequirements } from "./lostcity-content-requirements";
+import { readLostCityCasketSourceContract } from "./lostcity-content-casket";
 import { lostCityMonsterSourceId, lostCitySourceItemId } from "./lostcity-content-runtime-mapping";
 
 export interface LostCityRawSnapshotResult {
@@ -68,6 +69,7 @@ export function createLostCityRawSnapshot(input: {
   generatedAt?: string;
 }): LostCityRawSnapshotResult {
   const catalogOptions = { repoRoot: input.repoRoot, sourceDir: input.sourceDir };
+  readLostCityCasketSourceContract(catalogOptions);
   const npcs = readLostCityConfigCatalog({ ...catalogOptions, extension: ".npc" });
   const objects = readLostCityConfigCatalog({ ...catalogOptions, extension: ".obj" });
   const params = readLostCityConfigCatalog({ ...catalogOptions, extension: ".param" });

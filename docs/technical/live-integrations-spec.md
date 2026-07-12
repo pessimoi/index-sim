@@ -49,7 +49,7 @@ MVP behavior:
 - stores the last searched player name locally only when browser storage is available
 - provides understandable empty, not-found, rate-limited and service-unavailable states
 
-Current implementation note: the rewrite UI now exposes player input, service status, lookup, preview and Apply for these seven skills. It calls the same-origin hiscores API through `src/adapters/hiscores`, stores the last searched player with the rewrite `PersistedEnvelope<T>` helper only after a fresh response still matches the normalized current Player input and never calls a live upstream directly from the browser. Changing the Player input to a different normalized name clears the preview, late responses for old inputs are ignored, Apply rechecks freshness before mutating levels and the preview shows the returned player, source and fetchedAt metadata from the validated response. Vite dev/preview injects the D-061 source-backed provider into the repo-owned middleware; upstream failures remain sanitized and manual Player level fields stay usable. A static production build still needs an accepted same-origin runtime before live availability can be claimed.
+Current implementation note: the rewrite header exposes player input, service status, lookup and a bounded preview/Apply overlay for these seven skills. It calls the same-origin hiscores API through `src/adapters/hiscores`, stores the last searched player with the rewrite `PersistedEnvelope<T>` helper only after a fresh response still matches the normalized current Player input and never calls a live upstream directly from the browser. Changing the Player input to a different normalized name clears the preview, late responses for old inputs are ignored, Apply rechecks freshness before mutating levels and the preview shows the returned player, source and fetchedAt metadata from the validated response. Vite dev/preview injects the D-061 source-backed provider into the repo-owned middleware; upstream failures remain sanitized and manual Player level fields stay usable. A static production build still needs an accepted same-origin runtime before live availability can be claimed.
 
 ### Market price refresh
 
@@ -354,7 +354,13 @@ Rules:
 - Static prices, skipped drops, buried bones and alch-only rows must be intentionally marked.
 - Gem, casket, herb, supply and recoil dependencies must be represented as data, not special cases hidden in UI code.
 
-Current implementation note: the bounded allowlist was audited on 2026-07-10 against the public `markets.lostcity.rs/api/items?q=...` catalog using generated item names. Ambiguous dragonhide rows use their canonical color-specific item ids, and generated source identities resolve `keyhalf1` as tooth and `keyhalf2` as loop. This closes source-slug uncertainty for the current allowlist without claiming complete market-catalog coverage. Broader item-universe mapping remains a later scope decision.
+Current implementation note: the original 80-row bounded allowlist was audited on 2026-07-10 against the public `markets.lostcity.rs/api/items?q=...` catalog using generated item names. Ambiguous dragonhide rows use their canonical color-specific item ids, and generated source identities resolve `keyhalf1` as tooth and `keyhalf2` as loop. D-087 adds twelve identified dynamic-loot rows after bounded item-page and existing-parser review; `rune_2h` maps to `rune_2h_sword`. Ten non-guam species-specific unidentified-herb paths returned 404 and remain outside the current 92-row allowlist. Broader item-universe mapping remains a later scope decision.
+
+Ordinary casket component refresh remains part of this market dependency
+boundary, while the pure opened-content formula, source weights and parent-row
+override rule belong to the implemented
+[source-backed casket valuation specification](source-backed-casket-valuation-spec.md).
+The parent `casket` source slug must not silently replace opened-content EV.
 
 ## UI behavior
 
@@ -370,7 +376,7 @@ Recommended flow:
 
 The UI must not claim hiscores are unavailable simply because the app is not running on `localhost`. It should use `GET /api/hiscores/status` service availability or handle the hiscores endpoint response directly.
 
-Current implementation note: the rewrite follows this flow through the Levels panel. `GET /api/hiscores/status` drives the visible availability state; `GET /api/hiscores?player=...` returns a validated preview; Apply mutates only returned skills in the current setup model after verifying the preview still matches the normalized current Player input. Missing returned skills leave existing manual levels unchanged.
+Current implementation note: the rewrite follows this flow through the global header Player lookup. `GET /api/hiscores/status` drives the visible availability state; `GET /api/hiscores?player=...` returns a validated bounded preview popover; Apply mutates only returned skills in the current setup model after verifying the preview still matches the normalized current Player input. The popover opens for a successful response, closes on `Escape`, an outside pointer action or its own summary control, and returns focus to the summary after `Escape`. Missing returned skills leave existing manual levels unchanged.
 When the status endpoint reports a disabled provider or unavailable service, the player-name input remains visible for continuity with the live workflow but Lookup stays disabled. The user-facing copy points to the Player level fields for manual editing, and the unavailable state must not clear or overwrite those manual levels.
 
 ### Market prices
@@ -523,7 +529,9 @@ Rows are matched by approved `itemId` and `sourceSlug`; unknown, duplicate, mism
 
 Freshness model: `_scraped_at` is capture time, while each item estimate requires at least three accepted trades and a latest accepted trade no older than 30 days. Report quality is high for ten accepted observations no older than seven days, medium for five or more accepted/recent observations, low for three or four and retained when no new value is accepted. The latest commit touching `prices.json` or `price-history.json` is the latest accepted file change; the latest successful workflow run is separate schedule evidence. A failed run leaves both previous files active.
 
-Current live evidence: public crawler policy permits the bounded sequential item-page reads, the 80-item allowlist is catalog-audited and a full dry-run passed with 69 updated plus 11 retained/skipped mappings without writes. The exact root `MARKET_PRICES_UPSTREAM_URL` variable is configured and verified by repository readback. Two earlier runs failed at the empty-variable guard before upstream reads; scheduled-current prices must not be claimed until the first successful configured scheduled run is recorded. Raw pages and usernames remain uncommitted and unlogged.
+Proposed provenance correction: [the per-item price provenance and freshness specification](per-item-price-provenance-freshness-spec.md) persists the writer's currently transient item status without treating `_scraped_at` as every item's observation time. It proposes `price-provenance.json`, versioned shared history and safe PriceSet/browser-storage migration. The current two-file writer and loader remain production truth until that specification is implemented and the D-033/D-064 artifact decision is updated.
+
+Current live evidence: public crawler policy permits bounded sequential item-page reads. The original 80-item catalog-audited allowlist passed a full dry-run with 69 updated plus 11 retained/skipped mappings without writes on 2026-07-10. D-087's twelve-item expansion passed a separate no-write parser dry-run with eight updated plus four retained/skipped mappings on 2026-07-12. The exact root `MARKET_PRICES_UPSTREAM_URL` variable is configured and verified by repository readback. A complete successful configured run for the current 92-row allowlist remains adopter evidence; scheduled-current prices must not be claimed before it is recorded. Raw pages and usernames remain uncommitted and unlogged.
 
 ### Phase 3: rewrite adapters
 

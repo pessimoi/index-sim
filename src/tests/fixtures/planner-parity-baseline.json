@@ -138,10 +138,10 @@
       "result": "different",
       "classification": "source-data-delta",
       "reason": "The training order and bounded difference set remain unchanged. The current-product metric values and digests reflect the committed scheduled price snapshot layered on the Revision 274 game context.",
-      "source": "prices.json; price-history.json; docs/technical/architecture.md; docs/project/decisions.md D-059/D-060",
+      "source": "prices.json; price-provenance.json; price-history.json; docs/technical/architecture.md; docs/project/decisions.md D-059/D-060",
       "legacyDigest": "9dbd0105c727379a",
-      "rewriteDigest": "60c825e44c2d7dbe",
-      "differenceDigest": "55d993d3bc8b05f8",
+      "rewriteDigest": "709a443da9d76fe6",
+      "differenceDigest": "75d89f99bc70bd15",
       "differenceCount": 17
     },
     {

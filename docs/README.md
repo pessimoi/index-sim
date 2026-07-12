@@ -12,8 +12,13 @@ This directory is the project memory layer for humans and AI agents. It keeps cu
 - UI parity specification: [technical/ui-parity-spec.md](technical/ui-parity-spec.md)
 - Duel setup diff specification: [technical/duel-setup-diff-spec.md](technical/duel-setup-diff-spec.md)
 - Stats source distribution specification: [technical/stats-source-distribution-spec.md](technical/stats-source-distribution-spec.md)
+- Hit distribution comparison visualization specification: [technical/hit-distribution-visualization-spec.md](technical/hit-distribution-visualization-spec.md)
 - Risk and variability specification: [technical/risk-variability-spec.md](technical/risk-variability-spec.md)
 - Source-backed incoming damage specification: [technical/source-backed-incoming-damage-spec.md](technical/source-backed-incoming-damage-spec.md)
+- Source-backed casket valuation specification: [technical/source-backed-casket-valuation-spec.md](technical/source-backed-casket-valuation-spec.md)
+- Per-item price provenance and freshness specification: [technical/per-item-price-provenance-freshness-spec.md](technical/per-item-price-provenance-freshness-spec.md)
+- Dynamic loot market dependency coverage specification: [technical/dynamic-loot-market-dependency-coverage-spec.md](technical/dynamic-loot-market-dependency-coverage-spec.md)
+- High-impact dynamic-loot market allowlist specification: [technical/high-impact-dynamic-loot-market-allowlist-spec.md](technical/high-impact-dynamic-loot-market-allowlist-spec.md)
 - Accessibility and keyboard specification: [technical/accessibility-keyboard-spec.md](technical/accessibility-keyboard-spec.md)
 - Source-backed requirements and NPC size specification: [technical/source-backed-requirements-npc-size-spec.md](technical/source-backed-requirements-npc-size-spec.md)
 - Legacy Planner parity specification: [technical/legacy-planner-parity-spec.md](technical/legacy-planner-parity-spec.md)
@@ -48,8 +53,12 @@ These files are useful evidence, but they are not the living source of truth. Pr
 - Legacy-to-rewrite UI layout and workflow parity requirements belong in [technical/ui-parity-spec.md](technical/ui-parity-spec.md).
 - Duel setup and calculated-impact comparison requirements belong in [technical/duel-setup-diff-spec.md](technical/duel-setup-diff-spec.md).
 - Special-attack and cannon event-distribution requirements belong in [technical/stats-source-distribution-spec.md](technical/stats-source-distribution-spec.md).
+- Normal-versus-special hit-distribution comparison presentation and its whole-special event contract belong in [technical/hit-distribution-visualization-spec.md](technical/hit-distribution-visualization-spec.md).
 - Kill, trip, food, timed-GP and target-probability distribution requirements belong in [technical/risk-variability-spec.md](technical/risk-variability-spec.md).
 - Source-backed NPC attack profiles and shared Trip/Risk incoming-damage requirements belong in [technical/source-backed-incoming-damage-spec.md](technical/source-backed-incoming-damage-spec.md).
+- Ordinary fishing-casket opened-content valuation and its focused source-drift guard belong in [technical/source-backed-casket-valuation-spec.md](technical/source-backed-casket-valuation-spec.md).
+- Item-level price origin, observation/evaluation time, scheduled sidecar, history-v2 and PriceSet migration requirements belong in [technical/per-item-price-provenance-freshness-spec.md](technical/per-item-price-provenance-freshness-spec.md).
+- Trip-derived market dependency inventory belongs in [technical/dynamic-loot-market-dependency-coverage-spec.md](technical/dynamic-loot-market-dependency-coverage-spec.md); source-reviewed admission of identified high-impact rows belongs in [technical/high-impact-dynamic-loot-market-allowlist-spec.md](technical/high-impact-dynamic-loot-market-allowlist-spec.md).
 - Workbench and Dense keyboard interaction requirements belong in [technical/accessibility-keyboard-spec.md](technical/accessibility-keyboard-spec.md).
 - Generated item-requirement and NPC-size extraction/formula requirements belong in [technical/source-backed-requirements-npc-size-spec.md](technical/source-backed-requirements-npc-size-spec.md).
 - Optional archived Planner behavior comparison requirements belong in [technical/legacy-planner-parity-spec.md](technical/legacy-planner-parity-spec.md).

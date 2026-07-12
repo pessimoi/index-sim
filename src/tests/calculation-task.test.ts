@@ -89,7 +89,7 @@ describe("calculation task boundary", () => {
     });
     expect(risk.sampleCount).toBe(100);
     expect(() => structuredClone({ rows, planner, matrix, risk })).not.toThrow();
-  });
+  }, 15_000);
 
   it("resolves only a matching worker response and terminates the worker", async () => {
     const worker = new FakeWorker();

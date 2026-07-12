@@ -179,13 +179,13 @@ Status date: 2026-07-08. The accepted V1 replacement line for this slice is
 visible workflow parity in the root Vite rewrite, not a clone of legacy
 script-order internals.
 
-| Classification         | Items                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | Release impact                                                                                                                                                                                                                                                 |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `release-required`     | PlayerSidebar owns combat-type mutation and routes to one dynamically labelled active setup tab; compact `TYPE` mirrors state read-only. Melee/ranged/magic loadouts stash and restore style-owned weapon, ammo, spell, gear, prayers, boosts, manual overrides and special-attack state; `SimulationRequest` receives normalized combat request data without UI-only or saved-setup state; Result summary keeps the existing metric strip and Active assumptions review/reset boundaries; Stats shows combat roll detail, XP routing, source breakdown/detail for normal attack, special attack and cannon, Trip/banking summary, normal-player hit distribution and event-scoped special/cannon distributions; supported melee/ranged special attack controls show current domain metrics; magic unsupported and DBA boost states suppress `specialAttack` request data. | Complete for this slice.                                                                                                                                                                                                                                       |
-| `later`                | Full price-aware, quest-aware or generated-requirement-aware loadout optimization; browser detail coverage beyond the completed all-fixture metric strip.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Not required unless a later release makes one of these evidence areas a blocker. D-073 separately completes bounded visible whole-loadout optimization for current-target normal DPS.                                                                          |
-| `implemented evidence` | Repository-local visual regression suite from [visual-regression-spec.md](visual-regression-spec.md).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | Implemented with isolated Chromium config and reviewed Darwin baselines; remote merge-blocking status still needs a CI decision.                                                                                                                               |
-| `legacy-only`          | Runtime Babel, CDN React, production `window.*` ownership, archived legacy layout internals and script-order coupling.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Not ported by design.                                                                                                                                                                                                                                          |
-| `decision-needed`      | New special attack formulas and magic DPS specials.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Keep as explicit future decisions, not blockers for the accepted V1 slice. D-046 accepts the current ranged/magic/halberd auto-safespot behavior as the V1 default UX with user override, and D-050 keeps the dragon halberd NPC-size fallback warning for V1. |
+| Classification         | Items                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Release impact                                                                                                                                                                                                                                                 |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `release-required`     | PlayerSidebar owns combat-type mutation and routes to one dynamically labelled active setup tab; compact `TYPE` mirrors state read-only. Melee/ranged/magic loadouts stash and restore style-owned weapon, ammo, spell, gear, prayers, boosts, manual overrides and special-attack state, then end with the active setup's normal-versus-selected-special `Damage distribution`; `SimulationRequest` receives normalized combat request data without UI-only or saved-setup state; Result summary keeps the existing metric strip and Active assumptions review/reset boundaries; Stats shows combat roll detail, XP routing, source breakdown/detail for normal attack, special attack and cannon, Trip/banking summary and event-scoped special/cannon distributions; supported melee/ranged special attack controls show current domain metrics; magic unsupported and DBA boost states suppress `specialAttack` request data. | Complete for this slice.                                                                                                                                                                                                                                       |
+| `later`                | Full price-aware, quest-aware or generated-requirement-aware loadout optimization; browser detail coverage beyond the completed all-fixture metric strip.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Not required unless a later release makes one of these evidence areas a blocker. D-073 separately completes bounded visible whole-loadout optimization for current-target normal DPS.                                                                          |
+| `implemented evidence` | Repository-local visual regression suite from [visual-regression-spec.md](visual-regression-spec.md).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Implemented with isolated Chromium config and reviewed Darwin baselines; remote merge-blocking status still needs a CI decision.                                                                                                                               |
+| `legacy-only`          | Runtime Babel, CDN React, production `window.*` ownership, archived legacy layout internals and script-order coupling.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Not ported by design.                                                                                                                                                                                                                                          |
+| `decision-needed`      | New special attack formulas and magic DPS specials.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | Keep as explicit future decisions, not blockers for the accepted V1 slice. D-046 accepts the current ranged/magic/halberd auto-safespot behavior as the V1 default UX with user override, and D-050 keeps the dragon halberd NPC-size fallback warning for V1. |
 
 ### Dense Monster Table
 
@@ -408,6 +408,16 @@ The left rail, center pane and MonsterCard rail have independent scroll
 containers on desktop. On mobile the zones stack in workflow order, with
 MonsterCard after the active pane. The final default-pane decision remains open.
 
+The global Player lookup belongs to the header rather than the PlayerSidebar.
+Its player-name field and Lookup action stay directly available in the chrome;
+service feedback stays compact and a successful seven-skill preview opens in a
+bounded overlay with the existing Apply action. The header utility must not
+increase the desktop chrome beyond the compact console rhythm or collapse the
+active pane at the 640x360 landscape contract. Persistent runtime and price
+fallback labels do not belong in the header; Economy and Settings own that
+detail, while transient action feedback remains available through scoped
+notices and the global polite status announcer.
+
 ### Mobile shell
 
 Mobile can stack the zones, but must preserve workflow order:
@@ -427,19 +437,19 @@ The current tab order keeps one navigation owner per concept:
 
 1. Stats
 2. Current combat-style setup
-3. Compare
-4. Loot
-5. Trip
-6. Risk
-7. Cannon
-8. Duel
+3. Monsters
+4. Setups
+5. Loot
+6. Trip
+7. Risk
+8. Cannon
 9. Planner
 10. Economy
 11. Settings
 
 Additional requirements:
 
-- Compare is the default tab.
+- Monsters is the default tab.
 - The setup tab is labelled `Melee setup`, `Ranged setup` or `Magic setup` from PlayerSidebar state and never changes combat type itself.
 - PlayerSidebar is the only visible combat-type switch; compact `TYPE` is read-only.
 - A combat-type change must preserve per-style loadouts in the same way the legacy reducer stashes and restores loadouts.
@@ -488,15 +498,19 @@ Required controls and displays:
 
 - Combat type segmented control.
 - Levels, with fields filtered by combat type plus Defence, HP and Prayer.
-- Hiscores lookup with service-aware `available`, `unavailable` or disabled-runtime state from the same-origin API. D-061/D-066 provide the source and production runtime; full live acceptance still needs Cloudflare deployed evidence.
 - Stance/style control, including weapon-specific melee stance names and attack type.
 - Effective trip rates: XP/hr, net GP/hr and XP/hr by skill.
 
 Current implementation note: the PlayerSidebar is present in the root rewrite.
 It exposes combat-type switching, combat-style-filtered level fields plus
-Defence/HP/Prayer, stance/style selection, service-aware hiscores lookup with
-preview/apply and key effective rates. Full skill-XP row ownership and broader
-gear controls remain later parity work.
+Defence/HP/Prayer, stance/style selection and key effective rates. The
+service-aware Hiscores lookup and bounded preview/apply popover are owned by the
+global header utility. The header keeps Player lookup directly after the
+non-growing product brand instead of centering it in leftover space. A
+successful preview opens automatically and dismisses on `Escape`, an outside
+pointer action or its own summary control; `Escape` returns focus to that
+control. Full skill-XP row ownership and broader gear controls remain later
+parity work.
 
 ### SetupBar
 
@@ -545,13 +559,13 @@ Required content:
 - Large metrics for DPS, effective XP/hr, effective net GP/hr and hit chance.
 - Combat roll metrics: max hit, effective accuracy, effective damage, tick/speed, TTK, cycle, kills/hr and GP/kill.
 - Banking trip metrics when trip modeling applies.
-- Normal attack plus event-scoped special-attack and cannon hit distribution histograms.
+- A normal-versus-selected-special main hit-distribution comparison plus separately scoped special-hit and cannonball detail histograms.
 - XP routing chips.
 
 Current implementation note: the rewrite Stats pane now includes the shared
 metric strip, active assumptions/modifiers summary, a compact source breakdown,
-combat roll detail metrics, XP routing chips, a Trip & banking summary and a
-normal-player-attack hit distribution histogram. The source breakdown and combat
+combat roll detail metrics, XP routing chips, a Trip & banking summary and an
+exact discrete normal-versus-special hit-distribution comparison. The source breakdown and combat
 roll detail are derived in the view-model from existing combat, special attack,
 trip and cannon outputs. The source breakdown lists normal attack, special
 attack and cannon with modeled, partial, not modeled or inactive status and shows
@@ -572,7 +586,9 @@ cannonballs/trip and sparse/idle/respawn-bound state. Normal attack, a selected
 supported DPS special and an actively firing cannon now reuse the same domain
 single-event distribution model. Special scope is one modeled special hit and
 cannon scope is one fired cannonball under D-069; the UI names that scope and
-does not claim aggregate multi-hit, kill, trip or hourly variance. Inactive,
+does not claim kill, trip or hourly variance. Separately, D-083's main comparison
+uses the verified independent component-roll contract to show one complete
+selected special activation against one normal attack. Inactive,
 idle, invalid or unsupported source histograms remain `null`. Missing or
 unsupported metrics stay `null`/`-` instead of being displayed as zero. Magic DPS
 specials are `not modeled`, the DBA special boost path is `inactive` because it
@@ -587,8 +603,11 @@ from those modeled XP source rows. The Trip & banking summary mirrors the
 current trip result for kills/trip, trip length, bank time, effective kills/hr,
 supply/kill, net GP/hr, current bound, safespot and protection state. Hit
 distribution bucket data is derived from the current combat result through the
-domain/view-model boundary, with bounded hit chance/max-hit inputs, a combined
-miss/zero bucket, damage buckets, accessible bucket labels and a max-hit marker.
+domain/view-model boundary. It separates miss from an accurate zero, mixes the
+normal sustained-roll samples, aligns normal and whole-special integer outcomes
+on one probability scale, exposes exact/cumulative values on focus or hover and
+in an accessible table, and shows expected-damage plus full-target-HP/KO context.
+Long exact domains scroll only inside the chart rather than widening the page.
 This does not change the `SimulationResult` contract or combat golden baselines.
 Further combat roll edge-case parity, full browser-display expansion and visual
 regression remain open parity work.
@@ -616,7 +635,7 @@ Current implementation note: the rewrite workbench exposes one active equipment 
 
 Current special-attack implementation note: the dense rewrite UI has an interim Special attack section that exposes the existing domain-supported melee and ranged DPS special weapons, ranged spec-arrow selection for bow specials and result metrics for spec max hit, hit chance, specs/hr, DPS with spec and DPS gain. The control writes versioned rewrite setup state and `formToSimulationRequest()` only emits `specialAttack` for valid supported selections. Magic special attack UI shows a compact unsupported state because no magic DPS special path is currently modeled, and it emits no `specialAttack` request. DBA special boost is modeled as a boost/spec-energy state instead of a DPS-special weapon: when the DBA boost is active the DPS-special selector is paused, no conflicting `specialAttack` request is emitted, and the Trip pane is the visible owner of the DBA restore carry toggle and summary row. Persisted setup normalization drops unknown, combat-style-incompatible and DBA-conflicting special state from active, per-style and custom setup state. Under D-071, dragon halberd uses one selected-target hit for source-backed size 1 and two for size greater than 1. Missing-size legacy contexts preserve the D-050 double-hit fallback and structured warning. Adjacent-target simulation and new special formulas remain outside this slice.
 
-### Compare
+### Monsters
 
 Required content:
 
@@ -630,7 +649,7 @@ Required content:
 - Relevant/irrelevant toggle and persisted relevance.
 - Bar visualization for XP/hr and GP/hr.
 
-Current implementation note: Compare shares the metric strip and active
+Current implementation note: Monsters shares the metric strip and active
 assumptions/modifiers summary with Stats above the dense monster table.
 
 ### Loot
@@ -811,29 +830,30 @@ Required content:
 
 Current implementation note: the root rewrite now exposes Cannon as its own workbench tab in the legacy tab order. It owns per-monster enable, target count and respawn settings in versioned rewrite setup state, provides current-monster reset, can link its spot assumptions to Trip sparse state, and displays idle/respawn-bound status plus compact accuracy, XP, supply, sparse-link and inventory-reserve notes. The output metrics cover effective targets, cannon DPS, balls/hr, balls/kill, cannon ranged XP/hr, effective XP/hr with cannon, effective net GP/hr with cannon, ball cost/hr, ball cost/kill, ball price, cannonballs/trip, ball cost/trip and kills/hr uplift. Browser tests snapshot the expanded Cannon output for the ranged Dagannoth cannon path. Legacy cannon-map migration remains a legacy storage decision, not part of the visible Cannon tab parity.
 
-### Duel
+### Setup comparison
 
 Required content:
 
-- Snapshot live loadout action.
-- Persisted setup snapshots.
-- Rename, load and delete snapshot controls.
-- Versioned snapshot export/import with bounded validation and non-destructive merge behavior.
+- Save current setup action.
+- Persisted saved setups.
+- Rename, load and delete controls for saved setups.
+- Versioned saved-setup export/import with bounded validation and non-destructive merge behavior.
 - Table comparing live and saved setups on the current monster.
 - Best markers for effective XP/hr, effective net GP/hr and GP/XP.
 - A visible DPS delta and an expandable live-versus-snapshot review for active setup fields and calculated impact.
 - On-demand cross-monster matrix for live and saved setups with metric selection, filtering and per-monster best markers.
 
-Current implementation note: the rewrite Duel tab now exposes the visible
-snapshot workflow over the Goal 1 foundation. `src/app/state/duel-snapshots.ts`
+Current implementation note: the rewrite Setups tab now exposes the visible
+saved-setup workflow over the Goal 1 foundation. `src/app/state/duel-snapshots.ts`
 owns version 1 of the separate rewrite-local `index-sim:duel-snapshots`
-persistence contract. Snapshot payloads store validated and normalized
+persistence contract. Saved payloads store validated and normalized
 `CombatSetupFormState` values only, reject oversized persisted lists, cap
-app-side mutations to 12 snapshots and do not store calculated results, upstream
+app-side mutations to 12 saved setups and do not store calculated results, upstream
 data, player names or shared-link data. The UI can snapshot the current setup,
-rename snapshots, load a snapshot into the live editor while preserving the
-current target monster, delete individual snapshots and export/import a strict
-version 1 JSON envelope. Import rejects oversized, malformed,
+rename saved setups, load one into the live editor while preserving the current
+target monster and delete individual saved setups. Browser persistence is
+automatic; version 1 export/import is grouped under `Manage saved setups` for
+backup or transfer. Import rejects oversized, malformed,
 unsupported-version and computed-result payloads, updates matching ids and adds
 new snapshots only while the current 12-entry cap has room. The comparison table
 uses `createDuelComparisonViewModel()` to build live plus snapshot rows by
@@ -846,7 +866,7 @@ loot policy and prices are shared recalculation inputs rather than snapshot
 differences; Planner targets and inactive per-style caches are excluded. D-068
 keeps this comparative and does not claim per-field causal attribution. The
 snapshot persistence and export/import schema are unchanged.
-The optional Monster matrix is built only after an explicit user action through
+The optional all-monster comparison is built only after an explicit user action through
 `createDuelMatrixViewModel()`. It evaluates the live setup and at most 12 saved
 setups across the current generated monster catalog, exposes DPS, XP/hr, net
 GP/hr and GP/XP views, supports a local monster filter and marks the best setup
@@ -854,11 +874,11 @@ within each monster row. The matrix is not persisted and is treated as stale
 when setup, snapshot, price, cannon or loot inputs change, so normal setup edits
 do not trigger a full cross-monster recalculation.
 Compatible legacy `sim_input_v3.duelSetups` rows migrate through the same bounded
-form validation into rewrite-owned Duel snapshot storage. Existing rewrite
-snapshots win conflicts, the shared 12-entry cap applies and invalid or computed
+form validation into the rewrite-owned saved-setup storage. Existing rewrite
+saved setups win conflicts, the shared 12-entry cap applies and invalid or computed
 rows produce sanitized skip reasons. The planned active setup permalink is
-specified separately and does not share the Duel collection. Account-backed
-saves, shared Duel collections and server-backed sharing remain out of scope.
+specified separately and does not share this collection. Account-backed saves,
+shared saved-setup collections and server-backed sharing remain out of scope.
 
 ### Planner
 
@@ -939,8 +959,8 @@ Current implementation note: Settings Price data shows scheduled status and acti
 
 Current implementation note: complete for the accepted V1 workbench shell slice.
 The root rewrite now has the workbench shell foundation with PlayerSidebar,
-setup context bar, legacy-order TabBar, active pane routing for Stats,
-combat-style setup, Compare, Loot, Trip, Cannon, Duel, Planner and
+setup context bar, workflow-order TabBar, active pane routing for Stats,
+combat-style setup, Monsters, Setups, Loot, Trip, Risk, Cannon, Planner and
 Economy/Settings surfaces, and a visible right-side MonsterCard rail. Full
 visual regression remains open.
 
@@ -965,11 +985,11 @@ custom setup migration remain open.
 
 ### Phase D: main workflow parity
 
-- Restore full Stats, Compare, Loot and Trip tab workflows.
-- Add UI-level tests for changing a target, editing a loadout, sorting/filtering Compare, changing loot actions and changing trip assumptions.
+- Restore full Stats, Monsters, Loot and Trip tab workflows.
+- Add UI-level tests for changing a target, editing a loadout, sorting/filtering Monsters, changing loot actions and changing trip assumptions.
 
 Current implementation note: Stats, Result summary, Loot/Economy and Trip are
-complete for the accepted V1 replacement slices, and Compare has the accepted
+complete for the accepted V1 replacement slices, and Monsters has the accepted
 D-032 release classification. Remaining exact legacy numeric questions are later
 or decision-needed scope.
 

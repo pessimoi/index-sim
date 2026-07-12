@@ -1,7 +1,7 @@
 # Numeric user-path audit
 
 - Status: cross-path clean
-- Date: 2026-07-11
+- Date: 2026-07-12
 - Runtime: source-backed generated Revision 274 snapshot with scheduled static prices and generated fallbacks
 - Scope: Result, Dense Compare, calculation worker, Duel live, Duel matrix, saved setup round-trip and archived legacy golden evidence
 
@@ -18,6 +18,17 @@ All audited current-runtime paths produced the same numeric values within the au
 
 - `FullSimulationResult.rates.ttkSec` now uses the Trip path's cannon/poison/recoil-adjusted kill time. The prior combat-only value disagreed with the same result's kills/hr, XP/hr and economy rates when auxiliary damage was active.
 - Stats combat-roll detail continues to expose the normal player-combat TTK separately.
+- Ordinary caskets use the exact Revision 274 opened-content table; the generated parent object cost cannot override the component EV.
+
+## Source-backed casket correction
+
+The focused correction compares the prior generated parent object cost with the current component-derived opened value. It is classified separately from generic market-price differences.
+
+| Monster                           | Drop chance | Previous parent value | Opened contents EV | GP/kill delta | Classification       |
+| --------------------------------- | ----------: | --------------------: | -----------------: | ------------: | -------------------- |
+| Dagannoth (lvl 74) (dagannoth)    |        0.8% |                 50.00 |              3,361 |         25.87 | source-backed-casket |
+| Dagannoth (lvl 92) (dagannoth_92) |        0.8% |                 50.00 |              3,361 |         25.87 | source-backed-casket |
+| Rock Crab (rock_crab)             |        0.8% |                 50.00 |              3,361 |         25.87 | source-backed-casket |
 
 ## Large legacy-to-rewrite observations
 
@@ -29,20 +40,20 @@ Legacy comparisons are evidence, not current runtime truth. Economy deltas are e
 
 | Fixture                                      | Metric                |   Legacy |  Rewrite | Relative delta | Classification | Note                                                                                                    |
 | -------------------------------------------- | --------------------- | -------: | -------: | -------------: | -------------- | ------------------------------------------------------------------------------------------------------- |
-| magic_fire_bolt_chaos_druid_alch             | effectiveNetGpPerHour |   34,900 |  -42,836 |         181.5% | price-source   | Legacy uses embedded gamedata.js prices; rewrite uses scheduled static prices plus generated fallbacks. |
-| ranged_steel_knives_chaos_druid_inventory    | effectiveNetGpPerHour | -345,261 |  237,119 |         168.7% | price-source   | Legacy uses embedded gamedata.js prices; rewrite uses scheduled static prices plus generated fallbacks. |
+| ranged_steel_knives_chaos_druid_inventory    | effectiveNetGpPerHour | -345,261 |  249,213 |         172.2% | price-source   | Legacy uses embedded gamedata.js prices; rewrite uses scheduled static prices plus generated fallbacks. |
+| magic_fire_bolt_chaos_druid_alch             | effectiveNetGpPerHour |   34,900 |  -51,277 |         168.1% | price-source   | Legacy uses embedded gamedata.js prices; rewrite uses scheduled static prices plus generated fallbacks. |
 | ranged_steel_knives_chaos_druid_inventory    | supplyCostPerKill     |    2,275 |    84.80 |          96.3% | price-source   | Legacy uses embedded gamedata.js prices; rewrite uses scheduled static prices plus generated fallbacks. |
-| ranged_yew_longbow_black_demon_no_recovery   | effectiveNetGpPerHour |  -28,711 |  -89,335 |          67.9% | price-source   | Legacy uses embedded gamedata.js prices; rewrite uses scheduled static prices plus generated fallbacks. |
-| ranged_magic_shortbow_greater_demon_spec     | effectiveNetGpPerHour |  -11,661 |  -30,619 |          61.9% | price-source   | Legacy uses embedded gamedata.js prices; rewrite uses scheduled static prices plus generated fallbacks. |
-| ranged_magic_shortbow_dagannoth_cannon       | effectiveNetGpPerHour | -256,270 | -516,801 |          50.4% | price-source   | Legacy uses embedded gamedata.js prices; rewrite uses scheduled static prices plus generated fallbacks. |
+| ranged_yew_longbow_black_demon_no_recovery   | effectiveNetGpPerHour |  -28,711 |  -88,414 |          67.5% | price-source   | Legacy uses embedded gamedata.js prices; rewrite uses scheduled static prices plus generated fallbacks. |
+| ranged_magic_shortbow_greater_demon_spec     | effectiveNetGpPerHour |  -11,661 |  -27,445 |          57.5% | price-source   | Legacy uses embedded gamedata.js prices; rewrite uses scheduled static prices plus generated fallbacks. |
+| ranged_magic_shortbow_dagannoth_cannon       | effectiveNetGpPerHour | -256,270 | -504,140 |          49.2% | price-source   | Legacy uses embedded gamedata.js prices; rewrite uses scheduled static prices plus generated fallbacks. |
 | ranged_magic_shortbow_dagannoth_cannon       | effectiveXpPerHour    |   44,558 |   84,897 |          47.5% | accepted-delta | Rewrite XP/HR composes player and cannon effective XP; legacy keeps cannon XP in a separate row.        |
-| ranged_magic_shortbow_dagannoth_cannon       | supplyCostPerKill     |   812.03 |    1,524 |          46.7% | price-source   | Legacy uses embedded gamedata.js prices; rewrite uses scheduled static prices plus generated fallbacks. |
+| magic_water_bolt_tribesman_poison_safespot   | effectiveNetGpPerHour |  -86,417 | -163,590 |          47.2% | accepted-delta | D-055 accepts source-backed Revision 274 Tribesman combat and loot deltas.                              |
+| ranged_magic_shortbow_dagannoth_cannon       | supplyCostPerKill     |   812.03 |    1,515 |          46.4% | price-source   | Legacy uses embedded gamedata.js prices; rewrite uses scheduled static prices plus generated fallbacks. |
 | ranged_yew_longbow_black_demon_no_recovery   | supplyCostPerKill     |    2,645 |    4,754 |          44.4% | price-source   | Legacy uses embedded gamedata.js prices; rewrite uses scheduled static prices plus generated fallbacks. |
-| magic_water_bolt_tribesman_poison_safespot   | effectiveNetGpPerHour |  -86,417 | -147,179 |          41.3% | accepted-delta | D-055 accepts source-backed Revision 274 Tribesman combat and loot deltas.                              |
-| magic_water_bolt_tribesman_poison_safespot   | supplyCostPerKill     |    1,388 |    2,068 |          32.9% | accepted-delta | D-055 accepts source-backed Revision 274 Tribesman combat and loot deltas.                              |
-| melee_black_dragon_food_limited_trip         | effectiveNetGpPerHour |  -42,521 |  -29,180 |          31.4% | price-source   | Legacy uses embedded gamedata.js prices; rewrite uses scheduled static prices plus generated fallbacks. |
-| magic_fire_bolt_chaos_druid_alch             | supplyCostPerKill     |   855.13 |    1,175 |          27.2% | price-source   | Legacy uses embedded gamedata.js prices; rewrite uses scheduled static prices plus generated fallbacks. |
-| melee_rune_scimitar_hill_giant_super_prayers | effectiveNetGpPerHour | -109,053 |  -80,579 |          26.1% | price-source   | Legacy uses embedded gamedata.js prices; rewrite uses scheduled static prices plus generated fallbacks. |
+| melee_black_dragon_food_limited_trip         | effectiveNetGpPerHour |  -42,521 |  -25,751 |          39.4% | price-source   | Legacy uses embedded gamedata.js prices; rewrite uses scheduled static prices plus generated fallbacks. |
+| magic_water_bolt_tribesman_poison_safespot   | supplyCostPerKill     |    1,388 |    2,214 |          37.3% | accepted-delta | D-055 accepts source-backed Revision 274 Tribesman combat and loot deltas.                              |
+| magic_fire_bolt_chaos_druid_alch             | supplyCostPerKill     |   855.13 |    1,246 |          31.4% | price-source   | Legacy uses embedded gamedata.js prices; rewrite uses scheduled static prices plus generated fallbacks. |
+| melee_rune_scimitar_hill_giant_super_prayers | effectiveNetGpPerHour | -109,053 |  -79,519 |          27.1% | price-source   | Legacy uses embedded gamedata.js prices; rewrite uses scheduled static prices plus generated fallbacks. |
 | magic_water_bolt_tribesman_poison_safespot   | ttkSec                |    20.27 |    25.89 |          21.7% | accepted-delta | D-055 accepts source-backed Revision 274 Tribesman combat and loot deltas.                              |
 | magic_water_bolt_tribesman_poison_safespot   | killsPerHour          |   158.09 |   126.83 |          19.8% | accepted-delta | D-055 accepts source-backed Revision 274 Tribesman combat and loot deltas.                              |
 | magic_water_bolt_tribesman_poison_safespot   | effectiveKph          |   132.15 |   110.40 |          16.5% | accepted-delta | D-055 accepts source-backed Revision 274 Tribesman combat and loot deltas.                              |

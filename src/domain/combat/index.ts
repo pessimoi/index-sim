@@ -6,6 +6,7 @@ import {
   type DbaInfo,
   type EntityId,
   type GameDataSnapshot,
+  type HitDistributionRoll,
   type MonsterDefinition,
   type SimulationContext,
   type SimulationRequest,
@@ -105,6 +106,7 @@ export interface HitDistributionBucket {
   maxDamage: number;
   probability: number;
   isMiss: boolean;
+  isAccurateZero: boolean;
   isMaxHit: boolean;
 }
 
@@ -116,6 +118,12 @@ export interface HitDistribution {
   peakMaxHit: number;
   probabilityTotal: number;
   buckets: HitDistributionBucket[];
+}
+
+interface HitDistributionState {
+  damage: number;
+  accurate: boolean;
+  probability: number;
 }
 
 const PRAYERS: Record<EntityId, PrayerDefinition> = {
@@ -520,57 +528,129 @@ function clampProbability(value: number): number {
   return Math.max(0, Math.min(1, value));
 }
 
-export function createHitDistribution(
-  input: HitDistributionInput,
-  maxDamageBuckets = 30
-): HitDistribution {
-  const hitChanceValue = clampProbability(input.hitChance);
-  const missChance = 1 - hitChanceValue;
-  const rawPeakMaxHit = Number.isFinite(input.peakMaxHit)
-    ? input.peakMaxHit!
-    : Number.isFinite(input.maxHit)
-      ? input.maxHit
-      : 0;
-  const peakMaxHit = Math.max(0, Math.round(rawPeakMaxHit));
-  const bucketLimit = Math.max(1, Math.floor(maxDamageBuckets));
-  const bucketWidth = peakMaxHit > bucketLimit ? Math.ceil(peakMaxHit / bucketLimit) : 1;
-  const perDamageProbability = peakMaxHit > 0 ? hitChanceValue / (peakMaxHit + 1) : 0;
-  const buckets: HitDistributionBucket[] = [
+export function createHitDistribution(input: HitDistributionInput): HitDistribution {
+  return createIndependentHitDistribution(
     {
-      id: "miss-zero",
-      label: "Miss / 0",
-      minDamage: 0,
-      maxDamage: 0,
-      probability: peakMaxHit > 0 ? missChance + perDamageProbability : 1,
-      isMiss: true,
-      isMaxHit: peakMaxHit === 0
-    }
-  ];
+      hitChance: input.hitChance,
+      maxHit: Number.isFinite(input.peakMaxHit) ? input.peakMaxHit! : input.maxHit
+    },
+    1
+  );
+}
 
-  for (let minDamage = 1; minDamage <= peakMaxHit; minDamage += bucketWidth) {
-    const maxDamage = Math.min(peakMaxHit, minDamage + bucketWidth - 1);
-    const damageCount = maxDamage - minDamage + 1;
-    const label = minDamage === maxDamage ? `${minDamage}` : `${minDamage}-${maxDamage}`;
-    buckets.push({
-      id: `damage-${minDamage}-${maxDamage}`,
-      label,
-      minDamage,
-      maxDamage,
-      probability: perDamageProbability * damageCount,
-      isMiss: false,
-      isMaxHit: maxDamage === peakMaxHit
-    });
+function normalizedHitRoll(rollInput: HitDistributionRoll): HitDistributionRoll {
+  return {
+    hitChance: clampProbability(rollInput.hitChance),
+    maxHit: Number.isFinite(rollInput.maxHit) ? Math.max(0, Math.round(rollInput.maxHit)) : 0
+  };
+}
+
+function bucketsFromStates(states: readonly HitDistributionState[]): HitDistribution {
+  const missChance = clampProbability(
+    states.filter((state) => !state.accurate).reduce((sum, state) => sum + state.probability, 0)
+  );
+  const maxHit = Math.max(
+    0,
+    ...states.filter((state) => state.accurate).map((state) => state.damage)
+  );
+  const probabilities = Array.from({ length: maxHit + 1 }, () => 0);
+  for (const state of states) {
+    if (state.accurate) probabilities[state.damage] += state.probability;
   }
 
+  const buckets: HitDistributionBucket[] = [
+    {
+      id: "miss",
+      label: "Miss",
+      minDamage: 0,
+      maxDamage: 0,
+      probability: missChance,
+      isMiss: true,
+      isAccurateZero: false,
+      isMaxHit: false
+    },
+    ...probabilities.map((probability, damage) => ({
+      id: `damage-${damage}`,
+      label: `${damage}`,
+      minDamage: damage,
+      maxDamage: damage,
+      probability,
+      isMiss: false,
+      isAccurateZero: damage === 0,
+      isMaxHit: damage === maxHit
+    }))
+  ];
+  const averageHit = probabilities.reduce(
+    (sum, probability, damage) => sum + probability * damage,
+    0
+  );
+
   return {
-    hitChance: hitChanceValue,
+    hitChance: clampProbability(1 - missChance),
     missChance,
-    averageHit: Number.isFinite(input.averageHit) ? input.averageHit : 0,
-    maxHit: Number.isFinite(input.maxHit) ? input.maxHit : 0,
-    peakMaxHit,
+    averageHit,
+    maxHit,
+    peakMaxHit: maxHit,
     probabilityTotal: buckets.reduce((sum, bucket) => sum + bucket.probability, 0),
     buckets
   };
+}
+
+function singleHitStates(rollInput: HitDistributionRoll): HitDistributionState[] {
+  const hitRoll = normalizedHitRoll(rollInput);
+  const perDamageProbability = hitRoll.hitChance / (hitRoll.maxHit + 1);
+  return [
+    { damage: 0, accurate: false, probability: 1 - hitRoll.hitChance },
+    ...Array.from({ length: hitRoll.maxHit + 1 }, (_, damage) => ({
+      damage,
+      accurate: true,
+      probability: perDamageProbability
+    }))
+  ];
+}
+
+export function createHitDistributionMixture(
+  rolls: readonly HitDistributionRoll[]
+): HitDistribution {
+  if (rolls.length === 0) {
+    return bucketsFromStates([{ damage: 0, accurate: false, probability: 1 }]);
+  }
+  const weight = 1 / rolls.length;
+  return bucketsFromStates(
+    rolls.flatMap((hitRoll) =>
+      singleHitStates(hitRoll).map((state) => ({
+        ...state,
+        probability: state.probability * weight
+      }))
+    )
+  );
+}
+
+export function createIndependentHitDistribution(
+  rollInput: HitDistributionRoll,
+  hitCount: number
+): HitDistribution {
+  const count = Math.max(1, Math.min(8, Math.floor(Number.isFinite(hitCount) ? hitCount : 1)));
+  const componentStates = singleHitStates(rollInput);
+  let combined: HitDistributionState[] = [{ damage: 0, accurate: false, probability: 1 }];
+
+  for (let hit = 0; hit < count; hit += 1) {
+    const next = new Map<string, HitDistributionState>();
+    for (const left of combined) {
+      for (const right of componentStates) {
+        const damage = left.damage + right.damage;
+        const accurate = left.accurate || right.accurate;
+        const key = `${accurate ? 1 : 0}:${damage}`;
+        const probability = left.probability * right.probability;
+        const current = next.get(key);
+        if (current) current.probability += probability;
+        else next.set(key, { damage, accurate, probability });
+      }
+    }
+    combined = [...next.values()];
+  }
+
+  return bucketsFromStates(combined);
 }
 
 export function weaponStances(
@@ -913,22 +993,15 @@ export function simulateCombat(
     0,
     (defenceLevel + 9) * (monsterDefenceBonus(monster, defenceField) + 64)
   );
-  let hitChanceValue: number;
-  let avgHit: number;
-  if (offSamples.length > 1) {
-    let hitChanceSum = 0;
-    let avgHitSum = 0;
-    for (const sample of offSamples) {
-      const sampleHitChance = hitChance(roll(sample.effAcc, accuracyBonusEffective), defenceRoll);
-      hitChanceSum += sampleHitChance;
-      avgHitSum += (sample.mh / 2) * sampleHitChance;
-    }
-    hitChanceValue = hitChanceSum / offSamples.length;
-    avgHit = avgHitSum / offSamples.length;
-  } else {
-    hitChanceValue = hitChance(attackRoll, defenceRoll);
-    avgHit = (maxHit / 2) * hitChanceValue;
-  }
+  const normalHitRolls = offSamples.map((sample) => ({
+    hitChance: hitChance(roll(sample.effAcc, accuracyBonusEffective), defenceRoll),
+    maxHit: sample.mh
+  }));
+  const hitChanceValue =
+    normalHitRolls.reduce((sum, hitRoll) => sum + hitRoll.hitChance, 0) / normalHitRolls.length;
+  const avgHit =
+    normalHitRolls.reduce((sum, hitRoll) => sum + (hitRoll.maxHit / 2) * hitRoll.hitChance, 0) /
+    normalHitRolls.length;
 
   const baseTicks =
     loadoutBonuses.attackSpeed ?? context.gameData.weapons[request.loadout.weaponId]?.speed ?? 4;
@@ -994,7 +1067,8 @@ export function simulateCombat(
       damageBonus: damageBonusEffective,
       defenceField,
       styleId: stance?.style ?? request.styleId,
-      attackType: stance?.type
+      attackType: stance?.type,
+      normalHitRolls
     }
   };
 }

@@ -74,12 +74,12 @@ async function preparePlanner(page: Page) {
 }
 
 async function prepareDuelMatrix(page: Page) {
-  await openWorkbenchTab(page, "Duel");
-  const duel = page.getByRole("region", { name: "Duel", exact: true });
-  await duel.getByRole("button", { name: "Monster matrix" }).click();
-  const matrix = duel.getByRole("table", { name: "All-monster setup matrix" });
+  await openWorkbenchTab(page, "Setups");
+  const duel = page.getByRole("region", { name: "Setup comparison", exact: true });
+  await duel.getByRole("button", { name: "All monsters" }).click();
+  const matrix = duel.getByRole("table", { name: "All-monster setup comparison" });
   await expect(matrix).toBeVisible();
-  await duel.getByLabel("Find matrix monster").fill("giant");
+  await duel.getByLabel("Find monster in setup comparison").fill("giant");
   await expect(matrix.getByRole("row", { name: /Giant/ }).first()).toBeVisible();
   return duel;
 }
@@ -122,6 +122,13 @@ test.describe("repository visual regression", () => {
     await bonusSummary.scrollIntoViewIfNeeded();
     await expect(bonusSummary).toBeVisible();
     await captureActivePane(page, "loadout-melee-details-desktop.png");
+    const damageDistribution = page.getByRole("region", {
+      name: "Damage distribution",
+      exact: true
+    });
+    await damageDistribution.scrollIntoViewIfNeeded();
+    await expect(damageDistribution.getByLabel("Damage distribution buckets")).toBeVisible();
+    await captureActivePane(page, "stats-hit-distribution-desktop.png");
   });
 
   test("Ranged loadout desktop", async ({ page }) => {
@@ -157,16 +164,11 @@ test.describe("repository visual regression", () => {
     const stats = page.getByRole("region", { name: "Stats analysis", exact: true });
     await expect(stats.getByRole("region", { name: "Combat roll details" })).toBeVisible();
     await expect(stats.getByLabel("XP routing chips")).toBeVisible();
-    await expect(stats.getByLabel("Hit distribution buckets")).toBeVisible();
     await captureActivePane(page, "stats-desktop.png");
     const combatRoll = stats.getByRole("region", { name: "Combat roll details" });
     await combatRoll.scrollIntoViewIfNeeded();
     await expect(combatRoll).toBeVisible();
     await captureActivePane(page, "stats-combat-roll-desktop.png");
-    const hitDistribution = stats.getByRole("region", { name: "Hit distribution" });
-    await hitDistribution.scrollIntoViewIfNeeded();
-    await expect(hitDistribution).toBeVisible();
-    await captureActivePane(page, "stats-hit-distribution-desktop.png");
   });
 
   test("Trip desktop", async ({ page }) => {

@@ -45,9 +45,11 @@ import {
   lostCityWeaponSourceId
 } from "../../scripts/lostcity-content-runtime-mapping";
 import { parseLostCitySourceImpactArgs } from "../../scripts/report-lostcity-source-impact";
+import { readLostCityCasketSourceContract } from "../../scripts/lostcity-content-casket";
 import { createLostCityRawSnapshot } from "../../scripts/lostcity-content-snapshot";
 import { readLostCityItemRequirements } from "../../scripts/lostcity-content-requirements";
 import { EQUIPMENT_SLOTS, type GameDataSnapshot } from "../domain/shared";
+import { CASKET_COIN_AMOUNTS, CASKET_REWARD_TABLE, CASKET_ROLL_DENOMINATOR } from "../domain/trip";
 
 const FIXTURE_SOURCE = "src/tests/fixtures/lostcity-source";
 const TEST_ROOT = join(process.cwd(), ".vite", "lostcity-source-parser-test");
@@ -211,6 +213,42 @@ describe("LostCity content source parser", () => {
   beforeEach(() => {
     rmSync(TEST_ROOT, { recursive: true, force: true });
     mkdirSync(TEST_ROOT, { recursive: true });
+  });
+
+  it("locks the ordinary casket table to the pinned RuneScript trigger", () => {
+    const contract = readLostCityCasketSourceContract({ sourceDir: FIXTURE_SOURCE });
+
+    expect(contract.denominator).toBe(CASKET_ROLL_DENOMINATOR);
+    expect(contract.coinAmounts).toEqual(CASKET_COIN_AMOUNTS);
+    expect(contract.rows.map((row) => row.weight)).toEqual(
+      CASKET_REWARD_TABLE.map((row) => row.weight)
+    );
+    expect(contract.rows.map((row) => row.sourceItemId)).toEqual(
+      CASKET_REWARD_TABLE.map((row) => row.sourceItemId)
+    );
+    expect(contract.rows.map((row) => row.runtimeItemId)).toEqual(
+      CASKET_REWARD_TABLE.map((row) => row.itemId ?? "coins")
+    );
+    expect(contract.sourceRef).toBe(
+      "scripts/skill_fishing/scripts/fishing_spots/memberfish.rs2:1#casket"
+    );
+  });
+
+  it("fails the ordinary casket source contract when a reward threshold drifts", () => {
+    const sourceDir = join(TEST_ROOT, "casket-threshold-drift");
+    cpSync(FIXTURE_SOURCE, sourceDir, { recursive: true });
+    const casketPath = join(
+      sourceDir,
+      "scripts/skill_fishing/scripts/fishing_spots/memberfish.rs2"
+    );
+    writeFileSync(
+      casketPath,
+      readFileSync(casketPath, "utf8").replace("$random < 92", "$random < 93")
+    );
+
+    expect(() => readLostCityCasketSourceContract({ sourceDir })).toThrow(
+      /ordinary casket source contract drifted/
+    );
   });
 
   it("parses deterministic config catalogs and preserves repeated params", () => {

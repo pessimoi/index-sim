@@ -2,10 +2,15 @@ import type {
   EntityId,
   EquipmentItemDefinition,
   GameDataSnapshot,
+  ItemPriceQuality,
+  ItemPriceRefreshStatus,
+  ItemPriceValueOrigin,
   PriceSet,
   SimulationContext
 } from "../../domain/shared";
 import { resolveCanonicalItemId } from "../../domain/economy/canonical-item-id";
+import { MARKET_SOURCE_MAPPINGS } from "../../data/market-source-mapping";
+import { auditDynamicLootMarketDependencies } from "../../data/market-sync-items";
 
 export type GeneratedRuntimeSource = "generated-static-snapshot" | "legacy-derived-static-snapshot";
 
@@ -26,6 +31,7 @@ export type RuntimeCoverageSection =
   | "equipment.runtimeFields"
   | "requirements"
   | "priceSet.itemPrices"
+  | "priceSet.itemPriceMetadata"
   | "priceSet.alchValues";
 
 export interface RuntimeCoverageSummary {
@@ -50,7 +56,69 @@ export interface GeneratedRuntimeReadinessReport {
   referencePriceSetId: EntityId;
   candidatePriceSetId: EntityId;
   sections: RuntimeCoverageSummary[];
+  priceMetadata: {
+    numericCount: number;
+    metadataCount: number;
+    missingMetadataCount: number;
+    generatedFallbackCount: number;
+    marketMappingsMissingNumeric: EntityId[];
+    byValueOrigin: Record<ItemPriceValueOrigin, number>;
+    byRefreshStatus: Record<ItemPriceRefreshStatus, number>;
+    byQuality: Record<ItemPriceQuality, number>;
+  };
+  dynamicLootPriceDependencies: {
+    dependencyCount: number;
+    mappedCount: number;
+    missingMappingCount: number;
+    missingMappingItemIds: EntityId[];
+    unrecognizedActiveTags: string[];
+  };
   blockers: string[];
+}
+
+function priceMetadataSummary(
+  priceSet: PriceSet
+): GeneratedRuntimeReadinessReport["priceMetadata"] {
+  const metadata = priceSet.itemPriceMetadata ?? {};
+  const byValueOrigin: Record<ItemPriceValueOrigin, number> = {
+    "market-observation": 0,
+    "legacy-static": 0,
+    "generated-object-cost": 0,
+    imported: 0,
+    manual: 0,
+    unknown: 0
+  };
+  const byRefreshStatus: Record<ItemPriceRefreshStatus, number> = {
+    observed: 0,
+    retained: 0,
+    "not-evaluated": 0,
+    "not-applicable": 0
+  };
+  const byQuality: Record<ItemPriceQuality, number> = {
+    high: 0,
+    medium: 0,
+    low: 0,
+    fallback: 0,
+    unknown: 0
+  };
+  for (const item of Object.values(metadata)) {
+    byValueOrigin[item.valueOrigin] += 1;
+    byRefreshStatus[item.refreshStatus] += 1;
+    byQuality[item.quality] += 1;
+  }
+  const numericIds = Object.keys(priceSet.itemPrices);
+  return {
+    numericCount: numericIds.length,
+    metadataCount: Object.keys(metadata).length,
+    missingMetadataCount: numericIds.filter((itemId) => metadata[itemId] === undefined).length,
+    generatedFallbackCount: byValueOrigin["generated-object-cost"],
+    marketMappingsMissingNumeric: MARKET_SOURCE_MAPPINGS.filter(
+      (mapping) => mapping.syncPrice && priceSet.itemPrices[mapping.itemId] === undefined
+    ).map((mapping) => mapping.itemId),
+    byValueOrigin,
+    byRefreshStatus,
+    byQuality
+  };
 }
 
 interface ReadinessReportInput {
@@ -76,6 +144,7 @@ const BLOCKING_SECTIONS = new Set<RuntimeCoverageSection>([
   "equipment",
   "equipment.runtimeFields",
   "priceSet.itemPrices",
+  "priceSet.itemPriceMetadata",
   "priceSet.alchValues"
 ]);
 
@@ -177,7 +246,7 @@ function canonicalItemId(itemId: EntityId): EntityId {
 }
 
 function coverageForCanonicalIds(
-  section: "items" | "priceSet.itemPrices" | "priceSet.alchValues",
+  section: "items" | "priceSet.itemPrices" | "priceSet.itemPriceMetadata" | "priceSet.alchValues",
   referenceIds: EntityId[],
   candidateIds: EntityId[],
   exampleLimit: number
@@ -229,6 +298,8 @@ function idsForSection(context: SimulationContext, section: RuntimeCoverageSecti
       return sortedIds(context.gameData.requirements);
     case "priceSet.itemPrices":
       return priceIds(context.priceSet, "itemPrices");
+    case "priceSet.itemPriceMetadata":
+      return sortedIds(context.priceSet.itemPriceMetadata);
     case "priceSet.alchValues":
       return priceIds(context.priceSet, "alchValues");
   }
@@ -462,6 +533,14 @@ function coverageForSection(
   section: RuntimeCoverageSection,
   exampleLimit: number
 ): RuntimeCoverageSummary {
+  if (section === "priceSet.itemPriceMetadata") {
+    return coverageForCanonicalIds(
+      section,
+      idsForSection(candidate, "priceSet.itemPrices"),
+      idsForSection(candidate, section),
+      exampleLimit
+    );
+  }
   if (section === "monsters.combatStats") {
     return coverageForMonsterCombatStats(reference, candidate, exampleLimit);
   }
@@ -547,6 +626,7 @@ export function createGeneratedRuntimeReadinessReport(
     "equipment.runtimeFields",
     "requirements",
     "priceSet.itemPrices",
+    "priceSet.itemPriceMetadata",
     "priceSet.alchValues"
   ];
   const coverage = sections.map((section) =>
@@ -556,6 +636,7 @@ export function createGeneratedRuntimeReadinessReport(
     const blocker = blockerForSection(section);
     return blocker ? [blocker] : [];
   });
+  const dynamicLootDependencies = auditDynamicLootMarketDependencies(input.candidate.gameData);
 
   return {
     ready: blockers.length === 0,
@@ -565,6 +646,14 @@ export function createGeneratedRuntimeReadinessReport(
     referencePriceSetId: input.reference.priceSet.id,
     candidatePriceSetId: input.candidate.priceSet.id,
     sections: coverage,
+    priceMetadata: priceMetadataSummary(input.candidate.priceSet),
+    dynamicLootPriceDependencies: {
+      dependencyCount: dynamicLootDependencies.dependencyItemIds.length,
+      mappedCount: dynamicLootDependencies.mappedItemIds.length,
+      missingMappingCount: dynamicLootDependencies.missingMappingItemIds.length,
+      missingMappingItemIds: dynamicLootDependencies.missingMappingItemIds,
+      unrecognizedActiveTags: dynamicLootDependencies.unrecognizedActiveTags
+    },
     blockers
   };
 }

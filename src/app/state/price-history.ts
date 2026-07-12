@@ -1,9 +1,21 @@
 import { z } from "zod";
-import { PriceMapSchema, PriceSetSchema, parsePriceHistory } from "@/data/schemas";
-import type { PriceSet } from "@/domain/shared";
+import {
+  ItemPriceMetadataMapSchema,
+  PriceMapSchema,
+  PriceSetSchema,
+  completeItemPriceMetadata,
+  parsePriceHistory
+} from "@/data/schemas";
+import type { ItemPriceMetadata, PriceSet } from "@/domain/shared";
+import {
+  loadPersisted,
+  savePersisted,
+  type KeyValueStorage,
+  type LoadPersistedResult
+} from "@/adapters/storage";
 
 export const PRICE_HISTORY_STORAGE_KEY = "index-sim:price-history";
-export const PRICE_HISTORY_VERSION = 1;
+export const PRICE_HISTORY_VERSION = 2;
 export const PRICE_HISTORY_MAX_SNAPSHOTS = 20;
 export const PRICE_HISTORY_MAX_ITEMS_PER_SNAPSHOT = 2_000;
 export const PRICE_HISTORY_ANALYSIS_MAX_SNAPSHOTS = 10_000;
@@ -18,12 +30,49 @@ const CappedPriceMapSchema = PriceMapSchema.refine(
   `At most ${PRICE_HISTORY_MAX_ITEMS_PER_SNAPSHOT} item prices can be stored per snapshot`
 );
 
+const PricePointStatusSchema = z.enum([
+  "observed",
+  "retained",
+  "carried-forward",
+  "legacy-unknown",
+  "local-capture"
+]);
+
 export const BrowserPriceHistorySnapshotSchema = z
   .object({
     capturedAt: IsoTimestampSchema,
     sourcePriceSetId: z.string().min(1),
     label: z.string().min(1).max(160),
+    itemPrices: CappedPriceMapSchema,
+    itemPriceMetadata: ItemPriceMetadataMapSchema.optional(),
+    itemPriceStatuses: z.record(z.string().min(1), PricePointStatusSchema).optional()
+  })
+  .strict()
+  .superRefine((snapshot, ctx) => {
+    const priceKeys = Object.keys(snapshot.itemPrices).sort();
+    if (!snapshot.itemPriceMetadata) return;
+    const metadataKeys = Object.keys(snapshot.itemPriceMetadata).sort();
+    if (JSON.stringify(priceKeys) !== JSON.stringify(metadataKeys)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["itemPriceMetadata"],
+        message: "history metadata keys must match item price keys"
+      });
+    }
+  });
+
+const BrowserPriceHistorySnapshotV1Schema = z
+  .object({
+    capturedAt: IsoTimestampSchema,
+    sourcePriceSetId: z.string().min(1),
+    label: z.string().min(1).max(160),
     itemPrices: CappedPriceMapSchema
+  })
+  .strict();
+
+const BrowserPriceHistoryStateV1Schema = z
+  .object({
+    snapshots: z.array(BrowserPriceHistorySnapshotV1Schema).max(PRICE_HISTORY_MAX_SNAPSHOTS)
   })
   .strict();
 
@@ -47,6 +96,53 @@ export type PriceHistoryAnalysisState = z.infer<typeof PriceHistoryAnalysisState
 export const DEFAULT_PRICE_HISTORY_STATE: BrowserPriceHistoryState = {
   snapshots: []
 };
+
+function unknownHistoryMetadata(itemPrices: Record<string, number>) {
+  return completeItemPriceMetadata({
+    itemPrices,
+    fallbackOrigin: "unknown",
+    fallbackReasonCode: "legacy-metadata-unavailable"
+  });
+}
+
+export function loadBrowserPriceHistory(
+  storage: KeyValueStorage
+): LoadPersistedResult<BrowserPriceHistoryState> {
+  const currentOptions = {
+    key: PRICE_HISTORY_STORAGE_KEY,
+    version: PRICE_HISTORY_VERSION,
+    schema: BrowserPriceHistoryStateSchema,
+    storage
+  };
+  const current = loadPersisted(currentOptions);
+  if (current.status !== "version-mismatch" || current.foundVersion !== 1) return current;
+
+  const legacy = loadPersisted({
+    ...currentOptions,
+    version: 1,
+    schema: BrowserPriceHistoryStateV1Schema
+  });
+  if (legacy.status !== "loaded") return current;
+  const value = BrowserPriceHistoryStateSchema.parse({
+    snapshots: legacy.value.snapshots.map((snapshot) => ({
+      ...snapshot,
+      itemPriceMetadata: unknownHistoryMetadata(snapshot.itemPrices),
+      itemPriceStatuses: Object.fromEntries(
+        Object.keys(snapshot.itemPrices).map((itemId) => [itemId, "legacy-unknown"])
+      )
+    }))
+  });
+  try {
+    const envelope = savePersisted(currentOptions, value);
+    return { status: "loaded", value, envelope };
+  } catch {
+    return {
+      status: "loaded",
+      value,
+      envelope: { version: PRICE_HISTORY_VERSION, savedAt: legacy.envelope.savedAt, data: value }
+    };
+  }
+}
 
 export type PriceHistoryBaselineMode = "previous" | "first" | "snapshot";
 export type PriceHistoryMoverSortKey =
@@ -93,6 +189,7 @@ export interface PriceHistoryTrendPoint {
   snapshotLabel: string;
   sourcePriceSetId: string;
   price: number;
+  priceStatus: z.infer<typeof PricePointStatusSchema>;
   gpDeltaFromPrevious: number | null;
   percentDeltaFromPrevious: number | null;
 }
@@ -125,6 +222,22 @@ function capItemPrices(itemPrices: PriceSet["itemPrices"]): PriceSet["itemPrices
   );
 }
 
+function metadataForCappedPrices(
+  itemPrices: Record<string, number>,
+  metadata: Record<string, ItemPriceMetadata> | undefined
+): Record<string, ItemPriceMetadata> {
+  return completeItemPriceMetadata({
+    itemPrices,
+    itemPriceMetadata: Object.fromEntries(
+      Object.keys(itemPrices).flatMap((itemId) =>
+        metadata?.[itemId] ? [[itemId, metadata[itemId]]] : []
+      )
+    ),
+    fallbackOrigin: "unknown",
+    fallbackReasonCode: "legacy-metadata-unavailable"
+  });
+}
+
 export function priceHistorySnapshotKey(snapshot: BrowserPriceHistorySnapshot): string {
   return `${snapshot.capturedAt}::${snapshot.sourcePriceSetId}`;
 }
@@ -153,11 +266,16 @@ export function createPriceHistorySnapshot(
   capturedAt: Date = new Date()
 ): BrowserPriceHistorySnapshot {
   const validated = PriceSetSchema.parse(priceSet) as PriceSet;
+  const itemPrices = capItemPrices(validated.itemPrices);
   return BrowserPriceHistorySnapshotSchema.parse({
     capturedAt: capturedAt.toISOString(),
     sourcePriceSetId: validated.id,
     label: validated.label,
-    itemPrices: capItemPrices(validated.itemPrices)
+    itemPrices,
+    itemPriceMetadata: metadataForCappedPrices(itemPrices, validated.itemPriceMetadata),
+    itemPriceStatuses: Object.fromEntries(
+      Object.keys(itemPrices).map((itemId) => [itemId, "local-capture"])
+    )
   });
 }
 
@@ -182,13 +300,48 @@ export function keepPriceHistoryOnFailure(
 
 export function createSharedPriceHistoryAnalysis(input: unknown): PriceHistoryAnalysisState {
   const snapshots = parsePriceHistory(input)
-    .map((snapshot) =>
-      BrowserPriceHistorySnapshotSchema.parse({
-        capturedAt: new Date(snapshot.t * 1000).toISOString(),
-        sourcePriceSetId: `scheduled-market-${snapshot.t}`,
-        label: "Scheduled market",
-        itemPrices: capItemPrices(snapshot.prices)
-      })
+    .snapshots.map((snapshot) =>
+      BrowserPriceHistorySnapshotSchema.parse(
+        (() => {
+          const itemPrices = capItemPrices(snapshot.prices);
+          const metadata = unknownHistoryMetadata(itemPrices);
+          const itemPriceStatuses = Object.fromEntries(
+            Object.keys(itemPrices).map((itemId) => [
+              itemId,
+              snapshot.kind === "legacy-unknown" ? "legacy-unknown" : "carried-forward"
+            ])
+          );
+          for (const [itemId, evaluation] of Object.entries(snapshot.evaluations)) {
+            if (itemPrices[itemId] === undefined) continue;
+            itemPriceStatuses[itemId] = evaluation.result;
+            metadata[itemId] =
+              evaluation.result === "observed"
+                ? {
+                    valueOrigin: "market-observation",
+                    refreshStatus: "observed",
+                    quality: evaluation.quality,
+                    sourceId: "markets.lostcity.rs",
+                    sourceSlug: evaluation.sourceSlug,
+                    valueObservedAt: evaluation.valueObservedAt,
+                    evaluatedAt: new Date(snapshot.t * 1000).toISOString()
+                  }
+                : {
+                    ...metadata[itemId],
+                    refreshStatus: "retained",
+                    evaluatedAt: new Date(snapshot.t * 1000).toISOString(),
+                    reasonCode: evaluation.reasonCode
+                  };
+          }
+          return {
+            capturedAt: new Date(snapshot.t * 1000).toISOString(),
+            sourcePriceSetId: `scheduled-market-${snapshot.t}`,
+            label: "Scheduled market",
+            itemPrices,
+            itemPriceMetadata: metadata,
+            itemPriceStatuses
+          };
+        })()
+      )
     )
     .sort((left, right) => Date.parse(right.capturedAt) - Date.parse(left.capturedAt));
   return PriceHistoryAnalysisStateSchema.parse({ snapshots });
@@ -278,6 +431,7 @@ export function analyzePriceHistoryTrend(
           snapshotLabel: snapshot.label,
           sourcePriceSetId: snapshot.sourcePriceSetId,
           price,
+          priceStatus: snapshot.itemPriceStatuses?.[normalizedItemId] ?? "local-capture",
           gpDeltaFromPrevious: null,
           percentDeltaFromPrevious: null
         }

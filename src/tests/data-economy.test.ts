@@ -7,6 +7,7 @@ import {
   aliasesForCanonicalItemId,
   collectMissingPriceWarnings,
   createCanonicalItemIdResolver,
+  deriveItemPriceFreshness,
   lookupItemPrice,
   resolveCanonicalItemId
 } from "../domain/economy";
@@ -20,6 +21,7 @@ import {
 } from "../data";
 import {
   PRICE_SET_IMPORT_MAX_BYTES,
+  ItemPriceMetadataSchema,
   PriceHistorySchema,
   PriceSetSchema,
   PriceSetValidationError,
@@ -323,13 +325,79 @@ describe("price file schemas", () => {
     expect(priceSet.itemPrices.rune_scimitar).toBeGreaterThan(0);
     expect(priceSet.alchValues.rune_scimitar).toBeGreaterThan(0);
     expect(priceSet.itemPrices).not.toHaveProperty("_scraped_at");
-    expect(priceHistory.length).toBeGreaterThan(0);
-    expect(priceHistory[0]?.prices.rune_scimitar).toBeGreaterThan(0);
+    expect(priceHistory.snapshots.length).toBeGreaterThan(0);
+    expect(priceHistory.snapshots[0]?.prices.rune_scimitar).toBeGreaterThan(0);
+  });
+
+  it("validates item price metadata invariants and derives display freshness", () => {
+    const observed = ItemPriceMetadataSchema.parse({
+      valueOrigin: "market-observation",
+      refreshStatus: "observed",
+      quality: "high",
+      sourceId: "markets.lostcity.rs",
+      sourceSlug: "lobster",
+      valueObservedAt: "2026-07-10T00:00:00.000Z",
+      evaluatedAt: "2026-07-11T00:00:00.000Z",
+      sourceObservations: 10,
+      usableObservations: 9,
+      acceptedObservations: 8,
+      rejectedObservations: 2
+    });
+
+    expect(deriveItemPriceFreshness(observed, new Date("2026-07-12T00:00:00.000Z"))).toBe(
+      "observed-current"
+    );
+    expect(deriveItemPriceFreshness(observed, new Date("2026-08-12T00:00:00.000Z"))).toBe(
+      "observed-stale"
+    );
+    expect(
+      ItemPriceMetadataSchema.safeParse({
+        ...observed,
+        valueObservedAt: "not-a-date"
+      }).success
+    ).toBe(false);
+    expect(
+      ItemPriceMetadataSchema.safeParse({
+        ...observed,
+        acceptedObservations: 10,
+        rejectedObservations: 2
+      }).success
+    ).toBe(false);
+    expect(
+      ItemPriceMetadataSchema.safeParse({
+        valueOrigin: "generated-object-cost",
+        refreshStatus: "observed",
+        quality: "fallback",
+        reasonCode: "generated-price-fallback"
+      }).success
+    ).toBe(false);
+  });
+
+  it("normalizes old PriceSet imports to imported unknown metadata without observation times", () => {
+    const imported = parsePriceSetJson(
+      JSON.stringify({
+        id: "old-import",
+        label: "Old import",
+        source: "manual",
+        createdAt: "2026-07-05T00:00:00.000Z",
+        itemPrices: { lobster: 205 },
+        alchValues: { lobster: 0 }
+      })
+    );
+
+    expect(imported.itemPriceMetadata?.lobster).toEqual({
+      valueOrigin: "imported",
+      refreshStatus: "not-evaluated",
+      quality: "unknown",
+      reasonCode: "import-metadata-unavailable"
+    });
+    expect(imported.itemPriceMetadata?.lobster).not.toHaveProperty("valueObservedAt");
   });
 
   it("builds a read-only scheduled static PriceSet candidate from committed price files", () => {
     const status = createScheduledStaticPriceSnapshotStatus({
       pricesText: readTextFile("prices.json"),
+      priceProvenanceText: readTextFile("price-provenance.json"),
       alchText: readTextFile("alch.json"),
       priceHistoryText: readTextFile("price-history.json")
     });
@@ -337,6 +405,7 @@ describe("price file schemas", () => {
     expect(status.status).toBe("loaded");
     expect(status.files).toEqual({
       prices: "loaded",
+      priceProvenance: "loaded",
       alch: "loaded",
       priceHistory: "loaded"
     });
@@ -347,6 +416,13 @@ describe("price file schemas", () => {
     });
     expect(status.scheduledPriceSet?.itemPrices.rune_scimitar).toBeGreaterThan(0);
     expect(status.scheduledPriceSet?.alchValues.rune_scimitar).toBeGreaterThan(0);
+    expect(status.scheduledPriceSet?.itemPriceMetadata?.rune_2h).toMatchObject({
+      valueOrigin: "legacy-static",
+      refreshStatus: "not-evaluated",
+      sourceId: "markets.lostcity.rs",
+      sourceSlug: "rune_2h_sword",
+      reasonCode: "legacy-metadata-unavailable"
+    });
     expect(status.scheduledPriceSet?.itemPrices).not.toHaveProperty("_scraped_at");
     expect(status.itemCount).toBeGreaterThan(0);
     expect(status.alchCount).toBeGreaterThan(0);
@@ -354,6 +430,7 @@ describe("price file schemas", () => {
 
   it("gates committed raw data files for duplicate keys before object parsing", () => {
     expect(() => readJsonFile("prices.json")).not.toThrow();
+    expect(() => readJsonFile("price-provenance.json")).not.toThrow();
     expect(() => readJsonFile("alch.json")).not.toThrow();
     expect(() => readJsonFile("price-history.json")).not.toThrow();
   });
@@ -487,6 +564,14 @@ describe("economy price lookup warnings", () => {
       source: "manual",
       createdAt: "2026-07-05",
       itemPrices: { sapphire: 451 },
+      itemPriceMetadata: {
+        sapphire: {
+          valueOrigin: "manual",
+          refreshStatus: "not-evaluated",
+          quality: "unknown",
+          reasonCode: "manual-value"
+        }
+      },
       alchValues: {}
     });
 
@@ -496,7 +581,8 @@ describe("economy price lookup warnings", () => {
       canonicalItemId: "uncut_sapphire",
       lookupSource: "alias",
       aliasItemId: "sapphire",
-      value: 451
+      value: 451,
+      metadata: { valueOrigin: "manual", reasonCode: "manual-value" }
     });
   });
 

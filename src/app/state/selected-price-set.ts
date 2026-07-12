@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { PRICE_SET_IMPORT_MAX_BYTES, PriceSetSchema } from "@/data/schemas";
+import {
+  PRICE_SET_IMPORT_MAX_BYTES,
+  PriceSetSchema,
+  normalizePriceSetItemMetadata
+} from "@/data/schemas";
 import type { PriceSet } from "@/domain/shared";
 import {
   clearPersisted,
@@ -10,7 +14,7 @@ import {
 } from "@/adapters/storage";
 
 export const SELECTED_PRICE_SET_STORAGE_KEY = "index-sim:price-set:selected";
-export const SELECTED_PRICE_SET_VERSION = 1;
+export const SELECTED_PRICE_SET_VERSION = 2;
 
 const IsoTimestampSchema = z
   .string()
@@ -20,6 +24,24 @@ const IsoTimestampSchema = z
   });
 
 export const SelectedPriceSetStateSchema = z
+  .object({
+    priceSet: PriceSetSchema,
+    selectedAt: IsoTimestampSchema
+  })
+  .strict()
+  .superRefine((state, ctx) => {
+    const priceKeys = Object.keys(state.priceSet.itemPrices).sort();
+    const metadataKeys = Object.keys(state.priceSet.itemPriceMetadata ?? {}).sort();
+    if (JSON.stringify(priceKeys) !== JSON.stringify(metadataKeys)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["priceSet", "itemPriceMetadata"],
+        message: "selected PriceSet requires metadata for every item price"
+      });
+    }
+  });
+
+const SelectedPriceSetStateV1Schema = z
   .object({
     priceSet: PriceSetSchema,
     selectedAt: IsoTimestampSchema
@@ -74,6 +96,37 @@ export function loadSelectedPriceSet(storage: KeyValueStorage): LoadSelectedPric
   if (loaded.status === "loaded") {
     return loaded;
   }
+  if (loaded.status === "version-mismatch" && loaded.foundVersion === 1) {
+    const legacy = loadPersisted({
+      key: SELECTED_PRICE_SET_STORAGE_KEY,
+      version: 1,
+      schema: SelectedPriceSetStateV1Schema,
+      storage
+    });
+    if (legacy.status === "loaded") {
+      const value = SelectedPriceSetStateSchema.parse({
+        ...legacy.value,
+        priceSet: normalizePriceSetItemMetadata(legacy.value.priceSet as PriceSet, {
+          fallbackOrigin: "imported",
+          fallbackReasonCode: "import-metadata-unavailable"
+        })
+      });
+      try {
+        const envelope = savePersisted(selectedPriceSetStorageOptions(storage), value);
+        return { status: "loaded", value, envelope };
+      } catch {
+        return {
+          status: "loaded",
+          value,
+          envelope: {
+            version: SELECTED_PRICE_SET_VERSION,
+            savedAt: legacy.envelope.savedAt,
+            data: value
+          }
+        };
+      }
+    }
+  }
   if (loaded.status === "version-mismatch") {
     return loaded;
   }
@@ -102,7 +155,7 @@ export function saveSelectedPriceSet(
   options: { now?: () => Date } = {}
 ): PersistedEnvelope<SelectedPriceSetState> {
   return savePersisted(selectedPriceSetStorageOptions(storage, options.now), {
-    priceSet,
+    priceSet: normalizePriceSetItemMetadata(priceSet),
     selectedAt: (options.now ?? (() => new Date()))().toISOString()
   });
 }

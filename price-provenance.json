@@ -1,0 +1,989 @@
+{
+  "version": 1,
+  "capturedAt": "2026-07-12T03:54:50.000Z",
+  "refreshSource": "markets.lostcity.rs",
+  "items": {
+    "adamant_arrow": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "adamant_axe": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "adamant_dart": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "adamant_full_helm": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "adamant_full_helm",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "adamant_kiteshield": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "adamant_med_helm": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "adamant_platebody": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "adamant_platelegs": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "adamant_platelegs",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "adamant_sq_shield": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "adamantite_bar": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "adamantite_bar",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "adamantite_ore": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "adamantite_ore",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "air_talisman": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "air_talisman",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "airrune": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "airrune",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "antifire_potion": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "ashes": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "big_bones": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "big_bones",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "bloodrune": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "bloodrune",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "body_talisman": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "body_talisman",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "bodyrune": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "bodyrune",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "bronze_arrow": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "bronze_arrow",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "bronze_dart": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "chaos_talisman": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "chaos_talisman",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "chaosrune": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "chaosrune",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "coal": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "coal",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "cosmic_talisman": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "cosmic_talisman",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "cosmicrune": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "cosmicrune",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "cow_hide": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "cow_hide",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "deathrune": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "deathrune",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "diamond": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "diamond",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "dragon_bones": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "dragon_bones",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "dragon_longsword": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "dragon_spear": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "dragon_spear",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "dragonhide_black": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "dragonhide_blue": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "dragonhide_blue",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "dragonhide_green": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "dragonhide_green",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "dragonhide_red": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "dragonstone": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "dragonstone",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "earthrune": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "earthrune",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "emerald": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "emerald",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "eye_of_newt": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "feather": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "fire_battlestaff": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "fire_battlestaff",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "firerune": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "firerune",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "gold_bar": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "gold_bar",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "gold_ore": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "gold_ore",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "granite_shield": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "guam_leaf": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "herb_avantoe": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "avantoe",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "herb_cadantine": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "cadantine",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "herb_dwarf_weed": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "dwarf_weed",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "herb_guam": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "guam_leaf",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "herb_harralander": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "harralander",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "herb_irit": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "irit_leaf",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "herb_kwuarm": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "kwuarm",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "herb_lantadyme": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "lantadyme",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "herb_marrentill": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "marentill",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "herb_ranarr": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "ranarr_weed",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "herb_tarromin": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "tarromin",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "iron_arrow": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "iron_arrow",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "iron_bar": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "iron_dart": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "iron_knife": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "iron_ore": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "iron_ore",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "lawrune": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "lawrune",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "limpwurt_root": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "limpwurt_root",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "lobster": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "lobster",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "loop_half_key": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "keyhalf2",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "magic_potion": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "magic_staff": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "mcannonball": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "mindrune": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "mindrune",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "mithril_2h_sword": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "mithril_arrow": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "mithril_axe": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "mithril_bar": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "mithril_bar",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "mithril_battleaxe": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "mithril_chainbody": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "mithril_chainbody",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "mithril_dart": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "mithril_kiteshield": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "mithril_kiteshield",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "mithril_mace": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "mithril_ore": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "mithril_ore",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "mithril_platebody": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "mithril_spear": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "mithril_sq_shield": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "mithril_sq_shield",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "mithril_sword": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "nature_talisman": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "nature_talisman",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "naturerune": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "naturerune",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "prayer_potion": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "ranging_potion": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "restore_potion": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "ring_of_recoil": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "ring_of_recoil",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "ruby": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "ruby",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "rune_2h": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "rune_2h_sword",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "rune_arrow": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "rune_arrow",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "rune_battleaxe": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "rune_battleaxe",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "rune_chainbody": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "rune_chainbody",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "rune_dagger": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "rune_dagger",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "rune_dart": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "rune_full_helm": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "rune_full_helm",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "rune_kiteshield": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "rune_kiteshield",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "rune_knife": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "rune_longsword": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "rune_med_helm": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "rune_med_helm",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "rune_platebody": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "rune_platelegs": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "rune_scimitar": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "rune_scimitar",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "rune_sq_shield": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "rune_sq_shield",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "rune_warhammer": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "sapphire": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "sapphire",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "shark": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "shark",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "silver_ore": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "silver_ore",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "snape_grass": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "soulrune": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "soulrune",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "steel_arrow": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "steel_arrow",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "steel_bar": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "steel_bar",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "steel_dart": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "super_antipoison": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "super_attack": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "super_defence": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "super_set": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "super_strength": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "swordfish": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "swordfish",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "tooth_half_key": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "keyhalf1",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "tuna": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "tuna",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "uncut_diamond": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "uncut_diamond",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "uncut_dragonstone": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "uncut_dragonstone",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "uncut_emerald": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "uncut_emerald",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "uncut_ruby": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "uncut_ruby",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "uncut_sapphire": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "uncut_sapphire",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "unicorn_horn_dust": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "unidentified_guam": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "unidentified_guam",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "vial_water": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "water_talisman": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "waterrune": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "waterrune",
+      "reasonCode": "legacy-metadata-unavailable"
+    },
+    "weapon_poison": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    },
+    "white_berries": {
+      "valueOrigin": "legacy-static",
+      "refreshStatus": "not-evaluated",
+      "quality": "unknown",
+      "reasonCode": "outside-market-allowlist"
+    }
+  }
+}

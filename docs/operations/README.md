@@ -53,7 +53,7 @@ Current market run behavior:
 - The default market provider is disabled, so local runs show the disabled service state unless a test injects a provider.
 - The rewrite UI keeps JSON price import available as the offline fallback.
 - The rewrite UI stores selected imported or compatible legacy market prices in `index-sim:price-set:selected`. Generated Revision 274 alch values replace imported alch maps before use/persistence and again on restore. Reset clears only this selected key and returns to scheduled or bundled market prices.
-- Economy loads committed `price-history.json` as read-only shared history and merges it in memory with capped local comparisons from `index-sim:price-history`. `Save local comparison` and `Clear local history` change only the local key; clearing it leaves shared history visible.
+- Economy loads committed version-2 `price-history.json` as read-only shared history and merges it in memory with version-2 capped local comparisons from `index-sim:price-history`. Valid v1 local snapshots migrate with unknown per-item freshness. `Save local comparison` and `Clear local history` change only the local key.
 - The rewrite UI can export the currently active `PriceSet` as JSON that the same `PriceSet` import parser accepts.
 - The Settings tab can show a rewrite-local state recovery view when a known rewrite-owned browser key is invalid or uses an unsupported version. The report exports metadata only: state labels, storage keys, status, expected/found versions and sanitized reasons. Per-key Clear and Clear invalid local data operate only on allowlisted rewrite-owned keys and do not remove legacy or unknown localStorage keys.
 - The rewrite UI can detect known legacy browser storage keys and show an import/keep/clear choice. Import writes only rewrite-owned setup, hiscores last-player, selected active price set, accepted browser-local price-history snapshots and dismissed keys and keeps legacy keys. D-049 keeps full legacy price-history payloads review-only/not migrated for V1. Clear removes only known legacy keys after explicit user confirmation; no server cleanup, account context or tenant cleanup is involved.
@@ -64,15 +64,16 @@ Accepted market price writer target:
 - A scheduled repo automation fetches the approved `markets.lostcity.rs` data.
 - It runs as GitHub Actions cron at 00:15 and 12:15 UTC.
 - It writes latest item prices to `prices.json`.
+- It writes one validated item-level origin/freshness row per committed numeric price to `price-provenance.json`.
 - Generated game data owns high alch; the writer does not change `alch.json`.
-- It retains 12-hour history for 90 days and one latest point per older UTC day in `price-history.json`.
+- It retains versioned 12-hour history for 90 days and one latest point per older UTC day in `price-history.json`, preserving sparse observed/retained evaluations.
 - It validates the generated JSON and commits only when the files differ.
 - It uses the repository `GITHUB_TOKEN` with `contents: write`, with no separate app token unless the default token is insufficient.
 - It has no `workflow_dispatch` manual trigger.
 - It avoids artifact upload and large caches by default.
 - No browser, user action or production runtime request triggers upstream market fetches.
-- Local writer: `--input` validates normalized fixture data; `--upstream-url https://markets.lostcity.rs/` derives one `/items/{slug}` request per approved mapping. Requests are sequential with 350 ms spacing and per-page redirect/timeout/size/content checks. The adapter accepts only the first ten completed buy/sell rows with one unambiguous coin-denominated unit price, skips item/mixed/multiple offers and drops usernames. A mapping-specific 404 is reported as skipped and retains its prior price; other HTTP/network/contract failures stop the run. MAD/median filtering, unweighted observations and freshness gates update prices or retain prior values. A mapping with neither usable trades nor an existing market price stays absent so the app's generated item-price fallback remains active. An all-retained run fails before write so stale values cannot receive a fresh capture timestamp. Candidates are validated before deterministic writes to only `prices.json` and `price-history.json`.
-- Workflow: `.github/workflows/update-market-prices.yml` runs at 00:15 and 12:15 UTC, validates the two JSON outputs plus focused tests and `git diff --check`, rejects every other changed file and commits only real diffs. It has `contents: write`, no `workflow_dispatch`, no artifact upload and no broad secret requirement.
+- Local writer: `--input` validates normalized fixture data; `--upstream-url https://markets.lostcity.rs/` derives one `/items/{slug}` request per approved mapping. Requests are sequential with 350 ms spacing and per-page redirect/timeout/size/content checks. The adapter accepts bounded completed coin-only trades and drops usernames. A mapping-specific 404 retains its prior value and value-establishing provenance while recording a bounded evaluation reason. A mapping with neither usable trades nor an existing price stays absent so runtime generated fallback remains explicit. An all-retained run fails before write. Prices, provenance and history candidates are all validated before deterministic three-file writes.
+- Workflow: `.github/workflows/update-market-prices.yml` runs at 00:15 and 12:15 UTC, validates `prices.json`, `price-provenance.json` and `price-history.json` plus focused tests and `git diff --check`, rejects every other changed file and commits only real three-file diffs. It has `contents: write`, no `workflow_dispatch`, no artifact upload and no broad secret requirement.
 
 ## Live integration release copy audit
 
@@ -130,13 +131,14 @@ Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
 
 The current rewrite browser talks to same-origin live integration endpoints only, so static deployments should keep `connect-src 'self'` unless a separately accepted runtime requires more. If a future implementation adds browser-side upstream probes, tighten `connect-src` to the exact approved origins and document the source in [../project/decisions.md](../project/decisions.md). Do not add a database, user-triggered scraper or shared cloud state as part of deploy hardening.
 
-The D-066 build profile is root-path only. `npm run deploy:verify-artifact` rejects inline scripts, external index assets, source maps, unexpected root files, non-hashed assets, symlinks, local absolute paths and common secret material; validates `_headers` plus all three market files; and emits a deterministic artifact checksum without writing release state. The current artifact has 7 files/2 hashed assets, 1,384,153 bytes and SHA-256 `a8bd9ee19cfa6c17ff659006cbde54e50ab846e2c93e276098fa2af35bf4d2ce`. `npm run deploy:smoke` validates route ordering, content types, cache classes, the headers above, market JSON and enabled Hiscores status without sending a player lookup. Cloudflare account connection, provider-side no-log verification, preview/production smoke and any custom domain are intentionally left to the operator of a concrete instance.
+The D-066 build profile is root-path only. `npm run deploy:verify-artifact` rejects inline scripts, external index assets, source maps, unexpected root files, non-hashed assets, symlinks, local absolute paths and common secret material; validates `_headers` plus all four market data files; verifies price/provenance capture time and key parity; and emits a deterministic artifact checksum without writing release state. `npm run deploy:smoke` applies the same logical-set checks over HTTPS. Artifact byte count and checksum are build outputs, not durable documentation constants.
 
 ## Data and price maintenance
 
 Known files:
 
 - `prices.json`
+- `price-provenance.json`
 - `alch.json`
 - `price-history.json`
 - embedded price fallbacks in `gamedata.js`
@@ -147,30 +149,30 @@ Current validation:
 npm run test -- src/tests/market-writer.test.ts
 npm run test -- src/tests/data-economy.test.ts
 npm run prices:write-scheduled -- --input src/tests/fixtures/market-writer/upstream-valid.json --item-ids lobster,rune_scimitar,dragon_bones --now 2026-07-08T00:15:00.000Z --dry-run
-node -e "for (const f of ['prices.json','price-history.json']) JSON.parse(require('fs').readFileSync(f,'utf8'))"
+node -e "for (const f of ['prices.json','price-provenance.json','price-history.json']) JSON.parse(require('fs').readFileSync(f,'utf8'))"
 ```
 
 The rewrite data layer can adapt current legacy runtime data into a validated `GameDataSnapshot`, including the browser sandbox bootstrap used by the Vite UI. It can validate `PriceSet` imports. In local runs where the market provider is disabled, the visible Market UI stays scheduled-only: no user-triggered refresh controls are shown, and the active scheduled/imported/bundled `PriceSet` summary, validated `PriceSet` import path, active `PriceSet` export and local-override reset controls remain available. This is not yet an authoritative game-data generation workflow.
 
-Accepted workflow target: scheduled repo automation reads approved `markets.lostcity.rs/items/{slug}` pages and writes market prices plus static shared history. High alch comes from generated game data. The local writer validates both output files and skips unchanged writes; GitHub Actions commits only real diffs to `prices.json` and `price-history.json`. No database, backend-managed mutable history or user-triggered upstream refresh is accepted.
+Accepted workflow target: scheduled repo automation reads approved `markets.lostcity.rs/items/{slug}` pages and writes numeric prices, item-level provenance and versioned shared history. High alch comes from generated game data. The local writer validates all three scheduled outputs and skips unchanged writes; GitHub Actions commits only their real diffs. No database, backend-managed mutable history or user-triggered upstream refresh is accepted.
 
-Current repository evidence: public crawler policy permits the accepted sequential reads, the bounded allowlist is catalog-audited and the full 2026-07-10 read-only dry-run passed with 69 updated plus 11 retained/skipped mappings. The exact root repository variable was configured and read back on 2026-07-10. The two earlier scheduled runs failed at the empty-variable guard before any upstream read. No successful configured run was observed at handoff, so a future operator must validate one before enabling scheduled-current claims. No raw page or username is committed.
+Current repository evidence: public crawler policy permits the accepted sequential reads. The original 80-row catalog-audited allowlist passed the full 2026-07-10 read-only dry-run with 69 updated plus 11 retained/skipped mappings. D-087's twelve identified additions passed a separate no-write parser dry-run on 2026-07-12 with eight updated plus four retained/skipped mappings; the ten unsupported species-specific unidentified herbs remain excluded. The exact root repository variable was configured and read back on 2026-07-10. No complete successful configured run for the current 92-row allowlist was observed at handoff, so a future operator must validate one before enabling scheduled-current claims. No raw page or username is committed.
 
 ### Scheduled market freshness evidence
 
-The accepted shared market snapshot is the latest committed, schema-valid state of `prices.json` and `price-history.json`. Generated game data independently owns high alch. `_scraped_at` is capture time and the latest history entry is the matching retained shared point.
+The accepted shared market snapshot is the latest committed, schema-valid logical set of `prices.json`, `price-provenance.json` and version-2 `price-history.json`. Generated game data independently owns high alch. `_scraped_at` and `price-provenance.json.capturedAt` are matching artifact capture times, never blanket item observation times.
 
 Use this local check to inspect the committed snapshot freshness without contacting the upstream:
 
 ```sh
-node -e "const fs=require('fs'); const prices=JSON.parse(fs.readFileSync('prices.json','utf8')); const history=JSON.parse(fs.readFileSync('price-history.json','utf8')); const last=history.at(-1); console.log({pricesScrapedAt: new Date(prices._scraped_at*1000).toISOString(), lastHistoryAt: last ? new Date(last.t*1000).toISOString() : null, historySnapshots: history.length});"
-git log -1 --format="%h %cI %s" -- prices.json price-history.json
+node -e "const fs=require('fs'); const prices=JSON.parse(fs.readFileSync('prices.json','utf8')); const provenance=JSON.parse(fs.readFileSync('price-provenance.json','utf8')); const history=JSON.parse(fs.readFileSync('price-history.json','utf8')); const last=history.snapshots.at(-1); console.log({pricesCapturedAt:new Date(prices._scraped_at*1000).toISOString(),provenanceCapturedAt:provenance.capturedAt,lastHistoryAt:last?new Date(last.t*1000).toISOString():null,historySnapshots:history.snapshots.length});"
+git log -1 --format="%h %cI %s" -- prices.json price-provenance.json price-history.json
 ```
 
 For release notes or handoff notes, distinguish three facts:
 
 - **Snapshot timestamp**: the `_scraped_at` timestamp in the committed `prices.json`.
-- **Latest accepted file change**: the latest commit touching `prices.json` or `price-history.json`.
+- **Latest accepted file change**: the latest commit touching the three-file scheduled logical set.
 - **Latest scheduled validation**: the latest successful GitHub Actions run of `Update market prices` on the release branch after `MARKET_PRICES_UPSTREAM_URL` is configured.
 
 A failed scheduled run leaves the previous committed snapshot in place because the writer builds and validates candidates before writing, and the workflow commits only after JSON validation, focused tests, `git diff --check` and the approved-file allowlist pass. A no-op run exits successfully without a commit when the generated market snapshot text matches the committed files; in that case the previous snapshot timestamp remains the active snapshot, while the successful workflow run is evidence that the scheduled check completed.

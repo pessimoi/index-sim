@@ -28,7 +28,12 @@ function createArtifact(): void {
   write("_headers", readFileSync(resolve("public/_headers"), "utf8"));
   write("assets/index-12345678.css", "body { color: black; }");
   write("assets/index-abcdefgh.js", 'document.querySelector("#root");');
-  for (const fileName of ["prices.json", "alch.json", "price-history.json"]) {
+  for (const fileName of [
+    "prices.json",
+    "price-provenance.json",
+    "alch.json",
+    "price-history.json"
+  ]) {
     write(fileName, readFileSync(resolve(fileName), "utf8"));
   }
 }
@@ -67,7 +72,9 @@ function responseFor(path: string, overrides: Record<string, Response> = {}): Re
       )
     });
   }
-  if (["/prices.json", "/alch.json", "/price-history.json"].includes(path)) {
+  if (
+    ["/prices.json", "/price-provenance.json", "/alch.json", "/price-history.json"].includes(path)
+  ) {
     return new Response(readFileSync(resolve(path.slice(1)), "utf8"), {
       status: 200,
       headers: securityHeaders("application/json; charset=utf-8", "no-cache")
@@ -100,7 +107,7 @@ describe("deployment readiness", () => {
     expect(first).toMatchObject({
       status: "ready",
       outDir: ".vite/deployment-readiness-test",
-      fileCount: 7,
+      fileCount: 8,
       assetCount: 2,
       historySnapshots: expect.any(Number),
       marketScrapedAt: expect.stringMatching(/^\d{4}-/)
@@ -157,6 +164,14 @@ describe("deployment readiness", () => {
     write("prices.json", '{"_scraped_at":1,"lobster":1,"lobster":2}');
     expect(() => verifyDeploymentArtifact({ outDir: TEST_ROOT })).toThrow(
       "invalid JSON in prices.json"
+    );
+
+    createArtifact();
+    const provenance = JSON.parse(readFileSync(resolve("price-provenance.json"), "utf8"));
+    provenance.capturedAt = "2026-01-01T00:00:00.000Z";
+    write("price-provenance.json", JSON.stringify(provenance));
+    expect(() => verifyDeploymentArtifact({ outDir: TEST_ROOT })).toThrow(
+      "Deployment price provenance does not match prices.json"
     );
   });
 

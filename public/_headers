@@ -16,9 +16,11 @@
 /prices.json
   Cache-Control: no-cache
 
+/price-provenance.json
+  Cache-Control: no-cache
+
 /alch.json
   Cache-Control: no-cache
 
 /price-history.json
   Cache-Control: no-cache
-

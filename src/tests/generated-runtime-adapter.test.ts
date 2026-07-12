@@ -26,6 +26,11 @@ describe("generated runtime adapter", () => {
     const composed = withGeneratedAlchAuthority(imported, runtime.context.gameData);
 
     expect(composed.itemPrices.rune_scimitar).toBe(99_999);
+    expect(composed.itemPriceMetadata?.rune_scimitar).toMatchObject({
+      valueOrigin: "unknown",
+      refreshStatus: "not-evaluated",
+      quality: "unknown"
+    });
     expect(composed.alchValues.rune_scimitar).toBe(
       runtime.context.gameData.items.rune_scimitar.alch
     );
@@ -61,6 +66,17 @@ describe("generated runtime adapter", () => {
     expect(result.context.priceSet.source).toBe("scraped");
     expect(result.context.priceSet.itemPrices.rune_scimitar).toBe(22000);
     expect(result.context.priceSet.itemPrices["1dose2defense"]).toBe(132);
+    expect(result.context.priceSet.itemPriceMetadata?.rune_scimitar).toMatchObject({
+      valueOrigin: "legacy-static",
+      refreshStatus: "not-evaluated",
+      quality: "unknown"
+    });
+    expect(result.context.priceSet.itemPriceMetadata?.["1dose2defense"]).toMatchObject({
+      valueOrigin: "generated-object-cost",
+      refreshStatus: "not-applicable",
+      quality: "fallback",
+      reasonCode: "generated-price-fallback"
+    });
     expect(result.context.priceSet.alchValues.adamant_spear).toBe(1248);
     expect(result.context.priceSet.provenance?.notes).toContain(
       "high-alch values are authoritative generated game data"
@@ -108,11 +124,38 @@ describe("generated runtime adapter", () => {
     const itemPriceCoverage = report.sections.find(
       (section) => section.section === "priceSet.itemPrices"
     );
+    const itemPriceMetadataCoverage = report.sections.find(
+      (section) => section.section === "priceSet.itemPriceMetadata"
+    );
     const alchCoverage = report.sections.find(
       (section) => section.section === "priceSet.alchValues"
     );
 
     expect(report.ready).toBe(true);
+    expect(report.priceMetadata).toMatchObject({
+      numericCount: report.priceMetadata.metadataCount,
+      missingMetadataCount: 0,
+      generatedFallbackCount: expect.any(Number)
+    });
+    expect(report.dynamicLootPriceDependencies).toMatchObject({
+      dependencyCount: 49,
+      mappedCount: 39,
+      missingMappingCount: 10,
+      unrecognizedActiveTags: []
+    });
+    expect(report.dynamicLootPriceDependencies.missingMappingItemIds).toEqual([
+      "unidentified_avantoe",
+      "unidentified_cadantine",
+      "unidentified_dwarf_weed",
+      "unidentified_harralander",
+      "unidentified_irit",
+      "unidentified_kwuarm",
+      "unidentified_lantadyme",
+      "unidentified_marentill",
+      "unidentified_ranarr",
+      "unidentified_tarromin"
+    ]);
+    expect(itemPriceMetadataCoverage).toMatchObject({ missingCount: 0, blocking: true });
     expect(report.referenceSnapshotId).toBe("browser-legacy-runtime");
     expect(report.candidateSnapshotId).toBe("lostcity-376072662e78-runtime");
     expect(monsterCoverage).toMatchObject({

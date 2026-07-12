@@ -243,12 +243,54 @@ export interface GameDataSnapshot {
   provenance?: DataProvenance;
 }
 
+export type ItemPriceValueOrigin =
+  | "market-observation"
+  | "legacy-static"
+  | "generated-object-cost"
+  | "imported"
+  | "manual"
+  | "unknown";
+
+export type ItemPriceRefreshStatus = "observed" | "retained" | "not-evaluated" | "not-applicable";
+
+export type ItemPriceQuality = "high" | "medium" | "low" | "fallback" | "unknown";
+
+export type ItemPriceReasonCode =
+  | "insufficient-observations"
+  | "outlier-filter-insufficient"
+  | "latest-observation-too-old"
+  | "source-item-unavailable"
+  | "outside-market-allowlist"
+  | "generated-price-fallback"
+  | "legacy-metadata-unavailable"
+  | "import-metadata-unavailable"
+  | "manual-value";
+
+export interface ItemPriceMetadata {
+  valueOrigin: ItemPriceValueOrigin;
+  refreshStatus: ItemPriceRefreshStatus;
+  quality: ItemPriceQuality;
+  sourceId?: "markets.lostcity.rs";
+  sourceSlug?: string;
+  sourceRef?: string;
+  verifiedAt?: string;
+  valueObservedAt?: string;
+  evaluatedAt?: string;
+  latestCandidateAt?: string;
+  sourceObservations?: number;
+  usableObservations?: number;
+  acceptedObservations?: number;
+  rejectedObservations?: number;
+  reasonCode?: ItemPriceReasonCode;
+}
+
 export interface PriceSet {
   id: EntityId;
   label: string;
   source: PriceSource;
   createdAt: string;
   itemPrices: Record<EntityId, number>;
+  itemPriceMetadata?: Record<EntityId, ItemPriceMetadata>;
   alchValues: Record<EntityId, number>;
   provenance?: DataProvenance;
 }
@@ -422,6 +464,7 @@ export interface SimulationWarning {
   code: string;
   message: string;
   severity: "info" | "warning" | "error";
+  itemId?: EntityId;
 }
 
 export interface SpecialAttackResult {
@@ -435,6 +478,11 @@ export interface SpecialAttackResult {
   dpsBase: number;
   dpsWithSpec: number;
   dpsGainPct: number;
+}
+
+export interface HitDistributionRoll {
+  hitChance: number;
+  maxHit: number;
 }
 
 export interface PoisonResult {
@@ -480,5 +528,6 @@ export interface CombatSimulationResult {
     defenceField: string;
     styleId: EntityId;
     attackType?: AttackType;
+    normalHitRolls: HitDistributionRoll[];
   };
 }

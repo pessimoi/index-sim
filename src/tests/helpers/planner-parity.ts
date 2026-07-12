@@ -519,7 +519,20 @@ export function normalizeRewritePlan(plan: PlannerPlan): NormalizedPlannerPlan {
       dpsBefore: stableNumber(transition.dpsBefore),
       dpsAfter: stableNumber(transition.dpsAfter)
     })),
-    warningCodes: [...new Set(plan.warnings.map((warning) => warning.code))].sort()
+    warningCodes: [
+      ...new Set(
+        plan.warnings
+          .map((warning) => warning.code)
+          .filter(
+            (code) =>
+              ![
+                "price-freshness-unknown",
+                "price-generated-fallback",
+                "price-market-retained"
+              ].includes(code)
+          )
+      )
+    ].sort()
   };
 }
 

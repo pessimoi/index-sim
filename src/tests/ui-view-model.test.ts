@@ -1,5 +1,6 @@
 import fixtureSet from "./fixtures/legacy-golden.json";
 import { loadBundledLegacyContext } from "../adapters/browser";
+import { createGeneratedRuntimeContext } from "../adapters/generated";
 import {
   DEFAULT_FORM_STATE,
   applyWeaponSelection,
@@ -37,7 +38,7 @@ import {
   weaponOptions
 } from "../app/view-models/simulation";
 import { simulateFullSimulation } from "../domain/simulation";
-import { HIGH_ALCH_MAGIC_XP_PER_CAST } from "../domain/trip";
+import { casketStats, HIGH_ALCH_MAGIC_XP_PER_CAST } from "../domain/trip";
 import { EQUIPMENT_SLOTS, type SimulationContext } from "../domain/shared";
 
 interface GoldenFixture {
@@ -203,7 +204,7 @@ describe("rewrite UI view models", () => {
     expect(context.gameData.monsters[request.monsterId]).toBeDefined();
   });
 
-  it("summarizes default active assumptions as an empty read-only state", async () => {
+  it("surfaces used legacy price freshness in the default active assumptions", async () => {
     const { context } = await loadBundledLegacyContext();
     const result = createSimulationViewModel(DEFAULT_FORM_STATE, {
       ...context,
@@ -220,12 +221,18 @@ describe("rewrite UI view models", () => {
     });
 
     expect(result.activeAssumptions).toMatchObject({
-      statusLabel: "Default assumptions active",
-      totalCount: 0,
-      hasActiveRows: false,
+      statusLabel: "1 active modifier",
+      totalCount: 1,
+      hasActiveRows: true,
       hiddenCount: 0
     });
-    expect(result.activeAssumptions.visibleRows).toEqual([]);
+    expect(result.activeAssumptions.visibleRows).toEqual([
+      expect.objectContaining({
+        id: "price-warnings",
+        label: "Price confidence",
+        reviewTab: "economy"
+      })
+    ]);
     expect(result.activeAssumptions.hiddenRows).toEqual([]);
   });
 
@@ -1763,6 +1770,24 @@ describe("rewrite UI view models", () => {
     expect(specialDetail?.notes.join("\n")).toContain(
       "Special attack XP is included in player combat XP/hr"
     );
+    const comparisonSpecial = result.hitDistributionComparison.series.find(
+      (series) => series.id === "special"
+    );
+    expect(comparisonSpecial?.label).toBe("Special: Dragon dagger(p) (switch)");
+    expect(comparisonSpecial?.scopeLabel).toBe("One complete special attack");
+    expect(comparisonSpecial?.distribution.averageHit).toBeCloseTo(
+      result.combat.specialAttack?.expPerSpec ?? 0
+    );
+    expect(comparisonSpecial?.distribution.maxHit).toBe(
+      (result.combat.specialAttack?.maxHit ?? 0) * (result.combat.specialAttack?.hits ?? 0)
+    );
+    expect(comparisonSpecial?.distribution.probabilityTotal).toBeCloseTo(1);
+    expect(result.hitDistributionComparison.targetHp).toBe(
+      context.gameData.monsters[form.monsterId]?.hp
+    );
+    expect(result.hitDistributionComparison.targetMarkerPercent).not.toBeNull();
+    expect(result.hitDistributionComparison.series[0]?.koChance).toBe(0);
+    expect(comparisonSpecial?.koChance).toBeGreaterThan(0);
   });
 
   it("surfaces dragon halberd NPC-size fallback warning only for that special path", async () => {
@@ -1946,25 +1971,59 @@ describe("rewrite UI view models", () => {
       0
     );
     const missBucket = distribution.buckets[0]!;
+    const zeroBucket = distribution.buckets[1]!;
     const maxBucket = distribution.buckets.find((bucket) => bucket.isMaxHit);
 
-    expect(distribution.hitChance).toBe(result.combat.hitChance);
-    expect(distribution.averageHit).toBe(result.combat.avgHit);
-    expect(distribution.maxHit).toBe(result.combat.maxHit);
+    expect(distribution.hitChance).toBeCloseTo(result.combat.hitChance);
+    expect(distribution.averageHit).toBeCloseTo(result.combat.avgHit);
+    expect(distribution.maxHit).toBe(result.combat.peakMaxHit);
     expect(distribution.hitChanceLabel).toBe(`${formatNumber(result.combat.hitChance * 100, 1)}%`);
     expect(distribution.averageHitLabel).toBe(formatNumber(result.combat.avgHit, 2));
-    expect(distribution.maxHitLabel).toBe(formatNumber(result.combat.maxHit, 1));
+    expect(distribution.maxHitLabel).toBe(formatNumber(result.combat.peakMaxHit));
     expect(probabilityTotal).toBeCloseTo(1);
     expect(distribution.probabilityTotal).toBeCloseTo(1);
     expect(missBucket).toMatchObject({
-      id: "miss-zero",
-      label: "Miss / 0",
+      id: "miss",
+      label: "Miss",
       isMiss: true
     });
-    expect(missBucket.ariaLabel).toContain("miss or zero damage");
+    expect(missBucket.ariaLabel).toContain("miss");
+    expect(zeroBucket).toMatchObject({
+      id: "damage-0",
+      label: "0",
+      isMiss: false,
+      isAccurateZero: true
+    });
+    expect(zeroBucket.ariaLabel).toContain("accurate zero damage");
+    expect(zeroBucket.cumulativeAtLeast).toBeCloseTo(result.combat.hitChance);
     expect(maxBucket).toBeDefined();
     expect(maxBucket?.ariaLabel).toContain("max hit bucket");
+    expect(result.hitDistributionComparison.series).toHaveLength(1);
+    expect(result.hitDistributionComparison.buckets[0]?.label).toBe("Miss");
+    expect(result.hitDistributionComparison.targetHp).toBeGreaterThan(0);
   }, 15_000);
+
+  it("omits transient hit-distribution presentation data from explicit rates-only paths", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const result = createSimulationViewModel(
+      DEFAULT_FORM_STATE,
+      context,
+      {},
+      {},
+      {},
+      {
+        includeLootRows: false,
+        includeHitDistributionAnalysis: false
+      }
+    );
+
+    expect(result.hitDistribution.buckets).toEqual([]);
+    expect(result.hitDistributionComparison.series).toEqual([]);
+    expect(result.hitDistributionComparison.buckets).toEqual([]);
+    expect(result.statsSourceBreakdown.details.every((detail) => detail.histogram == null)).toBe(
+      true
+    );
+  });
 
   it("builds default melee Stats combat roll detail metrics from current result data", async () => {
     const { context } = await loadBundledLegacyContext();
@@ -2777,6 +2836,101 @@ describe("rewrite UI view models", () => {
     expect(skipImpact?.gpPerKillContribution).toBe(0);
   });
 
+  it("surfaces source-weighted unid herb valuation and generic proxy use", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const form: CombatSetupFormState = {
+      ...DEFAULT_FORM_STATE,
+      monsterId: "giant"
+    };
+    const base = createSimulationViewModel(form, context);
+    const baseHerb = base.lootRows.find((row) => row.tag === "herb");
+    expect(baseHerb).toBeDefined();
+    if (!baseHerb) throw new Error("Missing random herb row");
+
+    const result = createSimulationViewModel(form, context, {}, { [baseHerb.rowId]: "unid" });
+    const herb = result.lootRows.find((row) => row.rowId === baseHerb.rowId);
+    const unidImpact = herb?.actionImpacts.find((impact) => impact.action === "unid");
+
+    expect(herb?.pref).toBe("unid");
+    expect(herb?.price).toBe(context.priceSet.itemPrices.unidentified_guam);
+    expect(herb?.expandedRows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: "unidentified_ranarr",
+          notes: expect.arrayContaining(["Uses generic unidentified-herb price proxy"])
+        })
+      ])
+    );
+    expect(unidImpact?.notes).toContain("Uses source-weighted unidentified herb values");
+    expect(result.moneyWarnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "unidentified-herb-price-approximation" })
+      ])
+    );
+  });
+
+  it("presents ordinary caskets as opened component EV without parent price history", () => {
+    const { context } = createGeneratedRuntimeContext();
+    const form: CombatSetupFormState = {
+      ...DEFAULT_FORM_STATE,
+      monsterId: "rock_crab"
+    };
+    const result = createSimulationViewModel(
+      form,
+      context,
+      {},
+      {},
+      {},
+      {
+        lootPriceHistoryByItem: {
+          casket: {
+            itemId: "casket",
+            itemLabel: "Casket",
+            latestPrice: 50,
+            baselinePrice: 40,
+            gpDelta: 10,
+            percentDelta: 25,
+            latestLabel: "Latest",
+            baselineLabel: "Baseline"
+          }
+        }
+      }
+    );
+    const casket = result.lootRows.find((row) => row.tag === "casket");
+
+    expect(casket).toBeDefined();
+    expect(casket?.price).not.toBe(context.priceSet.itemPrices.casket);
+    expect(casket?.valueDetails).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ label: "Valuation", value: "Opened contents EV" })
+      ])
+    );
+    expect(casket?.expandedRows).toHaveLength(8);
+    expect(casket?.expandedRows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          label: "20-640 coins (210 average)",
+          key: "coins",
+          chance: 60 / 128,
+          qty: 210,
+          price: 1
+        }),
+        expect.objectContaining({ key: "tooth_half_key", chance: 1 / 128 }),
+        expect.objectContaining({ key: "loop_half_key", chance: 1 / 128 })
+      ])
+    );
+    expect(casket?.expandedRows.reduce((sum, row) => sum + (row.evGp ?? 0), 0)).toBeCloseTo(
+      casket?.effectiveEvGp ?? 0,
+      10
+    );
+    expect(casket?.historyContext).toMatchObject({
+      itemId: null,
+      tracked: false,
+      statusLabel: "Component-derived",
+      emptyMessage: expect.stringContaining("parent casket history is not used")
+    });
+  });
+
   it("shows generated conditional loot as a locked, sanitized zero-value row", async () => {
     const { context } = await loadBundledLegacyContext();
     const conditionalContext: SimulationContext = {
@@ -3381,13 +3535,26 @@ describe("rewrite UI view models", () => {
 
   it("matches the legacy fixture numbers for a ranged safespot summary", async () => {
     const { context } = await loadBundledLegacyContext();
-    const result = createSimulationViewModel(rangedRockCrabForm(), context);
+    const form = rangedRockCrabForm();
+    const result = createSimulationViewModel(form, context);
     const expected = expectedFor("ranged_magic_shortbow_rock_crab_safespot");
+    const casketDrop = context.gameData.monsters.rock_crab.loot
+      ?.flatMap((entry) => (Array.isArray(entry) ? entry : [entry]))
+      .find((drop) => drop.tag === "casket");
+    const casketCorrection = casketDrop
+      ? casketDrop.chance *
+        casketDrop.qtyAvg *
+        (casketStats(context.priceSet, context.gameData).ev -
+          (context.priceSet.itemPrices.casket ?? 0))
+      : 0;
 
     expectCloseToFixture(result.combat.effectiveDps, expected.effDps);
     expectCloseToFixture(result.effectiveXpPerHour, expected.effectiveXpPerHour);
-    expectCloseToFixture(result.trip.gpPerKill, expected.gpPerKill);
-    expectCloseToFixture(result.trip.effectiveNetGpPerHour, expected.effectiveNetGpPerHour);
+    expectCloseToFixture(result.trip.gpPerKill, Number(expected.gpPerKill) + casketCorrection);
+    expectCloseToFixture(
+      result.trip.effectiveNetGpPerHour,
+      Number(expected.effectiveNetGpPerHour) + casketCorrection * result.trip.trip.effectiveKph
+    );
   });
 
   it("applies per-monster cannon settings to visible rates", async () => {

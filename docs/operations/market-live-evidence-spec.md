@@ -56,6 +56,18 @@ Sanitized live evidence from 2026-07-10:
 - the candidate diff remained limited to `prices.json` and `price-history.json`
 - no raw page, username, session cookie or local absolute path was stored or committed
 
+Bounded D-087 expansion evidence from 2026-07-12:
+
+- twelve identified gem/mega and ultra-rare dependencies returned supported
+  item pages; `rune_2h` resolves to `rune_2h_sword`
+- all twelve passed the existing page-internal slug/parser contract in one
+  no-write dry-run, which reported eight updated plus four retained/skipped
+- the ten non-guam species-specific `unidentified_*` paths returned 404 and
+  remain outside the allowlist instead of receiving guessed mappings
+- the current allowlist therefore contains 92 rows, but a complete successful
+  configured cron for all 92 remains future adopter evidence
+- no response body, listing or username was stored or committed
+
 Repository configuration evidence from 2026-07-10:
 
 - at 20:36 UTC, the Actions variable readback returned exactly `MARKET_PRICES_UPSTREAM_URL=https://markets.lostcity.rs/`

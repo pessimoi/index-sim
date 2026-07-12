@@ -149,10 +149,10 @@ The first accepted baseline set must cover:
 | -------------- | ------------------------------------------------------------------- | ---------------------------------- |
 | Root shell     | Default generated runtime and scheduled prices                      | desktop, compact landscape, mobile |
 | Dense Compare  | Filtered rows, current target and row markers                       | desktop pane, tablet pane          |
-| Melee loadout  | Equipment selectors and generated/fallback requirement warning      | desktop top and details            |
+| Melee loadout  | Equipment selectors, requirement warning and damage distribution    | desktop top, details and lower     |
 | Ranged loadout | Ammo, multi-prayer/boost state and visible manual overrides         | desktop top and details            |
 | Magic loadout  | Spell and equipment state                                           | desktop top and details            |
-| Stats          | Combat roll detail, XP routing and hit distribution                 | desktop top, roll and lower        |
+| Stats          | Combat roll detail, XP routing and Trip/banking summary             | desktop top and roll               |
 | Trip           | Manual food/prayer/reserve state and grouped summary                | desktop pane, mobile pane          |
 | Loot           | Value composition, action impact and one expanded nested drop table | desktop pane, mobile pane          |
 | Economy        | Fixed local history, movers and selected item trend                 | desktop top and trend              |

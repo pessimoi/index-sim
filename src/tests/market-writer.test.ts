@@ -13,7 +13,7 @@ import {
 } from "../../scripts/scheduled-market-writer-core";
 import { parseArgs, runScheduledMarketWriter } from "../../scripts/write-scheduled-market-prices";
 import { MARKET_SOURCE_MAPPINGS } from "../data/market-source-mapping";
-import { PriceHistorySchema } from "../data/schemas";
+import { PriceHistorySchema, type ScheduledPriceProvenanceArtifact } from "../data/schemas";
 
 const CAPTURED_AT = new Date("2026-07-08T00:15:00.000Z");
 const CAPTURED_AT_SECONDS = Math.floor(CAPTURED_AT.getTime() / 1000);
@@ -46,6 +46,27 @@ const BASE_HISTORY = [
   }
 ];
 
+function baseProvenance(): ScheduledPriceProvenanceArtifact {
+  return {
+    version: 1 as const,
+    capturedAt: new Date(BASE_PRICES._scraped_at * 1000).toISOString(),
+    refreshSource: "markets.lostcity.rs" as const,
+    items: Object.fromEntries(
+      Object.keys(BASE_PRICES)
+        .filter((itemId) => !itemId.startsWith("_"))
+        .map((itemId) => [
+          itemId,
+          {
+            valueOrigin: "legacy-static" as const,
+            refreshStatus: "not-evaluated" as const,
+            quality: "unknown" as const,
+            reasonCode: "legacy-metadata-unavailable" as const
+          }
+        ])
+    )
+  };
+}
+
 function readFixture(fileName: string): string {
   return readFileSync(join(process.cwd(), "src/tests/fixtures/market-writer", fileName), "utf8");
 }
@@ -62,6 +83,7 @@ function createOutputs(fileName = "upstream-valid.json"): ScheduledMarketSnapsho
   return createScheduledMarketSnapshotOutputs({
     upstream: parseFixture(fileName),
     previousPrices: BASE_PRICES,
+    previousPriceProvenance: baseProvenance(),
     previousPriceHistory: BASE_HISTORY,
     mappings: TEST_MAPPINGS,
     capturedAt: CAPTURED_AT
@@ -85,6 +107,10 @@ function expectWriterError(
 
 function writeFixtureFiles(outputDir: string): void {
   writeFileSync(join(outputDir, "prices.json"), JSON.stringify(BASE_PRICES, null, 2));
+  writeFileSync(
+    join(outputDir, "price-provenance.json"),
+    JSON.stringify(baseProvenance(), null, 2)
+  );
   writeFileSync(join(outputDir, "alch.json"), JSON.stringify(BASE_ALCH_VALUES, null, 2));
   writeFileSync(join(outputDir, "price-history.json"), JSON.stringify(BASE_HISTORY, null, 2));
 }
@@ -92,6 +118,7 @@ function writeFixtureFiles(outputDir: string): void {
 function readOutputFiles(outputDir: string): Record<string, string> {
   return {
     prices: readFileSync(join(outputDir, "prices.json"), "utf8"),
+    provenance: readFileSync(join(outputDir, "price-provenance.json"), "utf8"),
     alch: readFileSync(join(outputDir, "alch.json"), "utf8"),
     history: readFileSync(join(outputDir, "price-history.json"), "utf8")
   };
@@ -103,6 +130,7 @@ function writeOutputsIfChanged(
 ): string[] {
   const writes: Array<[string, string]> = [
     ["prices.json", outputs.pricesText],
+    ["price-provenance.json", outputs.priceProvenanceText],
     ["price-history.json", outputs.priceHistoryText]
   ];
   const changed: string[] = [];
@@ -152,7 +180,7 @@ function pageResponse(slug: string, prices: number[], contentType = "application
 }
 
 describe("scheduled market writer", () => {
-  it("creates deterministic price-only outputs from normalized completed trades", () => {
+  it("creates deterministic price, provenance and history outputs from normalized completed trades", () => {
     const outputs = createOutputs();
 
     expect(Object.keys(outputs.prices)).toEqual([...Object.keys(outputs.prices)].sort());
@@ -184,10 +212,30 @@ describe("scheduled market writer", () => {
       quality: "retained",
       reason: "No recent trade sample in fixture"
     });
-    expect(PriceHistorySchema.parse(JSON.parse(outputs.priceHistoryText))).toHaveLength(2);
-    expect(outputs.priceHistory.at(-1)).toMatchObject({
+    expect(PriceHistorySchema.parse(JSON.parse(outputs.priceHistoryText)).snapshots).toHaveLength(
+      2
+    );
+    expect(outputs.priceHistory.snapshots.at(-1)).toMatchObject({
       t: CAPTURED_AT_SECONDS,
+      kind: "writer-evaluated",
       prices: { lobster: 215, rune_scimitar: 23000, dragon_bones: 2800, static_only: 999 }
+    });
+    expect(outputs.priceProvenance.items).toMatchObject({
+      lobster: {
+        valueOrigin: "market-observation",
+        refreshStatus: "observed",
+        quality: "low",
+        sourceSlug: "lobster"
+      },
+      dragon_bones: {
+        valueOrigin: "legacy-static",
+        refreshStatus: "retained",
+        reasonCode: "source-item-unavailable"
+      },
+      static_only: {
+        valueOrigin: "legacy-static",
+        refreshStatus: "not-evaluated"
+      }
     });
   });
 
@@ -195,6 +243,7 @@ describe("scheduled market writer", () => {
     const outputs = createScheduledMarketSnapshotOutputs({
       upstream: parseRawFixture("raw-valid.json"),
       previousPrices: BASE_PRICES,
+      previousPriceProvenance: baseProvenance(),
       previousPriceHistory: BASE_HISTORY,
       mappings: TEST_MAPPINGS,
       capturedAt: CAPTURED_AT
@@ -270,20 +319,97 @@ describe("scheduled market writer", () => {
     });
   });
 
+  it("retains the establishing origin, observation time and quality without re-observing the value", () => {
+    const previousPriceProvenance = baseProvenance();
+    previousPriceProvenance.items.dragon_bones = {
+      valueOrigin: "market-observation",
+      refreshStatus: "observed",
+      quality: "high",
+      sourceId: "markets.lostcity.rs",
+      sourceSlug: "dragon_bones",
+      valueObservedAt: "2026-06-01T00:00:00.000Z",
+      evaluatedAt: new Date(BASE_PRICES._scraped_at * 1000).toISOString()
+    };
+
+    const outputs = createScheduledMarketSnapshotOutputs({
+      upstream: parseFixture("upstream-valid.json"),
+      previousPrices: BASE_PRICES,
+      previousPriceProvenance,
+      previousPriceHistory: BASE_HISTORY,
+      mappings: TEST_MAPPINGS,
+      capturedAt: CAPTURED_AT
+    });
+
+    expect(outputs.priceProvenance.items.dragon_bones).toMatchObject({
+      valueOrigin: "market-observation",
+      refreshStatus: "retained",
+      quality: "high",
+      valueObservedAt: "2026-06-01T00:00:00.000Z",
+      evaluatedAt: CAPTURED_AT.toISOString(),
+      reasonCode: "source-item-unavailable"
+    });
+    expect(outputs.priceHistory.snapshots[0]).toMatchObject({
+      kind: "legacy-unknown",
+      evaluations: {}
+    });
+  });
+
+  it("initializes unmapped legacy prices as not evaluated without inventing observation time", () => {
+    const outputs = createScheduledMarketSnapshotOutputs({
+      upstream: parseFixture("upstream-valid.json"),
+      previousPrices: BASE_PRICES,
+      previousPriceHistory: BASE_HISTORY,
+      mappings: TEST_MAPPINGS,
+      capturedAt: CAPTURED_AT
+    });
+
+    expect(outputs.priceProvenance.items.static_only).toEqual({
+      valueOrigin: "legacy-static",
+      refreshStatus: "not-evaluated",
+      quality: "unknown",
+      reasonCode: "outside-market-allowlist"
+    });
+    expect(outputs.priceProvenance.items.static_only).not.toHaveProperty("valueObservedAt");
+  });
+
   it("keeps 12-hour snapshots for 90 days and one latest snapshot per older UTC day", () => {
     const day = 24 * 60 * 60;
     const history = buildScheduledPriceHistory({
-      existingHistory: [
-        { t: CAPTURED_AT_SECONDS - 100 * day, prices: { lobster: 90 } },
-        { t: CAPTURED_AT_SECONDS - 100 * day + 12 * 60 * 60, prices: { lobster: 91 } },
-        { t: CAPTURED_AT_SECONDS - 89 * day, prices: { lobster: 95 } },
-        { t: CAPTURED_AT_SECONDS - 89 * day + 12 * 60 * 60, prices: { lobster: 96 } }
-      ],
+      existingHistory: {
+        version: 2,
+        snapshots: [
+          {
+            t: CAPTURED_AT_SECONDS - 100 * day,
+            kind: "legacy-unknown",
+            prices: { lobster: 90 },
+            evaluations: {}
+          },
+          {
+            t: CAPTURED_AT_SECONDS - 100 * day + 12 * 60 * 60,
+            kind: "legacy-unknown",
+            prices: { lobster: 91 },
+            evaluations: {}
+          },
+          {
+            t: CAPTURED_AT_SECONDS - 89 * day,
+            kind: "legacy-unknown",
+            prices: { lobster: 95 },
+            evaluations: {}
+          },
+          {
+            t: CAPTURED_AT_SECONDS - 89 * day + 12 * 60 * 60,
+            kind: "legacy-unknown",
+            prices: { lobster: 96 },
+            evaluations: {}
+          }
+        ]
+      },
       currentPrices: { _scraped_at: CAPTURED_AT_SECONDS, lobster: 100 },
-      capturedAtSeconds: CAPTURED_AT_SECONDS
+      capturedAtSeconds: CAPTURED_AT_SECONDS,
+      evaluations: {}
     });
 
-    expect(history.map((snapshot) => snapshot.prices.lobster)).toEqual([91, 95, 96, 100]);
+    expect(history.snapshots.map((snapshot) => snapshot.prices.lobster)).toEqual([91, 95, 96, 100]);
   });
 
   it("parses JSON and HTML Inertia item pages while discarding player identity fields", () => {
@@ -376,6 +502,7 @@ describe("scheduled market writer", () => {
             }))
           },
           previousPrices: BASE_PRICES,
+          previousPriceProvenance: baseProvenance(),
           previousPriceHistory: BASE_HISTORY,
           mappings: TEST_MAPPINGS,
           capturedAt: CAPTURED_AT
@@ -390,6 +517,12 @@ describe("scheduled market writer", () => {
       previousPrices: Object.fromEntries(
         Object.entries(BASE_PRICES).filter(([key]) => key !== "dragon_bones")
       ),
+      previousPriceProvenance: {
+        ...baseProvenance(),
+        items: Object.fromEntries(
+          Object.entries(baseProvenance().items).filter(([itemId]) => itemId !== "dragon_bones")
+        )
+      },
       previousPriceHistory: BASE_HISTORY,
       mappings: TEST_MAPPINGS,
       capturedAt: CAPTURED_AT
@@ -401,7 +534,7 @@ describe("scheduled market writer", () => {
     );
   });
 
-  it("writes only prices and history, leaves alch unchanged and skips identical reruns", () => {
+  it("writes prices, provenance and history, leaves alch unchanged and skips identical reruns", () => {
     const outputDir = join(process.cwd(), ".vite", `market-writer-idempotent-${process.pid}`);
     rmSync(outputDir, { recursive: true, force: true });
     mkdirSync(outputDir, { recursive: true });
@@ -411,11 +544,15 @@ describe("scheduled market writer", () => {
       const firstOutputs = createOutputs();
       expect(writeOutputsIfChanged(outputDir, firstOutputs).sort()).toEqual([
         "price-history.json",
+        "price-provenance.json",
         "prices.json"
       ]);
       const secondOutputs = createScheduledMarketSnapshotOutputs({
         upstream: parseFixture("upstream-valid.json"),
         previousPrices: JSON.parse(readFileSync(join(outputDir, "prices.json"), "utf8")),
+        previousPriceProvenance: JSON.parse(
+          readFileSync(join(outputDir, "price-provenance.json"), "utf8")
+        ),
         previousPriceHistory: JSON.parse(
           readFileSync(join(outputDir, "price-history.json"), "utf8")
         ),
@@ -485,7 +622,11 @@ describe("scheduled market writer", () => {
           signal: expect.any(AbortSignal)
         })
       );
-      expect(result.changedFiles.sort()).toEqual(["price-history.json", "prices.json"]);
+      expect(result.changedFiles.sort()).toEqual([
+        "price-history.json",
+        "price-provenance.json",
+        "prices.json"
+      ]);
       expect(result.report).toMatchObject({ updated: 2, skipped: 1 });
       expect(readOutputFiles(outputDir)).toEqual(before);
     } finally {

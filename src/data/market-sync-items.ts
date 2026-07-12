@@ -6,38 +6,15 @@ import type {
   MarketSourceMapping,
   MarketSyncRequest
 } from "../domain/shared";
+import { DYNAMIC_LOOT_PRICE_DEPENDENCIES } from "../domain/trip";
 import {
   getMarketSourceMapping,
   MARKET_SOURCE_MAPPINGS,
   MARKET_SOURCE_MAPPING_BY_ITEM_ID
 } from "./market-source-mapping";
 
-export const MARKET_SYNC_TAG_ITEM_IDS: Record<string, readonly EntityId[]> = {
-  gem: ["uncut_sapphire", "uncut_emerald", "uncut_ruby", "uncut_diamond", "dragonstone"],
-  casket: [
-    "uncut_sapphire",
-    "uncut_emerald",
-    "uncut_ruby",
-    "uncut_diamond",
-    "loop_half_key",
-    "tooth_half_key",
-    "cosmic_talisman"
-  ],
-  herb: [
-    "herb_guam",
-    "herb_marrentill",
-    "herb_tarromin",
-    "herb_harralander",
-    "herb_ranarr",
-    "herb_irit",
-    "herb_avantoe",
-    "herb_kwuarm",
-    "herb_cadantine",
-    "herb_lantadyme",
-    "herb_dwarf_weed",
-    "unidentified_guam"
-  ]
-};
+export const MARKET_SYNC_TAG_ITEM_IDS: Record<string, readonly EntityId[]> =
+  DYNAMIC_LOOT_PRICE_DEPENDENCIES;
 
 export const MARKET_SYNC_SUPPORT_ITEM_IDS: readonly EntityId[] = [
   "ring_of_recoil",
@@ -48,6 +25,23 @@ export const MARKET_SYNC_SUPPORT_ITEM_IDS: readonly EntityId[] = [
 export interface MarketSyncItemExpansion {
   itemIds: EntityId[];
   missingMappingItemIds: EntityId[];
+}
+
+export interface DynamicLootMarketDependencyRow {
+  tag: string;
+  monsterIds: EntityId[];
+  dropCount: number;
+  dependencyItemIds: EntityId[];
+  mappedItemIds: EntityId[];
+  missingMappingItemIds: EntityId[];
+}
+
+export interface DynamicLootMarketDependencyAudit {
+  rows: DynamicLootMarketDependencyRow[];
+  dependencyItemIds: EntityId[];
+  mappedItemIds: EntityId[];
+  missingMappingItemIds: EntityId[];
+  unrecognizedActiveTags: string[];
 }
 
 function addSupportedItem(
@@ -73,6 +67,61 @@ function flattenLoot(entries: readonly DropEntry[] | undefined): DropDefinition[
     }
   }
   return out;
+}
+
+export function auditDynamicLootMarketDependencies(
+  gameData: GameDataSnapshot
+): DynamicLootMarketDependencyAudit {
+  const usageByTag = new Map<string, { monsterIds: Set<EntityId>; dropCount: number }>();
+  const unrecognizedActiveTags = new Set<string>();
+
+  for (const monster of Object.values(gameData.monsters)) {
+    for (const drop of flattenLoot(monster.loot)) {
+      if (!drop.tag || drop.eligibility) continue;
+      if (!MARKET_SYNC_TAG_ITEM_IDS[drop.tag]) {
+        unrecognizedActiveTags.add(drop.tag);
+        continue;
+      }
+      const usage = usageByTag.get(drop.tag) ?? { monsterIds: new Set<EntityId>(), dropCount: 0 };
+      usage.monsterIds.add(monster.id);
+      usage.dropCount += 1;
+      usageByTag.set(drop.tag, usage);
+    }
+  }
+
+  const rows = Object.entries(MARKET_SYNC_TAG_ITEM_IDS)
+    .map(([tag, dependencies]): DynamicLootMarketDependencyRow => {
+      const usage = usageByTag.get(tag);
+      const dependencyItemIds = [...dependencies].sort();
+      const mappedItemIds = dependencyItemIds.filter((itemId) =>
+        MARKET_SOURCE_MAPPING_BY_ITEM_ID.has(itemId)
+      );
+      return {
+        tag,
+        monsterIds: [...(usage?.monsterIds ?? [])].sort(),
+        dropCount: usage?.dropCount ?? 0,
+        dependencyItemIds,
+        mappedItemIds,
+        missingMappingItemIds: dependencyItemIds.filter(
+          (itemId) => !MARKET_SOURCE_MAPPING_BY_ITEM_ID.has(itemId)
+        )
+      };
+    })
+    .sort((left, right) => left.tag.localeCompare(right.tag));
+  const dependencyItemIds = [...new Set(rows.flatMap((row) => row.dependencyItemIds))].sort();
+  const mappedItemIds = dependencyItemIds.filter((itemId) =>
+    MARKET_SOURCE_MAPPING_BY_ITEM_ID.has(itemId)
+  );
+
+  return {
+    rows,
+    dependencyItemIds,
+    mappedItemIds,
+    missingMappingItemIds: dependencyItemIds.filter(
+      (itemId) => !MARKET_SOURCE_MAPPING_BY_ITEM_ID.has(itemId)
+    ),
+    unrecognizedActiveTags: [...unrecognizedActiveTags].sort()
+  };
 }
 
 function addDropItems(

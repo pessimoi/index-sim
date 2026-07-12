@@ -2,11 +2,21 @@ import { createHash } from "node:crypto";
 import { lstatSync, readFileSync, readdirSync } from "node:fs";
 import { relative, resolve, sep } from "node:path";
 import { parseHiscoresStatusResponseJson } from "../src/data/schemas/live-integrations";
-import { PriceHistorySchema, createPriceSetFromLegacyRecords } from "../src/data/schemas/price-set";
+import {
+  PriceHistorySchema,
+  ScheduledPriceProvenanceArtifactSchema,
+  createPriceSetFromLegacyRecords,
+  stripLegacyPriceMetadata
+} from "../src/data/schemas/price-set";
 import { parseJsonWithDuplicateKeyCheck } from "../src/data/reliability";
 import { DEPLOYMENT_CSP } from "../src/server/deployment-security";
 
-const MARKET_FILES = ["prices.json", "alch.json", "price-history.json"] as const;
+const MARKET_FILES = [
+  "prices.json",
+  "price-provenance.json",
+  "alch.json",
+  "price-history.json"
+] as const;
 const CLOUDFLARE_HEADERS_FILE = "_headers";
 const REQUIRED_ROOT_FILES = new Set(["index.html", CLOUDFLARE_HEADERS_FILE, ...MARKET_FILES]);
 const HASHED_ASSET_PATTERN =
@@ -256,23 +266,33 @@ function validateMarketFiles(filesByPath: Map<string, ArtifactFile>): {
   historySnapshots: number;
 } {
   const prices = parseArtifactJson(filesByPath, "prices.json");
+  const provenanceInput = parseArtifactJson(filesByPath, "price-provenance.json");
   const alchValues = parseArtifactJson(filesByPath, "alch.json");
   const history = parseArtifactJson(filesByPath, "price-history.json");
   try {
+    const provenance = ScheduledPriceProvenanceArtifactSchema.parse(provenanceInput);
     const priceSet = createPriceSetFromLegacyRecords({
       id: "deployment-artifact",
       label: "Deployment artifact",
       source: "scraped",
       itemPrices: prices,
+      itemPriceMetadata: provenance.items,
       alchValues
     });
     const parsedHistory = PriceHistorySchema.parse(history);
     if (priceSet.createdAt === "legacy-unknown") {
       failArtifact("Deployment prices.json is missing a valid _scraped_at value");
     }
+    if (
+      provenance.capturedAt !== priceSet.createdAt ||
+      JSON.stringify(Object.keys(stripLegacyPriceMetadata(prices).values).sort()) !==
+        JSON.stringify(Object.keys(provenance.items).sort())
+    ) {
+      failArtifact("Deployment price provenance does not match prices.json");
+    }
     return {
       marketScrapedAt: priceSet.createdAt,
-      historySnapshots: parsedHistory.length
+      historySnapshots: parsedHistory.snapshots.length
     };
   } catch (error) {
     if (error instanceof DeploymentReadinessError) throw error;
@@ -602,6 +622,11 @@ function parseRemoteMarketFiles(
     const prices = parseJsonWithDuplicateKeyCheck(resources["prices.json"].text, {
       source: "prices.json"
     });
+    const provenance = ScheduledPriceProvenanceArtifactSchema.parse(
+      parseJsonWithDuplicateKeyCheck(resources["price-provenance.json"].text, {
+        source: "price-provenance.json"
+      })
+    );
     const alchValues = parseJsonWithDuplicateKeyCheck(resources["alch.json"].text, {
       source: "alch.json"
     });
@@ -615,12 +640,23 @@ function parseRemoteMarketFiles(
       label: "Deployed market",
       source: "scraped",
       itemPrices: prices,
+      itemPriceMetadata: provenance.items,
       alchValues
     });
     if (priceSet.createdAt === "legacy-unknown") {
       throw new Error("missing timestamp");
     }
-    return { marketScrapedAt: priceSet.createdAt, historySnapshots: history.length };
+    if (
+      provenance.capturedAt !== priceSet.createdAt ||
+      JSON.stringify(Object.keys(stripLegacyPriceMetadata(prices).values).sort()) !==
+        JSON.stringify(Object.keys(provenance.items).sort())
+    ) {
+      throw new Error("provenance mismatch");
+    }
+    return {
+      marketScrapedAt: priceSet.createdAt,
+      historySnapshots: history.snapshots.length
+    };
   } catch {
     throw new DeploymentReadinessError(
       "response_invalid",
