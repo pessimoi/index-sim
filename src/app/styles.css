@@ -5147,6 +5147,10 @@ th {
     flex-direction: column;
   }
 
+  .topbar-brand {
+    flex-basis: auto;
+  }
+
   .topbar-hiscores {
     flex-basis: auto;
     min-width: 0;

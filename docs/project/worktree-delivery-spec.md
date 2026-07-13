@@ -57,8 +57,10 @@ confirmed `origin/master...master` at `0/0` before staging. It is grouped as:
 
 - `fb160bc` - Refactor rewrite app ownership and state
 - `abb49f3` - Add architecture and startup release gates
-- one documentation/handoff commit containing only root guidance, audits,
-  living docs and implementation specifications
+- `e1eb011` - Document completed architecture and handoff
+- one final visual-evidence commit containing the reviewed Darwin baseline
+  refresh, the mobile topbar flex-basis correction found by that review and
+  this delivery-evidence update
 
 Pre-documentation delivery validation passed 694/694 unit tests, 19/19 explicit
 goldens, typecheck, the 81-module zero-cycle architecture check, production
@@ -66,6 +68,16 @@ build/artifact budgets, lint, Prettier and `git diff --check`. The complete
 production-preview Chromium gate passed 77/77. The 10-file/two-asset artifact
 is 1,953,715 bytes with SHA-256
 `00193bd3b92bf8f1faf6c25eca880ff74f5106f483e3dd3998bf8966e33b62bf`.
+The accumulated UI and scheduled-price changes intentionally changed 28 of the
+31 Darwin screenshots. All changed candidates were reviewed directly, the
+review caught and corrected a mobile-only 17rem topbar gap, and the explicit
+baseline update passed 20/20 before a separate read-only comparison rerun.
+The post-refresh exact-tree `npm run verify` gate also passed 694/694 unit
+tests, 19/19 goldens and every non-network release check. Its 10-file/two-asset
+artifact is 1,953,745 bytes with SHA-256
+`34ef8442bed0abbfc8374c3bac441f05852e70ade6ad775632290eb5c8e04849`;
+dependency audit remained the only skipped check under the documented
+network-disabled policy.
 The delivery uses no force push or history rewrite; final remote identity and
 clean-worktree evidence belong to the execution report because the
 documentation commit cannot record its own final SHA.

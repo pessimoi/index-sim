@@ -14,6 +14,12 @@ against 31 reviewed fixture-only snapshots, including the 640x360 compact
 landscape contract. Baseline writes remain explicit and require image-diff and
 privacy review.
 
+Visual delivery note, 2026-07-13: accumulated topbar ownership, workbench,
+conditional-loot, manual-price and scheduled-snapshot changes intentionally
+changed 28/31 Darwin PNGs. Direct candidate review found and fixed a mobile-only
+topbar `flex-basis` gap before accepting the images. The explicit update then
+passed 20/20; the normal read-only comparison remains the final visual gate.
+
 Worktree validation note, 2026-07-13: the Goal 1 ownership refactor moves
 legacy-to-rewrite mapping into `src/app/state/legacy-storage-migration.ts`.
 `npm run architecture:check` passes with 63 source modules, no cycles, 50
