@@ -1,4 +1,4 @@
-import { loadBundledLegacyContext } from "../adapters/browser";
+import { loadBundledLegacyContext } from "../adapters/legacy-runtime";
 import {
   createGeneratedRuntimeContext,
   createGeneratedRuntimeReadinessReport,

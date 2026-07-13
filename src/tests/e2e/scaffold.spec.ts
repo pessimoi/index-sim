@@ -1,9 +1,13 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test, type Download, type Locator, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { createGeneratedRuntimePriceSet } from "../../adapters/generated/price-fallback";
 import { createScheduledStaticPriceSnapshotStatus } from "../../adapters/market";
 import { LOOT_PREFS_STORAGE_KEY, LOOT_PREFS_VERSION } from "../../app/state/loot-prefs";
 import { LOOT_SETTINGS_STORAGE_KEY, LOOT_SETTINGS_VERSION } from "../../app/state/loot-settings";
+import {
+  MANUAL_PRICE_OVERRIDES_MAX_ITEMS,
+  MANUAL_PRICE_OVERRIDES_STORAGE_KEY
+} from "../../app/state/manual-price-overrides";
 import {
   DUEL_SNAPSHOTS_STORAGE_KEY,
   DUEL_SNAPSHOTS_VERSION,
@@ -13,6 +17,7 @@ import {
   DEFAULT_FORM_STATE,
   REWRITE_SETUP_STORAGE_KEY,
   REWRITE_SETUP_VERSION,
+  SavedSetupEnvelopeSchema,
   savedSetupFromForm
 } from "../../app/state/ui-state";
 import { createSimulationViewModel, formatNumber } from "../../app/view-models/simulation";
@@ -72,6 +77,15 @@ const GENERATED_BROWSER_FIXTURE_CONTEXT = {
     GENERATED_BROWSER_FIXTURE_GAME_DATA
   )
 };
+
+async function readDownloadText(download: Download): Promise<string> {
+  const stream = await download.createReadStream();
+  const chunks: Uint8Array[] = [];
+  for await (const chunk of stream) {
+    chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
 
 const CANNON_NUMERIC_LABELS = [
   "Effective targets",
@@ -248,17 +262,23 @@ function accessibleNameStartingWith(value: string): RegExp {
 async function chooseSearchableOption(
   region: Page | Locator,
   label: string,
-  optionLabel: string
+  optionLabel: string,
+  exact = false
 ): Promise<Locator> {
   const combobox = searchableCombobox(region, label);
   await combobox.click();
   const search = region.getByRole("searchbox", { name: `Search ${label} options`, exact: true });
   await search.fill(optionLabel);
-  await region
-    .getByRole("listbox", { name: `${label} options`, exact: true })
-    .getByRole("option", { name: accessibleNameStartingWith(optionLabel) })
-    .click();
+  const listbox = region.getByRole("listbox", { name: `${label} options`, exact: true });
+  const option = exact
+    ? listbox.getByRole("option", { name: optionLabel, exact: true })
+    : listbox.getByRole("option", { name: accessibleNameStartingWith(optionLabel) });
+  await option.click();
   return combobox;
+}
+
+async function expectAppStatus(page: Page, status: string): Promise<void> {
+  await expect(page.getByRole("status").filter({ hasText: status })).toHaveText(status);
 }
 
 async function expectSearchableSelection(
@@ -1921,7 +1941,7 @@ test("reviews and imports compatible legacy setup data", async ({ page }) => {
 
   await migration.getByRole("button", { name: "Import compatible data" }).click();
   await expect(migration).toHaveCount(0);
-  await expect(page.locator(".topbar")).toContainText("Imported compatible legacy data");
+  await expectAppStatus(page, "Imported compatible legacy data");
   await expect(page.getByLabel("TYPE", { exact: true })).toHaveText("ranged");
   await expect(page.getByLabel("TARGET", { exact: true })).toHaveValue("greater_demon");
   await page.waitForFunction(() => {
@@ -1981,7 +2001,9 @@ test("reviews and imports compatible legacy setup data", async ({ page }) => {
       )
     );
   });
-  await expect(page.locator(".topbar")).toContainText("Legacy browser prices");
+  await expect(page.getByLabel("Market active PriceSet summary")).toContainText(
+    "Legacy browser prices"
+  );
   const legacyImport = await resultMetricSnapshot(page);
   expect({
     legacyImport
@@ -2087,7 +2109,7 @@ test("keeps legacy data and dismisses the migration notice", async ({ page }) =>
 
   await migration.getByRole("button", { name: "Keep legacy data" }).click();
   await expect(migration).toHaveCount(0);
-  await expect(page.locator(".topbar")).toContainText("Kept legacy data");
+  await expectAppStatus(page, "Kept legacy data");
   await page.waitForFunction(() => {
     const legacyInput = window.localStorage.getItem("sim_input_v3") ?? "";
     return (
@@ -2174,9 +2196,7 @@ test("falls back without overwriting a setup that references unavailable game da
   await expect(page.getByLabel("Combat setup").getByLabel("TARGET", { exact: true })).toHaveValue(
     DEFAULT_FORM_STATE.monsterId
   );
-  await expect(page.locator(".topbar")).toContainText(
-    "Saved rewrite setup is incompatible; defaults are active"
-  );
+  await expectAppStatus(page, "Saved rewrite setup is incompatible; defaults are active");
 
   await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Settings" }).click();
   const recovery = page.getByLabel("Local state recovery");
@@ -2221,12 +2241,10 @@ test("keeps incompatible saved Duel snapshots recoverable and out of the runtime
   );
 
   await page.goto("/");
-  await expect(page.locator(".topbar")).toContainText(
-    "Saved setup comparisons are incompatible; an empty list is active"
-  );
+  await expectAppStatus(page, "Saved setup comparisons are incompatible; an empty list is active");
   await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Setups" }).click();
   await expect(page.getByRole("region", { name: "Setup comparison", exact: true })).toContainText(
-    "0 / 12 snapshots"
+    "0 / 12 saved setups"
   );
 
   await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Settings" }).click();
@@ -2311,7 +2329,7 @@ test("clears only known legacy data after confirmation", async ({ page }) => {
   await expect(migration.getByRole("button", { name: "Confirm clear" })).toBeVisible();
   await migration.getByRole("button", { name: "Confirm clear" }).click();
   await expect(migration).toHaveCount(0);
-  await expect(page.locator(".topbar")).toContainText("Cleared 17 legacy keys");
+  await expectAppStatus(page, "Cleared 17 legacy keys");
   await page.waitForFunction(() => {
     const knownKeys = [
       "sim_input_v3",
@@ -2370,6 +2388,130 @@ test("does not overwrite an existing rewrite setup before import action", async 
   });
 });
 
+test("exports current rewrite setup and completes successful setup import", async ({ page }) => {
+  await page.goto("/");
+  const topbarActions = page.locator(".topbar > .actions");
+  await expect(topbarActions.getByRole("button", { name: "Export setup" })).toBeVisible();
+  const transferControls = topbarActions.locator("label.file-button, button");
+  expect(
+    (await transferControls.allTextContents()).map((text) => text.trim().replace(/\s+/g, " "))
+  ).toEqual(["Import prices", "Import setup", "Export setup", "Share setup"]);
+
+  const downloadPromise = page.waitForEvent("download");
+  await topbarActions.getByRole("button", { name: "Export setup" }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe("index-sim-rewrite-setup.json");
+  const exportedText = await readDownloadText(download);
+  const exported = SavedSetupEnvelopeSchema.parse(JSON.parse(exportedText));
+  expect(exported.version).toBe(REWRITE_SETUP_VERSION);
+  expect(Number.isNaN(Date.parse(exported.savedAt))).toBe(false);
+  expect(Object.keys(exported.data).sort()).toEqual([
+    "cannonByMonster",
+    "customSetupsByMonster",
+    "defaultForm",
+    "denseCompare",
+    "form",
+    "setupMode"
+  ]);
+  expect(exported.data.form.monsterId).toBe("giant");
+  expect(exportedText).not.toContain("duelSnapshots");
+  expect(exportedText).not.toContain("lootPrefsByMonster");
+  expect(exportedText).not.toContain("plannerState");
+  expect(exportedText).not.toContain("priceHistory");
+
+  const defaultForm = savedSetupFromForm({
+    ...DEFAULT_FORM_STATE,
+    monsterId: "giant",
+    levels: { ...DEFAULT_FORM_STATE.levels, attack: 64, strength: 65 }
+  }).form;
+  const customForm = savedSetupFromForm({
+    ...defaultForm,
+    weaponId: "dragon_longsword",
+    levels: { ...defaultForm.levels, attack: 77, strength: 78 }
+  }).form;
+  const importedSetup = savedSetupFromForm(
+    customForm,
+    {
+      sort: { key: "monsterName", direction: "asc" },
+      monsterFilter: "dragon",
+      dropFilter: "bones",
+      showIrrelevant: true,
+      irrelevantMonsterIds: ["rock_crab"]
+    },
+    { giant: { enabled: true, targets: 4, respawnSec: 45 } },
+    { giant: customForm },
+    defaultForm,
+    "custom"
+  );
+  const setupInput = topbarActions
+    .locator("label.file-button")
+    .filter({ hasText: "Import setup" })
+    .locator('input[type="file"]');
+  await setupInput.setInputFiles({
+    name: "rewrite-setup.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(
+      JSON.stringify({
+        version: REWRITE_SETUP_VERSION,
+        savedAt: "2026-07-01T12:00:00.000Z",
+        data: importedSetup
+      })
+    )
+  });
+
+  const setupNotice = page.getByLabel("Setup import notice");
+  await expect(setupNotice).toHaveText("Imported rewrite setup.");
+  await expect(setupNotice).toHaveAttribute("role", "status");
+  await expect(setupNotice).toHaveClass(/topbar-import-notice setup-import-notice/);
+  expect(
+    await setupNotice.evaluate((element) =>
+      Array.from(element.parentElement?.children ?? []).indexOf(element)
+    )
+  ).toBe(4);
+  await expect(setupInput).toHaveValue("");
+  await expect(page.locator('span.visually-hidden[role="status"]')).toHaveText(
+    "Imported rewrite setup"
+  );
+  await expect(page.getByLabel("TARGET", { exact: true })).toHaveValue("giant");
+  await expect(page.getByLabel("Setup context")).toContainText("Custom setup");
+
+  const tabs = page.getByLabel("Workbench tabs");
+  await tabs.getByRole("tab", { name: "Melee setup" }).click();
+  const loadout = page.getByRole("region", { name: "Equipment loadout", exact: true });
+  await expectSearchableSelection(loadout, "Weapon", "dragon_longsword");
+
+  await tabs.getByRole("tab", { name: "Monsters" }).click();
+  const denseFilters = page.getByLabel("Dense compare filters");
+  await expect(denseFilters.getByLabel("Monster filter")).toHaveValue("dragon");
+  await expect(denseFilters.getByLabel("Drop filter")).toHaveValue("bones");
+  await expect(denseFilters.getByLabel("Show hidden / irrelevant")).toBeChecked();
+
+  await tabs.getByRole("tab", { name: "Cannon" }).click();
+  const cannon = page.getByLabel("Cannon", { exact: true });
+  await expect(cannon.getByLabel("Set up cannon")).toBeChecked();
+  await expect(cannon.getByLabel("Mobs at spot")).toHaveValue("4");
+  await expect(cannon.getByRole("spinbutton", { name: "Respawn", exact: true })).toHaveValue("45");
+
+  await page.waitForFunction((expectedSetup) => {
+    const raw = window.localStorage.getItem("index-sim:rewrite-setup");
+    if (!raw) return false;
+    return JSON.stringify(JSON.parse(raw).data) === JSON.stringify(expectedSetup);
+  }, importedSetup);
+  const persisted = await page.evaluate(() =>
+    JSON.parse(window.localStorage.getItem("index-sim:rewrite-setup") ?? "null")
+  );
+  expect(persisted.savedAt).not.toBe("2026-07-01T12:00:00.000Z");
+  expect(persisted.data).toEqual(importedSetup);
+
+  await tabs.getByRole("tab", { name: "Melee setup" }).click();
+  await page
+    .getByLabel("Setup context")
+    .getByRole("button", { name: "Remove custom setup" })
+    .click();
+  await expect(page.getByLabel("Setup context")).toContainText("Default setup");
+  await expectSearchableSelection(loadout, "Weapon", "rune_scimitar");
+});
+
 test("keeps setup import failures non-fatal and retryable", async ({ page }) => {
   await page.goto("/");
   await page.getByLabel("TARGET", { exact: true }).selectOption("dagannoth");
@@ -2422,6 +2564,7 @@ test("keeps setup import failures non-fatal and retryable", async ({ page }) => 
   expect(await page.evaluate(() => window.localStorage.getItem("index-sim:rewrite-setup"))).toBe(
     savedBefore
   );
+  await expect(setupInput).toHaveValue("");
 });
 
 test("keeps PriceSet import failures non-fatal and recoverable", async ({ page }) => {
@@ -2716,8 +2859,14 @@ test("optimizes the visible whole loadout and restores it with Undo", async ({ p
   const loadout = page.getByLabel("Equipment loadout");
   const weapon = searchableCombobox(loadout, "Weapon");
   const style = loadout.getByLabel("Style", { exact: true });
+  const respectLevels = loadout.getByLabel("Respect current levels");
   const originalMonster = await monster.getAttribute("data-selected-id");
   const originalStyle = await style.inputValue();
+
+  await expect(respectLevels).toBeChecked();
+  await respectLevels.uncheck();
+  await expect(respectLevels).not.toBeChecked();
+  await respectLevels.check();
 
   await chooseSearchableOption(loadout, "Weapon", "Iron scimitar");
   await expect(weapon).toHaveAttribute("data-selected-id", "iron_scimitar");
@@ -2735,7 +2884,7 @@ test("optimizes the visible whole loadout and restores it with Undo", async ({ p
   await expect(weapon).toHaveAttribute("data-selected-id", "iron_scimitar");
   await expect(monster).toHaveAttribute("data-selected-id", originalMonster ?? "");
   await expect(style).toHaveValue(originalStyle);
-  await expect(page.locator(".topbar")).toContainText("Restored loadout for Hill Giant");
+  await expectAppStatus(page, "Restored loadout for Hill Giant");
 });
 
 test("filters hidden gear tiers while keeping current selections", async ({ page }) => {
@@ -3232,18 +3381,18 @@ test("matches browser-rendered dense numeric snapshots", async ({ page }) => {
       ttk: "12.8s",
       killsPerHour: "235",
       xpPerHour: "21,573",
-      gpPerKill: "531",
-      gpPerHour: "124,685",
-      netGpPerHour: "-79,519"
+      gpPerKill: "527",
+      gpPerHour: "123,616",
+      netGpPerHour: "-80,221"
     },
     defaultMeleeResults: {
       DPS: "3.05",
       "MAX HIT": "16.4",
       "HIT %": "88.9%",
       "XP/HR": "21,573",
-      "GP/HR NET": "-79,519",
+      "GP/HR NET": "-80,221",
       "KILLS/HR": "235",
-      "GP/KILL": "531",
+      "GP/KILL": "527",
       "SUPPLY/KILL": "1,047"
     },
     rangedSafespot: {
@@ -3253,18 +3402,18 @@ test("matches browser-rendered dense numeric snapshots", async ({ page }) => {
       ttk: "45.6s",
       killsPerHour: "73",
       xpPerHour: "14,525",
-      gpPerKill: "620",
-      gpPerHour: "45,429",
-      netGpPerHour: "-181,581"
+      gpPerKill: "628",
+      gpPerHour: "46,025",
+      netGpPerHour: "-181,242"
     },
     rangedSafespotResults: {
       DPS: "1.96",
       "MAX HIT": "10.0",
       "HIT %": "70.6%",
       "XP/HR": "14,525",
-      "GP/HR NET": "-181,581",
+      "GP/HR NET": "-181,242",
       "KILLS/HR": "73",
-      "GP/KILL": "620",
+      "GP/KILL": "628",
       "SUPPLY/KILL": "4,971"
     },
     cannonRanged: {
@@ -3275,15 +3424,15 @@ test("matches browser-rendered dense numeric snapshots", async ({ page }) => {
       killsPerHour: "326",
       xpPerHour: "37,421",
       gpPerKill: "92",
-      gpPerHour: "29,956",
-      netGpPerHour: "-475,447"
+      gpPerHour: "29,967",
+      netGpPerHour: "-475,441"
     },
     cannonRangedResults: {
       DPS: "2.24",
       "MAX HIT": "10.0",
       "HIT %": "80.7%",
       "XP/HR": "37,421",
-      "GP/HR NET": "-475,447",
+      "GP/HR NET": "-475,441",
       "KILLS/HR": "326",
       "GP/KILL": "92",
       "SUPPLY/KILL": "2,818"
@@ -3295,7 +3444,7 @@ test("matches browser-rendered dense numeric snapshots", async ({ page }) => {
       "Balls/kill": "4.41",
       "Cannon Ranged XP/hr": "45,075",
       "Effective XP/hr": "37,421",
-      "Effective net GP/hr": "-475,447",
+      "Effective net GP/hr": "-475,441",
       "Ball cost/hr": "744,459",
       "Ball cost/kill": "1,763",
       "Ball price": "400",
@@ -3423,18 +3572,18 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
       ttk: "12.8s",
       killsPerHour: "235",
       xpPerHour: "21,573",
-      gpPerKill: "531",
-      gpPerHour: "124,685",
-      netGpPerHour: "-79,519"
+      gpPerKill: "527",
+      gpPerHour: "123,616",
+      netGpPerHour: "-80,221"
     },
     meleeBaselineResults: {
       DPS: "3.05",
       "MAX HIT": "16.4",
       "HIT %": "88.9%",
       "XP/HR": "21,573",
-      "GP/HR NET": "-79,519",
+      "GP/HR NET": "-80,221",
       "KILLS/HR": "235",
-      "GP/KILL": "531",
+      "GP/KILL": "527",
       "SUPPLY/KILL": "1,047"
     },
     meleeAlchRelevant: {
@@ -3444,18 +3593,18 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
       ttk: "23.2s",
       killsPerHour: "140",
       xpPerHour: "18,290",
-      gpPerKill: "487",
-      gpPerHour: "68,388",
-      netGpPerHour: "-97,747"
+      gpPerKill: "490",
+      gpPerHour: "68,821",
+      netGpPerHour: "-97,515"
     },
     meleeAlchRelevantResults: {
       DPS: "2.81",
       "MAX HIT": "16.4",
       "HIT %": "82.1%",
       "XP/HR": "18,290",
-      "GP/HR NET": "-97,747",
+      "GP/HR NET": "-97,515",
       "KILLS/HR": "140",
-      "GP/KILL": "487",
+      "GP/KILL": "490",
       "SUPPLY/KILL": "1,791"
     },
     rangedSafespot: {
@@ -3465,18 +3614,18 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
       ttk: "45.6s",
       killsPerHour: "73",
       xpPerHour: "14,525",
-      gpPerKill: "620",
-      gpPerHour: "45,429",
-      netGpPerHour: "-181,581"
+      gpPerKill: "628",
+      gpPerHour: "46,025",
+      netGpPerHour: "-181,242"
     },
     rangedSafespotResults: {
       DPS: "1.96",
       "MAX HIT": "10.0",
       "HIT %": "70.6%",
       "XP/HR": "14,525",
-      "GP/HR NET": "-181,581",
+      "GP/HR NET": "-181,242",
       "KILLS/HR": "73",
-      "GP/KILL": "620",
+      "GP/KILL": "628",
       "SUPPLY/KILL": "4,971"
     },
     rangedCannon: {
@@ -3487,15 +3636,15 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
       killsPerHour: "326",
       xpPerHour: "37,421",
       gpPerKill: "92",
-      gpPerHour: "29,956",
-      netGpPerHour: "-475,447"
+      gpPerHour: "29,967",
+      netGpPerHour: "-475,441"
     },
     rangedCannonResults: {
       DPS: "2.24",
       "MAX HIT": "10.0",
       "HIT %": "80.7%",
       "XP/HR": "37,421",
-      "GP/HR NET": "-475,447",
+      "GP/HR NET": "-475,441",
       "KILLS/HR": "326",
       "GP/KILL": "92",
       "SUPPLY/KILL": "2,818"
@@ -3507,18 +3656,18 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
       ttk: "1:33",
       killsPerHour: "37",
       xpPerHour: "21,210",
-      gpPerKill: "6,616",
-      gpPerHour: "246,695",
-      netGpPerHour: "-449,264"
+      gpPerKill: "6,617",
+      gpPerHour: "246,718",
+      netGpPerHour: "-449,256"
     },
     magicSafespotResults: {
       DPS: "1.19",
       "MAX HIT": "20.0",
       "HIT %": "35.7%",
       "XP/HR": "21,210",
-      "GP/HR NET": "-449,264",
+      "GP/HR NET": "-449,256",
       "KILLS/HR": "37",
-      "GP/KILL": "6,616",
+      "GP/KILL": "6,617",
       "SUPPLY/KILL": "37,574"
     },
     customLootSettings: {
@@ -3528,18 +3677,18 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
       ttk: "40.9s",
       killsPerHour: "67",
       xpPerHour: "8,443",
-      gpPerKill: "6,116",
-      gpPerHour: "412,259",
-      netGpPerHour: "69,856"
+      gpPerKill: "6,217",
+      gpPerHour: "419,040",
+      netGpPerHour: "72,687"
     },
     customLootSettingsResults: {
       DPS: "1.97",
       "MAX HIT": "22.9",
       "HIT %": "72.4%",
       "XP/HR": "8,443",
-      "GP/HR NET": "69,856",
+      "GP/HR NET": "72,687",
       "KILLS/HR": "67",
-      "GP/KILL": "6,116",
+      "GP/KILL": "6,217",
       "SUPPLY/KILL": "3,634"
     }
   });
@@ -4016,13 +4165,20 @@ test("shows source-backed conditional clue loot without allowing a value action"
   await page.getByLabel("TARGET", { exact: true }).selectOption("greater_demon");
   await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Loot" }).click();
 
-  const table = page.getByRole("table", { name: "Current monster drops" });
-  const row = table.getByRole("row", { name: /Clue scroll \(hard\)/ });
-  const action = row.getByLabel(/Action for Clue scroll \(hard\)/);
+  const loot = page.locator('section[aria-label="Current monster loot"]');
+  const table = loot.getByRole("table", { name: "Current monster drops" });
+  const disclosure = loot.locator("details.conditional-loot-group");
+  await expect(table).not.toContainText("Clue scroll (hard)");
+  await expect(disclosure).not.toHaveAttribute("open", "");
+  await expect(disclosure.locator("summary")).toContainText("Conditional drops (1)");
+  await disclosure.locator("summary").click();
+
+  const conditionalTable = loot.getByRole("table", { name: "Conditional monster drops" });
+  const row = conditionalTable.getByRole("row", { name: /Clue scroll \(hard\)/ });
   await expect(row).toBeVisible();
   await expect(row).toContainText("Clue eligibility not modeled");
-  await expect(action).toHaveValue("skip");
-  await expect(action).toBeDisabled();
+  await expect(row).toContainText("Skip (locked)");
+  await expect(row).toContainText("0.78%");
   await expect(row).not.toContainText("trail_hardcluedrop");
 });
 
@@ -4242,9 +4398,9 @@ test("matches browser-rendered numeric snapshots for loot action and trip overri
       "MAX HIT": "16.4",
       "HIT %": "88.9%",
       "XP/HR": "21,573",
-      "GP/HR NET": "-3,242",
+      "GP/HR NET": "-3,945",
       "KILLS/HR": "235",
-      "GP/KILL": "1,026",
+      "GP/KILL": "1,022",
       "SUPPLY/KILL": "1,047"
     },
     tripSummary: {
@@ -4263,9 +4419,9 @@ test("matches browser-rendered numeric snapshots for loot action and trip overri
       "MAX HIT": "16.4",
       "HIT %": "75.5%",
       "XP/HR": "20,093",
-      "GP/HR NET": "-58,827",
+      "GP/HR NET": "-58,260",
       "KILLS/HR": "80",
-      "GP/KILL": "1,773",
+      "GP/KILL": "1,785",
       "SUPPLY/KILL": "3,073"
     }
   });
@@ -4511,6 +4667,145 @@ test("keeps market UI scheduled-only when the compatibility sync API exists", as
   expect(
     await page.evaluate(() => window.localStorage.getItem("index-sim:price-set:selected"))
   ).toBeNull();
+});
+
+test("keeps manual item drafts and unavailable overrides scoped across base changes", async ({
+  page
+}) => {
+  await page.goto("/");
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Economy" }).click();
+
+  const panel = page.getByRole("region", { name: "Manual item price", exact: true });
+  const summary = panel.getByLabel("Manual item price summary");
+  const manualItem = searchableCombobox(panel, "Manual price item");
+  const priceInput = panel.getByLabel("Manual price", { exact: true });
+  const initialManualItemId = await manualItem.getAttribute("data-selected-id");
+  await priceInput.fill("777");
+  await chooseSearchableOption(
+    page,
+    "Trend item",
+    initialManualItemId === "big_bones" ? "Lobster" : "Big bones",
+    true
+  );
+  await expect(manualItem).toHaveAttribute("data-selected-id", initialManualItemId ?? "");
+  await expect(priceInput).toHaveValue("777");
+
+  await chooseSearchableOption(panel, "Manual price item", "Lobster", true);
+  const baseLabel = await summary
+    .locator("span")
+    .filter({ hasText: /^Base / })
+    .textContent();
+  expect(baseLabel).not.toBeNull();
+
+  await priceInput.fill("123456");
+  await panel.getByRole("button", { name: "Apply price" }).click();
+  await expect(summary).toContainText("Active 123,456");
+  await expect(summary).toContainText("Status Manual");
+  await expect(page.getByLabel("Market active PriceSet summary")).toContainText(
+    "Manual item overrides (1)"
+  );
+  await chooseSearchableOption(page, "Trend item", "Lobster", true);
+  await expect(page.getByLabel("Selected item price provenance")).toContainText("Origin manual");
+  await expect(page.getByLabel("Selected item price provenance")).toContainText(
+    "Reason manual value"
+  );
+
+  const persisted = await page.evaluate((key) => {
+    return JSON.parse(window.localStorage.getItem(key) ?? "null");
+  }, MANUAL_PRICE_OVERRIDES_STORAGE_KEY);
+  expect(persisted.data.items.lobster.price).toBe(123456);
+
+  await priceInput.fill("222222");
+  const market = page.getByLabel("Market price data");
+  await market
+    .locator("label.file-button")
+    .filter({ hasText: "Import PriceSet" })
+    .locator('input[type="file"]')
+    .setInputFiles({
+      name: "big-bones-only.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(
+        JSON.stringify({
+          id: "big-bones-only",
+          label: "Big bones only",
+          source: "manual",
+          createdAt: "2026-07-12T18:00:00.000Z",
+          itemPrices: { big_bones: 555 },
+          alchValues: { big_bones: 0 }
+        })
+      )
+    });
+  await expect(priceInput).toHaveValue("555");
+  await expect(summary).toContainText("Base 555");
+  await expect(summary).toContainText("Status Base");
+  await expect(panel).toContainText("0 active · 1 unavailable");
+  expect(
+    await page.evaluate(
+      (key) => JSON.parse(window.localStorage.getItem(key) ?? "null").data.items.lobster.price,
+      MANUAL_PRICE_OVERRIDES_STORAGE_KEY
+    )
+  ).toBe(123456);
+
+  await market.getByRole("button", { name: "Reset local price override" }).click();
+  await market.getByRole("button", { name: "Confirm reset to scheduled prices" }).click();
+  await chooseSearchableOption(panel, "Manual price item", "Lobster", true);
+  await expect(summary).toContainText("Active 123,456");
+  await expect(summary).toContainText("Status Manual");
+
+  await page.reload();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Economy" }).click();
+  const reloadedPanel = page.getByRole("region", {
+    name: "Manual item price",
+    exact: true
+  });
+  const reloadedSummary = reloadedPanel.getByLabel("Manual item price summary");
+  await chooseSearchableOption(reloadedPanel, "Manual price item", "Lobster", true);
+  await expect(reloadedSummary).toContainText("Active 123,456");
+  await expect(reloadedSummary).toContainText("Status Manual");
+
+  await reloadedPanel.getByRole("button", { name: "Reset item" }).click();
+  await expect(reloadedSummary).toContainText(baseLabel ?? "");
+  await expect(reloadedSummary).toContainText("Status Base");
+  expect(
+    await page.evaluate(
+      (key) => window.localStorage.getItem(key),
+      MANUAL_PRICE_OVERRIDES_STORAGE_KEY
+    )
+  ).toBe(null);
+
+  await page.evaluate(
+    ({ key, count }) => {
+      window.localStorage.setItem(
+        key,
+        JSON.stringify({
+          version: 1,
+          savedAt: "2026-07-12T19:00:00.000Z",
+          data: {
+            items: Object.fromEntries(
+              Array.from({ length: count }, (_, index) => [
+                `unavailable_${index}`,
+                { price: index, updatedAt: "2026-07-12T19:00:00.000Z" }
+              ])
+            )
+          }
+        })
+      );
+    },
+    {
+      key: MANUAL_PRICE_OVERRIDES_STORAGE_KEY,
+      count: MANUAL_PRICE_OVERRIDES_MAX_ITEMS
+    }
+  );
+  await page.reload();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Economy" }).click();
+  const capacityPanel = page.getByRole("region", {
+    name: "Manual item price",
+    exact: true
+  });
+  await chooseSearchableOption(capacityPanel, "Manual price item", "Lobster", true);
+  await capacityPanel.getByLabel("Manual price", { exact: true }).fill("999999");
+  await expect(capacityPanel.getByRole("button", { name: "Apply price" })).toBeDisabled();
+  await expect(capacityPanel).toContainText("Stored 512/512");
 });
 
 test("analyzes and manages browser-local price history in Economy", async ({ page }) => {

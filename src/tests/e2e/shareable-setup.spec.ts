@@ -115,7 +115,11 @@ test("reviews a shared setup before writing then loads and undoes all owned stat
   await review.getByRole("button", { name: "Load setup" }).click();
   await expect(review).toBeHidden();
   await expect(playerAttackField(page)).toHaveValue("71");
-  await expect(page.getByText("Loaded shared setup for Hill Giant", { exact: true })).toBeVisible();
+  await expect(
+    page
+      .getByLabel("Local state undo")
+      .getByText("Loaded shared setup for Hill Giant", { exact: true })
+  ).toBeVisible();
   await expect
     .poll(() =>
       page.evaluate((storageKey) => {
@@ -143,7 +147,9 @@ test("reviews a shared setup before writing then loads and undoes all owned stat
 
   await page.getByRole("button", { name: "Undo" }).click();
   await expect(playerAttackField(page)).toHaveValue("60");
-  await expect(page.locator(".topbar").getByText(/Restored pre-share setup/)).toBeVisible();
+  await expect(page.getByRole("status").filter({ hasText: "Restored pre-share setup" })).toHaveText(
+    "Restored pre-share setup"
+  );
   await expect
     .poll(() =>
       page.evaluate((storageKey) => {

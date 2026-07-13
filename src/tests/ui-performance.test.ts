@@ -1,4 +1,4 @@
-import { loadBundledLegacyContext } from "../adapters/browser";
+import { loadBundledLegacyContext } from "../adapters/legacy-runtime";
 import { createDuelSnapshot } from "../app/state/duel-snapshots";
 import { DEFAULT_FORM_STATE, type CombatSetupFormState } from "../app/state/ui-state";
 import {

@@ -1,5 +1,5 @@
 import { createMemoryStorage, loadPersisted } from "../adapters/storage";
-import { loadBundledLegacyContext } from "../adapters/browser";
+import { loadBundledLegacyContext } from "../adapters/legacy-runtime";
 import { defaultPool } from "../domain/planner";
 import { DEFAULT_FORM_STATE } from "../app/state/ui-state";
 import {

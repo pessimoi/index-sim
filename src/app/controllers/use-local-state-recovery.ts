@@ -1,0 +1,54 @@
+import { useState, useSyncExternalStore } from "react";
+import type { VersionedStorageOptions } from "@/adapters/storage";
+import type { LocalStateHealthItemId } from "../state/local-state-health";
+import {
+  LocalStateRecoveryControllerCore,
+  type LocalStateClearPendingId,
+  type LocalStateRecoveryDependencies,
+  type LocalStateRecoveryOutcome,
+  type LocalStateRecoverySnapshot
+} from "./local-state-recovery";
+
+export interface LocalStateRecoveryController extends LocalStateRecoverySnapshot {
+  shouldSkipPersist(id: LocalStateHealthItemId): boolean;
+  persist<T>(id: LocalStateHealthItemId, options: VersionedStorageOptions<T>, value: T): boolean;
+  recordStorageFailure(id: LocalStateHealthItemId, reason: "save_failed" | "clear_failed"): void;
+  clearStorageFailures(ids: readonly LocalStateHealthItemId[]): void;
+  markPersistenceUnavailable(): void;
+  blockContextInvalid(ids: readonly LocalStateHealthItemId[], notice: string | null): void;
+  unblockReplaced(ids: readonly LocalStateHealthItemId[]): void;
+  beginClear(id: Exclude<LocalStateClearPendingId, null>): void;
+  cancelClear(): void;
+  confirmClearItem(id: LocalStateHealthItemId): LocalStateRecoveryOutcome;
+  confirmClearInvalid(): LocalStateRecoveryOutcome;
+  exportReport(): void;
+  refresh(): LocalStateRecoverySnapshot["report"];
+}
+
+export function useLocalStateRecovery(
+  dependencies: LocalStateRecoveryDependencies
+): LocalStateRecoveryController {
+  const [controller] = useState(() => new LocalStateRecoveryControllerCore(dependencies));
+  const snapshot = useSyncExternalStore(
+    controller.subscribe,
+    controller.getSnapshot,
+    controller.getSnapshot
+  );
+
+  return {
+    ...snapshot,
+    shouldSkipPersist: controller.shouldSkipPersist,
+    persist: controller.persist,
+    recordStorageFailure: controller.recordStorageFailure,
+    clearStorageFailures: controller.clearStorageFailures,
+    markPersistenceUnavailable: controller.markPersistenceUnavailable,
+    blockContextInvalid: controller.blockContextInvalid,
+    unblockReplaced: controller.unblockReplaced,
+    beginClear: controller.beginClear,
+    cancelClear: controller.cancelClear,
+    confirmClearItem: controller.confirmClearItem,
+    confirmClearInvalid: controller.confirmClearInvalid,
+    exportReport: controller.exportReport,
+    refresh: controller.refresh
+  };
+}

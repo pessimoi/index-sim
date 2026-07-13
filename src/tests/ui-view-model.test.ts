@@ -1,5 +1,5 @@
 import fixtureSet from "./fixtures/legacy-golden.json";
-import { loadBundledLegacyContext } from "../adapters/browser";
+import { loadBundledLegacyContext } from "../adapters/legacy-runtime";
 import { createGeneratedRuntimeContext } from "../adapters/generated";
 import {
   DEFAULT_FORM_STATE,
@@ -563,7 +563,7 @@ describe("rewrite UI view models", () => {
     }
   });
 
-  it("keeps requirements non-blocking and reports bounded no-regression results", async () => {
+  it("filters unmet optimizer candidates by default and reports bounded no-regression results", async () => {
     const { context } = await loadBundledLegacyContext();
     const form = normalizeFormState({
       ...DEFAULT_FORM_STATE,
@@ -589,10 +589,81 @@ describe("rewrite UI view models", () => {
     });
     const optimizedViewModel = createSimulationViewModel(result.form, context);
 
+    expect(result.eligibilityPolicy).toBe("respect-current-levels");
+    expect(result.excludedCandidateCount).toBeGreaterThan(0);
     expect(result.capped).toBe(true);
     expect(result.optimizedDps).toBeGreaterThanOrEqual(result.baselineDps);
     expect(result.changedFields.length).toBeGreaterThan(0);
-    expect(optimizedViewModel.setupRequirements.hasWarnings).toBe(true);
+    expect(optimizedViewModel.setupRequirements.hasWarnings).toBe(false);
+  });
+
+  it("keeps the original warning-only candidate policy behind an explicit optimizer input", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const form = normalizeFormState({
+      ...DEFAULT_FORM_STATE,
+      monsterId: "black_dragon",
+      weaponId: "bronze_dagger",
+      levels: {
+        ...DEFAULT_FORM_STATE.levels,
+        attack: 1,
+        strength: 1,
+        defence: 1
+      },
+      gear: Object.fromEntries(EQUIPMENT_SLOTS.map((slot) => [slot, "none"]))
+    });
+    const result = optimizeVisibleLoadout({
+      form,
+      context,
+      weaponOptions: weaponOptions(context.gameData, form.combatStyle),
+      gearOptions: Object.fromEntries(
+        EQUIPMENT_SLOTS.map((slot) => [slot, equipmentSlotOptions(context.gameData, slot)])
+      ) as Record<(typeof EQUIPMENT_SLOTS)[number], ReturnType<typeof equipmentSlotOptions>>,
+      eligibilityPolicy: "ignore-requirements",
+      frontierLimit: 1
+    });
+
+    expect(result.eligibilityPolicy).toBe("ignore-requirements");
+    expect(result.excludedCandidateCount).toBe(0);
+    expect(result.optimizedDps).toBeGreaterThanOrEqual(result.baselineDps);
+    expect(createSimulationViewModel(result.form, context).setupRequirements.hasWarnings).toBe(
+      true
+    );
+  });
+
+  it("keeps an unmet current loadout as the no-regression baseline", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const form = normalizeFormState({
+      ...DEFAULT_FORM_STATE,
+      weaponId: "dragon_longsword",
+      levels: { ...DEFAULT_FORM_STATE.levels, attack: 1 }
+    });
+    const result = optimizeVisibleLoadout({
+      form,
+      context,
+      weaponOptions: [{ id: "dragon_longsword", label: "Dragon longsword" }],
+      gearOptions: Object.fromEntries(
+        EQUIPMENT_SLOTS.map((slot) => {
+          const itemId = form.gear[slot] ?? "none";
+          return [
+            slot,
+            [
+              {
+                id: itemId,
+                label: context.gameData.equipment[slot]?.[itemId]?.name ?? "None"
+              }
+            ]
+          ];
+        })
+      ) as Record<(typeof EQUIPMENT_SLOTS)[number], ReturnType<typeof equipmentSlotOptions>>
+    });
+
+    expect(result.excludedCandidateCount).toBeGreaterThan(0);
+    expect(result.form).toEqual(form);
+    expect(result.changedFields).toEqual([]);
+    expect(result.dpsDelta).toBe(0);
+    expect(createSimulationViewModel(result.form, context).setupRequirements.hasWarnings).toBe(
+      true
+    );
   });
 
   it("keeps the current loadout on an equal visible candidate set", async () => {

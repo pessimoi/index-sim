@@ -36,6 +36,19 @@ import {
   SELECTED_PRICE_SET_STORAGE_KEY,
   SELECTED_PRICE_SET_VERSION
 } from "../app/state/selected-price-set";
+import {
+  DEFAULT_MANUAL_PRICE_OVERRIDES_STATE,
+  MANUAL_PRICE_OVERRIDES_MAX_ITEMS,
+  MANUAL_PRICE_OVERRIDES_STORAGE_KEY,
+  ManualPriceOverridesStateSchema,
+  activeManualPriceOverridesForPriceSet,
+  applyManualPriceOverrides,
+  canSetManualPriceOverride,
+  loadManualPriceOverrides,
+  removeManualPriceOverride,
+  saveManualPriceOverrides,
+  setManualPriceOverride
+} from "../app/state/manual-price-overrides";
 import { PRICE_SET_IMPORT_MAX_BYTES, PriceSetValidationError } from "../data/schemas";
 import type { MarketSyncResponse, PriceSet, SimulationContext } from "../domain/shared";
 
@@ -127,6 +140,118 @@ function scheduledProvenanceText(itemIds: string[] = ["lobster"]): string {
 }
 
 describe("market sync UI state helpers", () => {
+  it("composes bounded manual item prices without mutating the base PriceSet", () => {
+    const base = importedPriceSet();
+    const state = setManualPriceOverride(
+      DEFAULT_MANUAL_PRICE_OVERRIDES_STATE,
+      "lobster",
+      999,
+      new Date("2026-07-12T12:00:00.000Z")
+    );
+    const active = applyManualPriceOverrides(base, state);
+
+    expect(base.itemPrices.lobster).toBe(205);
+    expect(active).toMatchObject({
+      source: "manual",
+      createdAt: "2026-07-12T12:00:00.000Z",
+      itemPrices: { lobster: 999, big_bones: 430 },
+      itemPriceMetadata: {
+        lobster: {
+          valueOrigin: "manual",
+          refreshStatus: "not-evaluated",
+          quality: "unknown",
+          reasonCode: "manual-value"
+        }
+      }
+    });
+    expect(active.alchValues).toEqual(base.alchValues);
+  });
+
+  it("persists, removes and clears one manual item price independently", () => {
+    const storage = createMemoryStorage();
+    const state = setManualPriceOverride(
+      DEFAULT_MANUAL_PRICE_OVERRIDES_STATE,
+      "lobster",
+      999,
+      new Date("2026-07-12T12:00:00.000Z")
+    );
+    saveManualPriceOverrides(storage, state);
+
+    expect(loadManualPriceOverrides(storage)).toMatchObject({
+      status: "loaded",
+      value: state
+    });
+
+    saveManualPriceOverrides(storage, removeManualPriceOverride(state, "lobster"));
+    expect(storage.getItem(MANUAL_PRICE_OVERRIDES_STORAGE_KEY)).toBeNull();
+    expect(loadManualPriceOverrides(storage).status).toBe("missing");
+  });
+
+  it("surfaces manual item price storage write and clear failures", () => {
+    const state = setManualPriceOverride(
+      DEFAULT_MANUAL_PRICE_OVERRIDES_STATE,
+      "lobster",
+      999,
+      new Date("2026-07-12T12:00:00.000Z")
+    );
+    const unavailableStorage = {
+      getItem: () => null,
+      setItem: () => {
+        throw new Error("storage unavailable");
+      },
+      removeItem: () => {
+        throw new Error("storage unavailable");
+      }
+    };
+
+    expect(() => saveManualPriceOverrides(unavailableStorage, state)).toThrow(
+      "storage unavailable"
+    );
+    expect(() =>
+      saveManualPriceOverrides(unavailableStorage, DEFAULT_MANUAL_PRICE_OVERRIDES_STATE)
+    ).toThrow("storage unavailable");
+  });
+
+  it("keeps unavailable ids stored but excludes them from active composition", () => {
+    const base = importedPriceSet();
+    const stale = setManualPriceOverride(
+      DEFAULT_MANUAL_PRICE_OVERRIDES_STATE,
+      "removed_item",
+      10,
+      new Date("2026-07-12T12:00:00.000Z")
+    );
+
+    expect(activeManualPriceOverridesForPriceSet(stale, base)).toEqual(
+      DEFAULT_MANUAL_PRICE_OVERRIDES_STATE
+    );
+    expect(applyManualPriceOverrides(base, stale)).toEqual(base);
+    expect(stale.items.removed_item?.price).toBe(10);
+  });
+
+  it("bounds new manual item prices while allowing an existing item to be updated", () => {
+    const full = ManualPriceOverridesStateSchema.parse({
+      items: Object.fromEntries(
+        Array.from({ length: MANUAL_PRICE_OVERRIDES_MAX_ITEMS }, (_, index) => [
+          `item_${index}`,
+          { price: index, updatedAt: "2026-07-12T12:00:00.000Z" }
+        ])
+      )
+    });
+
+    expect(canSetManualPriceOverride(full, "item_0")).toBe(true);
+    expect(canSetManualPriceOverride(full, "new_item")).toBe(false);
+    expect(() =>
+      ManualPriceOverridesStateSchema.parse({
+        items: Object.fromEntries(
+          Array.from({ length: MANUAL_PRICE_OVERRIDES_MAX_ITEMS + 1 }, (_, index) => [
+            `item_${index}`,
+            { price: index, updatedAt: "2026-07-12T12:00:00.000Z" }
+          ])
+        )
+      })
+    ).toThrow(/At most/);
+  });
+
   it("successful sync swaps the selected PriceSet", () => {
     const context = fixtureContext();
     const next = applyMarketSyncResponse(context, syncResponse);

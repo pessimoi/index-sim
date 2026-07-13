@@ -827,11 +827,16 @@ export interface BoundedLoadoutOptimizerInput {
   context: SimulationContext;
   weaponOptions: readonly SelectOptionViewModel[];
   gearOptions: Readonly<Record<EquipmentSlot, readonly SelectOptionViewModel[]>>;
+  eligibilityPolicy?: LoadoutEligibilityPolicy;
   frontierLimit?: number;
 }
 
+export type LoadoutEligibilityPolicy = "respect-current-levels" | "ignore-requirements";
+
 export interface BoundedLoadoutOptimizerResult {
   form: CombatSetupFormState;
+  eligibilityPolicy: LoadoutEligibilityPolicy;
+  excludedCandidateCount: number;
   baselineDps: number;
   optimizedDps: number;
   dpsDelta: number;
@@ -1151,10 +1156,38 @@ function loadoutFormSignature(form: CombatSetupFormState): string {
   return [form.weaponId, form.ammoId, form.styleId, loadoutGearSignature(form.gear)].join("|");
 }
 
+function loadoutCandidateMeetsCurrentLevels(input: {
+  itemId: EntityId;
+  gameData: GameDataSnapshot;
+  levels: PlayerLevels;
+}): boolean {
+  return unmetSetupRequirements(input.itemId, input.gameData, input.levels).length === 0;
+}
+
 export function optimizeVisibleLoadout(
   input: BoundedLoadoutOptimizerInput
 ): BoundedLoadoutOptimizerResult {
   const original = normalizeFormState(input.form);
+  const eligibilityPolicy = input.eligibilityPolicy ?? "respect-current-levels";
+  let excludedCandidateCount = 0;
+  const filterOptions = (
+    options: readonly SelectOptionViewModel[]
+  ): readonly SelectOptionViewModel[] => {
+    if (eligibilityPolicy === "ignore-requirements") return options;
+    return options.filter((option) => {
+      const eligible = loadoutCandidateMeetsCurrentLevels({
+        itemId: option.id,
+        gameData: input.context.gameData,
+        levels: original.levels
+      });
+      if (!eligible) excludedCandidateCount += 1;
+      return eligible;
+    });
+  };
+  const eligibleWeaponOptions = filterOptions(input.weaponOptions);
+  const eligibleGearOptions = Object.fromEntries(
+    EQUIPMENT_SLOTS.map((slot) => [slot, filterOptions(input.gearOptions[slot])])
+  ) as Record<EquipmentSlot, readonly SelectOptionViewModel[]>;
   const requestedFrontierLimit =
     input.frontierLimit == null || !Number.isFinite(input.frontierLimit)
       ? DEFAULT_LOADOUT_FRONTIER_LIMIT
@@ -1175,7 +1208,7 @@ export function optimizeVisibleLoadout(
   let bestChangedFields: string[] = [];
   let bestSignature = loadoutFormSignature(original);
 
-  const weaponCandidates = input.weaponOptions.flatMap((option) => {
+  const weaponCandidates = eligibleWeaponOptions.flatMap((option) => {
     const weapon = input.context.gameData.weapons[option.id];
     return weapon?.type === original.combatStyle ? [option.id] : [];
   });
@@ -1185,7 +1218,7 @@ export function optimizeVisibleLoadout(
       form: weaponForm,
       original,
       gameData: input.context.gameData,
-      gearOptions: input.gearOptions,
+      gearOptions: eligibleGearOptions,
       frontierLimit
     });
     frontierPeak = Math.max(frontierPeak, frontier.peak);
@@ -1224,6 +1257,8 @@ export function optimizeVisibleLoadout(
   const dpsDelta = optimizedDps - (Number.isFinite(baseline.dps) ? baseline.dps : 0);
   return {
     form: dpsDelta < -LOADOUT_DPS_EPSILON ? original : bestForm,
+    eligibilityPolicy,
+    excludedCandidateCount,
     baselineDps: Number.isFinite(baseline.dps) ? baseline.dps : 0,
     optimizedDps,
     dpsDelta: Math.max(0, dpsDelta),
@@ -1858,6 +1893,28 @@ function setupRequirementItemName(
   return context.gameData.equipment[slot]?.[itemId]?.name ?? itemId;
 }
 
+interface UnmetSetupRequirement {
+  skill: SetupRequirementSkill;
+  skillLabel: string;
+  requiredLevel: number;
+  currentLevel: number;
+}
+
+function unmetSetupRequirements(
+  itemId: EntityId,
+  gameData: GameDataSnapshot,
+  levels: PlayerLevels
+): UnmetSetupRequirement[] {
+  if (itemId === "none") return [];
+  const requirement = requirementForItem(gameData, itemId).requirements;
+  return SETUP_REQUIREMENT_SKILLS.flatMap((skill) => {
+    const requiredLevel = requirement[skill] ?? 0;
+    const currentLevel = levels[skill];
+    if (requiredLevel <= 0 || currentLevel >= requiredLevel) return [];
+    return [{ skill, skillLabel: SKILL_LABEL[skill], requiredLevel, currentLevel }];
+  });
+}
+
 function createSetupRequirementWarnings(
   item: {
     slot: SetupRequirementSlot;
@@ -1867,30 +1924,16 @@ function createSetupRequirementWarnings(
   gameData: GameDataSnapshot,
   levels: PlayerLevels
 ): SetupRequirementWarningViewModel[] {
-  if (item.itemId === "none") return [];
-  const requirement = requirementForItem(gameData, item.itemId).requirements;
-  return SETUP_REQUIREMENT_SKILLS.flatMap((skill) => {
-    const requiredLevel = requirement[skill] ?? 0;
-    if (requiredLevel <= 0) return [];
-    const currentLevel = levels[skill];
-    if (currentLevel >= requiredLevel) return [];
-    const skillLabel = SKILL_LABEL[skill];
-    return [
-      {
-        code: "setup-requirement-unmet",
-        severity: "warning",
-        message: `${item.itemName} requires ${skillLabel} ${formatNumber(requiredLevel)}; current ${skillLabel} ${formatNumber(currentLevel)}.`,
-        itemId: item.itemId,
-        itemName: item.itemName,
-        slot: item.slot,
-        slotLabel: SETUP_REQUIREMENT_SLOT_LABELS[item.slot],
-        skill,
-        skillLabel,
-        requiredLevel,
-        currentLevel
-      }
-    ];
-  });
+  return unmetSetupRequirements(item.itemId, gameData, levels).map((requirement) => ({
+    code: "setup-requirement-unmet",
+    severity: "warning",
+    message: `${item.itemName} requires ${requirement.skillLabel} ${formatNumber(requirement.requiredLevel)}; current ${requirement.skillLabel} ${formatNumber(requirement.currentLevel)}.`,
+    itemId: item.itemId,
+    itemName: item.itemName,
+    slot: item.slot,
+    slotLabel: SETUP_REQUIREMENT_SLOT_LABELS[item.slot],
+    ...requirement
+  }));
 }
 
 function requirementPolicyForLookups(

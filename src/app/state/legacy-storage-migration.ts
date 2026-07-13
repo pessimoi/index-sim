@@ -1,4 +1,5 @@
 import { isSupportedSpecialAttackWeapon, weaponStances } from "@/domain/combat";
+import type { KeyValueStorage } from "@/adapters/storage";
 import {
   EQUIPMENT_SLOTS,
   type CombatStyle,
@@ -26,29 +27,20 @@ import {
   type CannonByMonsterState,
   type CombatSetupFormState,
   type CustomSetupsByMonsterState
-} from "@/app/state/ui-state";
-import {
-  MAX_DUEL_SNAPSHOTS,
-  createDuelSnapshot,
-  type DuelSnapshotsState
-} from "@/app/state/duel-snapshots";
+} from "./ui-state";
+import { MAX_DUEL_SNAPSHOTS, createDuelSnapshot, type DuelSnapshotsState } from "./duel-snapshots";
 import {
   DenseCompareSortStateSchema,
   type DenseCompareSortKey,
   type DenseCompareSortState
-} from "@/app/state/dense-compare";
+} from "./dense-compare";
 import {
   GEAR_TIER_DEFS,
   HiddenGearTiersStateSchema,
   type GearTierId,
   type HiddenGearTiersState
-} from "@/app/state/hidden-gear-tiers";
-import {
-  LootActionSchema,
-  LootPrefsStateSchema,
-  type LootPrefsState
-} from "@/app/state/loot-prefs";
-import type { KeyValueStorage } from "./index";
+} from "./hidden-gear-tiers";
+import { LootActionSchema, LootPrefsStateSchema, type LootPrefsState } from "./loot-prefs";
 
 export const LEGACY_INPUT_STORAGE_KEY = "sim_input_v3";
 

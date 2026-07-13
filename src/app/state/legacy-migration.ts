@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { LEGACY_STORAGE_KEYS } from "@/adapters/storage/legacy-migration";
+import { LEGACY_STORAGE_KEYS } from "./legacy-storage-migration";
 
 export const LEGACY_MIGRATION_DISMISSED_STORAGE_KEY = "index-sim:legacy-migration-dismissed";
 export const LEGACY_MIGRATION_DISMISSED_VERSION = 1;

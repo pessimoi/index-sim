@@ -1,5 +1,3 @@
-export { loadBundledLegacyContext } from "../legacy-runtime";
-export type { LegacyRuntimeBootstrapResult as BrowserBootstrapResult } from "../legacy-runtime";
 export {
   captureBrowserShareableSetupFragment,
   captureShareableSetupFragment,

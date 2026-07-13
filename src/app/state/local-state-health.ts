@@ -43,6 +43,11 @@ import {
   SELECTED_PRICE_SET_VERSION,
   loadSelectedPriceSet
 } from "./selected-price-set";
+import {
+  MANUAL_PRICE_OVERRIDES_STORAGE_KEY,
+  MANUAL_PRICE_OVERRIDES_VERSION,
+  ManualPriceOverridesStateSchema
+} from "./manual-price-overrides";
 import { REWRITE_SETUP_STORAGE_KEY, REWRITE_SETUP_VERSION, SavedSetupSchema } from "./ui-state";
 
 export const LOCAL_STATE_HEALTH_REASON_VALUES = [
@@ -70,6 +75,7 @@ export type LocalStateHealthItemId =
   | "duel-snapshots"
   | "price-history"
   | "selected-price-set"
+  | "manual-price-overrides"
   | "hiscores-last-player"
   | "legacy-migration-dismissed";
 
@@ -210,6 +216,11 @@ export const LOCAL_STATE_HEALTH_DESCRIPTORS: readonly LocalStateHealthDescriptor
     version: SELECTED_PRICE_SET_VERSION,
     load: (storage) => loadSelectedPriceSet(storage)
   },
+  persistedDescriptor("manual-price-overrides", "Manual item prices", {
+    key: MANUAL_PRICE_OVERRIDES_STORAGE_KEY,
+    version: MANUAL_PRICE_OVERRIDES_VERSION,
+    schema: ManualPriceOverridesStateSchema
+  }),
   persistedDescriptor("hiscores-last-player", "Hiscores last player", {
     key: HISCORES_LAST_PLAYER_STORAGE_KEY,
     version: HISCORES_LAST_PLAYER_STORAGE_VERSION,

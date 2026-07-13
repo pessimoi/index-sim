@@ -1,4 +1,4 @@
-import { loadBundledLegacyContext } from "../adapters/browser";
+import { loadBundledLegacyContext } from "../adapters/legacy-runtime";
 import { createMemoryStorage, type KeyValueStorage } from "../adapters/storage";
 import {
   LEGACY_INPUT_STORAGE_KEY,
@@ -8,7 +8,7 @@ import {
   createLegacyStorageKeyReview,
   detectLegacyStorageKeys,
   inspectLegacySetupMigration
-} from "../adapters/storage/legacy-migration";
+} from "../app/state/legacy-storage-migration";
 import { HIDDEN_GEAR_TIERS_STORAGE_KEY } from "../app/state/hidden-gear-tiers";
 import { MAX_DUEL_SNAPSHOTS, createDuelSnapshot } from "../app/state/duel-snapshots";
 import { LOOT_PREFS_STORAGE_KEY } from "../app/state/loot-prefs";

@@ -1,4 +1,4 @@
-import { loadBundledLegacyContext } from "../adapters/browser";
+import { loadBundledLegacyContext } from "../adapters/legacy-runtime";
 import type { MarketProvider } from "../server/market-core";
 import {
   MarketProviderError,

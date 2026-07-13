@@ -1,15 +1,54 @@
 import {
   Fragment,
+  useCallback,
   useEffect,
-  useId,
   useMemo,
   useRef,
   useState,
   type ChangeEvent,
-  type FormEvent,
   type KeyboardEvent
 } from "react";
-import { ZodError } from "zod";
+import {
+  DenseScaleCell,
+  InlineImportNotice,
+  MetricList,
+  PendingUndoStatus,
+  ShareSetupDialog,
+  type DisplayMetric,
+  type PendingUndo,
+  type SetupImportNotice,
+  type ShareSetupDialogState
+} from "./components/app-presenters";
+import {
+  ActiveAssumptionsSummary,
+  CalculationWarningSummary,
+  HitDistributionComparisonChart,
+  StatsCombatRollDetail,
+  StatsSourceDetailCard
+} from "./components/combat-result-presenters";
+import {
+  CompactSelectionSelectField,
+  DecimalField,
+  MultiSelectionField,
+  NumberField,
+  OptionalNumberField,
+  ReadOnlyField,
+  SearchableSelectField,
+  SelectField,
+  type SelectOption
+} from "./components/form-fields";
+import {
+  formatDelta,
+  itemPriceMetadataLabel,
+  optionalDelta,
+  optionalPercent,
+  optionalPrice,
+  signedPercent
+} from "./components/presentation-formatters";
+import { PriceTrendChart, PriceTrendSparkline } from "./components/price-history-charts";
+import { LocalStateRecoveryPanel } from "./components/settings/local-state-recovery-panel";
+import { HiscoresPanel } from "./components/topbar/hiscores-panel";
+import { CannonPane } from "./components/panes/cannon-pane";
 import {
   CalculationTaskCancelledError,
   startCalculationTask,
@@ -26,27 +65,13 @@ import {
   readBrowserFileText,
   writeShareableSetupToClipboard
 } from "@/adapters/browser";
-import {
-  HiscoresAdapterError,
-  fetchHiscoresStatus,
-  loadLastHiscoresPlayer,
-  lookupHiscores,
-  saveLastHiscoresPlayer
-} from "@/adapters/hiscores";
-import {
-  loadScheduledStaticPriceSnapshot,
-  parsePriceSetFileText,
-  type ScheduledStaticPriceSnapshotStatus
-} from "@/adapters/market";
-import { PRICE_SET_IMPORT_MAX_BYTES } from "@/data/schemas";
+import type { ScheduledStaticPriceSnapshotStatus } from "@/adapters/market";
 import { MARKET_SOURCE_MAPPINGS } from "@/data/market-source-mapping";
 import {
   createMemoryStorage,
   loadPersisted,
   tryClearPersisted,
-  trySavePersisted,
-  type KeyValueStorage,
-  type VersionedStorageOptions
+  type KeyValueStorage
 } from "@/adapters/storage";
 import {
   LEGACY_INPUT_STORAGE_KEY,
@@ -55,12 +80,7 @@ import {
   type LegacyStorageKeyMigrationDisposition,
   type LegacySetupMigrationReport,
   type LegacyStorageKey
-} from "@/adapters/storage/legacy-migration";
-import {
-  generatedItemValues,
-  loadGeneratedRuntimeContext,
-  withGeneratedAlchAuthority
-} from "@/adapters/generated";
+} from "./state/legacy-storage-migration";
 import { supportedSpecialAttacksForCombatStyle } from "@/domain/combat";
 import { deriveItemPriceFreshness } from "@/domain/economy";
 import { loadoutToCombatBonuses } from "@/domain/equipment";
@@ -81,8 +101,6 @@ import type {
   EquipmentBonuses,
   EquipmentSlot,
   EntityId,
-  HiscoresResponse,
-  HiscoresStatusResponse,
   PriceSet,
   SimulationContext
 } from "@/domain/shared";
@@ -95,9 +113,7 @@ import {
 import {
   activePriceSetOriginLabel,
   createScheduledPriceSnapshotViewModel,
-  resolveActivePriceSetFallback,
   scheduledPriceSetFromStatus,
-  withGeneratedScheduledPriceFallbacks,
   type ActivePriceSetOrigin
 } from "./state/market-sync";
 import {
@@ -105,24 +121,21 @@ import {
   LEGACY_MIGRATION_DISMISSED_VERSION,
   LegacyMigrationDismissedStateSchema
 } from "./state/legacy-migration";
-import {
-  clearInvalidLocalState,
-  clearLocalStateItem,
-  createLocalStateHealthExport,
-  createLocalStateHealthReport,
-  localStateHealthNeedsAttention,
-  type LocalStateHealthItem,
-  type LocalStateHealthItemId,
-  type LocalStateHealthReport,
-  type LocalStateStorageFailure
-} from "./state/local-state-health";
+import type { LocalStateHealthItemId } from "./state/local-state-health";
+import { useHiscoresLookup } from "./controllers/use-hiscores-lookup";
+import { useLocalStateRecovery } from "./controllers/use-local-state-recovery";
+import { useSetupFileTransfer } from "./controllers/use-setup-file-transfer";
+import { usePriceSetTransfer } from "./controllers/use-price-set-transfer";
+import type {
+  AcceptedPriceSetOutcome,
+  PriceImportSurface,
+  ResetPriceSetOutcome
+} from "./controllers/price-set-transfer";
 import {
   applyHiscoresLevels,
   canApplyHiscoresPreview,
-  countApplicableHiscoresSkills,
   createHiscoresPreviewRows,
-  isHiscoresPreviewCurrent,
-  normalizeHiscoresPlayerInput
+  isHiscoresPreviewCurrent
 } from "./state/hiscores";
 import {
   DEFAULT_HIDDEN_GEAR_TIERS_STATE,
@@ -190,20 +203,20 @@ import {
   type PriceHistoryBaselineMode,
   type PriceHistoryMoverRow,
   type PriceHistoryMoverSortKey,
-  type PriceHistoryMoverSortState,
-  type PriceHistoryTrendAnalysis
+  type PriceHistoryMoverSortState
 } from "./state/price-history";
 import {
-  createPriceImportSuccessNotice,
-  describePriceImportError,
-  type PriceImportNotice
-} from "./state/price-import";
-import {
-  clearSelectedPriceSet,
-  loadSelectedPriceSet,
-  saveSelectedPriceSet,
-  type LoadSelectedPriceSetResult
-} from "./state/selected-price-set";
+  DEFAULT_MANUAL_PRICE_OVERRIDES_STATE,
+  MANUAL_PRICE_OVERRIDES_MAX_ITEMS,
+  activeManualPriceOverridesForPriceSet,
+  applyManualPriceOverrides,
+  canSetManualPriceOverride,
+  loadManualPriceOverrides,
+  removeManualPriceOverride,
+  saveManualPriceOverrides,
+  setManualPriceOverride,
+  type ManualPriceOverridesState
+} from "./state/manual-price-overrides";
 import {
   ShareableSetupError,
   applyShareableSetup,
@@ -213,15 +226,8 @@ import {
   reviewShareableSetup,
   type ShareableSetupReview
 } from "./state/shareable-setup";
-import {
-  SETUP_IMPORT_MAX_BYTES,
-  SetupImportError,
-  parseSavedSetupExportText
-} from "./state/setup-import";
-import {
-  duelSnapshotsCompatibilityIssues,
-  savedSetupCompatibilityIssues
-} from "./state/setup-compatibility";
+import { useRuntimeBootstrap } from "./controllers/use-runtime-bootstrap";
+import type { RuntimeBootstrapResult } from "./controllers/runtime-bootstrap";
 import {
   PLANNER_METRICS,
   PLANNER_SKILLS,
@@ -264,6 +270,7 @@ import {
   type CannonByMonsterState,
   type CombatSetupFormState,
   type CustomSetupsByMonsterState,
+  type SavedSetupState,
   type SetupSelectionOption,
   type SetupMode
 } from "./state/ui-state";
@@ -290,31 +297,21 @@ import {
   plannerAllowedPool,
   type ActiveAssumptionResetTarget,
   type ActiveAssumptionReviewTarget,
-  type ActiveAssumptionsSummaryViewModel,
-  type DenseCompareScaleCellViewModel,
   type DenseCompareRowViewModel,
   type DuelComparisonRowViewModel,
   type DuelMatrixMetricId,
   type DuelMatrixViewModel,
-  type CalculationWarningViewModel,
-  type HitDistributionComparisonViewModel,
-  type HitDistributionViewModel,
   type MonsterCardViewModel,
   type PlannerGearPoolEditorViewModel,
   type PlannerPanelViewModel,
   type LootDropRowViewModel,
   type LootPriceHistoryItemContext,
-  type StatsCombatRollDetailViewModel,
-  type StatsSourceDetailViewModel,
   formatNumber,
   monsterOptions,
   spellOptions,
   styleOptions,
   weaponOptions
 } from "./view-models/simulation";
-
-const LOCAL_STATE_PERSISTENCE_NOTICE =
-  "Local storage is unavailable. Changes may not persist after reload.";
 
 function createBrowserStorageAccess(): { storage: KeyValueStorage; unavailable: boolean } {
   if (typeof window === "undefined") {
@@ -387,13 +384,6 @@ const plannerUiStorageOptions = {
   storage
 };
 
-const initialLocalStateHealthReport = createLocalStateHealthReport(storage, new Date(), {
-  storageUnavailable: localStorageAccessUnavailable
-});
-const initialLocalStateRecoveryBlockedIds = initialLocalStateHealthReport.items
-  .filter(localStateHealthNeedsAttention)
-  .map((item) => item.id);
-
 function loadInitialSavedSetup(): {
   loaded: boolean;
   setup: ReturnType<typeof savedSetupFromForm>;
@@ -430,6 +420,11 @@ function loadInitialPriceHistory(): BrowserPriceHistoryState {
   return persisted.status === "loaded" ? persisted.value : DEFAULT_PRICE_HISTORY_STATE;
 }
 
+function loadInitialManualPriceOverrides(): ManualPriceOverridesState {
+  const persisted = loadManualPriceOverrides(storage);
+  return persisted.status === "loaded" ? persisted.value : DEFAULT_MANUAL_PRICE_OVERRIDES_STATE;
+}
+
 function loadInitialPlannerUiState(): PlannerUiState {
   return loadPlannerUiState(storage);
 }
@@ -438,69 +433,9 @@ function loadInitialLegacyMigrationDismissed(): boolean {
   return loadPersisted(legacyMigrationDismissedStorageOptions).status === "loaded";
 }
 
-function describeSelectedPriceSetLoadIssue(result: LoadSelectedPriceSetResult): string | null {
-  if (result.status === "missing" || result.status === "loaded") return null;
-  if (result.status === "unavailable") {
-    return "Local storage is unavailable. Bundled prices were loaded and changes may not persist after reload.";
-  }
-  if (result.status === "version-mismatch") {
-    return "Saved active PriceSet uses an unsupported local version. Bundled prices were loaded.";
-  }
-  switch (result.reason) {
-    case "body_too_large":
-      return "Saved active PriceSet is too large. Bundled prices were loaded.";
-    case "duplicate_keys":
-      return "Saved active PriceSet contains duplicate data. Bundled prices were loaded.";
-    case "invalid_json":
-      return "Saved active PriceSet is not valid JSON. Bundled prices were loaded.";
-    case "invalid_envelope":
-      return "Saved active PriceSet metadata is invalid. Bundled prices were loaded.";
-    case "invalid_data":
-      return "Saved active PriceSet data is invalid. Bundled prices were loaded.";
-  }
-}
-
-function priceSetExportFileName(priceSet: PriceSet): string {
-  const safeId = priceSet.id.replace(/[^a-z0-9._-]+/gi, "-").replace(/^-+|-+$/g, "");
-  return `index-sim-price-set-${safeId || "active"}.json`;
-}
-
-type SelectOption = { id: string; label: string; hint?: string };
-
-type DisplayMetric = {
-  label: string;
-  value: string;
-  tone?: string;
-};
-
-interface SetupImportNotice {
-  tone: "success" | "error";
-  message: string;
-  details?: string[];
-}
-
 type ShareableSetupInspection =
   { status: "ready"; review: ShareableSetupReview } | { status: "error"; message: string };
 
-interface ShareSetupDialogState {
-  url: string;
-  targetLabel: string;
-  combatStyle: CombatStyle;
-  cannonEnabled: boolean;
-  lootPreferenceCount: number;
-  copyStatus: "idle" | "copied" | "failed";
-}
-
-interface PendingUndo {
-  id: string;
-  label: string;
-  restoreLabel: string;
-  createdAt: number;
-  restore: () => void;
-}
-
-type PriceImportSurface = "topbar" | "settings" | "market";
-type ScopedPriceImportNotice = PriceImportNotice & { surface: PriceImportSurface };
 const EMPTY_DENSE_COMPARE_ROWS: DenseCompareRowViewModel[] = [];
 
 const COMBAT_STYLE_OPTIONS: SelectOption[] = [
@@ -702,141 +637,6 @@ function isDenseScaleColumn(key: DenseCompareSortKey): key is DenseScaleColumnKe
   return key === "xpPerHour" || key === "netGpPerHour";
 }
 
-function DenseScaleCell({
-  value,
-  scale
-}: {
-  value: string;
-  scale: DenseCompareScaleCellViewModel;
-}) {
-  return (
-    <span className={`dense-scale-cell dense-scale-${scale.tone}`} aria-label={scale.ariaLabel}>
-      <span className="dense-scale-track" aria-hidden="true">
-        <span style={{ width: `${scale.widthPercent}%` }} />
-      </span>
-      <span className="dense-scale-number">{value}</span>
-    </span>
-  );
-}
-
-function InlineImportNotice({
-  notice,
-  ariaLabel,
-  className = ""
-}: {
-  notice: SetupImportNotice | PriceImportNotice;
-  ariaLabel: string;
-  className?: string;
-}) {
-  return (
-    <div
-      className={`${className} inline-status ${notice.tone}`.trim()}
-      role={notice.tone === "error" ? "alert" : "status"}
-      aria-label={ariaLabel}
-    >
-      <span>{notice.message}</span>
-      {"code" in notice && notice.code ? (
-        <span className="import-error-code">Code {notice.code}</span>
-      ) : null}
-      {notice.details?.length ? (
-        <ul>
-          {notice.details.map((detail) => (
-            <li key={detail}>{detail}</li>
-          ))}
-        </ul>
-      ) : null}
-    </div>
-  );
-}
-
-function ShareSetupDialog({
-  state,
-  onCopy,
-  onClose
-}: {
-  state: ShareSetupDialogState;
-  onCopy: () => void;
-  onClose: () => void;
-}) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const urlFieldRef = useRef<HTMLInputElement>(null);
-  const titleId = useId();
-  const urlId = useId();
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    if (!dialog.open) dialog.showModal();
-    urlFieldRef.current?.focus();
-    return () => {
-      if (dialog.open) dialog.close();
-    };
-  }, []);
-
-  return (
-    <dialog
-      ref={dialogRef}
-      className="share-setup-dialog"
-      aria-labelledby={titleId}
-      onCancel={(event) => {
-        event.preventDefault();
-        onClose();
-      }}
-    >
-      <div className="share-setup-dialog-header">
-        <div>
-          <span className="eyebrow">Portable setup</span>
-          <h2 id={titleId}>Share setup</h2>
-        </div>
-        <button type="button" onClick={onClose} aria-label="Close share setup dialog">
-          Close
-        </button>
-      </div>
-      <p>
-        {state.targetLabel} · {state.combatStyle} · Player levels included
-      </p>
-      <div className="share-setup-summary" aria-label="Shared setup contents">
-        <span>Cannon {state.cannonEnabled ? "included" : "off"}</span>
-        <span>{formatNumber(state.lootPreferenceCount)} loot choices</span>
-        <span>Uses recipient prices</span>
-      </div>
-      <div className="field share-setup-url-field">
-        <label htmlFor={urlId}>Setup link</label>
-        <input
-          ref={urlFieldRef}
-          id={urlId}
-          type="text"
-          readOnly
-          value={state.url}
-          onFocus={(event) => event.currentTarget.select()}
-        />
-      </div>
-      <p className="share-setup-privacy-note">
-        Anyone with this link can read the included levels and setup choices. The link is encoded,
-        not encrypted.
-      </p>
-      <div className="share-setup-dialog-actions">
-        <button type="button" onClick={onCopy}>
-          Copy
-        </button>
-        <button type="button" onClick={onClose}>
-          Done
-        </button>
-      </div>
-      {state.copyStatus !== "idle" ? (
-        <p
-          className={`inline-status ${state.copyStatus === "copied" ? "success" : "error"}`}
-          role="status"
-        >
-          {state.copyStatus === "copied"
-            ? "Link copied"
-            : "Clipboard unavailable. Select the link and copy it manually."}
-        </p>
-      ) : null}
-    </dialog>
-  );
-}
-
 const WORKBENCH_TABS = [
   { id: "stats", label: "Stats" },
   { id: "loadout", label: "Loadout" },
@@ -877,30 +677,6 @@ function emptyGearSelectOptions(): Record<EquipmentSlot, SelectOption[]> {
   return options;
 }
 
-function numberValue(value: string, fallback: number, min = 1, max = 99): number {
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isFinite(parsed)) return fallback;
-  return Math.max(min, Math.min(max, parsed));
-}
-
-function decimalValue(value: string, fallback: number, min = 0, max = 999): number {
-  const parsed = Number.parseFloat(value);
-  if (!Number.isFinite(parsed)) return fallback;
-  return Math.max(min, Math.min(max, parsed));
-}
-
-function stepDecimalValue(
-  value: string,
-  fallback: number,
-  min: number,
-  max: number,
-  step: number
-): number {
-  const clamped = decimalValue(value, fallback, min, max);
-  if (!(step > 0)) return clamped;
-  return Number((Math.round(clamped / step) * step).toFixed(6));
-}
-
 function primaryLevelKey(combatStyle: CombatStyle): keyof CombatSetupFormState["levels"] {
   if (combatStyle === "ranged") return "ranged";
   if (combatStyle === "magic") return "magic";
@@ -933,23 +709,12 @@ function actionLabel(action: LootAction): string {
   return action === "unid" ? "Unid" : action.charAt(0).toUpperCase() + action.slice(1);
 }
 
-function formatDelta(value: number): string {
-  if (!Number.isFinite(value)) return "-";
-  if (Math.abs(value) < 0.5) return "0";
-  return `${value > 0 ? "+" : ""}${formatNumber(value)}`;
-}
-
 function yesNo(value: boolean): string {
   return value ? "On" : "Off";
 }
 
 function signedInteger(value: number): string {
   return `${value > 0 ? "+" : ""}${formatNumber(value)}`;
-}
-
-function signedPercent(value: number): string {
-  if (!Number.isFinite(value)) return "-";
-  return `${value >= 0 ? "+" : ""}${formatNumber(value, 1)}%`;
 }
 
 function finiteMetric(value: number, digits = 1): string {
@@ -987,10 +752,6 @@ function formatAge(seconds: number | null): string {
   return `${Math.floor(seconds / 86400)}d`;
 }
 
-function itemPriceMetadataLabel(value: string | undefined): string {
-  return value ? value.replaceAll("-", " ") : "unknown";
-}
-
 function summarizeItemPriceMetadata(priceSet: PriceSet | null) {
   const metadata = Object.values(priceSet?.itemPriceMetadata ?? {});
   return {
@@ -1007,6 +768,7 @@ function summarizeItemPriceMetadata(priceSet: PriceSet | null) {
     generatedFallback: metadata.filter(
       (item) => item.valueOrigin === "generated-object-cost" || item.quality === "fallback"
     ).length,
+    manual: metadata.filter((item) => item.valueOrigin === "manual").length,
     unknown: metadata.filter((item) =>
       ["legacy-static", "imported", "unknown"].includes(item.valueOrigin)
     ).length,
@@ -1032,18 +794,6 @@ function economyAriaSort(
 ): "ascending" | "descending" | "none" {
   if (sort.key !== key) return "none";
   return sort.direction === "asc" ? "ascending" : "descending";
-}
-
-function optionalPrice(value: number | null): string {
-  return value === null ? "-" : formatNumber(value);
-}
-
-function optionalDelta(value: number | null): string {
-  return value === null ? "-" : formatDelta(value);
-}
-
-function optionalPercent(value: number | null): string {
-  return value === null ? "-" : signedPercent(value);
 }
 
 function optionalNumber(value: number | null, digits = 0): string {
@@ -1185,145 +935,6 @@ function moverTone(row: PriceHistoryMoverRow): string | undefined {
   return row.gpDelta > 0 ? "gain" : "loss";
 }
 
-function PriceTrendChart({ trend }: { trend: PriceHistoryTrendAnalysis }) {
-  if (trend.points.length === 0) {
-    return (
-      <div className="economy-trend empty" aria-label="Item price trend">
-        <div className="section-title-row">
-          <h3>Item trend</h3>
-          <span className="status-pill">empty</span>
-        </div>
-        <p>No price points</p>
-      </div>
-    );
-  }
-
-  const width = 720;
-  const height = 176;
-  const paddingX = 26;
-  const paddingTop = 18;
-  const paddingBottom = 24;
-  const plotWidth = width - paddingX * 2;
-  const plotHeight = height - paddingTop - paddingBottom;
-  const minimum = trend.minimumPrice ?? 0;
-  const maximum = trend.maximumPrice ?? minimum;
-  const range = Math.max(1, maximum - minimum);
-  const denominator = Math.max(1, trend.points.length - 1);
-  const points = trend.points.map((point, index) => ({
-    ...point,
-    x: paddingX + (index / denominator) * plotWidth,
-    y: paddingTop + ((maximum - point.price) / range) * plotHeight
-  }));
-  const linePoints = points.map((point) => `${point.x},${point.y}`).join(" ");
-
-  return (
-    <div className="economy-trend" aria-label="Item price trend">
-      <div className="section-title-row">
-        <h3>{trend.itemLabel}</h3>
-        <span className="status-pill">{formatNumber(trend.points.length)} points</span>
-      </div>
-      <dl className="economy-trend-summary">
-        <div>
-          <dt>Latest</dt>
-          <dd>{optionalPrice(trend.latestPrice)}</dd>
-        </div>
-        <div>
-          <dt>Minimum</dt>
-          <dd>{optionalPrice(trend.minimumPrice)}</dd>
-        </div>
-        <div>
-          <dt>Maximum</dt>
-          <dd>{optionalPrice(trend.maximumPrice)}</dd>
-        </div>
-        <div>
-          <dt>Net change</dt>
-          <dd
-            className={
-              trend.netGpDelta === null || trend.netGpDelta === 0
-                ? undefined
-                : trend.netGpDelta > 0
-                  ? "gain"
-                  : "loss"
-            }
-          >
-            {optionalDelta(trend.netGpDelta)} / {optionalPercent(trend.netPercentDelta)}
-          </dd>
-        </div>
-      </dl>
-      <svg
-        className="economy-trend-chart"
-        viewBox={`0 0 ${width} ${height}`}
-        role="img"
-        aria-label={`${trend.itemLabel} price trend`}
-      >
-        <title>{`${trend.itemLabel} price trend from ${optionalPrice(
-          trend.firstPrice
-        )} to ${optionalPrice(trend.latestPrice)}`}</title>
-        <line
-          className="economy-trend-axis"
-          x1={paddingX}
-          x2={width - paddingX}
-          y1={height - paddingBottom}
-          y2={height - paddingBottom}
-        />
-        <polyline className="economy-trend-line" points={linePoints} />
-        {points.map((point, index) => (
-          <circle
-            className="economy-trend-point"
-            key={`${point.snapshotKey}-${index}`}
-            cx={point.x}
-            cy={point.y}
-            r="4"
-          >
-            <title>{`${point.capturedAt}: ${formatNumber(point.price)} (${itemPriceMetadataLabel(point.priceStatus)})`}</title>
-          </circle>
-        ))}
-      </svg>
-      <ol className="economy-trend-points" aria-label={`Price points for ${trend.itemLabel}`}>
-        {trend.points.map((point, index) => (
-          <li key={`${point.snapshotKey}-${index}`}>
-            <time dateTime={point.capturedAt}>{point.capturedAt.slice(0, 10)}</time>
-            <strong>{formatNumber(point.price)}</strong>
-            <span>{optionalDelta(point.gpDeltaFromPrevious)}</span>
-            <span>{itemPriceMetadataLabel(point.priceStatus)}</span>
-          </li>
-        ))}
-      </ol>
-    </div>
-  );
-}
-
-function PriceTrendSparkline({ row }: { row: PriceHistoryMoverRow }) {
-  const width = 96;
-  const height = 28;
-  const padding = 3;
-  const minimum = row.trendPrices.length ? Math.min(...row.trendPrices) : 0;
-  const maximum = row.trendPrices.length ? Math.max(...row.trendPrices) : minimum;
-  const range = Math.max(1, maximum - minimum);
-  const denominator = Math.max(1, row.trendPrices.length - 1);
-  const points = row.trendPrices.map((price, index) => ({
-    price,
-    x: padding + (index / denominator) * (width - padding * 2),
-    y: padding + ((maximum - price) / range) * (height - padding * 2)
-  }));
-
-  if (points.length === 0) return <span>-</span>;
-
-  return (
-    <svg
-      className="economy-sparkline"
-      viewBox={`0 0 ${width} ${height}`}
-      role="img"
-      aria-label={`${row.itemLabel} price trend, ${row.trendPrices.map(formatNumber).join(" to ")}`}
-    >
-      <polyline points={points.map((point) => `${point.x},${point.y}`).join(" ")} />
-      {points.map((point, index) => (
-        <circle key={`${point.price}-${index}`} cx={point.x} cy={point.y} r="2" />
-      ))}
-    </svg>
-  );
-}
-
 function metric(
   label: string,
   value: string,
@@ -1349,15 +960,6 @@ function metric(
   );
 }
 
-function metricList(items: DisplayMetric[]) {
-  return items.map((item) => (
-    <div className="metric" key={item.label}>
-      <span>{item.label}</span>
-      <strong className={item.tone}>{item.value}</strong>
-    </div>
-  ));
-}
-
 function setupSelectionSummary(
   selectedIds: readonly string[],
   options: readonly SetupSelectionOption[]
@@ -1372,519 +974,7 @@ function tripMetricGroup(title: string, items: DisplayMetric[]) {
   return (
     <section className="trip-output-group" aria-label={`${title} trip summary`} key={title}>
       <h3>{title}</h3>
-      {metricList(items)}
-    </section>
-  );
-}
-
-function CalculationWarningSummary({
-  warnings,
-  label,
-  title = "Price warnings"
-}: {
-  warnings: readonly CalculationWarningViewModel[];
-  label: string;
-  title?: string;
-}) {
-  if (!warnings.length) return null;
-  const visible = warnings.slice(0, 4);
-  return (
-    <div className="calculation-warnings" role="status" aria-label={label}>
-      <strong>{title}</strong>
-      {visible.map((warning) => (
-        <span className={warning.severity} key={`${warning.code}:${warning.message}`}>
-          {warning.message}
-        </span>
-      ))}
-      {warnings.length > visible.length && (
-        <span>{formatNumber(warnings.length - visible.length)} more</span>
-      )}
-    </div>
-  );
-}
-
-const STATS_SOURCE_DETAIL_METRIC_IDS = {
-  "special-attack": [
-    "spec-weapon",
-    "hits",
-    "max-hit",
-    "hit-chance",
-    "specs-hr",
-    "dps-with-spec",
-    "dps-gain",
-    "dps",
-    "xp-hr"
-  ],
-  cannon: [
-    "effective-targets",
-    "dps",
-    "balls-hr",
-    "balls-kill",
-    "cannon-ranged-xp-hr",
-    "ball-cost-hour",
-    "ball-cost-kill",
-    "cannonballs-trip",
-    "sparse-state",
-    "xp-hr",
-    "supply-cost-hour",
-    "supply-cost-kill"
-  ]
-} as const;
-
-function statsSourceDetailMetricLabel(
-  detail: StatsSourceDetailViewModel,
-  metric: StatsSourceDetailViewModel["metrics"][number]
-): string {
-  if (detail.id === "special-attack" && metric.id === "dps") return "DPS gain";
-  if (detail.id === "cannon" && metric.id === "dps") return "Cannon DPS";
-  return metric.label;
-}
-
-function orderedStatsSourceDetailMetrics(detail: StatsSourceDetailViewModel) {
-  const metricById = new Map(detail.metrics.map((metric) => [metric.id, metric]));
-  const ids =
-    detail.id === "special-attack"
-      ? STATS_SOURCE_DETAIL_METRIC_IDS["special-attack"]
-      : detail.id === "cannon"
-        ? STATS_SOURCE_DETAIL_METRIC_IDS.cannon
-        : detail.metrics.map((metric) => metric.id);
-
-  return ids.flatMap((id) => {
-    const metric = metricById.get(id);
-    return metric ? [metric] : [];
-  });
-}
-
-function HitDistributionChart({
-  distribution,
-  ariaLabel
-}: {
-  distribution: HitDistributionViewModel;
-  ariaLabel: string;
-}) {
-  const summary = [
-    { label: "Hit chance", value: distribution.hitChanceLabel, tone: "teal" },
-    { label: "Expected damage", value: distribution.averageHitLabel },
-    { label: "Max hit", value: distribution.maxHitLabel }
-  ];
-  const minWidth = Math.max(320, distribution.buckets.length * 24);
-
-  return (
-    <>
-      <div className="hit-distribution-summary">{metricList(summary)}</div>
-      <div className="hit-chart-viewport">
-        <div className="hit-chart-layout" style={{ minWidth }}>
-          <div className="hit-chart-y-axis" aria-hidden="true">
-            <span>
-              {Math.max(...distribution.buckets.map((bucket) => bucket.probability * 100)).toFixed(
-                1
-              )}
-              %
-            </span>
-            <span>0%</span>
-          </div>
-          <div className="hit-chart-plot">
-            <span className="hit-chart-gridline top" aria-hidden="true" />
-            <span className="hit-chart-gridline bottom" aria-hidden="true" />
-            <div
-              className="hit-chart-bars"
-              role="list"
-              aria-label={ariaLabel}
-              style={{
-                gridTemplateColumns: `repeat(${distribution.buckets.length}, minmax(18px, 1fr))`
-              }}
-            >
-              {distribution.buckets.map((bucket) => (
-                <div
-                  tabIndex={0}
-                  className={`hit-chart-bucket ${bucket.isMiss ? "miss" : ""} ${
-                    bucket.isAccurateZero ? "accurate-zero" : ""
-                  } ${bucket.isMaxHit ? "max-hit" : ""}`}
-                  role="listitem"
-                  aria-label={bucket.ariaLabel}
-                  key={bucket.id}
-                >
-                  <span className="hit-chart-column" aria-hidden="true">
-                    <span
-                      className="hit-chart-bar normal"
-                      style={{ height: `${bucket.heightPercent}%` }}
-                    />
-                  </span>
-                  <span className="hit-chart-label">{bucket.label}</span>
-                  <span className="hit-chart-tooltip" aria-hidden="true">
-                    <strong>
-                      {bucket.isMiss
-                        ? "Miss"
-                        : bucket.isAccurateZero
-                          ? "Accurate 0 damage"
-                          : `${bucket.damage} damage`}
-                    </strong>
-                    <span>Exact {bucket.percentLabel}</span>
-                    {bucket.cumulativeAtLeastLabel ? (
-                      <span>At least {bucket.cumulativeAtLeastLabel}</span>
-                    ) : null}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </>
-  );
-}
-
-function HitDistributionComparisonChart({
-  comparison,
-  ariaLabel
-}: {
-  comparison: HitDistributionComparisonViewModel;
-  ariaLabel: string;
-}) {
-  const normal = comparison.series[0]!;
-  const special = comparison.series.find((series) => series.id === "special") ?? null;
-  const summary: Array<{ label: string; value: string; tone?: "teal" | "gold" }> = [
-    { label: "Normal hit chance", value: normal.distribution.hitChanceLabel, tone: "teal" },
-    { label: "Expected / attack", value: normal.expectedDamageLabel },
-    { label: "Normal max hit", value: normal.distribution.maxHitLabel }
-  ];
-  if (special) {
-    summary.push(
-      { label: "Special connects", value: special.distribution.hitChanceLabel, tone: "gold" },
-      { label: "Expected / special", value: special.expectedDamageLabel, tone: "gold" },
-      { label: "Special max", value: special.distribution.maxHitLabel, tone: "gold" }
-    );
-  }
-  if (comparison.targetHp != null) {
-    summary.push({ label: "Normal KO chance", value: normal.koChanceLabel });
-    if (special)
-      summary.push({ label: "Special KO chance", value: special.koChanceLabel, tone: "gold" });
-  }
-  const minWidth = Math.max(420, comparison.buckets.length * (special ? 30 : 24));
-
-  return (
-    <>
-      <div className="hit-distribution-summary comparison">{metricList(summary)}</div>
-      <div className="hit-chart-legend" aria-label="Damage distribution series">
-        <span className="normal">Normal attack</span>
-        {special ? <span className="special">{special.label}</span> : null}
-        {comparison.targetHpLabel ? (
-          <span className="target">{comparison.targetHpLabel}</span>
-        ) : null}
-      </div>
-      <div className="hit-chart-viewport">
-        <div className="hit-chart-layout comparison" style={{ minWidth }}>
-          <div className="hit-chart-y-axis" aria-hidden="true">
-            <span>{comparison.maxProbabilityLabel}</span>
-            <span>{comparison.middleProbabilityLabel}</span>
-            <span>0%</span>
-          </div>
-          <div className="hit-chart-plot comparison">
-            <span className="hit-chart-gridline top" aria-hidden="true" />
-            <span className="hit-chart-gridline middle" aria-hidden="true" />
-            <span className="hit-chart-gridline bottom" aria-hidden="true" />
-            {comparison.koRegionStartPercent != null ? (
-              <span
-                className="hit-chart-ko-region"
-                style={{ left: `${comparison.koRegionStartPercent}%` }}
-                aria-hidden="true"
-              />
-            ) : null}
-            {comparison.targetMarkerPercent != null && comparison.targetHpLabel ? (
-              <span
-                className="hit-chart-target-marker"
-                style={{ left: `${comparison.targetMarkerPercent}%` }}
-                aria-hidden="true"
-              >
-                <em>{comparison.targetHpLabel}</em>
-              </span>
-            ) : null}
-            {comparison.series.map((series) => (
-              <span
-                className={`hit-chart-expected-marker ${series.id}`}
-                style={{ left: `${series.expectedMarkerPercent}%` }}
-                aria-hidden="true"
-                key={series.id}
-              >
-                <em>{series.id === "normal" ? "AVG" : "SPEC AVG"}</em>
-              </span>
-            ))}
-            <div
-              className="hit-chart-bars"
-              role="list"
-              aria-label={ariaLabel}
-              style={{
-                gridTemplateColumns: `repeat(${comparison.buckets.length}, minmax(${special ? 24 : 18}px, 1fr))`
-              }}
-            >
-              {comparison.buckets.map((bucket) => (
-                <div
-                  tabIndex={0}
-                  className={`hit-chart-bucket ${bucket.isMiss ? "miss" : ""} ${
-                    bucket.isAccurateZero ? "accurate-zero" : ""
-                  }`}
-                  role="listitem"
-                  aria-label={bucket.ariaLabel}
-                  key={bucket.id}
-                >
-                  <span className="hit-chart-column comparison" aria-hidden="true">
-                    <span
-                      className={`hit-chart-bar normal ${bucket.normal.isMaxHit ? "max-hit" : ""}`}
-                      style={{ height: `${bucket.normal.heightPercent}%` }}
-                    />
-                    {bucket.special ? (
-                      <span
-                        className={`hit-chart-bar special ${bucket.special.isMaxHit ? "max-hit" : ""}`}
-                        style={{ height: `${bucket.special.heightPercent}%` }}
-                      />
-                    ) : null}
-                  </span>
-                  <span className="hit-chart-label">{bucket.label}</span>
-                  <span className="hit-chart-tooltip" aria-hidden="true">
-                    <strong>
-                      {bucket.isMiss
-                        ? "Miss"
-                        : bucket.isAccurateZero
-                          ? "Accurate 0 damage"
-                          : `${bucket.damage} damage`}
-                    </strong>
-                    <span>Normal exact {bucket.normal.percentLabel}</span>
-                    {bucket.normal.cumulativeAtLeastLabel && !bucket.isMiss ? (
-                      <span>
-                        Normal ≥ {bucket.damage}: {bucket.normal.cumulativeAtLeastLabel}
-                      </span>
-                    ) : null}
-                    {bucket.special && special ? (
-                      <>
-                        <span>Special exact {bucket.special.percentLabel}</span>
-                        {bucket.special.cumulativeAtLeastLabel && !bucket.isMiss ? (
-                          <span>
-                            Special ≥ {bucket.damage}: {bucket.special.cumulativeAtLeastLabel}
-                          </span>
-                        ) : null}
-                      </>
-                    ) : null}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-      <details className="hit-chart-data-table">
-        <summary>Show exact probabilities</summary>
-        <div>
-          <table>
-            <thead>
-              <tr>
-                <th scope="col">Outcome</th>
-                <th scope="col">Normal exact</th>
-                <th scope="col">Normal at least</th>
-                {special ? <th scope="col">Special exact</th> : null}
-                {special ? <th scope="col">Special at least</th> : null}
-              </tr>
-            </thead>
-            <tbody>
-              {comparison.buckets.map((bucket) => (
-                <tr key={bucket.id}>
-                  <th scope="row">{bucket.isMiss ? "Miss" : bucket.label}</th>
-                  <td>{bucket.normal.percentLabel}</td>
-                  <td>{bucket.isMiss ? "-" : bucket.normal.cumulativeAtLeastLabel}</td>
-                  {special ? <td>{bucket.special?.percentLabel ?? "0.0%"}</td> : null}
-                  {special ? (
-                    <td>
-                      {bucket.isMiss ? "-" : (bucket.special?.cumulativeAtLeastLabel ?? "0.0%")}
-                    </td>
-                  ) : null}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </details>
-    </>
-  );
-}
-
-function StatsSourceDetailCard({ detail }: { detail: StatsSourceDetailViewModel }) {
-  const metrics = orderedStatsSourceDetailMetrics(detail);
-
-  return (
-    <article
-      className={`source-detail-card ${detail.status}`}
-      role="listitem"
-      aria-label={`${detail.label} detail: ${detail.statusLabel}`}
-    >
-      <div className="source-detail-heading">
-        <div>
-          <h3>{detail.label} detail</h3>
-          <span>{detail.statusLabel}</span>
-        </div>
-      </div>
-      <div className="source-detail-metrics">
-        {metrics.map((metric) => (
-          <div key={metric.id}>
-            <span>{statsSourceDetailMetricLabel(detail, metric)}</span>
-            <strong>{metric.value}</strong>
-          </div>
-        ))}
-      </div>
-      <CalculationWarningSummary
-        warnings={detail.warnings}
-        label={`${detail.label} source warnings`}
-        title={`${detail.label} note`}
-      />
-      {detail.notes.length > 0 ? (
-        <ul className="source-detail-notes">
-          {detail.notes.map((note) => (
-            <li key={note}>{note}</li>
-          ))}
-        </ul>
-      ) : null}
-      {detail.histogram && detail.histogramScopeLabel ? (
-        <section
-          className="source-detail-distribution"
-          aria-label={`${detail.label} damage distribution`}
-        >
-          <div className="source-detail-distribution-heading">
-            <h4>Damage distribution</h4>
-            <span>{detail.histogramScopeLabel}</span>
-          </div>
-          <HitDistributionChart
-            distribution={detail.histogram}
-            ariaLabel={`${detail.label} damage distribution buckets`}
-          />
-        </section>
-      ) : null}
-    </article>
-  );
-}
-
-function StatsCombatRollDetail({ detail }: { detail: StatsCombatRollDetailViewModel }) {
-  return (
-    <section className="stats-panel combat-roll-panel" aria-label="Combat roll details">
-      <div className="section-title-row">
-        <div>
-          <h2>Combat roll details</h2>
-          <span className="section-subtitle">Normal attack and current result metrics</span>
-        </div>
-        <span className={`status-pill ${detail.status === "modeled" ? "ready" : ""}`}>
-          {detail.statusLabel}
-        </span>
-      </div>
-      <div className="combat-roll-grid" role="list" aria-label="Combat roll metrics">
-        {detail.metrics.map((metric) => (
-          <div
-            className={`combat-roll-metric ${metric.tone}`}
-            role="listitem"
-            aria-label={`${metric.label}: ${metric.value}; ${metric.note}`}
-            key={metric.id}
-          >
-            <span>{metric.label}</span>
-            <strong>{metric.value}</strong>
-            <small>{metric.note}</small>
-          </div>
-        ))}
-      </div>
-      <ul className="combat-roll-notes">
-        {detail.notes.map((note) => (
-          <li key={note}>{note}</li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-function ActiveAssumptionsSummary({
-  summary,
-  onReview,
-  onReset
-}: {
-  summary: ActiveAssumptionsSummaryViewModel;
-  onReview: (tab: ActiveAssumptionReviewTarget) => void;
-  onReset: (target: ActiveAssumptionResetTarget, statusLabel: string) => void;
-}) {
-  const renderRow = (row: ActiveAssumptionsSummaryViewModel["visibleRows"][number]) => {
-    const resetAction = row.resetAction;
-    return (
-      <li className={`active-assumption-row ${row.tone}`} key={row.id}>
-        <div className="active-assumption-copy">
-          <strong>{row.label}</strong>
-          <span>{row.detail}</span>
-        </div>
-        <em>{row.value}</em>
-        <div className="active-assumption-actions">
-          <button
-            type="button"
-            className="compact-action"
-            aria-label={`Review ${row.label}`}
-            onClick={() => onReview(row.reviewTab)}
-          >
-            Review
-          </button>
-          {resetAction ? (
-            <button
-              type="button"
-              className="compact-action"
-              aria-label={resetAction.ariaLabel}
-              onClick={() => onReset(resetAction.target, resetAction.statusLabel)}
-            >
-              {resetAction.label}
-            </button>
-          ) : null}
-        </div>
-      </li>
-    );
-  };
-
-  return (
-    <section className="active-assumptions-summary" aria-label="Active assumptions">
-      <div className="section-title-row">
-        <div>
-          <h2>Active assumptions</h2>
-          <span className="section-subtitle">Modifiers affecting current result</span>
-        </div>
-        <span className={`status-pill ${summary.hasActiveRows ? "ready" : ""}`}>
-          {summary.statusLabel}
-        </span>
-      </div>
-
-      {summary.hasActiveRows ? (
-        <>
-          <ul className="active-assumption-list">{summary.visibleRows.map(renderRow)}</ul>
-          {summary.hiddenRows.length > 0 ? (
-            <details className="active-assumption-more">
-              <summary>+{formatNumber(summary.hiddenCount)} more</summary>
-              <ul className="active-assumption-list">{summary.hiddenRows.map(renderRow)}</ul>
-            </details>
-          ) : null}
-        </>
-      ) : (
-        <p className="active-assumptions-empty">{summary.statusLabel}</p>
-      )}
-    </section>
-  );
-}
-
-function PendingUndoStatus({
-  pendingUndo,
-  onUndo
-}: {
-  pendingUndo: PendingUndo | null;
-  onUndo: () => void;
-}) {
-  if (!pendingUndo) return null;
-  return (
-    <section
-      className="pending-undo-strip"
-      role="status"
-      aria-live="polite"
-      aria-label="Local state undo"
-    >
-      <span>{pendingUndo.label}</span>
-      <button type="button" onClick={onUndo}>
-        Undo
-      </button>
+      <MetricList items={items} />
     </section>
   );
 }
@@ -2219,107 +1309,6 @@ function legacyMigrationTone(report: LegacySetupMigrationReport, hasRewriteSetup
   return "";
 }
 
-function describeHiscoresError(error: unknown): string {
-  if (error instanceof HiscoresAdapterError) {
-    if (error.code === "bad-request") return "Check the player name";
-    if (error.code === "not-found") return "Player not found";
-    if (error.code === "rate-limited") {
-      return error.retryAfterSeconds
-        ? `Rate limited. Try again in ${error.retryAfterSeconds}s`
-        : "Rate limited";
-    }
-    if (error.code === "upstream-unavailable") return hiscoresUnavailableMessage(null);
-    if (error.code === "upstream-invalid") return "Hiscores response invalid";
-  }
-  return "Hiscores lookup failed. Player level fields still work for manual edits.";
-}
-
-function sanitizeImportDetail(value: string): string {
-  return value
-    .replace(/(?:[A-Za-z]:)?[\\/][^\s"']+/g, "[path]")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 180);
-}
-
-function formatZodIssuePath(path: PropertyKey[]): string {
-  return path.length > 0 ? path.map(String).join(".") : "setup";
-}
-
-function zodIssueSummaries(error: ZodError): string[] {
-  return error.issues.slice(0, 3).map((issue) => {
-    const path = formatZodIssuePath(issue.path);
-    const message = sanitizeImportDetail(issue.message);
-    return `${path}: ${message}`;
-  });
-}
-
-function describeSetupImportError(error: unknown): SetupImportNotice {
-  if (error instanceof Error && /^File exceeds \d+ bytes$/.test(error.message)) {
-    return {
-      tone: "error",
-      message:
-        "Setup import failed: the file is too large. Choose an exported setup JSON under 250 KB."
-    };
-  }
-
-  if (error instanceof SetupImportError) {
-    if (error.code === "body_too_large") {
-      return {
-        tone: "error",
-        message:
-          "Setup import failed: the file is too large. Choose an exported setup JSON under 250 KB."
-      };
-    }
-    if (error.code === "duplicate_keys") {
-      return {
-        tone: "error",
-        message: "Setup import failed: the JSON contains duplicate keys."
-      };
-    }
-    if (error.code === "invalid_json") {
-      return { tone: "error", message: "Setup import failed: the file is not valid JSON." };
-    }
-    if (error.code === "unsupported_version") {
-      return {
-        tone: "error",
-        message: `Setup import failed: this app only supports rewrite setup version ${REWRITE_SETUP_VERSION}. Export a fresh setup and try again.`
-      };
-    }
-    if (error.code === "incompatible_entities") {
-      return {
-        tone: "error",
-        message: "Setup import failed: the setup references data unavailable in this game version.",
-        details: error.issues.map(sanitizeImportDetail)
-      };
-    }
-    return {
-      tone: "error",
-      message: "Setup import failed: the file is not a valid rewrite setup export.",
-      details: error.issues.map(sanitizeImportDetail)
-    };
-  }
-
-  if (error instanceof ZodError) {
-    const details = zodIssueSummaries(error);
-    const hasVersionIssue = error.issues.some((issue) => issue.path[0] === "version");
-    if (hasVersionIssue) {
-      return {
-        tone: "error",
-        message: `Setup import failed: this app only supports rewrite setup version ${REWRITE_SETUP_VERSION}. Export a fresh setup and try again.`,
-        details
-      };
-    }
-    return {
-      tone: "error",
-      message: "Setup import failed: the file is not a valid rewrite setup export.",
-      details
-    };
-  }
-
-  return { tone: "error", message: "Setup import failed. Check the file and try again." };
-}
-
 function describeShareableSetupError(error: unknown): string {
   if (error instanceof ShareableSetupError) {
     if (error.code === "body_too_large") return "Shared setup link is too large.";
@@ -2375,541 +1364,6 @@ function describeDuelSnapshotsImportError(error: unknown): SetupImportNotice {
   };
 }
 
-function statusText(status: HiscoresStatusResponse | null, available: boolean): string {
-  if (status === null) return "checking";
-  if (available) return "available";
-  return status.source.id === "disabled" ? "disabled" : "unavailable";
-}
-
-function hiscoresUnavailableMessage(status: HiscoresStatusResponse | null): string {
-  return status?.source.id === "disabled"
-    ? "Live hiscores lookup is not configured in this run. Use the Player level fields above to edit levels manually."
-    : "Hiscores lookup is unavailable right now. Use the Player level fields above to edit levels manually.";
-}
-
-function SelectField({
-  label,
-  value,
-  options,
-  onChange,
-  disabled = false,
-  className
-}: {
-  label: string;
-  value: string;
-  options: Array<{ id: string; label: string }>;
-  onChange: (value: string) => void;
-  disabled?: boolean;
-  className?: string;
-}) {
-  const id = useId();
-  const selectedLabel = options.find((option) => option.id === value)?.label ?? value;
-  return (
-    <div className={`field ${className ?? ""}`.trim()}>
-      <label htmlFor={id}>{label}</label>
-      <select
-        id={id}
-        value={value}
-        title={selectedLabel}
-        disabled={disabled}
-        onChange={(event) => onChange(event.target.value)}
-      >
-        {options.map((option) => (
-          <option key={option.id} value={option.id}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
-function CompactSelectionSelectField({
-  label,
-  value,
-  options,
-  extraCount,
-  onChange
-}: {
-  label: string;
-  value: string;
-  options: Array<{ id: string; label: string }>;
-  extraCount: number;
-  onChange: (value: string) => void;
-}) {
-  const id = useId();
-  const selectedLabel = options.find((option) => option.id === value)?.label ?? value;
-  return (
-    <div className="field compact-selection-field">
-      <label htmlFor={id}>{label}</label>
-      <div className="compact-selection-control">
-        <select
-          id={id}
-          value={value}
-          title={selectedLabel}
-          onChange={(event) => onChange(event.target.value)}
-        >
-          {options.map((option) => (
-            <option key={option.id} value={option.id}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-        {extraCount > 0 && (
-          <span className="selection-extra-badge" aria-label={`${extraCount} additional active`}>
-            +{formatNumber(extraCount)}
-          </span>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function MultiSelectionField({
-  label,
-  options,
-  selectedIds,
-  onToggle
-}: {
-  label: string;
-  options: readonly SetupSelectionOption[];
-  selectedIds: readonly string[];
-  onToggle: (id: string, selected: boolean) => void;
-}) {
-  const selectedCount = selectedIds.length;
-  return (
-    <div className="selection-toggle-group">
-      <div className="selection-toggle-header">
-        <span>{label}</span>
-        <span className={`status-pill ${selectedCount ? "ready" : ""}`}>
-          {selectedCount ? `${formatNumber(selectedCount)} active` : "None"}
-        </span>
-      </div>
-      <div className="multi-selection-grid" aria-label={`${label} selections`}>
-        <label className="toggle">
-          <input
-            type="checkbox"
-            checked={selectedCount === 0}
-            onChange={(event) => onToggle("none", event.target.checked)}
-          />
-          <span>None</span>
-        </label>
-        {options.map((option) => (
-          <label className="toggle selection-toggle" key={option.id}>
-            <input
-              type="checkbox"
-              checked={selectedIds.includes(option.id)}
-              onChange={(event) => onToggle(option.id, event.target.checked)}
-            />
-            <span>{option.label}</span>
-            <small>{option.categoryLabel}</small>
-          </label>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function SearchableSelectField({
-  label,
-  value,
-  options,
-  onChange,
-  disabled = false,
-  searchPlaceholder = "Search",
-  className
-}: {
-  label: string;
-  value: string;
-  options: SelectOption[];
-  onChange: (value: string) => void;
-  disabled?: boolean;
-  searchPlaceholder?: string;
-  className?: string;
-}) {
-  const labelId = useId();
-  const triggerId = useId();
-  const listboxId = useId();
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
-  const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
-  const [expanded, setExpanded] = useState(false);
-  const [query, setQuery] = useState("");
-  const [activeIndex, setActiveIndex] = useState(0);
-  const normalizedQuery = query.trim().toLocaleLowerCase();
-  const selectedOption = options.find((option) => option.id === value);
-  const selectedLabel = selectedOption?.label ?? value;
-  const filteredOptions =
-    normalizedQuery.length === 0
-      ? options
-      : options.filter((option) =>
-          [option.label, option.id, option.hint ?? ""]
-            .join(" ")
-            .toLocaleLowerCase()
-            .includes(normalizedQuery)
-        );
-  const boundedActiveIndex = Math.max(
-    0,
-    Math.min(activeIndex, Math.max(0, filteredOptions.length - 1))
-  );
-  const activeOption = filteredOptions[boundedActiveIndex];
-
-  useEffect(() => {
-    if (expanded) searchInputRef.current?.focus();
-  }, [expanded]);
-
-  useEffect(() => {
-    if (!expanded) return;
-    optionRefs.current[boundedActiveIndex]?.scrollIntoView({ block: "nearest" });
-  }, [boundedActiveIndex, expanded]);
-
-  const openOptions = () => {
-    if (disabled) return;
-    setQuery("");
-    setActiveIndex(
-      Math.max(
-        0,
-        options.findIndex((option) => option.id === value)
-      )
-    );
-    setExpanded(true);
-  };
-
-  const closeOptions = (restoreTriggerFocus = false) => {
-    setExpanded(false);
-    setQuery("");
-    if (restoreTriggerFocus) triggerRef.current?.focus();
-  };
-
-  const commitOption = (option: SelectOption) => {
-    onChange(option.id);
-    setQuery("");
-    setExpanded(false);
-    triggerRef.current?.focus();
-  };
-
-  const handleSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "ArrowDown") {
-      event.preventDefault();
-      setActiveIndex((current) => Math.min(current + 1, filteredOptions.length - 1));
-      return;
-    }
-    if (event.key === "ArrowUp") {
-      event.preventDefault();
-      setActiveIndex((current) => Math.max(0, current - 1));
-      return;
-    }
-    if (event.key === "Home") {
-      event.preventDefault();
-      setActiveIndex(0);
-      return;
-    }
-    if (event.key === "End") {
-      event.preventDefault();
-      setActiveIndex(Math.max(0, filteredOptions.length - 1));
-      return;
-    }
-    if (event.key === "Enter" && activeOption) {
-      event.preventDefault();
-      commitOption(activeOption);
-      return;
-    }
-    if (event.key === "Escape") {
-      event.preventDefault();
-      closeOptions(true);
-    }
-  };
-
-  return (
-    <div
-      className={`field searchable-field ${expanded ? "expanded" : ""} ${className ?? ""}`.trim()}
-      onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) closeOptions();
-      }}
-    >
-      <label id={labelId}>{label}</label>
-      <button
-        ref={triggerRef}
-        id={triggerId}
-        type="button"
-        role="combobox"
-        className="searchable-combobox-trigger"
-        title={selectedLabel}
-        aria-labelledby={labelId}
-        aria-controls={listboxId}
-        aria-expanded={expanded}
-        aria-haspopup="listbox"
-        data-selected-id={value}
-        disabled={disabled}
-        onClick={() => (expanded ? closeOptions() : openOptions())}
-        onKeyDown={(event) => {
-          if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-            event.preventDefault();
-            openOptions();
-          }
-          if (event.key === "Escape" && expanded) {
-            event.preventDefault();
-            closeOptions(true);
-          }
-        }}
-      >
-        <span>{selectedLabel}</span>
-        <span aria-hidden="true">{expanded ? "▲" : "▼"}</span>
-      </button>
-      {expanded && (
-        <div className="searchable-combobox-popover">
-          <div className="searchable-combobox-search">
-            <input
-              ref={searchInputRef}
-              type="search"
-              value={query}
-              placeholder={searchPlaceholder}
-              autoComplete="off"
-              aria-label={`Search ${label} options`}
-              aria-controls={listboxId}
-              aria-activedescendant={
-                activeOption ? `${listboxId}-option-${boundedActiveIndex}` : undefined
-              }
-              onChange={(event) => {
-                setQuery(event.target.value);
-                setActiveIndex(0);
-              }}
-              onKeyDown={handleSearchKeyDown}
-            />
-            <span className="searchable-combobox-status" role="status" aria-live="polite">
-              {formatNumber(filteredOptions.length)} of {formatNumber(options.length)} options
-            </span>
-          </div>
-          <div
-            id={listboxId}
-            className="searchable-combobox-list"
-            role="listbox"
-            aria-label={`${label} options`}
-          >
-            {filteredOptions.length ? (
-              filteredOptions.map((option, index) => (
-                <button
-                  ref={(element) => {
-                    optionRefs.current[index] = element;
-                  }}
-                  id={`${listboxId}-option-${index}`}
-                  type="button"
-                  role="option"
-                  className={`searchable-combobox-option ${index === boundedActiveIndex ? "active" : ""}`}
-                  aria-label={option.label}
-                  aria-selected={option.id === value}
-                  key={option.id}
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => commitOption(option)}
-                >
-                  <span>{option.label}</span>
-                  {option.hint && <small aria-hidden="true">{option.hint}</small>}
-                  {option.id === value && <em aria-hidden="true">Selected</em>}
-                </button>
-              ))
-            ) : (
-              <p className="searchable-combobox-empty">No matching options</p>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function NumberField({
-  label,
-  value,
-  onChange,
-  min = 1,
-  max = 99,
-  disabled = false
-}: {
-  label: string;
-  value: number;
-  onChange: (value: number) => void;
-  min?: number;
-  max?: number;
-  disabled?: boolean;
-}) {
-  const id = useId();
-  return (
-    <div className="field">
-      <label htmlFor={id}>{label}</label>
-      <input
-        id={id}
-        type="number"
-        min={min}
-        max={max}
-        disabled={disabled}
-        value={value}
-        onChange={(event) => onChange(numberValue(event.target.value, value, min, max))}
-      />
-    </div>
-  );
-}
-
-function DecimalField({
-  label,
-  value,
-  onChange,
-  min = 0,
-  max = 999,
-  step = 0.05,
-  disabled = false
-}: {
-  label: string;
-  value: number;
-  onChange: (value: number) => void;
-  min?: number;
-  max?: number;
-  step?: number;
-  disabled?: boolean;
-}) {
-  const id = useId();
-  return (
-    <div className="field">
-      <label htmlFor={id}>{label}</label>
-      <input
-        id={id}
-        type="number"
-        min={min}
-        max={max}
-        step={step}
-        disabled={disabled}
-        value={value}
-        onChange={(event) => onChange(stepDecimalValue(event.target.value, value, min, max, step))}
-      />
-    </div>
-  );
-}
-
-function OptionalNumberField({
-  label,
-  value,
-  onChange,
-  min,
-  max,
-  step = 1,
-  placeholder,
-  resetLabel = "Reset",
-  compactReset = false
-}: {
-  label: string;
-  value: number | null;
-  onChange: (value: number | null) => void;
-  min: number;
-  max: number;
-  step?: number;
-  placeholder?: string;
-  resetLabel?: string;
-  compactReset?: boolean;
-}) {
-  const id = useId();
-  return (
-    <div className={`field optional-number-field ${compactReset ? "compact" : ""}`.trim()}>
-      <label htmlFor={id}>{label}</label>
-      <div className="optional-number-control">
-        <input
-          id={id}
-          type="number"
-          min={min}
-          max={max}
-          step={step}
-          value={value ?? ""}
-          placeholder={placeholder}
-          onChange={(event) => {
-            const rawValue = event.target.value;
-            if (rawValue.trim() === "") {
-              onChange(null);
-              return;
-            }
-            const parsed =
-              step === 1 ? numberValue(rawValue, 0, min, max) : decimalValue(rawValue, 0, min, max);
-            onChange(parsed);
-          }}
-        />
-        <button
-          type="button"
-          aria-label={compactReset ? `${resetLabel} ${label}` : undefined}
-          title={compactReset ? `${resetLabel} ${label} to derived value` : undefined}
-          disabled={value == null}
-          onClick={() => onChange(null)}
-        >
-          {compactReset ? "↺" : resetLabel}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function ReadOnlyField({
-  label,
-  value,
-  disabled = false
-}: {
-  label: string;
-  value: string;
-  disabled?: boolean;
-}) {
-  const labelId = useId();
-  return (
-    <div className={`field readonly-field ${disabled ? "disabled" : ""}`}>
-      <span id={labelId}>{label}</span>
-      <output aria-labelledby={labelId}>{value}</output>
-    </div>
-  );
-}
-
-function localStateStatusLabel(item: LocalStateHealthItem): string {
-  if (item.status === "loaded") return "Loaded";
-  if (item.status === "missing") return "Not saved";
-  if (item.status === "version-mismatch") return "Unsupported version";
-  if (item.status === "unavailable") return "Storage unavailable";
-  if (item.status === "save-failed") return "Save failed";
-  return "Invalid";
-}
-
-function localStateReasonLabel(item: LocalStateHealthItem): string {
-  if (item.status === "missing") return "Using defaults until this state is saved.";
-  if (item.status === "loaded") return "Local data is valid.";
-  if (item.status === "unavailable") {
-    return "Local storage could not be read. Defaults are active and changes may not persist after reload.";
-  }
-  if (item.status === "save-failed") {
-    return item.reason === "clear_failed"
-      ? "Local storage could not be cleared. Current session data remains active, but reload may restore the saved state."
-      : "Local storage could not be saved. Current session data remains active, but changes may not persist after reload.";
-  }
-  if (item.status === "version-mismatch") {
-    return `Found v${formatNumber(item.foundVersion ?? 0)}, expected v${formatNumber(
-      item.expectedVersion
-    )}. Defaults are active until this key is cleared or replaced.`;
-  }
-  if (item.reason === "body_too_large") {
-    return "Saved data is too large. Defaults are active until this key is cleared or replaced.";
-  }
-  if (item.reason === "duplicate_keys") {
-    return "Saved data contains duplicate JSON keys. Defaults are active until this key is cleared or replaced.";
-  }
-  if (item.reason === "invalid_json") {
-    return "Saved data is not valid JSON. Defaults are active until this key is cleared or replaced.";
-  }
-  if (item.reason === "invalid_envelope") {
-    return "Saved metadata is invalid. Defaults are active until this key is cleared or replaced.";
-  }
-  return "Saved data failed validation. Defaults are active until this key is cleared or replaced.";
-}
-
-function localStateHealthExportFileName(report: LocalStateHealthReport): string {
-  const safeTimestamp = report.generatedAt.replace(/[^0-9A-Za-z._-]+/g, "-");
-  return `index-sim-local-state-health-${safeTimestamp}.json`;
-}
-
-function localStateRecoveryStatus(report: LocalStateHealthReport): string {
-  return report.hasAttention ? `${formatNumber(report.attentionCount)} need attention` : "Healthy";
-}
-
 export function App() {
   const [context, setContext] = useState<SimulationContext | null>(null);
   const [initialSavedSetup] = useState(loadInitialSavedSetup);
@@ -2952,6 +1406,13 @@ export function App() {
   const [priceHistory, setPriceHistory] =
     useState<BrowserPriceHistoryState>(loadInitialPriceHistory);
   const [bundledPriceSet, setBundledPriceSet] = useState<PriceSet | null>(null);
+  const [basePriceSet, setBasePriceSet] = useState<PriceSet | null>(null);
+  const [manualPriceOverrides, setManualPriceOverrides] = useState<ManualPriceOverridesState>(
+    loadInitialManualPriceOverrides
+  );
+  const [manualPriceItemId, setManualPriceItemId] = useState("");
+  const [manualPriceDraft, setManualPriceDraft] = useState<number | null>(null);
+  const [manualPriceClearPending, setManualPriceClearPending] = useState(false);
   const [scheduledSnapshotStatus, setScheduledSnapshotStatus] =
     useState<ScheduledStaticPriceSnapshotStatus | null>(null);
   const [activePriceSetOrigin, setActivePriceSetOrigin] = useState<ActivePriceSetOrigin>("bundled");
@@ -2967,52 +1428,50 @@ export function App() {
     loadInitialLegacyMigrationDismissed
   );
   const [legacyClearPending, setLegacyClearPending] = useState(false);
-  const [localStateHealthReport, setLocalStateHealthReport] = useState<LocalStateHealthReport>(
-    () => initialLocalStateHealthReport
-  );
-  const [localStateRecoveryBlockedIds, setLocalStateRecoveryBlockedIds] = useState<
-    LocalStateHealthItemId[]
-  >(() => initialLocalStateRecoveryBlockedIds);
-  const [localStateClearPendingId, setLocalStateClearPendingId] = useState<
-    LocalStateHealthItemId | "invalid-all" | null
-  >(null);
-  const [localStateStorageFailures, setLocalStateStorageFailures] = useState<
-    LocalStateStorageFailure[]
-  >([]);
-  const [localStateContextInvalidIds, setLocalStateContextInvalidIds] = useState<
-    LocalStateHealthItemId[]
-  >([]);
   const [priceAgeNowMs, setPriceAgeNowMs] = useState(() => Date.now());
-  const [localStateRecoveryNotice, setLocalStateRecoveryNotice] = useState<string | null>(() =>
-    localStorageAccessUnavailable ? LOCAL_STATE_PERSISTENCE_NOTICE : null
-  );
-  const skipNextLocalStatePersistRef = useRef<Set<LocalStateHealthItemId>>(new Set());
   const [readyToPersist, setReadyToPersist] = useState(false);
   const [status, setStatus] = useState("Loading source-backed runtime data");
+  const localStateRecovery = useLocalStateRecovery({
+    storage,
+    storageUnavailable: localStorageAccessUnavailable,
+    onStatus: setStatus,
+    onDownload: downloadJsonFile
+  });
+  const persistLocalState = localStateRecovery.persist;
+  const persistImportedSetup = useCallback(
+    (setup: SavedSetupState) => persistLocalState("rewrite-setup", setupStorageOptions, setup),
+    [persistLocalState]
+  );
+  const setupFileTransfer = useSetupFileTransfer({
+    persistSetup: persistImportedSetup,
+    unblockReplaced: localStateRecovery.unblockReplaced,
+    refreshLocalStateHealth: localStateRecovery.refresh
+  });
+  const priceSetTransfer = usePriceSetTransfer({
+    storage,
+    storageUnavailable: localStorageAccessUnavailable,
+    clearStorageFailures: localStateRecovery.clearStorageFailures,
+    recordStorageFailure: localStateRecovery.recordStorageFailure,
+    markPersistenceUnavailable: localStateRecovery.markPersistenceUnavailable,
+    unblockReplaced: localStateRecovery.unblockReplaced,
+    refreshLocalStateHealth: localStateRecovery.refresh
+  });
+  const hiscores = useHiscoresLookup({
+    storage,
+    clearStorageFailures: localStateRecovery.clearStorageFailures,
+    recordStorageFailure: localStateRecovery.recordStorageFailure,
+    unblockReplaced: localStateRecovery.unblockReplaced,
+    refreshLocalStateHealth: localStateRecovery.refresh
+  });
   const [fatalError, setFatalError] = useState<string | null>(null);
-  const [setupImportNotice, setSetupImportNotice] = useState<SetupImportNotice | null>(null);
   const [receivedShareableSetupPayload] = useState(captureBrowserShareableSetupFragment);
   const [shareReviewDismissed, setShareReviewDismissed] = useState(false);
   const [shareDialog, setShareDialog] = useState<ShareSetupDialogState | null>(null);
   const [shareCreateNotice, setShareCreateNotice] = useState<string | null>(null);
   const [duelImportNotice, setDuelImportNotice] = useState<SetupImportNotice | null>(null);
-  const [priceImportNotice, setPriceImportNotice] = useState<ScopedPriceImportNotice | null>(null);
   const [priceLabel, setPriceLabel] = useState(
     "Scheduled static prices + generated item fallbacks"
   );
-  const [hiscoresStatus, setHiscoresStatus] = useState<HiscoresStatusResponse | null>(null);
-  const [hiscoresPlayer, setHiscoresPlayer] = useState(() => loadLastHiscoresPlayer(storage));
-  const [hiscoresResponse, setHiscoresResponse] = useState<HiscoresResponse | null>(null);
-  const [hiscoresPreviewOpen, setHiscoresPreviewOpen] = useState(false);
-  const [hiscoresBusy, setHiscoresBusy] = useState(false);
-  const [hiscoresNotice, setHiscoresNotice] = useState<{
-    tone: "neutral" | "success" | "error";
-    message: string;
-  } | null>(null);
-  const hiscoresPlayerRef = useRef(hiscoresPlayer);
-  const hiscoresLookupSequenceRef = useRef(0);
-  const hiscoresPreviewDetailsRef = useRef<HTMLDetailsElement>(null);
-  const hiscoresPreviewSummaryRef = useRef<HTMLElement>(null);
   const [marketNotice, setMarketNotice] = useState<{
     tone: "neutral" | "success" | "warning" | "error";
     message: string;
@@ -3027,92 +1486,12 @@ export function App() {
     direction: "desc"
   });
   const [priceHistoryClearPending, setPriceHistoryClearPending] = useState(false);
-  const [priceSetResetPending, setPriceSetResetPending] = useState(false);
   const [lootNotice, setLootNotice] = useState<string | null>(null);
   const [pendingUndo, setPendingUndo] = useState<PendingUndo | null>(null);
+  const [respectLoadoutRequirements, setRespectLoadoutRequirements] = useState(true);
   const [activeTab, setActiveTab] = useState<WorkbenchTabId>("compare");
   const shareSetupButtonRef = useRef<HTMLButtonElement>(null);
   const heavyForm = useDebouncedValue(form, 250);
-  const localStateRecoveryBlocked = (itemId: LocalStateHealthItemId): boolean =>
-    localStateRecoveryBlockedIds.includes(itemId);
-  const shouldSkipLocalStatePersist = (itemId: LocalStateHealthItemId): boolean => {
-    if (skipNextLocalStatePersistRef.current.has(itemId)) {
-      skipNextLocalStatePersistRef.current.delete(itemId);
-      return true;
-    }
-    return localStateRecoveryBlocked(itemId);
-  };
-  const refreshLocalStateHealthReport = (
-    storageFailures: readonly LocalStateStorageFailure[] = localStateStorageFailures
-  ): LocalStateHealthReport => {
-    const report = createLocalStateHealthReport(storage, new Date(), {
-      storageUnavailable: localStorageAccessUnavailable,
-      storageFailures,
-      contextInvalidItemIds: localStateContextInvalidIds
-    });
-    setLocalStateHealthReport(report);
-    return report;
-  };
-  const recordLocalStateStorageFailure = (
-    itemId: LocalStateHealthItemId,
-    reason: LocalStateStorageFailure["reason"]
-  ): void => {
-    setLocalStateStorageFailures((current) => {
-      return [...current.filter((failure) => failure.id !== itemId), { id: itemId, reason }];
-    });
-    setLocalStateRecoveryNotice(LOCAL_STATE_PERSISTENCE_NOTICE);
-    setStatus(LOCAL_STATE_PERSISTENCE_NOTICE);
-  };
-  const clearLocalStateStorageFailures = (itemIds: readonly LocalStateHealthItemId[]): void => {
-    if (!itemIds.length) return;
-    setLocalStateStorageFailures((current) => {
-      const next = current.filter((failure) => !itemIds.includes(failure.id));
-      return next;
-    });
-  };
-  const persistLocalState = <T,>(
-    itemId: LocalStateHealthItemId,
-    options: VersionedStorageOptions<T>,
-    value: T
-  ): boolean => {
-    const result = trySavePersisted(options, value);
-    if (result.status === "saved") {
-      if (localStorageAccessUnavailable) {
-        setLocalStateRecoveryNotice(LOCAL_STATE_PERSISTENCE_NOTICE);
-        setStatus(LOCAL_STATE_PERSISTENCE_NOTICE);
-        return false;
-      }
-      clearLocalStateStorageFailures([itemId]);
-      return true;
-    }
-    recordLocalStateStorageFailure(itemId, result.reason);
-    return false;
-  };
-  const releaseLocalStateRecoveryBlocks = (itemIds: readonly LocalStateHealthItemId[]): void => {
-    if (!itemIds.length) return;
-    for (const itemId of itemIds) skipNextLocalStatePersistRef.current.add(itemId);
-    setLocalStateRecoveryBlockedIds((current) =>
-      current.filter((itemId) => !itemIds.includes(itemId))
-    );
-    setLocalStateContextInvalidIds((current) =>
-      current.filter((itemId) => !itemIds.includes(itemId))
-    );
-  };
-  const unblockReplacedLocalState = (itemIds: readonly LocalStateHealthItemId[]): void => {
-    if (!itemIds.length) return;
-    setLocalStateRecoveryBlockedIds((current) =>
-      current.filter((itemId) => !itemIds.includes(itemId))
-    );
-    setLocalStateContextInvalidIds((current) =>
-      current.filter((itemId) => !itemIds.includes(itemId))
-    );
-  };
-
-  /* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps -- Storage failures are external-system state and this effect refreshes their sanitized UI report. */
-  useEffect(() => {
-    refreshLocalStateHealthReport(localStateStorageFailures);
-  }, [localStateContextInvalidIds, localStateStorageFailures]);
-  /* eslint-enable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
 
   useEffect(() => {
     const timerId = window.setInterval(() => setPriceAgeNowMs(Date.now()), 60_000);
@@ -3127,175 +1506,53 @@ export function App() {
     []
   );
 
+  const runtimeBootstrap = useRuntimeBootstrap({
+    storage,
+    initialSavedSetup,
+    initialDuelSnapshots,
+    initialManualPriceOverrides: manualPriceOverrides
+  });
+  const blockContextInvalidLocalState = localStateRecovery.blockContextInvalid;
+  const appliedRuntimeBootstrapResultRef = useRef<RuntimeBootstrapResult | null>(null);
+
+  /* eslint-disable react-hooks/set-state-in-effect -- One resolved startup transaction is applied idempotently before versioned persistence is enabled. */
   useEffect(() => {
-    hiscoresPlayerRef.current = hiscoresPlayer;
-  }, [hiscoresPlayer]);
+    if (runtimeBootstrap.status === "loading") return;
+    if (runtimeBootstrap.status === "error") {
+      setFatalError(runtimeBootstrap.message);
+      return;
+    }
 
-  useEffect(() => {
-    if (!hiscoresPreviewOpen) return;
+    const result = runtimeBootstrap.result;
+    if (appliedRuntimeBootstrapResultRef.current === result) return;
+    appliedRuntimeBootstrapResultRef.current = result;
 
-    const dismissOnOutsidePointer = (event: PointerEvent) => {
-      if (
-        event.target instanceof Node &&
-        !hiscoresPreviewDetailsRef.current?.contains(event.target)
-      ) {
-        setHiscoresPreviewOpen(false);
-      }
-    };
-    const dismissOnEscape = (event: globalThis.KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      event.preventDefault();
-      setHiscoresPreviewOpen(false);
-      window.requestAnimationFrame(() => hiscoresPreviewSummaryRef.current?.focus());
-    };
-
-    document.addEventListener("pointerdown", dismissOnOutsidePointer);
-    document.addEventListener("keydown", dismissOnEscape);
-    return () => {
-      document.removeEventListener("pointerdown", dismissOnOutsidePointer);
-      document.removeEventListener("keydown", dismissOnEscape);
-    };
-  }, [hiscoresPreviewOpen]);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetchHiscoresStatus()
-      .then((result) => {
-        if (cancelled) return;
-        setHiscoresStatus(result);
-        setHiscoresNotice(
-          result.available ? null : { tone: "neutral", message: hiscoresUnavailableMessage(result) }
-        );
-      })
-      .catch((caught: unknown) => {
-        if (cancelled) return;
-        setHiscoresStatus(null);
-        setHiscoresNotice({ tone: "error", message: describeHiscoresError(caught) });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    loadGeneratedRuntimeContext()
-      .then(async (result) => {
-        if (cancelled) return;
-        const bundledContext = result.context;
-        const setupCompatibilityIssues = initialSavedSetup.loaded
-          ? savedSetupCompatibilityIssues(initialSavedSetup.setup, bundledContext.gameData)
-          : [];
-        const duelCompatibilityIssues = duelSnapshotsCompatibilityIssues(
-          initialDuelSnapshots,
-          bundledContext.gameData
-        );
-        if (setupCompatibilityIssues.length > 0) {
-          const fallbackSetup = savedSetupFromForm(DEFAULT_FORM_STATE);
-          setForm(fallbackSetup.form);
-          setDefaultForm(fallbackSetup.defaultForm);
-          setSetupMode(fallbackSetup.setupMode);
-          setCustomSetupsByMonster(fallbackSetup.customSetupsByMonster);
-          setCannonByMonster(fallbackSetup.cannonByMonster);
-          setDenseCompare(fallbackSetup.denseCompare);
-        }
-        if (duelCompatibilityIssues.length > 0) {
-          setDuelSnapshots(DEFAULT_DUEL_SNAPSHOTS_STATE);
-        }
-        const contextInvalidIds: LocalStateHealthItemId[] = [
-          ...(setupCompatibilityIssues.length > 0 ? (["rewrite-setup"] as const) : []),
-          ...(duelCompatibilityIssues.length > 0 ? (["duel-snapshots"] as const) : [])
-        ];
-        if (contextInvalidIds.length > 0) {
-          setLocalStateContextInvalidIds(contextInvalidIds);
-          setLocalStateRecoveryBlockedIds((current) => [
-            ...current,
-            ...contextInvalidIds.filter((itemId) => !current.includes(itemId))
-          ]);
-          setLocalStateRecoveryNotice(
-            contextInvalidIds.length > 1
-              ? "Saved setup and setup comparisons reference unavailable game data. Defaults are active until the saved data is cleared or replaced."
-              : setupCompatibilityIssues.length > 0
-                ? "Saved rewrite setup references data unavailable in this game version. Defaults are active until the saved setup is cleared or replaced."
-                : "Saved setup comparisons reference unavailable game data. An empty setup list is active until the saved setups are cleared or replaced."
-          );
-        }
-        const selectedPriceSet = loadSelectedPriceSet(storage);
-        const restoredPriceSet =
-          selectedPriceSet.status === "loaded"
-            ? withGeneratedAlchAuthority(selectedPriceSet.value.priceSet, bundledContext.gameData)
-            : null;
-        const scheduledStatus = await loadScheduledStaticPriceSnapshot({
-          fallbackPriceSet: restoredPriceSet ?? bundledContext.priceSet,
-          canonicalAlchValues: generatedItemValues(bundledContext.gameData, "alch")
-        });
-        if (cancelled) return;
-        const runtimeScheduledStatus = withGeneratedScheduledPriceFallbacks(
-          scheduledStatus,
-          bundledContext.gameData
-        );
-        const fallbackResolution = resolveActivePriceSetFallback({
-          bundledPriceSet: bundledContext.priceSet,
-          selectedPriceSet: restoredPriceSet,
-          scheduledSnapshotStatus: runtimeScheduledStatus
-        });
-        const scheduledLoaded = runtimeScheduledStatus.status === "loaded";
-        setBundledPriceSet(bundledContext.priceSet);
-        setScheduledSnapshotStatus(runtimeScheduledStatus);
-        setActivePriceSetOrigin(fallbackResolution.origin);
-        if (restoredPriceSet) {
-          setStatus(
-            initialSavedSetup.loaded
-              ? "Loaded saved rewrite setup and selected PriceSet"
-              : "Loaded selected PriceSet"
-          );
-          setContext({ ...bundledContext, priceSet: fallbackResolution.priceSet });
-          setPriceLabel(fallbackResolution.priceSet.label);
-          setMarketNotice({
-            tone: "success",
-            message: `Restored selected PriceSet: ${restoredPriceSet.label}`
-          });
-        } else {
-          const selectedPriceSetIssue = describeSelectedPriceSetLoadIssue(selectedPriceSet);
-          const loadedStatus = scheduledLoaded
-            ? "Loaded scheduled prices"
-            : initialSavedSetup.loaded
-              ? "Loaded saved rewrite setup"
-              : "Loaded source-backed runtime data";
-          setStatus(
-            selectedPriceSetIssue && !scheduledLoaded ? selectedPriceSetIssue : loadedStatus
-          );
-          setContext({ ...bundledContext, priceSet: fallbackResolution.priceSet });
-          setPriceLabel(fallbackResolution.priceSet.label);
-          if (scheduledLoaded) {
-            setMarketNotice({
-              tone: selectedPriceSetIssue ? "neutral" : "success",
-              message: selectedPriceSetIssue
-                ? "Saved active PriceSet could not be restored. Scheduled prices were loaded."
-                : "Scheduled prices loaded."
-            });
-          } else if (selectedPriceSetIssue) {
-            setMarketNotice({ tone: "error", message: selectedPriceSetIssue });
-          }
-        }
-        if (setupCompatibilityIssues.length > 0) {
-          setStatus("Saved rewrite setup is incompatible; defaults are active");
-        } else if (duelCompatibilityIssues.length > 0) {
-          setStatus("Saved setup comparisons are incompatible; an empty list is active");
-        }
-        setReadyToPersist(true);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setFatalError(
-            "Source-backed runtime data could not be loaded. Verify the deployed data artifacts and reload."
-          );
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [initialDuelSnapshots, initialSavedSetup]);
+    if (result.setupReplacement) {
+      setForm(result.setupReplacement.form);
+      setDefaultForm(result.setupReplacement.defaultForm);
+      setSetupMode(result.setupReplacement.setupMode);
+      setCustomSetupsByMonster(result.setupReplacement.customSetupsByMonster);
+      setCannonByMonster(result.setupReplacement.cannonByMonster);
+      setDenseCompare(result.setupReplacement.denseCompare);
+    }
+    if (result.duelSnapshotsReplacement) {
+      setDuelSnapshots(result.duelSnapshotsReplacement);
+    }
+    if (result.contextInvalidItemIds.length > 0) {
+      blockContextInvalidLocalState(result.contextInvalidItemIds, result.recoveryNotice);
+    }
+    setBundledPriceSet(result.bundledPriceSet);
+    setBasePriceSet(result.basePriceSet);
+    setManualPriceOverrides(result.manualPriceOverrides);
+    setScheduledSnapshotStatus(result.scheduledSnapshotStatus);
+    setActivePriceSetOrigin(result.activePriceSetOrigin);
+    setStatus(result.statusMessage);
+    setContext(result.context);
+    setPriceLabel(result.priceLabel);
+    if (result.marketNotice) setMarketNotice(result.marketNotice);
+    setReadyToPersist(true);
+  }, [blockContextInvalidLocalState, runtimeBootstrap]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const legacyMigrationReport = useMemo<LegacySetupMigrationReport | null>(() => {
     if (!context || legacyMigrationDismissed) return null;
@@ -3335,10 +1592,10 @@ export function App() {
     return next;
   }, [context, lootPrefsByMonster]);
 
-  /* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps -- These effects synchronize versioned app state to browser storage and surface sanitized storage failures. */
+  /* eslint-disable react-hooks/exhaustive-deps -- These effects synchronize versioned app state to browser storage and surface sanitized storage failures. */
   useEffect(() => {
-    if (!readyToPersist || shouldSkipLocalStatePersist("rewrite-setup")) return;
-    persistLocalState(
+    if (!readyToPersist || localStateRecovery.shouldSkipPersist("rewrite-setup")) return;
+    localStateRecovery.persist(
       "rewrite-setup",
       setupStorageOptions,
       savedSetupFromForm(
@@ -3356,47 +1613,47 @@ export function App() {
     defaultForm,
     denseCompareForGameData,
     form,
-    localStateRecoveryBlockedIds,
+    localStateRecovery.blockedIds,
     readyToPersist,
     setupMode
   ]);
 
   useEffect(() => {
-    if (!readyToPersist || shouldSkipLocalStatePersist("loot-prefs")) return;
-    persistLocalState("loot-prefs", lootPrefsStorageOptions, lootPrefsForGameData);
-  }, [localStateRecoveryBlockedIds, lootPrefsForGameData, readyToPersist]);
+    if (!readyToPersist || localStateRecovery.shouldSkipPersist("loot-prefs")) return;
+    localStateRecovery.persist("loot-prefs", lootPrefsStorageOptions, lootPrefsForGameData);
+  }, [localStateRecovery.blockedIds, lootPrefsForGameData, readyToPersist]);
 
   useEffect(() => {
-    if (!readyToPersist || shouldSkipLocalStatePersist("loot-settings")) return;
-    persistLocalState("loot-settings", lootSettingsStorageOptions, lootSettingsByMonster);
-  }, [localStateRecoveryBlockedIds, lootSettingsByMonster, readyToPersist]);
+    if (!readyToPersist || localStateRecovery.shouldSkipPersist("loot-settings")) return;
+    localStateRecovery.persist("loot-settings", lootSettingsStorageOptions, lootSettingsByMonster);
+  }, [localStateRecovery.blockedIds, lootSettingsByMonster, readyToPersist]);
 
   useEffect(() => {
-    if (!readyToPersist || shouldSkipLocalStatePersist("hidden-gear-tiers")) return;
-    persistLocalState("hidden-gear-tiers", hiddenGearTiersStorageOptions, hiddenGearTiers);
-  }, [hiddenGearTiers, localStateRecoveryBlockedIds, readyToPersist]);
+    if (!readyToPersist || localStateRecovery.shouldSkipPersist("hidden-gear-tiers")) return;
+    localStateRecovery.persist("hidden-gear-tiers", hiddenGearTiersStorageOptions, hiddenGearTiers);
+  }, [hiddenGearTiers, localStateRecovery.blockedIds, readyToPersist]);
 
   useEffect(() => {
-    if (!readyToPersist || shouldSkipLocalStatePersist("duel-snapshots")) return;
-    persistLocalState("duel-snapshots", duelSnapshotsStorageOptions, duelSnapshots);
-  }, [duelSnapshots, localStateRecoveryBlockedIds, readyToPersist]);
+    if (!readyToPersist || localStateRecovery.shouldSkipPersist("duel-snapshots")) return;
+    localStateRecovery.persist("duel-snapshots", duelSnapshotsStorageOptions, duelSnapshots);
+  }, [duelSnapshots, localStateRecovery.blockedIds, readyToPersist]);
 
   useEffect(() => {
     if (
       !readyToPersist ||
       priceHistory.snapshots.length === 0 ||
-      shouldSkipLocalStatePersist("price-history")
+      localStateRecovery.shouldSkipPersist("price-history")
     ) {
       return;
     }
-    persistLocalState("price-history", priceHistoryStorageOptions, priceHistory);
-  }, [localStateRecoveryBlockedIds, priceHistory, readyToPersist]);
+    localStateRecovery.persist("price-history", priceHistoryStorageOptions, priceHistory);
+  }, [localStateRecovery.blockedIds, priceHistory, readyToPersist]);
 
   useEffect(() => {
-    if (!readyToPersist || shouldSkipLocalStatePersist("planner-ui")) return;
-    persistLocalState("planner-ui", plannerUiStorageOptions, plannerState);
-  }, [localStateRecoveryBlockedIds, plannerState, readyToPersist]);
-  /* eslint-enable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
+    if (!readyToPersist || localStateRecovery.shouldSkipPersist("planner-ui")) return;
+    localStateRecovery.persist("planner-ui", plannerUiStorageOptions, plannerState);
+  }, [localStateRecovery.blockedIds, plannerState, readyToPersist]);
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   const currentLootRowIds = useMemo(() => {
     if (!context) return [];
@@ -3556,6 +1813,10 @@ export function App() {
       setupMode
     ]
   );
+  const actionableLootRows =
+    viewModel?.lootRows.filter((row) => row.eligibilityDescription === null) ?? [];
+  const conditionalLootRows =
+    viewModel?.lootRows.filter((row) => row.eligibilityDescription !== null) ?? [];
   const derivedViewModel = useMemo(
     () =>
       context
@@ -3683,14 +1944,12 @@ export function App() {
   const denseCompareTotalRows = context ? Object.keys(context.gameData.monsters).length : 0;
   const hiscoresPreviewRows = useMemo(
     () =>
-      isHiscoresPreviewCurrent(hiscoresPlayer, hiscoresResponse)
-        ? createHiscoresPreviewRows(form, hiscoresResponse)
+      isHiscoresPreviewCurrent(hiscores.player, hiscores.response)
+        ? createHiscoresPreviewRows(form, hiscores.response)
         : [],
-    [form, hiscoresPlayer, hiscoresResponse]
+    [form, hiscores.player, hiscores.response]
   );
-  const hiscoresAvailable = hiscoresStatus?.available === true;
-  const hiscoresStatusText = statusText(hiscoresStatus, hiscoresAvailable);
-  const canApplyHiscores = canApplyHiscoresPreview(hiscoresPlayer, hiscoresResponse);
+  const canApplyHiscores = canApplyHiscoresPreview(hiscores.player, hiscores.response);
 
   const monsters = useMemo(() => (context ? monsterOptions(context.gameData) : []), [context]);
   const styles = useMemo(
@@ -3878,6 +2137,13 @@ export function App() {
     ],
     [viewModel]
   );
+  const manualPriceItemOptions = useMemo<SelectOption[]>(
+    () =>
+      Object.keys(basePriceSet?.itemPrices ?? {})
+        .map((itemId) => ({ id: itemId, label: priceHistoryItemLabels[itemId] ?? itemId }))
+        .sort((left, right) => left.label.localeCompare(right.label)),
+    [basePriceSet, priceHistoryItemLabels]
+  );
   const riskBuildFresh =
     riskBuild != null &&
     riskBuild.source.form === form &&
@@ -3999,11 +2265,16 @@ export function App() {
       form,
       context,
       weaponOptions: weaponSelectOptions,
-      gearOptions: gearSelectOptions
+      gearOptions: gearSelectOptions,
+      eligibilityPolicy: respectLoadoutRequirements
+        ? "respect-current-levels"
+        : "ignore-requirements"
     });
     const monsterName = context.gameData.monsters[form.monsterId]?.name ?? form.monsterId;
     if (!result.changedFields.length) {
-      setStatus(`Current loadout is already best visible for ${monsterName}`);
+      setStatus(
+        `Current loadout is already best ${respectLoadoutRequirements ? "eligible " : ""}visible for ${monsterName}`
+      );
       return;
     }
     commitFormState(result.form);
@@ -4011,7 +2282,11 @@ export function App() {
     const detail = `Optimized loadout for ${monsterName}: +${formatNumber(
       result.dpsDeltaPct,
       2
-    )}% normal DPS, ${formatNumber(result.changedFields.length)} fields${capLabel}`;
+    )}% normal DPS, ${formatNumber(result.changedFields.length)} fields${capLabel}${
+      result.excludedCandidateCount > 0
+        ? `, ${formatNumber(result.excludedCandidateCount)} ineligible choices skipped`
+        : ""
+    }`;
     setUndoableStatus(detail, `Restored loadout for ${monsterName}`, () => {
       commitFormState(previousForm);
     });
@@ -4024,43 +2299,30 @@ export function App() {
     setPendingUndo(null);
   };
 
-  const persistSelectedActivePriceSet = (priceSet: PriceSet, selectedAt: Date): boolean => {
-    try {
-      saveSelectedPriceSet(storage, priceSet, { now: () => selectedAt });
-      if (localStorageAccessUnavailable) {
-        setLocalStateRecoveryNotice(LOCAL_STATE_PERSISTENCE_NOTICE);
-        refreshLocalStateHealthReport();
-        return false;
-      }
-      clearLocalStateStorageFailures(["selected-price-set"]);
-      refreshLocalStateHealthReport();
-      setPriceSetResetPending(false);
-      return true;
-    } catch {
-      recordLocalStateStorageFailure("selected-price-set", "save_failed");
-      return false;
-    }
+  const applyAcceptedPriceSet = (outcome: AcceptedPriceSetOutcome) => {
+    setBasePriceSet(outcome.basePriceSet);
+    setManualPriceDraft(null);
+    setManualPriceClearPending(false);
+    setContext((current) => (current ? { ...current, priceSet: outcome.activePriceSet } : current));
+    setPriceHistory(outcome.priceHistoryUpdate);
+    setPriceLabel(outcome.activePriceSet.label);
+    setActivePriceSetOrigin(outcome.activePriceSetOrigin);
+    setStatus(outcome.appStatus);
+    setMarketNotice(outcome.marketNotice);
+    setFatalError(null);
   };
 
   const acceptPriceSet = (priceSet: PriceSet, acceptedAt: Date, nextStatus: string) => {
     if (!context) return;
-    const canonicalPriceSet = withGeneratedAlchAuthority(priceSet, context.gameData);
-    const selectedPersisted = persistSelectedActivePriceSet(canonicalPriceSet, acceptedAt);
-    unblockReplacedLocalState(["price-history", "selected-price-set"]);
-    setContext((current) => (current ? { ...current, priceSet: canonicalPriceSet } : current));
-    setPriceHistory((current) =>
-      appendAcceptedPriceSetToHistory(current, canonicalPriceSet, acceptedAt)
+    applyAcceptedPriceSet(
+      priceSetTransfer.acceptPriceSet({
+        priceSet,
+        acceptedAt,
+        nextStatus,
+        gameData: context.gameData,
+        manualPriceOverrides
+      })
     );
-    setPriceLabel(canonicalPriceSet.label);
-    setActivePriceSetOrigin("selected");
-    setStatus(nextStatus);
-    setMarketNotice({
-      tone: selectedPersisted ? "success" : "neutral",
-      message: selectedPersisted
-        ? `${nextStatus}: ${canonicalPriceSet.label}. High alch uses current generated game data.`
-        : `${nextStatus}: ${canonicalPriceSet.label}. High alch uses current generated game data. Local restore was not saved.`
-    });
-    setFatalError(null);
   };
 
   const importPrices = async (
@@ -4070,18 +2332,12 @@ export function App() {
     const file = event.target.files?.[0];
     if (!file || !context) return;
     try {
-      setPriceImportNotice(null);
-      const priceSet = parsePriceSetFileText(
-        await readBrowserFileText(file, PRICE_SET_IMPORT_MAX_BYTES),
-        { maxBytes: PRICE_SET_IMPORT_MAX_BYTES }
-      );
-      acceptPriceSet(priceSet, new Date(), "Imported price set");
-      setPriceImportNotice({
-        ...createPriceImportSuccessNotice(priceSet.label),
-        surface
+      const outcome = await priceSetTransfer.importFile(file, {
+        surface,
+        gameData: context.gameData,
+        manualPriceOverrides
       });
-    } catch (caught) {
-      setPriceImportNotice({ ...describePriceImportError(caught), surface });
+      if (outcome.status === "ready") applyAcceptedPriceSet(outcome);
     } finally {
       event.target.value = "";
     }
@@ -4091,41 +2347,43 @@ export function App() {
     const file = event.target.files?.[0];
     if (!file || !context) return;
     try {
-      setSetupImportNotice(null);
-      const parsed = parseSavedSetupExportText(
-        await readBrowserFileText(file, SETUP_IMPORT_MAX_BYTES),
-        context.gameData
-      );
-      const setup = parsed.data;
-      const persisted = persistLocalState("rewrite-setup", setupStorageOptions, setup);
-      setForm(normalizeFormState(setup.form));
-      setDefaultForm(normalizeFormState(setup.defaultForm));
-      setSetupMode(setup.setupMode);
-      setCustomSetupsByMonster(setup.customSetupsByMonster);
-      setDenseCompare(setup.denseCompare);
-      setCannonByMonster(setup.cannonByMonster);
-      unblockReplacedLocalState(["rewrite-setup"]);
-      refreshLocalStateHealthReport();
-      setStatus(persisted ? "Imported rewrite setup" : "Imported rewrite setup for this session");
-      setSetupImportNotice({
-        tone: "success",
-        message: persisted
-          ? "Imported rewrite setup."
-          : "Imported rewrite setup for this session. Local storage is unavailable, so changes may not persist after reload."
-      });
+      const outcome = await setupFileTransfer.importFile(file, context.gameData);
+      if (outcome.status !== "ready") return;
+      setForm(normalizeFormState(outcome.setup.form));
+      setDefaultForm(normalizeFormState(outcome.setup.defaultForm));
+      setSetupMode(outcome.setup.setupMode);
+      setCustomSetupsByMonster(outcome.setup.customSetupsByMonster);
+      setDenseCompare(outcome.setup.denseCompare);
+      setCannonByMonster(outcome.setup.cannonByMonster);
+      setStatus(outcome.appStatus);
       setFatalError(null);
-    } catch (caught) {
-      setSetupImportNotice(describeSetupImportError(caught));
     } finally {
       event.target.value = "";
     }
   };
 
+  const exportCurrentSetup = (): void => {
+    setupFileTransfer.exportSetup(
+      savedSetupFromForm(
+        form,
+        denseCompare,
+        cannonByMonster,
+        customSetupsByMonster,
+        defaultForm,
+        setupMode
+      )
+    );
+  };
+
   const dismissLegacyMigration = (report: LegacySetupMigrationReport, message: string): void => {
-    persistLocalState("legacy-migration-dismissed", legacyMigrationDismissedStorageOptions, {
-      dismissedAt: new Date().toISOString(),
-      foundKeys: report.foundKeys
-    });
+    localStateRecovery.persist(
+      "legacy-migration-dismissed",
+      legacyMigrationDismissedStorageOptions,
+      {
+        dismissedAt: new Date().toISOString(),
+        foundKeys: report.foundKeys
+      }
+    );
     setLegacyMigrationDismissed(true);
     setLegacyClearPending(false);
     setStatus(message);
@@ -4202,48 +2460,41 @@ export function App() {
             defaultForm,
             setupMode
           );
-      persistLocalState("rewrite-setup", setupStorageOptions, setup);
+      localStateRecovery.persist("rewrite-setup", setupStorageOptions, setup);
       setForm(normalizeFormState(setup.form));
       setDefaultForm(normalizeFormState(setup.defaultForm));
       setSetupMode(setup.setupMode);
       setCustomSetupsByMonster(setup.customSetupsByMonster);
       setDenseCompare(setup.denseCompare);
       setCannonByMonster(setup.cannonByMonster);
-      unblockReplacedLocalState(["rewrite-setup"]);
+      localStateRecovery.unblockReplaced(["rewrite-setup"]);
     }
     if (legacyMigrationReport.lootPrefs != null) {
       const nextLootPrefs = mergeLootPrefsState(
         lootPrefsForGameData,
         legacyMigrationReport.lootPrefs
       );
-      persistLocalState("loot-prefs", lootPrefsStorageOptions, nextLootPrefs);
+      localStateRecovery.persist("loot-prefs", lootPrefsStorageOptions, nextLootPrefs);
       setLootPrefsByMonster(nextLootPrefs);
-      unblockReplacedLocalState(["loot-prefs"]);
+      localStateRecovery.unblockReplaced(["loot-prefs"]);
     }
     if (legacyMigrationReport.duelSnapshots != null) {
       const merged = mergeDuelSnapshots(duelSnapshots, legacyMigrationReport.duelSnapshots);
-      persistLocalState("duel-snapshots", duelSnapshotsStorageOptions, merged.state);
+      localStateRecovery.persist("duel-snapshots", duelSnapshotsStorageOptions, merged.state);
       setDuelSnapshots(merged.state);
-      unblockReplacedLocalState(["duel-snapshots"]);
+      localStateRecovery.unblockReplaced(["duel-snapshots"]);
     }
     if (legacyMigrationReport.hiddenGearTiers != null) {
-      persistLocalState(
+      localStateRecovery.persist(
         "hidden-gear-tiers",
         hiddenGearTiersStorageOptions,
         legacyMigrationReport.hiddenGearTiers
       );
       setHiddenGearTiers(legacyMigrationReport.hiddenGearTiers);
-      unblockReplacedLocalState(["hidden-gear-tiers"]);
+      localStateRecovery.unblockReplaced(["hidden-gear-tiers"]);
     }
     if (legacyMigrationReport.hiscoresPlayer) {
-      try {
-        saveLastHiscoresPlayer(storage, legacyMigrationReport.hiscoresPlayer);
-        clearLocalStateStorageFailures(["hiscores-last-player"]);
-      } catch {
-        recordLocalStateStorageFailure("hiscores-last-player", "save_failed");
-      }
-      setHiscoresPlayer(legacyMigrationReport.hiscoresPlayer);
-      unblockReplacedLocalState(["hiscores-last-player"]);
+      hiscores.replacePersistedPlayer(legacyMigrationReport.hiscoresPlayer);
     }
     if (legacyMigrationReport.priceSet) {
       const priceSet = legacyMigrationReport.priceSet;
@@ -4251,7 +2502,7 @@ export function App() {
       acceptPriceSet(priceSet, acceptedAt, "Imported compatible legacy PriceSet");
     }
     setFatalError(null);
-    refreshLocalStateHealthReport();
+    localStateRecovery.refresh();
     dismissLegacyMigration(legacyMigrationReport, "Imported compatible legacy data");
   };
 
@@ -4266,8 +2517,7 @@ export function App() {
     try {
       clearedKeys = clearKnownLegacyStorageKeys(storage);
     } catch {
-      recordLocalStateStorageFailure("legacy-migration-dismissed", "clear_failed");
-      setLocalStateRecoveryNotice(LOCAL_STATE_PERSISTENCE_NOTICE);
+      localStateRecovery.recordStorageFailure("legacy-migration-dismissed", "clear_failed");
       setStatus("Could not clear legacy data. Local storage is unavailable.");
       return;
     }
@@ -4277,140 +2527,32 @@ export function App() {
     );
   };
 
-  const exportLocalStateRecoveryReport = () => {
-    const report = refreshLocalStateHealthReport();
-    downloadJsonFile(localStateHealthExportFileName(report), createLocalStateHealthExport(report));
-    setLocalStateClearPendingId(null);
-    setLocalStateRecoveryNotice("Exported local state recovery report");
-    setStatus("Exported local state recovery report");
-  };
-
-  const confirmClearLocalStateItem = (item: LocalStateHealthItem) => {
-    const result = clearLocalStateItem(storage, item.id);
-    clearLocalStateStorageFailures(result.clearedItems.map((clearedItem) => clearedItem.id));
-    for (const failed of result.failedItems) {
-      recordLocalStateStorageFailure(failed.item.id, failed.reason);
+  const confirmClearLocalStateItem = (itemId: LocalStateHealthItemId) => {
+    const outcome = localStateRecovery.confirmClearItem(itemId);
+    if (outcome.clearedIds.includes("manual-price-overrides")) {
+      setManualPriceOverrides(DEFAULT_MANUAL_PRICE_OVERRIDES_STATE);
+      setManualPriceDraft(null);
+      setManualPriceClearPending(false);
+      if (basePriceSet) {
+        const restoredPriceSet = applyManualPriceOverrides(
+          basePriceSet,
+          DEFAULT_MANUAL_PRICE_OVERRIDES_STATE
+        );
+        setContext((current) => (current ? { ...current, priceSet: restoredPriceSet } : current));
+        setPriceLabel(restoredPriceSet.label);
+      }
     }
-    releaseLocalStateRecoveryBlocks(result.clearedItems.map((clearedItem) => clearedItem.id));
-    refreshLocalStateHealthReport();
-    setLocalStateClearPendingId(null);
-    const message =
-      result.failedItems.length > 0
-        ? `Could not clear ${item.label}. Local storage is unavailable.`
-        : result.clearedItems.length > 0
-          ? `Cleared ${item.label}`
-          : `${item.label} had no local data to clear`;
-    setLocalStateRecoveryNotice(message);
-    setStatus(message);
   };
 
   const confirmClearInvalidLocalState = () => {
-    const result = clearInvalidLocalState(storage, localStateHealthReport);
-    clearLocalStateStorageFailures(result.clearedItems.map((item) => item.id));
-    for (const failed of result.failedItems) {
-      recordLocalStateStorageFailure(failed.item.id, failed.reason);
-    }
-    releaseLocalStateRecoveryBlocks(result.clearedItems.map((item) => item.id));
-    refreshLocalStateHealthReport();
-    setLocalStateClearPendingId(null);
-    const message =
-      result.failedItems.length > 0
-        ? `Could not clear ${formatNumber(result.failedItems.length)} local state keys. Local storage is unavailable.`
-        : result.clearedItems.length > 0
-          ? `Cleared ${formatNumber(result.clearedItems.length)} invalid local state keys`
-          : "No invalid local state keys to clear";
-    setLocalStateRecoveryNotice(message);
-    setStatus(message);
-  };
-
-  const handleHiscoresPlayerChange = (value: string) => {
-    hiscoresPlayerRef.current = value;
-    setHiscoresPlayer(value);
-    if (hiscoresResponse && !isHiscoresPreviewCurrent(value, hiscoresResponse)) {
-      setHiscoresResponse(null);
-      setHiscoresPreviewOpen(false);
-      setHiscoresNotice((notice) => (notice?.tone === "success" ? null : notice));
-    }
-  };
-
-  const handleHiscoresLookup = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const lookupPlayer = hiscoresPlayer;
-    const lookupPlayerKey = normalizeHiscoresPlayerInput(lookupPlayer);
-    if (!lookupPlayerKey) {
-      setHiscoresNotice({ tone: "error", message: "Enter a player name" });
-      return;
-    }
-    if (!hiscoresAvailable) {
-      setHiscoresNotice({ tone: "error", message: hiscoresUnavailableMessage(hiscoresStatus) });
-      return;
-    }
-
-    const requestSequence = (hiscoresLookupSequenceRef.current += 1);
-    setHiscoresBusy(true);
-    setHiscoresNotice({ tone: "neutral", message: "Looking up hiscores" });
-    try {
-      const response = await lookupHiscores(lookupPlayer);
-      const latestRequest = requestSequence === hiscoresLookupSequenceRef.current;
-      if (!latestRequest || !isHiscoresPreviewCurrent(hiscoresPlayerRef.current, response)) {
-        if (latestRequest) {
-          setHiscoresResponse(null);
-          setHiscoresNotice({
-            tone: "neutral",
-            message: "Player changed before lookup completed. Run Lookup again."
-          });
-        }
-        return;
-      }
-      setHiscoresResponse(response);
-      setHiscoresPreviewOpen(true);
-      try {
-        saveLastHiscoresPlayer(storage, response.player);
-        clearLocalStateStorageFailures(["hiscores-last-player"]);
-      } catch {
-        recordLocalStateStorageFailure("hiscores-last-player", "save_failed");
-      }
-      unblockReplacedLocalState(["hiscores-last-player"]);
-      refreshLocalStateHealthReport();
-      setHiscoresNotice({
-        tone: "success",
-        message: createHiscoresPreviewRows(form, response).length
-          ? "Hiscores preview ready"
-          : "No supported skills returned"
-      });
-    } catch (caught: unknown) {
-      const latestRequest = requestSequence === hiscoresLookupSequenceRef.current;
-      if (
-        !latestRequest ||
-        normalizeHiscoresPlayerInput(hiscoresPlayerRef.current) !== lookupPlayerKey
-      ) {
-        return;
-      }
-      setHiscoresResponse(null);
-      setHiscoresPreviewOpen(false);
-      setHiscoresNotice({ tone: "error", message: describeHiscoresError(caught) });
-    } finally {
-      if (requestSequence === hiscoresLookupSequenceRef.current) {
-        setHiscoresBusy(false);
-      }
-    }
+    localStateRecovery.confirmClearInvalid();
   };
 
   const applyHiscoresPreview = () => {
-    if (!isHiscoresPreviewCurrent(hiscoresPlayer, hiscoresResponse)) {
-      setHiscoresResponse(null);
-      setHiscoresNotice({
-        tone: "neutral",
-        message: "Hiscores preview no longer matches Player. Run Lookup again."
-      });
-      return;
-    }
-    const applied = countApplicableHiscoresSkills(hiscoresResponse);
-    setFormSafe((current) => applyHiscoresLevels(current, hiscoresResponse));
-    setHiscoresNotice({
-      tone: applied ? "success" : "neutral",
-      message: applied ? `Applied ${applied} skills` : "No current setup skills to apply"
-    });
+    const outcome = hiscores.prepareApply();
+    if (outcome.status === "stale") return;
+    setFormSafe((current) => applyHiscoresLevels(current, outcome.response));
+    hiscores.recordApplied(outcome.applicableSkillCount);
   };
 
   const saveLocalPriceComparison = () => {
@@ -4433,11 +2575,11 @@ export function App() {
     const cleared = tryClearPersisted(priceHistoryStorageOptions);
     const persistedClear = cleared.status === "cleared" && !localStorageAccessUnavailable;
     if (cleared.status === "failed") {
-      recordLocalStateStorageFailure("price-history", cleared.reason);
+      localStateRecovery.recordStorageFailure("price-history", cleared.reason);
     } else if (persistedClear) {
-      clearLocalStateStorageFailures(["price-history"]);
+      localStateRecovery.clearStorageFailures(["price-history"]);
     } else {
-      setLocalStateRecoveryNotice(LOCAL_STATE_PERSISTENCE_NOTICE);
+      localStateRecovery.markPersistenceUnavailable();
     }
     setPriceHistory(DEFAULT_PRICE_HISTORY_STATE);
     setPriceHistoryClearPending(false);
@@ -4762,7 +2904,7 @@ export function App() {
       );
       const merged = mergeDuelSnapshots(duelSnapshots, imported.data);
       setDuelSnapshots(merged.state);
-      unblockReplacedLocalState(["duel-snapshots"]);
+      localStateRecovery.unblockReplaced(["duel-snapshots"]);
       const skipped =
         merged.skippedCount > 0 ? ` ${merged.skippedCount} skipped at the limit.` : "";
       const message = `Imported saved setups: ${merged.addedCount} added, ${merged.updatedCount} updated.${skipped}`;
@@ -4902,7 +3044,7 @@ export function App() {
     setLootSettingsByMonster(applied.state.lootSettingsByMonster);
     setActiveTab("loadout");
     setShareReviewDismissed(true);
-    unblockReplacedLocalState(["rewrite-setup", "loot-prefs", "loot-settings"]);
+    localStateRecovery.unblockReplaced(["rewrite-setup", "loot-prefs", "loot-settings"]);
     const monsterName =
       context.gameData.monsters[applied.state.form.monsterId]?.name ?? applied.state.form.monsterId;
     setUndoableStatus(`Loaded shared setup for ${monsterName}`, "Restored pre-share setup", () => {
@@ -4926,13 +3068,6 @@ export function App() {
     form.trip.targetsAtSpot === cannonTargets &&
     form.trip.respawnSeconds === cannonRespawn;
   const cannonHasCustomSettings = cannonByMonster[form.monsterId] != null;
-  const cannonStatus = !cannonEnabled
-    ? "off"
-    : currentCannonOutput?.idle
-      ? "idle"
-      : currentCannonOutput?.respawnBound
-        ? "respawn-bound"
-        : "active";
   const incoming = viewModel.trip.trip.incoming;
   const foodSummary = optionLabel(FOOD_OPTIONS, form.trip.foodKey);
   const bankTimeMode = form.trip.bankSeconds == null ? "auto" : "manual";
@@ -5016,28 +3151,6 @@ export function App() {
     : viewModel.trip.trip.scarce.respawnBound
       ? "Respawn-bound"
       : "Not bound";
-  const cannonSparseSummary = !cannonEnabled
-    ? "Off"
-    : cannonTripSparseLinked
-      ? "Linked"
-      : form.trip.scarceSpot
-        ? "Trip differs"
-        : "Cannon only";
-  const cannonReserveSummary =
-    cannonEnabled && viewModel.trip.trip.slots.reserveParts.includes("cannon (4 parts)")
-      ? "5 slots"
-      : "-";
-  const cannonNotice = !cannonEnabled
-    ? "Cannon is off for this monster."
-    : currentCannonOutput?.idle
-      ? "Idle: this spot is too sparse for the cannon to fire."
-      : currentCannonOutput?.respawnBound
-        ? "Respawn-bound: cannon uptime is limited by target respawns."
-        : cannonTripSparseLinked
-          ? "Trip sparse assumptions use the same target count and respawn as Cannon."
-          : form.trip.scarceSpot
-            ? "Trip sparse assumptions differ from this Cannon spot."
-            : "Cannon affects ranged XP, supply cost and inventory reserve slots.";
   const tripStatus = viewModel.trip.trip.scarce.respawnBound
     ? "respawn-bound"
     : viewModel.trip.trip.bound;
@@ -5296,12 +3409,6 @@ export function App() {
       ? `${legacyMigrationReport.importedFields.length} compatible fields`
       : "review only"
     : "";
-  const localStateRecoveryVisible =
-    activeTab === "settings" &&
-    (localStateHealthReport.hasAttention || localStateRecoveryNotice != null);
-  const localStateAttentionItems = localStateHealthReport.items.filter(
-    (item) => item.needsAttention
-  );
   const plannerPanel = plannerResult?.panel ?? null;
   const plannerStatus = plannerResult?.error
     ? "error"
@@ -5334,6 +3441,16 @@ export function App() {
   const activePriceSetAlchCount = activePriceSet
     ? Object.keys(activePriceSet.alchValues).length
     : 0;
+  const activeManualPriceOverrides = basePriceSet
+    ? activeManualPriceOverridesForPriceSet(manualPriceOverrides, basePriceSet)
+    : DEFAULT_MANUAL_PRICE_OVERRIDES_STATE;
+  const storedManualPriceOverrideCount = Object.keys(manualPriceOverrides.items).length;
+  const activeManualPriceOverrideCount = Object.keys(activeManualPriceOverrides.items).length;
+  const inactiveManualPriceOverrideCount =
+    storedManualPriceOverrideCount - activeManualPriceOverrideCount;
+  const activePriceSourceLabel = activeManualPriceOverrideCount
+    ? `Manual item overrides (${formatNumber(activeManualPriceOverrideCount)})`
+    : activePriceSetOriginLabel(activePriceSetOrigin);
   const activePriceMetadataSummary = summarizeItemPriceMetadata(activePriceSet);
   const scheduledPriceSet = scheduledPriceSetFromStatus(scheduledSnapshotStatus);
   const scheduledPriceSetCreatedAtMs = scheduledPriceSet
@@ -5360,6 +3477,27 @@ export function App() {
     selectedEconomyItemMetadata ?? undefined,
     new Date(priceAgeNowMs)
   );
+  const effectiveManualPriceItemId = manualPriceItemOptions.some(
+    (option) => option.id === manualPriceItemId
+  )
+    ? manualPriceItemId
+    : (manualPriceItemOptions[0]?.id ?? "");
+  const selectedManualBasePrice = effectiveManualPriceItemId
+    ? (basePriceSet?.itemPrices[effectiveManualPriceItemId] ?? null)
+    : null;
+  const selectedManualActivePrice = effectiveManualPriceItemId
+    ? (activePriceSet?.itemPrices[effectiveManualPriceItemId] ?? null)
+    : null;
+  const selectedManualOverride = effectiveManualPriceItemId
+    ? (activeManualPriceOverrides.items[effectiveManualPriceItemId] ?? null)
+    : null;
+  const manualPriceInputValue =
+    manualPriceDraft ?? selectedManualActivePrice ?? selectedManualBasePrice ?? 0;
+  const manualPriceAtCapacity =
+    selectedManualBasePrice !== null &&
+    manualPriceInputValue !== selectedManualBasePrice &&
+    !canSetManualPriceOverride(manualPriceOverrides, effectiveManualPriceItemId);
+  const manualPriceCanApply = selectedManualBasePrice !== null && !manualPriceAtCapacity;
   const scheduledSnapshotViewModel = createScheduledPriceSnapshotViewModel(
     scheduledSnapshotStatus,
     activePriceSetOrigin
@@ -5371,68 +3509,126 @@ export function App() {
   const canResetActivePriceSet = Boolean(
     activePriceSet && resetFallbackPriceSet && activePriceSetOrigin === "selected"
   );
+  const commitManualPriceOverrides = (
+    next: ManualPriceOverridesState,
+    successMessage: string
+  ): void => {
+    let persisted = true;
+    try {
+      saveManualPriceOverrides(storage, next);
+      if (localStorageAccessUnavailable) {
+        persisted = false;
+        localStateRecovery.markPersistenceUnavailable();
+      } else {
+        localStateRecovery.clearStorageFailures(["manual-price-overrides"]);
+      }
+    } catch {
+      persisted = false;
+      localStateRecovery.recordStorageFailure("manual-price-overrides", "save_failed");
+    }
+    localStateRecovery.unblockReplaced(["manual-price-overrides"]);
+    setManualPriceOverrides(next);
+    if (basePriceSet) {
+      const nextActivePriceSet = applyManualPriceOverrides(basePriceSet, next);
+      setContext((current) => (current ? { ...current, priceSet: nextActivePriceSet } : current));
+      setPriceLabel(nextActivePriceSet.label);
+    }
+    setManualPriceClearPending(false);
+    localStateRecovery.refresh();
+    setStatus(persisted ? successMessage : `${successMessage} for this session`);
+    setMarketNotice({
+      tone: persisted ? "success" : "neutral",
+      message: persisted
+        ? successMessage
+        : `${successMessage} for this session. Local storage is unavailable, so reload may restore the previous value.`
+    });
+  };
+  const applyManualItemPrice = () => {
+    if (!effectiveManualPriceItemId || selectedManualBasePrice === null) return;
+    if (manualPriceInputValue === selectedManualBasePrice) {
+      const next = removeManualPriceOverride(manualPriceOverrides, effectiveManualPriceItemId);
+      commitManualPriceOverrides(
+        next,
+        `Restored ${priceHistoryItemLabels[effectiveManualPriceItemId] ?? effectiveManualPriceItemId} to base price`
+      );
+      return;
+    }
+    if (!canSetManualPriceOverride(manualPriceOverrides, effectiveManualPriceItemId)) {
+      const message = "Manual item price limit reached; reset an existing item before adding one.";
+      setStatus(message);
+      setMarketNotice({ tone: "error", message });
+      return;
+    }
+    const next = setManualPriceOverride(
+      manualPriceOverrides,
+      effectiveManualPriceItemId,
+      manualPriceInputValue,
+      new Date()
+    );
+    commitManualPriceOverrides(
+      next,
+      `Applied manual price for ${priceHistoryItemLabels[effectiveManualPriceItemId] ?? effectiveManualPriceItemId}`
+    );
+  };
+  const resetManualItemPrice = () => {
+    if (!effectiveManualPriceItemId || !selectedManualOverride) return;
+    const next = removeManualPriceOverride(manualPriceOverrides, effectiveManualPriceItemId);
+    commitManualPriceOverrides(
+      next,
+      `Reset manual price for ${priceHistoryItemLabels[effectiveManualPriceItemId] ?? effectiveManualPriceItemId}`
+    );
+    setManualPriceDraft(selectedManualBasePrice);
+  };
+  const confirmClearAllManualPrices = () => {
+    commitManualPriceOverrides(
+      DEFAULT_MANUAL_PRICE_OVERRIDES_STATE,
+      "Cleared all manual item prices"
+    );
+    setManualPriceDraft(selectedManualBasePrice);
+  };
   const exportActivePriceSet = () => {
     if (!activePriceSet) return;
-    downloadJsonFile(priceSetExportFileName(activePriceSet), activePriceSet);
-    setPriceSetResetPending(false);
-    setStatus("Exported active PriceSet");
-    setMarketNotice({
-      tone: "success",
-      message: `Exported active PriceSet: ${activePriceSet.label}`
-    });
+    const outcome = priceSetTransfer.exportPriceSet(activePriceSet);
+    setStatus(outcome.appStatus);
+    setMarketNotice(outcome.marketNotice);
   };
   const requestResetActivePriceSet = () => {
     if (!canResetActivePriceSet) return;
-    setPriceSetResetPending(true);
-    setMarketNotice({
-      tone: "neutral",
-      message: `Confirm reset local price override to ${resetFallbackLabel}. Local price history will be kept.`
-    });
+    setMarketNotice(priceSetTransfer.requestReset(resetFallbackLabel));
+  };
+  const applyResetPriceSet = (outcome: ResetPriceSetOutcome) => {
+    setBasePriceSet(outcome.basePriceSet);
+    setManualPriceDraft(null);
+    setManualPriceClearPending(false);
+    setContext((current) => (current ? { ...current, priceSet: outcome.activePriceSet } : current));
+    setPriceLabel(outcome.activePriceSet.label);
+    setActivePriceSetOrigin(outcome.activePriceSetOrigin);
+    setStatus(outcome.appStatus);
+    setMarketNotice(outcome.marketNotice);
+    setFatalError(null);
   };
   const resetActivePriceSetToFallback = () => {
     if (!resetFallbackPriceSet) return;
-    let persistedReset = true;
-    try {
-      clearSelectedPriceSet(storage);
-      if (localStorageAccessUnavailable) {
-        persistedReset = false;
-        setLocalStateRecoveryNotice(LOCAL_STATE_PERSISTENCE_NOTICE);
-      } else {
-        clearLocalStateStorageFailures(["selected-price-set"]);
-      }
-    } catch {
-      persistedReset = false;
-      recordLocalStateStorageFailure("selected-price-set", "clear_failed");
-    }
-    refreshLocalStateHealthReport();
-    setContext((current) => (current ? { ...current, priceSet: resetFallbackPriceSet } : current));
-    setPriceLabel(resetFallbackPriceSet.label);
-    setActivePriceSetOrigin(resetFallbackOrigin);
-    setPriceSetResetPending(false);
-    setStatus(
-      persistedReset
-        ? `Reset to ${resetFallbackLabel}`
-        : `Reset to ${resetFallbackLabel} for this session`
+    applyResetPriceSet(
+      priceSetTransfer.resetToFallback({
+        fallbackPriceSet: resetFallbackPriceSet,
+        fallbackOrigin: resetFallbackOrigin,
+        fallbackLabel: resetFallbackLabel,
+        manualPriceOverrides
+      })
     );
-    setMarketNotice({
-      tone: persistedReset ? "success" : "neutral",
-      message: persistedReset
-        ? `Reset to ${resetFallbackLabel}. Local price history was kept.`
-        : `Reset to ${resetFallbackLabel} for this session. Local storage is unavailable, so reload may restore the previous PriceSet.`
-    });
-    setFatalError(null);
   };
   const renderPriceSetControls = () => (
     <>
       <button type="button" disabled={!activePriceSet} onClick={exportActivePriceSet}>
         Export active PriceSet
       </button>
-      {priceSetResetPending ? (
+      {priceSetTransfer.resetPending ? (
         <>
           <button type="button" onClick={resetActivePriceSetToFallback}>
             Confirm reset to {resetFallbackLabel}
           </button>
-          <button type="button" onClick={() => setPriceSetResetPending(false)}>
+          <button type="button" onClick={priceSetTransfer.cancelReset}>
             Cancel
           </button>
         </>
@@ -5503,87 +3699,21 @@ export function App() {
         <div className="topbar-brand">
           <h1>2004scape Combat Simulator</h1>
         </div>
-        <section className="topbar-hiscores" aria-label="Hiscores">
-          <div className="topbar-hiscores-heading">
-            <strong>Player lookup</strong>
-            <span className={`status-pill ${hiscoresAvailable ? "ready" : ""}`}>
-              {hiscoresStatusText}
-            </span>
-          </div>
-          <form className="hiscores-form topbar-hiscores-form" onSubmit={handleHiscoresLookup}>
-            <div className="field">
-              <label className="visually-hidden" htmlFor="hiscores-player">
-                Player
-              </label>
-              <input
-                id="hiscores-player"
-                type="text"
-                autoComplete="off"
-                placeholder="Player name"
-                value={hiscoresPlayer}
-                onChange={(event) => handleHiscoresPlayerChange(event.target.value)}
-              />
-            </div>
-            <button type="submit" disabled={!hiscoresAvailable || hiscoresBusy}>
-              {hiscoresBusy ? "Looking up" : "Lookup"}
-            </button>
-          </form>
-          {hiscoresNotice && (
-            <p
-              className={`inline-status ${hiscoresNotice.tone}`}
-              role={hiscoresNotice.tone === "error" ? "alert" : "status"}
-            >
-              {hiscoresNotice.message}
-            </p>
-          )}
-          {hiscoresPreviewRows.length > 0 && (
-            <details
-              className="hiscores-preview-details"
-              open={hiscoresPreviewOpen}
-              ref={hiscoresPreviewDetailsRef}
-              onToggle={(event) => setHiscoresPreviewOpen(event.currentTarget.open)}
-            >
-              <summary ref={hiscoresPreviewSummaryRef}>
-                Review {hiscoresPreviewRows.length} levels
-              </summary>
-              <div className="hiscores-preview">
-                {hiscoresResponse && (
-                  <p className="hiscores-preview-meta">
-                    <span>
-                      Preview for{" "}
-                      <strong>
-                        {hiscoresResponse.normalizedPlayer || hiscoresResponse.player}
-                      </strong>
-                    </span>
-                    <span>Source: {hiscoresResponse.source.label}</span>
-                    <span>Fetched: {hiscoresResponse.fetchedAt}</span>
-                  </p>
-                )}
-                <table aria-label="Hiscores preview">
-                  <thead>
-                    <tr>
-                      <th>Skill</th>
-                      <th>Current</th>
-                      <th>Hiscores</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {hiscoresPreviewRows.map((row) => (
-                      <tr key={row.skill}>
-                        <td>{row.skill}</td>
-                        <td>{row.currentLevel ?? "-"}</td>
-                        <td>{row.fetchedLevel}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <button type="button" disabled={!canApplyHiscores} onClick={applyHiscoresPreview}>
-                  Apply
-                </button>
-              </div>
-            </details>
-          )}
-        </section>
+        <HiscoresPanel
+          statusLabel={hiscores.statusLabel}
+          available={hiscores.available}
+          player={hiscores.player}
+          response={hiscores.response}
+          busy={hiscores.busy}
+          previewOpen={hiscores.previewOpen}
+          notice={hiscores.notice}
+          previewRows={hiscoresPreviewRows}
+          canApply={canApplyHiscores}
+          onPlayerChange={hiscores.changePlayer}
+          onLookup={hiscores.lookup}
+          onPreviewOpenChange={hiscores.setPreviewOpen}
+          onApply={applyHiscoresPreview}
+        />
         <div className="actions">
           <label className="file-button">
             Import prices
@@ -5597,38 +3727,22 @@ export function App() {
             Import setup
             <input type="file" accept="application/json,.json" onChange={importSetup} />
           </label>
-          <button
-            type="button"
-            onClick={() =>
-              downloadJsonFile("index-sim-rewrite-setup.json", {
-                version: REWRITE_SETUP_VERSION,
-                savedAt: new Date().toISOString(),
-                data: savedSetupFromForm(
-                  form,
-                  denseCompare,
-                  cannonByMonster,
-                  customSetupsByMonster,
-                  defaultForm,
-                  setupMode
-                )
-              })
-            }
-          >
+          <button type="button" onClick={exportCurrentSetup}>
             Export setup
           </button>
           <button ref={shareSetupButtonRef} type="button" onClick={openShareSetupDialog}>
             Share setup
           </button>
-          {priceImportNotice?.surface === "topbar" && (
+          {priceSetTransfer.importNotice?.surface === "topbar" && (
             <InlineImportNotice
-              notice={priceImportNotice}
+              notice={priceSetTransfer.importNotice}
               ariaLabel="Price import notice"
               className="topbar-import-notice price-import-notice"
             />
           )}
-          {setupImportNotice && (
+          {setupFileTransfer.notice && (
             <InlineImportNotice
-              notice={setupImportNotice}
+              notice={setupFileTransfer.notice}
               ariaLabel="Setup import notice"
               className="topbar-import-notice setup-import-notice"
             />
@@ -5967,20 +4081,25 @@ export function App() {
               onChange={(styleId) => setFormSafe((current) => updateForm(current, { styleId }))}
             />
             <div className="sidebar-metrics" aria-label="Effective trip rates">
-              {metricList([
-                {
-                  label: "Effective XP/hr",
-                  value: formatNumber(viewModel.effectiveXpPerHour),
-                  tone: "teal"
-                },
-                {
-                  label: "Net GP/hr",
-                  value: formatNumber(viewModel.trip.effectiveNetGpPerHour),
-                  tone: "gold"
-                },
-                { label: "Player XP/hr", value: formatNumber(viewModel.playerEffectiveXpPerHour) },
-                { label: "Cannon XP/hr", value: formatNumber(viewModel.cannonEffectiveXpPerHour) }
-              ])}
+              <MetricList
+                items={[
+                  {
+                    label: "Effective XP/hr",
+                    value: formatNumber(viewModel.effectiveXpPerHour),
+                    tone: "teal"
+                  },
+                  {
+                    label: "Net GP/hr",
+                    value: formatNumber(viewModel.trip.effectiveNetGpPerHour),
+                    tone: "gold"
+                  },
+                  {
+                    label: "Player XP/hr",
+                    value: formatNumber(viewModel.playerEffectiveXpPerHour)
+                  },
+                  { label: "Cannon XP/hr", value: formatNumber(viewModel.cannonEffectiveXpPerHour) }
+                ]}
+              />
             </div>
           </section>
         </aside>
@@ -6035,19 +4154,25 @@ export function App() {
               </button>
             </div>
             <div className="setup-context-metrics">
-              {metricList([
-                {
-                  label: "DPS",
-                  value: formatNumber(viewModel.combat.effectiveDps, 2),
-                  tone: "teal"
-                },
-                { label: "XP/hr", value: formatNumber(viewModel.effectiveXpPerHour), tone: "teal" },
-                {
-                  label: "Net GP/hr",
-                  value: formatNumber(viewModel.trip.effectiveNetGpPerHour),
-                  tone: "gold"
-                }
-              ])}
+              <MetricList
+                items={[
+                  {
+                    label: "DPS",
+                    value: formatNumber(viewModel.combat.effectiveDps, 2),
+                    tone: "teal"
+                  },
+                  {
+                    label: "XP/hr",
+                    value: formatNumber(viewModel.effectiveXpPerHour),
+                    tone: "teal"
+                  },
+                  {
+                    label: "Net GP/hr",
+                    value: formatNumber(viewModel.trip.effectiveNetGpPerHour),
+                    tone: "gold"
+                  }
+                ]}
+              />
             </div>
           </section>
 
@@ -6527,10 +4652,22 @@ export function App() {
                   />
                 </div>
                 <div className="loadout-actions">
+                  <label className="toggle loadout-eligibility-toggle">
+                    <input
+                      type="checkbox"
+                      checked={respectLoadoutRequirements}
+                      onChange={(event) => setRespectLoadoutRequirements(event.target.checked)}
+                    />
+                    <span>Respect current levels</span>
+                  </label>
                   <button
                     type="button"
                     onClick={optimizeCurrentLoadout}
-                    title="Maximize current-target normal DPS using visible weapon and equipment choices"
+                    title={
+                      respectLoadoutRequirements
+                        ? "Maximize current-target normal DPS using level-eligible visible weapon and equipment choices"
+                        : "Maximize current-target normal DPS using all visible weapon and equipment choices"
+                    }
                   >
                     Optimize loadout
                   </button>
@@ -6702,33 +4839,35 @@ export function App() {
                   )}
                   {viewModel.combat.specialAttack && (
                     <div className="special-output" aria-label="Special attack metrics">
-                      {metricList([
-                        {
-                          label: "Spec max hit",
-                          value:
-                            viewModel.combat.specialAttack.hits > 1
-                              ? `${formatNumber(viewModel.combat.specialAttack.maxHit)} x${viewModel.combat.specialAttack.hits}`
-                              : formatNumber(viewModel.combat.specialAttack.maxHit)
-                        },
-                        {
-                          label: "Spec hit %",
-                          value: `${formatNumber(viewModel.combat.specialAttack.hitChance * 100, 1)}%`
-                        },
-                        {
-                          label: "Specs/hr",
-                          value: formatNumber(viewModel.combat.specialAttack.specsPerHour, 1)
-                        },
-                        {
-                          label: "DPS with spec",
-                          value: formatNumber(viewModel.combat.specialAttack.dpsWithSpec, 2),
-                          tone: "teal"
-                        },
-                        {
-                          label: "DPS gain",
-                          value: signedPercent(viewModel.combat.specialAttack.dpsGainPct),
-                          tone: viewModel.combat.specialAttack.dpsGainPct >= 0 ? "teal" : "gold"
-                        }
-                      ])}
+                      <MetricList
+                        items={[
+                          {
+                            label: "Spec max hit",
+                            value:
+                              viewModel.combat.specialAttack.hits > 1
+                                ? `${formatNumber(viewModel.combat.specialAttack.maxHit)} x${viewModel.combat.specialAttack.hits}`
+                                : formatNumber(viewModel.combat.specialAttack.maxHit)
+                          },
+                          {
+                            label: "Spec hit %",
+                            value: `${formatNumber(viewModel.combat.specialAttack.hitChance * 100, 1)}%`
+                          },
+                          {
+                            label: "Specs/hr",
+                            value: formatNumber(viewModel.combat.specialAttack.specsPerHour, 1)
+                          },
+                          {
+                            label: "DPS with spec",
+                            value: formatNumber(viewModel.combat.specialAttack.dpsWithSpec, 2),
+                            tone: "teal"
+                          },
+                          {
+                            label: "DPS gain",
+                            value: signedPercent(viewModel.combat.specialAttack.dpsGainPct),
+                            tone: viewModel.combat.specialAttack.dpsGainPct >= 0 ? "teal" : "gold"
+                          }
+                        ]}
+                      />
                       {viewModel.specialWarnings.length > 0 && (
                         <div className="calculation-warning-slot">
                           <CalculationWarningSummary
@@ -6771,7 +4910,10 @@ export function App() {
                 <div className="section-title-row">
                   <h2>Loot actions</h2>
                   <span className="status-pill">
-                    {formatNumber(viewModel.lootRows.length)} drops
+                    {formatNumber(actionableLootRows.length)} drops
+                    {conditionalLootRows.length > 0
+                      ? ` · ${formatNumber(conditionalLootRows.length)} conditional`
+                      : ""}
                   </span>
                 </div>
                 <div className="loot-toolbar">
@@ -6824,7 +4966,7 @@ export function App() {
                   </button>
                   <button
                     type="button"
-                    disabled={viewModel.lootRows.length === 0}
+                    disabled={actionableLootRows.length === 0}
                     onClick={optimizeCurrentLoot}
                   >
                     Optimize net GP/hr
@@ -6834,34 +4976,36 @@ export function App() {
                   </span>
                 </div>
                 <div className="loot-output" aria-label="Loot action summary">
-                  {metricList([
-                    {
-                      label: "Default net GP/hr",
-                      value: formatNumber(viewModel.lootSummary.defaultEffectiveNetGpPerHour)
-                    },
-                    {
-                      label: "Current delta",
-                      value: formatDelta(viewModel.lootSummary.currentDeltaNetGpPerHour),
-                      tone: viewModel.lootSummary.currentDeltaNetGpPerHour >= 0 ? "teal" : "gold"
-                    },
-                    { label: "Loot GP/kill", value: formatNumber(viewModel.trip.gpPerKill) },
-                    {
-                      label: "Effective net",
-                      value: formatNumber(viewModel.trip.effectiveNetGpPerHour)
-                    },
-                    { label: "High alch", value: highAlchEnabled ? "On" : "Off" },
-                    {
-                      label: "Overhead",
-                      value:
-                        lootOverheadMode === "auto"
-                          ? `Auto ${formatNumber(derivedOverheadSec, 1)}s`
-                          : `${formatNumber(lootOverheadValue, 1)}s`
-                    },
-                    {
-                      label: "Talisman",
-                      value: optionLabel(TALISMAN_SPOT_OPTIONS, currentLootSettings.talismanSpot)
-                    }
-                  ])}
+                  <MetricList
+                    items={[
+                      {
+                        label: "Default net GP/hr",
+                        value: formatNumber(viewModel.lootSummary.defaultEffectiveNetGpPerHour)
+                      },
+                      {
+                        label: "Current delta",
+                        value: formatDelta(viewModel.lootSummary.currentDeltaNetGpPerHour),
+                        tone: viewModel.lootSummary.currentDeltaNetGpPerHour >= 0 ? "teal" : "gold"
+                      },
+                      { label: "Loot GP/kill", value: formatNumber(viewModel.trip.gpPerKill) },
+                      {
+                        label: "Effective net",
+                        value: formatNumber(viewModel.trip.effectiveNetGpPerHour)
+                      },
+                      { label: "High alch", value: highAlchEnabled ? "On" : "Off" },
+                      {
+                        label: "Overhead",
+                        value:
+                          lootOverheadMode === "auto"
+                            ? `Auto ${formatNumber(derivedOverheadSec, 1)}s`
+                            : `${formatNumber(lootOverheadValue, 1)}s`
+                      },
+                      {
+                        label: "Talisman",
+                        value: optionLabel(TALISMAN_SPOT_OPTIONS, currentLootSettings.talismanSpot)
+                      }
+                    ]}
+                  />
                 </div>
                 <CalculationWarningSummary
                   warnings={viewModel.moneyWarnings}
@@ -6934,12 +5078,12 @@ export function App() {
                       </tr>
                     </thead>
                     <tbody>
-                      {viewModel.lootRows.length === 0 ? (
+                      {actionableLootRows.length === 0 ? (
                         <tr>
                           <td colSpan={9}>No drops</td>
                         </tr>
                       ) : (
-                        viewModel.lootRows.map((row) => (
+                        actionableLootRows.map((row) => (
                           <tr
                             key={row.rowId}
                             className={[
@@ -7141,6 +5285,50 @@ export function App() {
                     </tbody>
                   </table>
                 </div>
+                {conditionalLootRows.length > 0 && (
+                  <details className="conditional-loot-group">
+                    <summary>
+                      Conditional drops ({formatNumber(conditionalLootRows.length)})
+                    </summary>
+                    <div className="conditional-loot-content">
+                      <p>
+                        Source-backed quest and clue rows stay visible for completeness, but are
+                        locked to Skip and excluded from loot value, inventory and trip calculations
+                        until exact player eligibility is modeled.
+                      </p>
+                      <div className="loot-table-wrap">
+                        <table
+                          className="loot-table conditional-loot-table"
+                          aria-label="Conditional monster drops"
+                        >
+                          <thead>
+                            <tr>
+                              <th>Drop</th>
+                              <th className="numeric">Chance</th>
+                              <th>Eligibility</th>
+                              <th>State</th>
+                              <th>Action</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {conditionalLootRows.map((row) => (
+                              <tr key={row.rowId} className="loot-row-attention">
+                                <td className="loot-name-cell">
+                                  <span>{row.name}</span>
+                                  <small>{row.key ?? row.tag ?? row.rowId}</small>
+                                </td>
+                                <td className="numeric">{formatNumber(row.chance * 100, 2)}%</td>
+                                <td>{row.eligibilityDescription}</td>
+                                <td>{row.stateLabel ?? "Conditional"}</td>
+                                <td>Skip (locked)</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </details>
+                )}
               </section>
 
               <section
@@ -8055,194 +6243,28 @@ export function App() {
                 )}
               </section>
 
-              <section className="cannon-strip" aria-label="Cannon" hidden={activeTab !== "cannon"}>
-                <div className="section-title-row">
-                  <h2>Dwarf multicannon</h2>
-                  <span
-                    className={`status-pill ${cannonEnabled && !currentCannonOutput?.idle ? "ready" : ""}`}
-                  >
-                    {cannonStatus}
-                  </span>
-                </div>
-                <div className="cannon-body">
-                  <label className="toggle">
-                    <input
-                      type="checkbox"
-                      checked={cannonEnabled}
-                      onChange={(event) =>
-                        setCannonForCurrentMonster({ enabled: event.target.checked })
-                      }
-                    />
-                    <span>Set up cannon</span>
-                  </label>
-                  <NumberField
-                    label="Mobs at spot"
-                    value={cannonTargets}
-                    min={1}
-                    max={8}
-                    onChange={setCannonTargetsForCurrentMonster}
-                  />
-                  <NumberField
-                    label="Respawn"
-                    value={cannonRespawn}
-                    min={1}
-                    max={3600}
-                    onChange={setCannonRespawnForCurrentMonster}
-                  />
-                  <label className="toggle cannon-sparse-toggle">
-                    <input
-                      type="checkbox"
-                      checked={cannonTripSparseLinked}
-                      disabled={!cannonEnabled}
-                      onChange={(event) => setTripSparseFromCannon(event.target.checked)}
-                    />
-                    <span>Link Trip sparse</span>
-                  </label>
-                  <div className="cannon-actions">
-                    <button
-                      type="button"
-                      disabled={!cannonHasCustomSettings}
-                      onClick={resetCannonForCurrentMonster}
-                    >
-                      Reset monster cannon
-                    </button>
-                  </div>
-                  <div
-                    className={`cannon-notice ${cannonEnabled && currentCannonOutput?.respawnBound ? "warning" : ""}`}
-                    role="status"
-                    aria-label="Cannon sparse status"
-                  >
-                    {cannonNotice}
-                  </div>
-                  <div className="cannon-output" aria-label="Cannon output">
-                    {cannonEnabled && currentCannonOutput ? (
-                      <div className="cannon-output-grid">
-                        {metricList([
-                          {
-                            label: "Effective targets",
-                            value: formatNumber(currentCannonOutput.effTargets, 1)
-                          },
-                          {
-                            label: "Cannon DPS",
-                            value: formatNumber(currentCannonOutput.cannonDps, 2),
-                            tone: "teal"
-                          },
-                          {
-                            label: "Balls/hr",
-                            value: formatNumber(currentCannonOutput.ballsPerHour)
-                          },
-                          {
-                            label: "Balls/kill",
-                            value: formatNumber(currentCannonOutput.ballsPerKill, 2)
-                          },
-                          {
-                            label: "Cannon Ranged XP/hr",
-                            value: formatNumber(currentCannonOutput.rangedXpPerHour),
-                            tone: "teal"
-                          },
-                          {
-                            label: "Effective XP/hr",
-                            value: formatNumber(viewModel.effectiveXpPerHour),
-                            tone: "teal"
-                          },
-                          {
-                            label: "Effective net GP/hr",
-                            value: formatNumber(viewModel.trip.effectiveNetGpPerHour),
-                            tone: "gold"
-                          },
-                          {
-                            label: "Ball cost/hr",
-                            value: formatNumber(currentCannonOutput.ballCostPerHour),
-                            tone: "gold"
-                          },
-                          {
-                            label: "Ball cost/kill",
-                            value: formatNumber(currentCannonOutput.ballCostPerKill),
-                            tone: "gold"
-                          },
-                          {
-                            label: "Ball price",
-                            value: formatNumber(currentCannonOutput.ballPrice)
-                          },
-                          {
-                            label: "Cannonballs/trip",
-                            value:
-                              currentCannonOutput.ballsPerTrip == null
-                                ? "-"
-                                : formatNumber(currentCannonOutput.ballsPerTrip)
-                          },
-                          {
-                            label: "Ball gp/trip",
-                            value:
-                              currentCannonOutput.ballCostPerTrip == null
-                                ? "-"
-                                : formatNumber(currentCannonOutput.ballCostPerTrip),
-                            tone: "gold"
-                          },
-                          {
-                            label: "K/hr uplift",
-                            value:
-                              currentCannonOutput.kphNoCannon > 0
-                                ? `${formatNumber(
-                                    (currentCannonOutput.kphWithCannon /
-                                      currentCannonOutput.kphNoCannon -
-                                      1) *
-                                      100,
-                                    1
-                                  )}%`
-                                : "-"
-                          }
-                        ])}
-                        {metricList([
-                          {
-                            label: "Accuracy rule",
-                            value: `${formatNumber(viewModel.combat.hitChance * 100, 1)}% roll`
-                          },
-                          { label: "XP rule", value: "Ranged XP" },
-                          {
-                            label: "Supply impact",
-                            value: `${formatNumber(currentCannonOutput.ballCostPerKill)} gp/kill`,
-                            tone: "gold"
-                          },
-                          { label: "Sparse link", value: cannonSparseSummary },
-                          { label: "Inventory reserve", value: cannonReserveSummary },
-                          {
-                            label: "Trip sparse K/hr",
-                            value: form.trip.scarceSpot
-                              ? formatNumber(viewModel.trip.trip.scarce.maxKph)
-                              : "-"
-                          }
-                        ])}
-                      </div>
-                    ) : (
-                      <div className="cannon-output-grid">
-                        {metricList([
-                          { label: "Effective targets", value: "0.0" },
-                          { label: "Cannon DPS", value: "0.00" },
-                          { label: "Balls/hr", value: "0" },
-                          { label: "Cannon Ranged XP/hr", value: "0" },
-                          {
-                            label: "Effective XP/hr",
-                            value: formatNumber(viewModel.effectiveXpPerHour)
-                          },
-                          {
-                            label: "Effective net GP/hr",
-                            value: formatNumber(viewModel.trip.effectiveNetGpPerHour),
-                            tone: "gold"
-                          },
-                          { label: "Ball cost/hr", value: "0" },
-                          { label: "Cannonballs/trip", value: "-" },
-                          { label: "Accuracy rule", value: "-" },
-                          { label: "XP rule", value: "-" },
-                          { label: "Supply impact", value: "-" },
-                          { label: "Sparse link", value: cannonSparseSummary },
-                          { label: "Inventory reserve", value: "-" }
-                        ])}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </section>
+              <CannonPane
+                hidden={activeTab !== "cannon"}
+                enabled={cannonEnabled}
+                targets={cannonTargets}
+                respawnSeconds={cannonRespawn}
+                tripSparseLinked={cannonTripSparseLinked}
+                hasCustomSettings={cannonHasCustomSettings}
+                output={currentCannonOutput}
+                effectiveXpPerHour={viewModel.effectiveXpPerHour}
+                effectiveNetGpPerHour={viewModel.trip.effectiveNetGpPerHour}
+                hitChance={viewModel.combat.hitChance}
+                tripSparseEnabled={form.trip.scarceSpot}
+                tripSparseMaxKph={viewModel.trip.trip.scarce.maxKph}
+                cannonReserveActive={viewModel.trip.trip.slots.reserveParts.includes(
+                  "cannon (4 parts)"
+                )}
+                onEnabledChange={(enabled) => setCannonForCurrentMonster({ enabled })}
+                onTargetsChange={setCannonTargetsForCurrentMonster}
+                onRespawnChange={setCannonRespawnForCurrentMonster}
+                onTripSparseLinkedChange={setTripSparseFromCannon}
+                onReset={resetCannonForCurrentMonster}
+              />
 
               <section
                 className="duel-pane"
@@ -8832,22 +6854,27 @@ export function App() {
                 ) : plannerPanel ? (
                   <div className="planner-output" aria-label="Planner output">
                     <div className="summary-strip planner-summary" aria-label="Planner summary">
-                      {metricList([
-                        { label: "Total XP", value: formatNumber(plannerPanel.summary.totalXp) },
-                        { label: "Steps", value: formatNumber(plannerPanel.summary.stepCount) },
-                        { label: "Phases", value: formatNumber(plannerPanel.summary.phaseCount) },
-                        { label: "Unlocks", value: formatNumber(plannerPanel.summary.unlockCount) },
-                        {
-                          label: "Start DPS",
-                          value: formatNumber(plannerPanel.summary.startDps, 2)
-                        },
-                        { label: "End DPS", value: formatNumber(plannerPanel.summary.endDps, 2) },
-                        { label: "Metric gain", value: plannerMetricDeltaValue },
-                        {
-                          label: "Truncated",
-                          value: plannerPanel.summary.truncated ? "Yes" : "No"
-                        }
-                      ])}
+                      <MetricList
+                        items={[
+                          { label: "Total XP", value: formatNumber(plannerPanel.summary.totalXp) },
+                          { label: "Steps", value: formatNumber(plannerPanel.summary.stepCount) },
+                          { label: "Phases", value: formatNumber(plannerPanel.summary.phaseCount) },
+                          {
+                            label: "Unlocks",
+                            value: formatNumber(plannerPanel.summary.unlockCount)
+                          },
+                          {
+                            label: "Start DPS",
+                            value: formatNumber(plannerPanel.summary.startDps, 2)
+                          },
+                          { label: "End DPS", value: formatNumber(plannerPanel.summary.endDps, 2) },
+                          { label: "Metric gain", value: plannerMetricDeltaValue },
+                          {
+                            label: "Truncated",
+                            value: plannerPanel.summary.truncated ? "Yes" : "No"
+                          }
+                        ]}
+                      />
                     </div>
 
                     <div className="planner-visual-grid">
@@ -9049,131 +7076,17 @@ export function App() {
                 aria-label={activeTab === "economy" ? "Economy" : "Live services"}
                 hidden={activeTab !== "economy" && activeTab !== "settings"}
               >
-                {localStateRecoveryVisible && (
-                  <section
-                    className="service-group local-state-recovery-panel"
-                    aria-label="Local state recovery"
-                  >
-                    <div className="section-title-row">
-                      <h2>Local state recovery</h2>
-                      <span
-                        className={`status-pill ${
-                          localStateHealthReport.hasAttention ? "warning" : "ready"
-                        }`}
-                      >
-                        {localStateRecoveryStatus(localStateHealthReport)}
-                      </span>
-                    </div>
-                    <p
-                      className={`inline-status ${
-                        localStateHealthReport.hasAttention ? "warning" : "success"
-                      }`}
-                      role={localStateHealthReport.hasAttention ? "alert" : "status"}
-                    >
-                      {localStateRecoveryNotice ??
-                        "Some browser-local rewrite state fell back to defaults."}
-                    </p>
-                    <div className="price-history-summary" aria-label="Local state health summary">
-                      <span>Known states {formatNumber(localStateHealthReport.itemCount)}</span>
-                      <span>
-                        Needs attention {formatNumber(localStateHealthReport.attentionCount)}
-                      </span>
-                      <span>Report {localStateHealthReport.generatedAt}</span>
-                    </div>
-                    <div className="market-sync-bar">
-                      <button type="button" onClick={exportLocalStateRecoveryReport}>
-                        Export recovery report
-                      </button>
-                      {localStateClearPendingId === "invalid-all" ? (
-                        <>
-                          <button
-                            type="button"
-                            className="danger-button"
-                            onClick={confirmClearInvalidLocalState}
-                          >
-                            Confirm clear invalid local data
-                          </button>
-                          <button type="button" onClick={() => setLocalStateClearPendingId(null)}>
-                            Cancel
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          type="button"
-                          className="danger-button"
-                          disabled={!localStateAttentionItems.some((item) => item.clearable)}
-                          onClick={() => setLocalStateClearPendingId("invalid-all")}
-                        >
-                          Clear invalid local data
-                        </button>
-                      )}
-                    </div>
-                    <table className="legacy-review-table">
-                      <thead>
-                        <tr>
-                          <th>State</th>
-                          <th>Key</th>
-                          <th>Status</th>
-                          <th>Version</th>
-                          <th>Recovery</th>
-                          <th>Clear</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {localStateHealthReport.items.map((item) => {
-                          const pending = localStateClearPendingId === item.id;
-                          return (
-                            <tr key={item.id}>
-                              <td>{item.label}</td>
-                              <td>
-                                <code>{item.storageKey}</code>
-                              </td>
-                              <td>{localStateStatusLabel(item)}</td>
-                              <td>
-                                v{formatNumber(item.expectedVersion)}
-                                {item.foundVersion != null
-                                  ? ` (found v${formatNumber(item.foundVersion)})`
-                                  : ""}
-                              </td>
-                              <td>{localStateReasonLabel(item)}</td>
-                              <td>
-                                {item.needsAttention && item.clearable ? (
-                                  pending ? (
-                                    <>
-                                      <button
-                                        type="button"
-                                        className="danger-button"
-                                        onClick={() => confirmClearLocalStateItem(item)}
-                                      >
-                                        Confirm clear {item.label}
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => setLocalStateClearPendingId(null)}
-                                      >
-                                        Cancel
-                                      </button>
-                                    </>
-                                  ) : (
-                                    <button
-                                      type="button"
-                                      className="danger-button"
-                                      onClick={() => setLocalStateClearPendingId(item.id)}
-                                    >
-                                      Clear {item.label}
-                                    </button>
-                                  )
-                                ) : (
-                                  "-"
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </section>
-                )}
+                <LocalStateRecoveryPanel
+                  visible={activeTab === "settings" && localStateRecovery.visible}
+                  report={localStateRecovery.report}
+                  notice={localStateRecovery.notice}
+                  pendingClearId={localStateRecovery.pendingClearId}
+                  onExport={localStateRecovery.exportReport}
+                  onBeginClear={localStateRecovery.beginClear}
+                  onCancelClear={localStateRecovery.cancelClear}
+                  onConfirmClearItem={confirmClearLocalStateItem}
+                  onConfirmClearInvalid={confirmClearInvalidLocalState}
+                />
                 {activeTab === "settings" && (
                   <section
                     className="service-group price-data-panel"
@@ -9182,12 +7095,12 @@ export function App() {
                     <div className="section-title-row">
                       <h2>Price data</h2>
                       <span className={`status-pill ${activePriceSet ? "ready" : ""}`}>
-                        {activePriceSet ? activePriceSetOriginLabel(activePriceSetOrigin) : "empty"}
+                        {activePriceSet ? activePriceSourceLabel : "empty"}
                       </span>
                     </div>
                     {renderScheduledSnapshotSummary()}
                     <div className="price-history-summary" aria-label="Active PriceSet summary">
-                      <span>Active source {activePriceSetOriginLabel(activePriceSetOrigin)}</span>
+                      <span>Active source {activePriceSourceLabel}</span>
                       <span>Label {activePriceSet?.label ?? priceLabel}</span>
                       <span>Source {activePriceSet?.source ?? "-"}</span>
                       <span>Created {activePriceSet?.createdAt ?? "-"}</span>
@@ -9214,9 +7127,9 @@ export function App() {
                         {marketNotice.message}
                       </p>
                     )}
-                    {priceImportNotice?.surface === "settings" && (
+                    {priceSetTransfer.importNotice?.surface === "settings" && (
                       <InlineImportNotice
-                        notice={priceImportNotice}
+                        notice={priceSetTransfer.importNotice}
                         ariaLabel="Price import notice"
                         className="price-import-panel-notice"
                       />
@@ -9329,7 +7242,7 @@ export function App() {
                     className="price-history-summary"
                     aria-label="Market active PriceSet summary"
                   >
-                    <span>Active source {activePriceSetOriginLabel(activePriceSetOrigin)}</span>
+                    <span>Active source {activePriceSourceLabel}</span>
                     <span>Label {activePriceSet?.label ?? priceLabel}</span>
                     <span>Source {activePriceSet?.source ?? "-"}</span>
                     <span>Created {activePriceSet?.createdAt ?? "-"}</span>
@@ -9347,6 +7260,7 @@ export function App() {
                       Generated fallback{" "}
                       {formatNumber(activePriceMetadataSummary.generatedFallback)}
                     </span>
+                    <span>Manual {formatNumber(activePriceMetadataSummary.manual)}</span>
                     <span>
                       Unknown provenance {formatNumber(activePriceMetadataSummary.unknown)}
                     </span>
@@ -9355,6 +7269,113 @@ export function App() {
                     </span>
                     <span>Alch values {formatNumber(activePriceSetAlchCount)}</span>
                   </div>
+                  {activeTab === "economy" && (
+                    <section className="manual-price-panel" aria-label="Manual item price">
+                      <div className="loot-section-heading">
+                        <div>
+                          <h3>Manual item price</h3>
+                          <small>
+                            Local correction over the active base PriceSet; high alch is unchanged.
+                          </small>
+                        </div>
+                        <span>
+                          {formatNumber(activeManualPriceOverrideCount)} active
+                          {inactiveManualPriceOverrideCount > 0
+                            ? ` · ${formatNumber(inactiveManualPriceOverrideCount)} unavailable`
+                            : ""}
+                        </span>
+                      </div>
+                      <div className="economy-controls manual-price-controls">
+                        <SearchableSelectField
+                          label="Manual price item"
+                          value={effectiveManualPriceItemId}
+                          options={manualPriceItemOptions}
+                          disabled={manualPriceItemOptions.length === 0}
+                          searchPlaceholder="Search priced items"
+                          onChange={(itemId) => {
+                            setManualPriceItemId(itemId);
+                            setManualPriceDraft(
+                              activePriceSet?.itemPrices[itemId] ??
+                                basePriceSet?.itemPrices[itemId] ??
+                                0
+                            );
+                          }}
+                        />
+                        <DecimalField
+                          label="Manual price"
+                          value={manualPriceInputValue}
+                          min={0}
+                          max={1_000_000_000_000}
+                          step={1}
+                          disabled={!effectiveManualPriceItemId}
+                          onChange={(value) => {
+                            setManualPriceItemId(effectiveManualPriceItemId);
+                            setManualPriceDraft(value);
+                          }}
+                        />
+                      </div>
+                      <div className="price-history-summary" aria-label="Manual item price summary">
+                        <span>
+                          Item{" "}
+                          {(priceHistoryItemLabels[effectiveManualPriceItemId] ??
+                            effectiveManualPriceItemId) ||
+                            "-"}
+                        </span>
+                        <span>Base {optionalPrice(selectedManualBasePrice)}</span>
+                        <span>Active {optionalPrice(selectedManualActivePrice)}</span>
+                        <span>Status {selectedManualOverride ? "Manual" : "Base"}</span>
+                        <span>Updated {selectedManualOverride?.updatedAt ?? "-"}</span>
+                        <span>
+                          Stored {formatNumber(storedManualPriceOverrideCount)}/
+                          {formatNumber(MANUAL_PRICE_OVERRIDES_MAX_ITEMS)}
+                        </span>
+                      </div>
+                      <div className="market-sync-bar">
+                        <button
+                          type="button"
+                          disabled={!manualPriceCanApply}
+                          title={
+                            manualPriceAtCapacity
+                              ? "Reset an existing manual item price before adding another"
+                              : undefined
+                          }
+                          onClick={applyManualItemPrice}
+                        >
+                          Apply price
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!selectedManualOverride}
+                          onClick={resetManualItemPrice}
+                        >
+                          Reset item
+                        </button>
+                        {manualPriceClearPending ? (
+                          <>
+                            <button
+                              type="button"
+                              className="danger-button"
+                              onClick={confirmClearAllManualPrices}
+                            >
+                              Confirm clear all manual prices
+                            </button>
+                            <button type="button" onClick={() => setManualPriceClearPending(false)}>
+                              Cancel
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            className="danger-button"
+                            disabled={storedManualPriceOverrideCount === 0}
+                            onClick={() => setManualPriceClearPending(true)}
+                          >
+                            Clear all manual prices
+                          </button>
+                        )}
+                      </div>
+                    </section>
+                  )}
                   <div className="price-history-summary" aria-label="Price history summary">
                     <span>Snapshots {formatNumber(priceHistorySummary.snapshotCount)}</span>
                     <span>Shared {formatNumber(sharedPriceHistory.snapshots.length)}</span>
@@ -9381,9 +7402,9 @@ export function App() {
                       {marketNotice.message}
                     </p>
                   )}
-                  {priceImportNotice?.surface === "market" && (
+                  {priceSetTransfer.importNotice?.surface === "market" && (
                     <InlineImportNotice
-                      notice={priceImportNotice}
+                      notice={priceSetTransfer.importNotice}
                       ariaLabel="Price import notice"
                       className="price-import-panel-notice"
                     />

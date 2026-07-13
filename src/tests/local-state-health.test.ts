@@ -20,6 +20,12 @@ import {
 import { PLANNER_UI_STORAGE_KEY, PlannerUiStateSchema } from "../app/state/planner";
 import { REWRITE_SETUP_STORAGE_KEY } from "../app/state/ui-state";
 import { saveSelectedPriceSet } from "../app/state/selected-price-set";
+import {
+  DEFAULT_MANUAL_PRICE_OVERRIDES_STATE,
+  MANUAL_PRICE_OVERRIDES_STORAGE_KEY,
+  saveManualPriceOverrides,
+  setManualPriceOverride
+} from "../app/state/manual-price-overrides";
 import type { PriceSet } from "../domain/shared";
 
 function persistedEnvelope(version: number, data: unknown): string {
@@ -330,6 +336,15 @@ describe("rewrite local state health", () => {
   it("exports only health metadata, not raw local payloads", () => {
     const storage = createMemoryStorage();
     saveSelectedPriceSet(storage, privatePriceSet());
+    saveManualPriceOverrides(
+      storage,
+      setManualPriceOverride(
+        DEFAULT_MANUAL_PRICE_OVERRIDES_STATE,
+        "private_item_id",
+        123,
+        new Date("2026-07-12T12:00:00.000Z")
+      )
+    );
     saveLastHiscoresPlayer(storage, "Fixture Player");
 
     const exported = JSON.stringify(
@@ -337,9 +352,15 @@ describe("rewrite local state health", () => {
     );
 
     expect(exported).toContain("Selected PriceSet");
+    expect(exported).toContain("Manual item prices");
     expect(exported).toContain("Hiscores last player");
     expect(exported).not.toContain("Private price payload");
     expect(exported).not.toContain("private_item_id");
     expect(exported).not.toContain("Fixture Player");
+    expect(item(createLocalStateHealthReport(storage), "manual-price-overrides")).toMatchObject({
+      storageKey: MANUAL_PRICE_OVERRIDES_STORAGE_KEY,
+      status: "loaded",
+      clearable: true
+    });
   });
 });
