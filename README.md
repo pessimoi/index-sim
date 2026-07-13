@@ -2,7 +2,7 @@
 
 Revision 274
 
-Prices updated 3 July 2026
+Committed price snapshot captured 12 July 2026
 
 ## Quick start
 
@@ -32,13 +32,20 @@ game revision update; follow the runbook in
 [docs/operations/README.md](docs/operations/README.md#game-revision-bump-pr-runbook).
 
 `npm run verify` is the authoritative repository handoff gate. It runs typecheck,
-the full unit and explicit golden suites, production build and artifact checks,
-lint, formatting, dependency audit when network access is available, and
-`git diff --check`. Browser and visual suites remain separate because they need
-a compatible Playwright/browser environment.
+the source dependency-graph architecture check, the full unit and explicit golden
+suites, production build and artifact checks, lint, formatting, dependency audit
+when network access is available, and `git diff --check`. Browser and visual
+suites remain separate because they need a compatible Playwright/browser
+environment.
 
 After a production build, verify the D-066 Cloudflare artifact contract with
 `npm run deploy:verify-artifact`.
+
+Measure paired cold/warm production startup locally with
+`npm run startup:measure`. The command builds, serves and measures the current
+artifact with Playwright Chromium; it is workstation evidence rather than a
+universal latency SLA. The release gate separately enforces deterministic entry
+JavaScript byte budgets.
 
 The accepted production target is one Cloudflare Worker with Static Assets.
 Cloudflare Builds should run `npm run deploy:cloudflare:build` for `master`, then

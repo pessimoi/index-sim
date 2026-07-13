@@ -49,6 +49,27 @@ Validation evidence:
 
 After the push, local `HEAD` and `origin/master` both resolved to `c6ac6845a8458650a6913f3c9d45c09efc8933ff`, divergence was `0/0` and `git status --short` was clean. No force push, history rewrite or user-change removal was used.
 
+### 2026-07-13 follow-up delivery
+
+The next accumulated architecture/workflow worktree started from
+`19c9557c7ace12bbbff10c5a7ab8aea2b8b55150` on local `master`; a fresh fetch
+confirmed `origin/master...master` at `0/0` before staging. It is grouped as:
+
+- `fb160bc` - Refactor rewrite app ownership and state
+- `abb49f3` - Add architecture and startup release gates
+- one documentation/handoff commit containing only root guidance, audits,
+  living docs and implementation specifications
+
+Pre-documentation delivery validation passed 694/694 unit tests, 19/19 explicit
+goldens, typecheck, the 81-module zero-cycle architecture check, production
+build/artifact budgets, lint, Prettier and `git diff --check`. The complete
+production-preview Chromium gate passed 77/77. The 10-file/two-asset artifact
+is 1,953,715 bytes with SHA-256
+`00193bd3b92bf8f1faf6c25eca880ff74f5106f483e3dd3998bf8966e33b62bf`.
+The delivery uses no force push or history rewrite; final remote identity and
+clean-worktree evidence belong to the execution report because the
+documentation commit cannot record its own final SHA.
+
 ## Delivery outcome
 
 The work is done when:

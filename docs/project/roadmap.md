@@ -49,4 +49,4 @@ Implementation requirements for the rewrite live in [../technical/rewrite-spec.m
 - Database-backed persistence.
 - Public API contract.
 - Request-triggered or server-managed market jobs beyond the accepted repository scheduler.
-- Full CI/CD or public deployment pipeline.
+- A general merge-blocking CI system or automatically operated public deployment. The repository-owned Cloudflare build/deploy package and scheduled market workflow exist, but account connection, live operation and any remote merge gate remain adopter decisions.

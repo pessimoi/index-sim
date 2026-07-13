@@ -1,6 +1,6 @@
 # Conditional quest and clue loot specification
 
-Status: accepted for implementation on 2026-07-11.
+Status: implemented on 2026-07-11 under D-072; exact player-state activation remains decision-gated.
 
 ## Purpose
 
@@ -130,3 +130,7 @@ the source-backed omission explicit and future-extensible.
   that quest or clue state is modeled.
 - Evidence and validation pass, then this goal is committed and pushed before
   Goal 6.
+
+The implemented D-089 presentation follow-up is specified in
+[conditional-loot-presentation-spec.md](conditional-loot-presentation-spec.md).
+It changes only how these existing inactive rows are grouped in Loot.

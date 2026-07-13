@@ -14,6 +14,7 @@ This section owns planning material. Keep it light and keep implementation detai
 - [npc-attack-source-audit.md](npc-attack-source-audit.md): generated Revision 274 NPC attack-handler coverage and the still-open calculation decision package.
 - [worktree-delivery-spec.md](worktree-delivery-spec.md): review, commit grouping, validation and safe `origin/master` delivery plan for the current accumulated worktree.
 - [handoff-hardening-spec.md](handoff-hardening-spec.md): fresh-clone onboarding, repository verification, source-pin maintenance and technical handoff acceptance.
+- [documentation-audit.md](documentation-audit.md): 2026-07-13 repository-wide file/documentation consistency audit and remaining maintenance questions.
 
 ## Rules
 

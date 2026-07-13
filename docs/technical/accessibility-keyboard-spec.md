@@ -1,6 +1,6 @@
 # Accessibility and keyboard navigation specification
 
-Status: accepted for implementation on 2026-07-11.
+Status: implemented and browser-verified on 2026-07-11 under D-070.
 
 ## Purpose
 

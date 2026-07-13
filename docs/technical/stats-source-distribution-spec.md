@@ -1,6 +1,6 @@
 # Stats source distribution specification
 
-Status: accepted for implementation on 2026-07-11.
+Status: implemented and browser-verified on 2026-07-11 under D-069.
 
 The implemented event-scoped source-detail histograms in this document remain
 current-state truth. The discrete vertical normal-versus-special main

@@ -1,6 +1,12 @@
 # Bounded loadout optimizer specification
 
-Status: accepted for implementation on 2026-07-11.
+Status: implemented on 2026-07-11 under D-073; D-088 adds the implemented default numeric-level eligibility policy.
+
+D-088 later extends this implemented D-073 contract with the checked-by-default
+numeric-level eligibility policy in
+[requirement-aware-loadout-optimizer-spec.md](requirement-aware-loadout-optimizer-spec.md).
+The original warning-only candidate policy remains available explicitly; this
+document otherwise retains the D-073 implementation boundary.
 
 ## Purpose
 

@@ -1,6 +1,6 @@
 # Rewrite specification
 
-- Status: specification draft
+- Status: living target specification; the accepted V1 root rewrite is implemented, while explicit later decisions remain open
 - Owner: technical docs
 - Date: 2026-07-06
 - Scope: rewrite the current static 2004scape Combat Simulator into a maintainable, tested, typed architecture.

@@ -172,8 +172,10 @@ Configuration checks:
 Do not duplicate the URL in browser code or public runtime configuration.
 
 Completed 2026-07-10: repository-variable readback matched the exact approved root. The
-workflow still has only scheduled triggers, `contents: write` permission and the two-file
-output allowlist. This completes configuration but does not substitute for Phase 4.
+workflow still has only scheduled triggers and `contents: write` permission. D-085 later
+expanded its changed-file allowlist to the validated `prices.json`,
+`price-provenance.json` and `price-history.json` logical set. This completes repository
+configuration but does not substitute for current-allowlist Phase 4 evidence.
 
 ### Phase 4: Adopter observes the first scheduled run
 

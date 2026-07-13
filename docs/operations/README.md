@@ -13,7 +13,7 @@ The repo now uses the Vite/React rewrite as the root app path. The old CDN/Babel
 
 Current verified facts:
 
-- `README.md` states Revision 274 and "Prices updated 3 July 2026".
+- `README.md` states Revision 274 and identifies the committed price snapshot as captured on 12 July 2026. The machine-readable source of truth is `prices.json._scraped_at`, which matches `price-provenance.json.capturedAt`.
 - `index.html` mounts `src/app/main.tsx` through Vite.
 - `legacy/index.html` can load the old local scripts in script-tag order for reference and parity work.
 - Archived legacy UI text mentions `python run_sim.py`, `/api/prices`, `/api/scrape` and `/api/hiscores`.
@@ -52,7 +52,7 @@ Current market run behavior:
 - Vite dev and preview expose same-origin `GET /api/market/status` and `POST /api/market/sync` through repo-owned middleware.
 - The default market provider is disabled, so local runs show the disabled service state unless a test injects a provider.
 - The rewrite UI keeps JSON price import available as the offline fallback.
-- The rewrite UI stores selected imported or compatible legacy market prices in `index-sim:price-set:selected`. Generated Revision 274 alch values replace imported alch maps before use/persistence and again on restore. Reset clears only this selected key and returns to scheduled or bundled market prices.
+- The rewrite UI stores selected imported or compatible legacy market prices in `index-sim:price-set:selected`. Generated Revision 274 alch values replace imported alch maps before use/persistence and again on restore. Reset clears only this selected key and returns to scheduled or bundled market prices. A separate capped `index-sim:manual-price-overrides` overlay can replace individual active item prices without mutating the selected/scheduled/bundled base or generated alch values.
 - Economy loads committed version-2 `price-history.json` as read-only shared history and merges it in memory with version-2 capped local comparisons from `index-sim:price-history`. Valid v1 local snapshots migrate with unknown per-item freshness. `Save local comparison` and `Clear local history` change only the local key.
 - The rewrite UI can export the currently active `PriceSet` as JSON that the same `PriceSet` import parser accepts.
 - The Settings tab can show a rewrite-local state recovery view when a known rewrite-owned browser key is invalid or uses an unsupported version. The report exports metadata only: state labels, storage keys, status, expected/found versions and sanitized reasons. Per-key Clear and Clear invalid local data operate only on allowlisted rewrite-owned keys and do not remove legacy or unknown localStorage keys.
@@ -131,7 +131,7 @@ Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
 
 The current rewrite browser talks to same-origin live integration endpoints only, so static deployments should keep `connect-src 'self'` unless a separately accepted runtime requires more. If a future implementation adds browser-side upstream probes, tighten `connect-src` to the exact approved origins and document the source in [../project/decisions.md](../project/decisions.md). Do not add a database, user-triggered scraper or shared cloud state as part of deploy hardening.
 
-The D-066 build profile is root-path only. `npm run deploy:verify-artifact` rejects inline scripts, external index assets, source maps, unexpected root files, non-hashed assets, symlinks, local absolute paths and common secret material; validates `_headers` plus all four market data files; verifies price/provenance capture time and key parity; and emits a deterministic artifact checksum without writing release state. `npm run deploy:smoke` applies the same logical-set checks over HTTPS. Artifact byte count and checksum are build outputs, not durable documentation constants.
+The D-066 build profile is root-path only. `npm run deploy:verify-artifact` rejects inline scripts, external index assets, source maps, unexpected root files, non-hashed assets, symlinks, local absolute paths and common secret material; validates `_headers` plus all four market data files; verifies price/provenance capture time and key parity; enforces the D-094 direct entry-JavaScript limits of 725,000 raw and 210,000 gzip bytes; and emits bounded entry/chunk metadata plus a deterministic artifact checksum without writing release state. `npm run deploy:smoke` applies the same logical-set checks over HTTPS. Total artifact byte count and checksum are build outputs, not durable documentation constants.
 
 ## Data and price maintenance
 
@@ -152,7 +152,7 @@ npm run prices:write-scheduled -- --input src/tests/fixtures/market-writer/upstr
 node -e "for (const f of ['prices.json','price-provenance.json','price-history.json']) JSON.parse(require('fs').readFileSync(f,'utf8'))"
 ```
 
-The rewrite data layer can adapt current legacy runtime data into a validated `GameDataSnapshot`, including the browser sandbox bootstrap used by the Vite UI. It can validate `PriceSet` imports. In local runs where the market provider is disabled, the visible Market UI stays scheduled-only: no user-triggered refresh controls are shown, and the active scheduled/imported/bundled `PriceSet` summary, validated `PriceSet` import path, active `PriceSet` export and local-override reset controls remain available. This is not yet an authoritative game-data generation workflow.
+The production Vite UI loads the committed source-backed `GameDataSnapshot` through a dynamic `src/adapters/generated` bootstrap import after rendering the existing loading state. The snapshot remains validated, required runtime truth; splitting stages parse/paint work and does not turn it into an optional or upstream-fetched asset. Run `npm run startup:measure` for paired local cold/warm evidence. The legacy sandbox adapter remains reference/regression evidence and is not the root bootstrap. The data layer also validates `PriceSet` imports. In local runs where the market provider is disabled, the visible Market UI stays scheduled-only: no user-triggered refresh controls are shown, and the active scheduled/imported/bundled `PriceSet` summary, validated import/export paths, selected-PriceSet reset and per-item manual override/reset controls remain available. The authoritative revision-update workflow is the reviewed `npm run data:generate` path described below.
 
 Accepted workflow target: scheduled repo automation reads approved `markets.lostcity.rs/items/{slug}` pages and writes numeric prices, item-level provenance and versioned shared history. High alch comes from generated game data. The local writer validates all three scheduled outputs and skips unchanged writes; GitHub Actions commits only their real diffs. No database, backend-managed mutable history or user-triggered upstream refresh is accepted.
 

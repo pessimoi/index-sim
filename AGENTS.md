@@ -13,7 +13,7 @@ This file is the first stop for AI agents working in this repository. Keep it sh
 1. Run or inspect `git status --short` and protect unrelated user changes.
 2. Read `README.md`, this file and [docs/README.md](docs/README.md).
 3. For technical work, read [docs/technical/architecture.md](docs/technical/architecture.md) and [docs/technical/testing.md](docs/technical/testing.md).
-4. Search the code with `rg` before editing. The current app is script-order and `window.*` driven, so local changes can have global effects.
+4. Search the code with `rg` before editing. The production rewrite is module-based, but the archived legacy runtime is script-order and `window.*` driven; changes to shared data, adapters or legacy-reference files can still have global effects.
 5. If a claim is not verifiable from code or docs, mark it in the relevant document as an open question.
 6. Run temporary scripts, caches and generated helper files from inside this repository, not from `/tmp` or other external scratch paths, unless a human explicitly approves. This avoids endpoint-security noise on the user's work machine.
 
@@ -43,7 +43,7 @@ The legacy `views.jsx` `ArchitectureBoard` is only a docs-link panel. Treat the 
 - Market price sync and local price persistence: `market.js`
 - Legacy planner domain logic: `planner-core.js`
 - Rewrite planner domain logic: `src/domain/planner`
-- Price snapshots: `prices.json`, `alch.json`, `price-history.json`
+- Price snapshots and provenance: `prices.json`, `price-provenance.json`, `alch.json`, `price-history.json`
 - Generated game-data workflow: `scripts/generate-game-data.ts`, `scripts/game-data-generator-core.ts`, `src/data/generated/`, `docs/project/revision-impact/current.md`
 - Raw LostCity source audit and candidate impact workflow: `scripts/lostcity-content-*.ts`, `scripts/report-lostcity-source-coverage.ts`, `scripts/report-lostcity-source-impact.ts`, `npm run data:source-audit`, `npm run data:source-impact`
 - Root runtime bootstrap: `src/adapters/generated`, using `src/data/generated/game-data.json` plus scheduled static prices and generated item fallbacks
@@ -53,7 +53,9 @@ The legacy `views.jsx` `ArchitectureBoard` is only a docs-link panel. Treat the 
 - Scheduled market price workflow: `.github/workflows/update-market-prices.yml`
 - Provider-neutral deployment validation: `scripts/deployment-readiness-core.ts`, `scripts/verify-public-deployment.ts`, `npm run deploy:verify-artifact`, `npm run deploy:smoke`
 - Production deployment target: Cloudflare Worker + Static Assets through `src/server/cloudflare-worker.ts`, `wrangler.jsonc`, `public/_headers`, `npm run deploy:cloudflare:build`, `npm run deploy:cloudflare:preview`, `npm run deploy:cloudflare`
-- Styling: `styles.css`
+- Rewrite styling: `src/app/styles.css`
+- Archived legacy styling: `styles.css` plus inline styles in `views.jsx`
+- Same-origin service boundaries: `src/server`, `src/adapters/hiscores`, `src/adapters/market`
 - Rewrite implementation: `src/app`, `src/domain`, `src/data`, `src/adapters`, `src/tests`
 - Documentation map: `docs/README.md`
 
@@ -80,15 +82,15 @@ No general GitHub Actions CI config, database schema or stateful backend exists 
 
 ### API or backend change
 
-- Current state: no repo-owned backend exists. UI references `/api/prices`, `/api/scrape` and `/api/hiscores`, and mentions `run_sim.py`, but that file is absent.
-- Ask a human before adding a backend, choosing framework, adding auth or changing deployment shape.
+- Current state: repo-owned framework-neutral Hiscores and market handlers, Vite middleware and a Cloudflare Worker adapter exist under `src/server`. No stateful simulation backend, database, auth service or `run_sim.py` exists. `/api/prices` and `/api/scrape` are archived legacy references; the rewrite uses `/api/hiscores` and compatibility `/api/market/*` boundaries while scheduled static prices own production market freshness.
+- Ask a human before adding another backend framework, server-managed state, auth or a changed deployment shape.
 - Read first: [docs/operations/README.md](docs/operations/README.md), [docs/project/decisions.md](docs/project/decisions.md).
 - Update docs: operations, architecture, testing and decisions.
 
 ### Data or config change
 
 - Read first: [docs/product/README.md](docs/product/README.md), [docs/technical/architecture.md](docs/technical/architecture.md).
-- Check code/data: `gamedata.js`, `prices.json`, `alch.json`, `price-history.json`, `market.js`, `engine.js`, `scripts/generate-game-data.ts`, `scripts/game-data-generator-core.ts`, `src/data/generated/`.
+- Check code/data: `gamedata.js`, `prices.json`, `price-provenance.json`, `alch.json`, `price-history.json`, `market.js`, `engine.js`, `scripts/generate-game-data.ts`, `scripts/game-data-generator-core.ts`, `src/data/generated/`.
 - Risks: source provenance, placeholder prices, localStorage price overrides, duplicate item keys, loot table shape, raw upstream dumps, historical generated snapshot archives.
 - Validate: JSON parse for data files, `node --check` for affected `.js`, `npm run test -- src/tests/data-generator.test.ts` for generated-data workflow changes, and `npm run test:golden` for simulation-impacting changes.
 - Update docs when source tags, price workflow or data ownership changes.
@@ -131,7 +133,7 @@ Update docs in the same change when you alter:
 
 ## Testing line
 
-Use [docs/technical/testing.md](docs/technical/testing.md) as the owner. The current minimum for documentation-only changes is `git diff --check`. For source changes, run syntax checks for affected `.js` files and parse affected JSON files. Add stronger tests before risky refactors.
+Use [docs/technical/testing.md](docs/technical/testing.md) as the owner. The current minimum for documentation-only changes is `git diff --check`. For source changes, run syntax checks for affected `.js` files and parse affected JSON files. Run `npm run architecture:check` when changing module boundaries, entrypoints, adapters or barrel exports. Add stronger tests before risky refactors.
 
 Keep test helpers, npm caches and generated scratch files inside the repo and ignore them when appropriate. Do not use `/tmp`-style script locations unless the user explicitly asks for that.
 

@@ -1,6 +1,6 @@
 # Source-backed requirements and NPC size specification
 
-Status: accepted for implementation on 2026-07-11.
+Status: implemented on 2026-07-11 under D-071.
 
 ## Purpose
 

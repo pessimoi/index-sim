@@ -203,10 +203,9 @@ candidate. The workflow's changed-file allowlist, parse checks, commit command
 and tests must cover all three files. A failed run leaves the previous committed
 set active.
 
-Adding the third scheduled artifact changes the currently accepted D-033/D-064
-two-file output set. The implementation change must update the accepted
-decision record; this proposed specification does not itself mark that policy
-change accepted.
+This section originally identified the required change from the D-033/D-064
+two-file output set. D-085 now accepts that change, and the implementation,
+workflow and deployment gates use the three-file logical set.
 
 ## Writer update and retention rules
 
@@ -647,3 +646,8 @@ Implemented on 2026-07-12 under D-085:
   phase.
 
 None of these questions blocks truthful per-item metadata and freshness.
+
+The implemented D-090 local correction workflow is specified in
+[manual-item-price-overrides-spec.md](manual-item-price-overrides-spec.md). It
+uses the already-valid `manual` origin and `manual-value` reason without
+changing scheduled observation semantics.

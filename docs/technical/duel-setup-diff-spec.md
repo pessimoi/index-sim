@@ -1,6 +1,6 @@
 # Setup comparison diff and impact explanation specification
 
-- Status: accepted for implementation
+- Status: implemented and browser-verified under D-068
 - Date: 2026-07-11
 - Owner: technical docs
 - Source: approved post-V1 extension Goal 1
