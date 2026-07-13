@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { lstatSync, readFileSync, readdirSync } from "node:fs";
 import { relative, resolve, sep } from "node:path";
+import { gzipSync } from "node:zlib";
 import { parseHiscoresStatusResponseJson } from "../src/data/schemas/live-integrations";
 import {
   PriceHistorySchema,
@@ -24,6 +25,8 @@ const HASHED_ASSET_PATTERN =
 const TEXT_FILE_PATTERN = /(?:^_headers$|\.(?:css|html|js|json|txt)$)/i;
 const MAX_HTTP_BODY_BYTES = 5_000_000;
 const MAX_API_BODY_BYTES = 100_000;
+export const MAX_ENTRY_JAVASCRIPT_BYTES = 725_000;
+export const MAX_ENTRY_JAVASCRIPT_GZIP_BYTES = 210_000;
 
 export const DEPLOYMENT_SMOKE_TIMEOUT_MS = 15_000;
 export { DEPLOYMENT_CSP };
@@ -46,6 +49,9 @@ export interface DeploymentArtifactReport {
   outDir: string;
   fileCount: number;
   assetCount: number;
+  entryJavaScriptBytes: number;
+  entryJavaScriptGzipBytes: number;
+  javascriptChunkCount: number;
   totalBytes: number;
   sha256: string;
   marketScrapedAt: string;
@@ -338,6 +344,40 @@ function artifactDigest(files: readonly ArtifactFile[]): string {
   return hash.digest("hex");
 }
 
+function entryJavaScriptReport(
+  assets: readonly string[],
+  files: readonly ArtifactFile[],
+  filesByPath: ReadonlyMap<string, ArtifactFile>
+): Pick<
+  DeploymentArtifactReport,
+  "entryJavaScriptBytes" | "entryJavaScriptGzipBytes" | "javascriptChunkCount"
+> {
+  const entryFiles = assets
+    .filter((asset) => asset.endsWith(".js"))
+    .map((asset) => filesByPath.get(asset))
+    .filter((file): file is ArtifactFile => file !== undefined);
+  const entryJavaScriptBytes = entryFiles.reduce((total, file) => total + file.bytes.byteLength, 0);
+  const entryJavaScriptGzipBytes = entryFiles.reduce(
+    (total, file) => total + gzipSync(file.bytes).byteLength,
+    0
+  );
+  if (entryJavaScriptBytes > MAX_ENTRY_JAVASCRIPT_BYTES) {
+    failArtifact(
+      `Deployment entry JavaScript exceeds ${MAX_ENTRY_JAVASCRIPT_BYTES} bytes (${entryJavaScriptBytes})`
+    );
+  }
+  if (entryJavaScriptGzipBytes > MAX_ENTRY_JAVASCRIPT_GZIP_BYTES) {
+    failArtifact(
+      `Deployment entry JavaScript gzip exceeds ${MAX_ENTRY_JAVASCRIPT_GZIP_BYTES} bytes (${entryJavaScriptGzipBytes})`
+    );
+  }
+  return {
+    entryJavaScriptBytes,
+    entryJavaScriptGzipBytes,
+    javascriptChunkCount: files.filter((file) => file.path.endsWith(".js")).length
+  };
+}
+
 export function verifyDeploymentArtifact(
   options: {
     outDir?: string;
@@ -372,11 +412,13 @@ export function verifyDeploymentArtifact(
   }
 
   const market = validateMarketFiles(filesByPath);
+  const entryJavaScript = entryJavaScriptReport(assets, files, filesByPath);
   return {
     status: "ready",
     outDir: repoRelativePath(projectRoot, outDir),
     fileCount: files.length,
     assetCount: assets.length,
+    ...entryJavaScript,
     totalBytes: files.reduce((sum, file) => sum + file.bytes.byteLength, 0),
     sha256: artifactDigest(files),
     ...market

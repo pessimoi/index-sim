@@ -20,6 +20,15 @@ const scheduledPriceAssetFiles = [
 const archivedLegacyJsxFiles = new Set(["planner.jsx", "views.jsx"]);
 const hiscoresProvider = createLostCityHiscoresProvider();
 
+export function isDirectScheduledPriceAssetRequest(requestUrlValue: string | undefined): boolean {
+  const requestUrl = new URL(requestUrlValue ?? "/", "http://localhost");
+  const pathname = requestUrl.pathname.replace(/^\/+/, "");
+  return (
+    requestUrl.search === "" &&
+    scheduledPriceAssetFiles.includes(pathname as (typeof scheduledPriceAssetFiles)[number])
+  );
+}
+
 function archivedLegacyRuntimePlugin(): Plugin {
   return {
     name: "index-sim-archived-legacy-runtime",
@@ -43,17 +52,16 @@ function archivedLegacyRuntimePlugin(): Plugin {
 }
 
 function scheduledPriceAssetsPlugin(): Plugin {
-  const assetFileSet = new Set<string>(scheduledPriceAssetFiles);
-
   const attachStaticPriceAssetMiddleware = (
     server: Pick<ViteDevServer | PreviewServer, "middlewares">
   ) => {
     server.middlewares.use((request, response, next) => {
-      const pathname = new URL(request.url ?? "/", "http://localhost").pathname.replace(/^\/+/, "");
-      if (!assetFileSet.has(pathname)) {
+      if (!isDirectScheduledPriceAssetRequest(request.url)) {
         next();
         return;
       }
+
+      const pathname = new URL(request.url ?? "/", "http://localhost").pathname.replace(/^\/+/, "");
 
       response.statusCode = 200;
       response.setHeader("Content-Type", "application/json; charset=utf-8");

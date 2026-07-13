@@ -38,6 +38,8 @@
     "test:e2e:visual": "playwright test --config playwright.visual.config.ts",
     "test:e2e:visual:update": "playwright test --config playwright.visual.config.ts --update-snapshots",
     "typecheck": "tsc -b",
+    "architecture:check": "$NODE node_modules/vite-node/vite-node.mjs --config vitest.config.ts scripts/check-architecture.ts",
+    "startup:measure": "$NODE scripts/measure-startup.mjs",
     "lint": "$NODE node_modules/eslint/bin/eslint.js .",
     "format:check": "$NODE node_modules/prettier/bin/prettier.cjs --check ."
   },

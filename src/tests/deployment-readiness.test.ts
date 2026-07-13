@@ -3,6 +3,8 @@ import { dirname, join, resolve } from "node:path";
 import {
   DEPLOYMENT_CSP,
   DeploymentReadinessError,
+  MAX_ENTRY_JAVASCRIPT_BYTES,
+  MAX_ENTRY_JAVASCRIPT_GZIP_BYTES,
   smokePublicDeployment,
   verifyDeploymentArtifact,
   type DeploymentFetchLike
@@ -109,6 +111,9 @@ describe("deployment readiness", () => {
       outDir: ".vite/deployment-readiness-test",
       fileCount: 8,
       assetCount: 2,
+      entryJavaScriptBytes: expect.any(Number),
+      entryJavaScriptGzipBytes: expect.any(Number),
+      javascriptChunkCount: 1,
       historySnapshots: expect.any(Number),
       marketScrapedAt: expect.stringMatching(/^\d{4}-/)
     });
@@ -129,6 +134,25 @@ describe("deployment readiness", () => {
         DeploymentReadinessError
       );
     }
+  });
+
+  it("rejects entry JavaScript over the raw or gzip release budgets", () => {
+    createArtifact();
+    write("assets/index-abcdefgh.js", "x".repeat(MAX_ENTRY_JAVASCRIPT_BYTES + 1));
+    expect(() => verifyDeploymentArtifact({ outDir: TEST_ROOT })).toThrow(
+      `Deployment entry JavaScript exceeds ${MAX_ENTRY_JAVASCRIPT_BYTES} bytes`
+    );
+
+    createArtifact();
+    let state = 0x12345678;
+    const pseudoRandom = Array.from({ length: MAX_ENTRY_JAVASCRIPT_GZIP_BYTES * 2 }, () => {
+      state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+      return String.fromCharCode(32 + (state % 95));
+    }).join("");
+    write("assets/index-abcdefgh.js", pseudoRandom);
+    expect(() => verifyDeploymentArtifact({ outDir: TEST_ROOT })).toThrow(
+      `Deployment entry JavaScript gzip exceeds ${MAX_ENTRY_JAVASCRIPT_GZIP_BYTES} bytes`
+    );
   });
 
   it("sanitizes an unreadable artifact directory", () => {
