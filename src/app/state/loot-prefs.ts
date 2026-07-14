@@ -83,3 +83,17 @@ export function replaceLootPrefsForMonster(
   else delete next[monsterId];
   return LootPrefsStateSchema.parse(next);
 }
+
+export function mergeLootPrefsState(
+  current: LootPrefsState,
+  imported: LootPrefsState
+): LootPrefsState {
+  const next: LootPrefsState = { ...current };
+  for (const [monsterId, prefs] of Object.entries(imported)) {
+    next[monsterId] = {
+      ...(next[monsterId] ?? {}),
+      ...prefs
+    };
+  }
+  return LootPrefsStateSchema.parse(next);
+}

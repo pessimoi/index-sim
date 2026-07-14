@@ -1,14 +1,16 @@
 import {
-  formatNumber,
   type ActiveAssumptionResetTarget,
   type ActiveAssumptionReviewTarget,
-  type ActiveAssumptionsSummaryViewModel,
-  type CalculationWarningViewModel,
-  type HitDistributionComparisonViewModel,
-  type HitDistributionViewModel,
-  type StatsCombatRollDetailViewModel,
-  type StatsSourceDetailViewModel
-} from "../view-models/simulation";
+  type ActiveAssumptionsSummaryViewModel
+} from "../view-models/active-assumptions";
+import type {
+  HitDistributionComparisonViewModel,
+  HitDistributionViewModel,
+  StatsCombatRollDetailViewModel,
+  StatsSourceDetailViewModel
+} from "../view-models/stats";
+import type { CalculationWarningViewModel } from "../view-models/contracts";
+import { formatNumber } from "../view-models/formatting";
 import { MetricList } from "./app-presenters";
 
 export function CalculationWarningSummary({

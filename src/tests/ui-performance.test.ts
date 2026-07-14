@@ -1,12 +1,10 @@
 import { loadBundledLegacyContext } from "../adapters/legacy-runtime";
 import { createDuelSnapshot } from "../app/state/duel-snapshots";
 import { DEFAULT_FORM_STATE, type CombatSetupFormState } from "../app/state/ui-state";
-import {
-  createCompareRows,
-  createDuelMatrixViewModel,
-  createPlannerViewModel,
-  createSimulationViewModel
-} from "../app/view-models/simulation";
+import { createPlannerViewModel } from "../app/view-models/planner";
+import { createSimulationViewModel } from "../app/view-models/simulation";
+import { createCompareRows } from "../app/view-models/compare";
+import { createDuelMatrixViewModel } from "../app/view-models/duel";
 import type { SimulationContext } from "../domain/shared";
 
 function levelVariant(index: number): CombatSetupFormState {

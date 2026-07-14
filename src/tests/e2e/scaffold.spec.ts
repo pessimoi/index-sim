@@ -20,7 +20,8 @@ import {
   SavedSetupEnvelopeSchema,
   savedSetupFromForm
 } from "../../app/state/ui-state";
-import { createSimulationViewModel, formatNumber } from "../../app/view-models/simulation";
+import { formatNumber } from "../../app/view-models/formatting";
+import { createSimulationViewModel } from "../../app/view-models/simulation";
 import { parseGameDataSnapshot } from "../../data/schemas/game-data";
 import { LEGACY_GOLDEN_CASES } from "../fixtures/legacy-case-definitions";
 import { createRewriteFixtureCase } from "../helpers/rewrite-fixture";

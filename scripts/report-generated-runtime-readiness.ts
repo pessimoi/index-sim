@@ -11,9 +11,9 @@ import { createGeneratedRuntimePriceSet } from "../src/adapters/generated/price-
 import {
   createGameDataSnapshotFromLegacy,
   createPriceSetFromLegacyGameData,
-  parseJsonWithDuplicateKeyCheck,
   type LegacySnapshotInput
-} from "../src/data";
+} from "../src/data/legacy-adapter";
+import { parseJsonWithDuplicateKeyCheck } from "../src/data/reliability";
 import { parseGameDataSnapshot } from "../src/data/schemas/game-data";
 import {
   ScheduledPriceProvenanceArtifactSchema,

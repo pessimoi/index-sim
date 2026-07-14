@@ -1,0 +1,779 @@
+import { EQUIPMENT_SLOTS } from "@/domain/shared";
+import type { CombatStyle, EquipmentSlot, EntityId, SimulationContext } from "@/domain/shared";
+import { FOOD, type LootAction } from "@/domain/trip";
+import { DEFAULT_DENSE_COMPARE_SORT_STATE } from "../state/dense-compare";
+import {
+  DUEL_SNAPSHOTS_VERSION,
+  DuelSnapshotsImportError,
+  MAX_DUEL_SNAPSHOTS,
+  normalizeDuelSnapshotsState,
+  type DuelSnapshotsState
+} from "../state/duel-snapshots";
+import type { LootSettingsByMonsterState } from "../state/loot-settings";
+import {
+  BOOST_SELECTION_OPTIONS,
+  PRAYER_SELECTION_OPTIONS,
+  normalizeFormState,
+  type CannonByMonsterState,
+  type CombatSetupFormState
+} from "../state/ui-state";
+import { createDenseCompareRows } from "./compare";
+import { SETUP_REQUIREMENT_SLOT_LABELS } from "./loadout";
+import { createSimulationViewModel, type SimulationViewModel } from "./simulation";
+import type { InlineNoticeViewModel } from "./contracts";
+
+export type DuelComparisonRowSource = "live" | "snapshot";
+export type DuelViewMode = "current-target" | "monster-matrix";
+
+export function defaultDuelSnapshotName(
+  viewModel: SimulationViewModel,
+  snapshotCount: number
+): string {
+  const setup = viewModel.monsterCard.setupOverview;
+  if (setup.combatStyle === "magic" && setup.spell) return setup.spell.label;
+  if (setup.combatStyle === "ranged" && setup.ammo) return setup.ammo.label;
+  return setup.weapon.label || `Setup ${snapshotCount + 1}`;
+}
+
+export function describeDuelSnapshotsImportError(error: unknown): InlineNoticeViewModel {
+  const code =
+    error instanceof DuelSnapshotsImportError
+      ? error.code
+      : error instanceof Error && /^File exceeds \d+ bytes$/.test(error.message)
+        ? "body_too_large"
+        : null;
+
+  if (code === "body_too_large") {
+    return {
+      tone: "error",
+      message: "Saved setup import failed: choose an exported setup file under 250 KB."
+    };
+  }
+  if (code === "invalid_json") {
+    return { tone: "error", message: "Saved setup import failed: the file is not valid JSON." };
+  }
+  if (code === "duplicate_keys" || code === "duplicate_ids") {
+    return {
+      tone: "error",
+      message: "Saved setup import failed: the export contains duplicate setup data."
+    };
+  }
+  if (code === "incompatible_entities") {
+    return {
+      tone: "error",
+      message: "Saved setup import failed: a setup references unavailable game data."
+    };
+  }
+  if (code === "unsupported_version") {
+    return {
+      tone: "error",
+      message: `Saved setup import failed: this app only supports setup file version ${DUEL_SNAPSHOTS_VERSION}.`
+    };
+  }
+  return {
+    tone: "error",
+    message: "Saved setup import failed: the file is not a valid setup export."
+  };
+}
+
+export interface DuelComparisonRowDeltasViewModel {
+  maxHit: number;
+  dps: number;
+  hitChance: number;
+  ttkSec: number;
+  killsPerTrip: number;
+  killsPerHour: number;
+  effectiveXpPerHour: number;
+  effectiveNetGpPerHour: number;
+  gpPerXp: number | null;
+  supplyCostPerHour: number;
+}
+
+export type DuelSetupDiffCategoryId =
+  "combat" | "levels" | "loadout" | "gear" | "prayers-boosts" | "special-overrides" | "trip";
+
+export interface DuelSetupDiffItemViewModel {
+  id: string;
+  label: string;
+  liveValue: string;
+  snapshotValue: string;
+}
+
+export interface DuelSetupDiffGroupViewModel {
+  id: DuelSetupDiffCategoryId;
+  label: string;
+  items: DuelSetupDiffItemViewModel[];
+}
+
+export interface DuelSetupDiffViewModel {
+  changeCount: number;
+  groups: DuelSetupDiffGroupViewModel[];
+  sharedContextNote: string;
+}
+
+export interface DuelComparisonBestMarkersViewModel {
+  effectiveXpPerHour: boolean;
+  effectiveNetGpPerHour: boolean;
+  gpPerXp: boolean;
+}
+
+export interface DuelComparisonRowViewModel {
+  id: string;
+  snapshotId: EntityId | null;
+  source: DuelComparisonRowSource;
+  name: string;
+  monsterId: EntityId;
+  monsterName: string;
+  combatStyle: CombatStyle;
+  loadoutLabel: string;
+  maxHit: number;
+  dps: number;
+  hitChance: number;
+  ttkSec: number;
+  killsPerTrip: number;
+  killsPerHour: number;
+  effectiveXpPerHour: number;
+  effectiveNetGpPerHour: number;
+  gpPerXp: number | null;
+  supplyCostPerHour: number;
+  bound: string;
+  warnings: string[];
+  setupDiff: DuelSetupDiffViewModel | null;
+  deltas: DuelComparisonRowDeltasViewModel;
+  best: DuelComparisonBestMarkersViewModel;
+}
+
+export interface DuelComparisonViewModel {
+  monsterId: EntityId;
+  monsterName: string;
+  snapshotCount: number;
+  snapshotLimit: number;
+  liveRow: DuelComparisonRowViewModel;
+  snapshotRows: DuelComparisonRowViewModel[];
+  rows: DuelComparisonRowViewModel[];
+}
+
+export type DuelMatrixMetricId = "dps" | "effectiveXpPerHour" | "effectiveNetGpPerHour" | "gpPerXp";
+
+export interface DuelMatrixMetricValuesViewModel {
+  dps: number | null;
+  effectiveXpPerHour: number | null;
+  effectiveNetGpPerHour: number | null;
+  gpPerXp: number | null;
+}
+
+export interface DuelMatrixCellViewModel {
+  setupId: string;
+  values: DuelMatrixMetricValuesViewModel;
+  best: Record<DuelMatrixMetricId, boolean>;
+}
+
+export interface DuelMatrixSetupViewModel {
+  id: string;
+  snapshotId: EntityId | null;
+  source: DuelComparisonRowSource;
+  name: string;
+  combatStyle: CombatStyle;
+  loadoutLabel: string;
+}
+
+export interface DuelMatrixRowViewModel {
+  monsterId: EntityId;
+  monsterName: string;
+  monsterLevel: number | null;
+  isCurrentTarget: boolean;
+  cells: DuelMatrixCellViewModel[];
+}
+
+export interface DuelMatrixViewModel {
+  currentMonsterId: EntityId;
+  monsterCount: number;
+  setupCount: number;
+  cellCount: number;
+  setups: DuelMatrixSetupViewModel[];
+  rows: DuelMatrixRowViewModel[];
+}
+
+type DuelComparisonBaseRowViewModel = Omit<
+  DuelComparisonRowViewModel,
+  "deltas" | "best" | "setupDiff"
+>;
+
+function gpPerXpValue(effectiveNetGpPerHour: number, effectiveXpPerHour: number): number | null {
+  return effectiveXpPerHour > 0 ? effectiveNetGpPerHour / effectiveXpPerHour : null;
+}
+
+function duelLoadoutLabel(vm: SimulationViewModel): string {
+  const overview = vm.monsterCard.setupOverview;
+  const parts = [overview.combatStyle, overview.weapon.label];
+  if (overview.ammo) parts.push(overview.ammo.label);
+  if (overview.spell) parts.push(overview.spell.label);
+  if (overview.prayerIds.length > 0) {
+    parts.push(`${overview.prayerIds.length} prayer${overview.prayerIds.length === 1 ? "" : "s"}`);
+  }
+  if (overview.boostIds.length > 0) {
+    parts.push(`${overview.boostIds.length} boost${overview.boostIds.length === 1 ? "" : "s"}`);
+  }
+  if (overview.sustained) parts.push("sustained");
+  return parts.join(" · ");
+}
+
+function duelBaseRowFromSimulation(
+  id: string,
+  source: DuelComparisonRowSource,
+  snapshotId: EntityId | null,
+  name: string,
+  vm: SimulationViewModel
+): DuelComparisonBaseRowViewModel {
+  const result = vm.result;
+  return {
+    id,
+    snapshotId,
+    source,
+    name,
+    monsterId: result.request.monsterId,
+    monsterName: vm.monsterCard.monsterName,
+    combatStyle: result.request.combatStyle,
+    loadoutLabel: duelLoadoutLabel(vm),
+    maxHit: result.combat.maxHit,
+    dps: result.rates.effectiveDps,
+    hitChance: result.combat.hitChance,
+    ttkSec: result.rates.ttkSec,
+    killsPerTrip: result.trip.trip.killsPerTrip,
+    killsPerHour: result.rates.killsPerHour,
+    effectiveXpPerHour: result.xp.effectiveXpPerHour,
+    effectiveNetGpPerHour: result.rates.effectiveNetGpPerHour,
+    gpPerXp: gpPerXpValue(result.rates.effectiveNetGpPerHour, result.xp.effectiveXpPerHour),
+    supplyCostPerHour: result.rates.supplyCostPerKill * result.rates.effectiveKph,
+    bound: result.trip.trip.bound,
+    warnings: vm.warnings
+  };
+}
+
+const DUEL_DIFF_CATEGORY_LABELS: Record<DuelSetupDiffCategoryId, string> = {
+  combat: "Combat",
+  levels: "Levels",
+  loadout: "Loadout",
+  gear: "Gear",
+  "prayers-boosts": "Prayers and boosts",
+  "special-overrides": "Special and overrides",
+  trip: "Trip"
+};
+
+const DUEL_LEVEL_LABELS: Record<keyof CombatSetupFormState["levels"], string> = {
+  attack: "Attack",
+  strength: "Strength",
+  defence: "Defence",
+  hitpoints: "Hitpoints",
+  ranged: "Ranged",
+  magic: "Magic",
+  prayer: "Prayer"
+};
+
+const DUEL_TRIP_LABELS: Record<keyof CombatSetupFormState["trip"], string> = {
+  foodKey: "Food",
+  teleport: "Teleport",
+  bankSeconds: "Bank time",
+  potionSets: "Boost vials",
+  potionDoses: "Boost doses",
+  singleDose: "Single-dose boosts",
+  dbaRestore: "DBA restore",
+  prayerMode: "Prayer restore",
+  alching: "High alch",
+  recoverAmmo: "Recover ammo",
+  runeSlots: "Rune slots",
+  antifire: "Antifire",
+  antipoison: "Antipoison",
+  safespot: "Safespot",
+  protect: "Protection prayer",
+  recoilRings: "Recoil rings",
+  foodCount: "Food count",
+  foodPerKillOverride: "Food per kill",
+  prayerPotionSets: "Prayer potion vials",
+  prayerPotionDoses: "Prayer potion doses",
+  altarSeconds: "Altar time",
+  scarceSpot: "Scarce spot",
+  targetsAtSpot: "Targets at spot",
+  respawnSeconds: "Respawn time"
+};
+
+function duelHumanizeId(value: string): string {
+  return value.replace(/_/g, " ").replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function duelBooleanLabel(value: boolean): string {
+  return value ? "On" : "Off";
+}
+
+function duelOptionalValue(value: string | number | boolean | null): string {
+  if (value == null) return "Auto";
+  if (typeof value === "boolean") return duelBooleanLabel(value);
+  return String(value);
+}
+
+function duelSelectionLabel(
+  values: readonly string[],
+  options: ReadonlyArray<{ id: string; label: string }>
+): string {
+  const labels = values
+    .filter((value) => value !== "none")
+    .map((value) => options.find((option) => option.id === value)?.label ?? duelHumanizeId(value));
+  return labels.length > 0 ? labels.join(", ") : "None";
+}
+
+function duelItemLabel(
+  context: SimulationContext,
+  kind: "weapon" | "ammo" | "spell",
+  itemId: EntityId
+): string {
+  if (itemId === "none") return "None";
+  if (kind === "weapon") return context.gameData.weapons[itemId]?.name ?? duelHumanizeId(itemId);
+  if (kind === "ammo") return context.gameData.ammo[itemId]?.name ?? duelHumanizeId(itemId);
+  return context.gameData.spells[itemId]?.name ?? duelHumanizeId(itemId);
+}
+
+function duelGearLabel(context: SimulationContext, slot: EquipmentSlot, itemId: EntityId): string {
+  if (itemId === "none") return "None";
+  return context.gameData.equipment[slot]?.[itemId]?.name ?? duelHumanizeId(itemId);
+}
+
+function createDuelSetupDiffViewModel(
+  liveForm: CombatSetupFormState,
+  snapshotForm: CombatSetupFormState,
+  context: SimulationContext
+): DuelSetupDiffViewModel {
+  const groups = new Map<DuelSetupDiffCategoryId, DuelSetupDiffItemViewModel[]>();
+  const add = (
+    category: DuelSetupDiffCategoryId,
+    id: string,
+    label: string,
+    liveRaw: unknown,
+    snapshotRaw: unknown,
+    liveValue = duelOptionalValue(liveRaw as string | number | boolean | null),
+    snapshotValue = duelOptionalValue(snapshotRaw as string | number | boolean | null)
+  ) => {
+    if (JSON.stringify(liveRaw) === JSON.stringify(snapshotRaw)) return;
+    const items = groups.get(category) ?? [];
+    items.push({ id, label, liveValue, snapshotValue });
+    groups.set(category, items);
+  };
+
+  add(
+    "combat",
+    "combat-style",
+    "Combat style",
+    liveForm.combatStyle,
+    snapshotForm.combatStyle,
+    duelHumanizeId(liveForm.combatStyle),
+    duelHumanizeId(snapshotForm.combatStyle)
+  );
+  add(
+    "combat",
+    "attack-style",
+    "Attack style",
+    liveForm.styleId,
+    snapshotForm.styleId,
+    duelHumanizeId(liveForm.styleId),
+    duelHumanizeId(snapshotForm.styleId)
+  );
+
+  for (const skill of Object.keys(DUEL_LEVEL_LABELS) as Array<keyof typeof DUEL_LEVEL_LABELS>) {
+    add(
+      "levels",
+      `level-${skill}`,
+      DUEL_LEVEL_LABELS[skill],
+      liveForm.levels[skill],
+      snapshotForm.levels[skill]
+    );
+  }
+
+  add(
+    "loadout",
+    "weapon",
+    "Weapon",
+    liveForm.weaponId,
+    snapshotForm.weaponId,
+    duelItemLabel(context, "weapon", liveForm.weaponId),
+    duelItemLabel(context, "weapon", snapshotForm.weaponId)
+  );
+  if (liveForm.combatStyle === "ranged" || snapshotForm.combatStyle === "ranged") {
+    add(
+      "loadout",
+      "ammo",
+      "Ammo",
+      liveForm.ammoId,
+      snapshotForm.ammoId,
+      duelItemLabel(context, "ammo", liveForm.ammoId),
+      duelItemLabel(context, "ammo", snapshotForm.ammoId)
+    );
+  }
+  if (liveForm.combatStyle === "magic" || snapshotForm.combatStyle === "magic") {
+    add(
+      "loadout",
+      "spell",
+      "Spell",
+      liveForm.spellId,
+      snapshotForm.spellId,
+      duelItemLabel(context, "spell", liveForm.spellId),
+      duelItemLabel(context, "spell", snapshotForm.spellId)
+    );
+  }
+
+  for (const slot of EQUIPMENT_SLOTS) {
+    const liveItem = liveForm.gear[slot] ?? "none";
+    const snapshotItem = snapshotForm.gear[slot] ?? "none";
+    add(
+      "gear",
+      `gear-${slot}`,
+      SETUP_REQUIREMENT_SLOT_LABELS[slot],
+      liveItem,
+      snapshotItem,
+      duelGearLabel(context, slot, liveItem),
+      duelGearLabel(context, slot, snapshotItem)
+    );
+  }
+
+  add(
+    "prayers-boosts",
+    "prayers",
+    "Prayers",
+    liveForm.prayers,
+    snapshotForm.prayers,
+    duelSelectionLabel(liveForm.prayers, PRAYER_SELECTION_OPTIONS),
+    duelSelectionLabel(snapshotForm.prayers, PRAYER_SELECTION_OPTIONS)
+  );
+  add(
+    "prayers-boosts",
+    "boosts",
+    "Boosts",
+    liveForm.boosts,
+    snapshotForm.boosts,
+    duelSelectionLabel(liveForm.boosts, BOOST_SELECTION_OPTIONS),
+    duelSelectionLabel(snapshotForm.boosts, BOOST_SELECTION_OPTIONS)
+  );
+  add(
+    "prayers-boosts",
+    "sustained",
+    "Sustained boosts",
+    liveForm.sustained,
+    snapshotForm.sustained
+  );
+  add(
+    "prayers-boosts",
+    "repot-threshold",
+    "Repot threshold",
+    liveForm.repotThreshold,
+    snapshotForm.repotThreshold
+  );
+
+  add(
+    "special-overrides",
+    "special-weapon",
+    "Special weapon",
+    liveForm.specialAttack.weaponId,
+    snapshotForm.specialAttack.weaponId,
+    duelItemLabel(context, "weapon", liveForm.specialAttack.weaponId),
+    duelItemLabel(context, "weapon", snapshotForm.specialAttack.weaponId)
+  );
+  add(
+    "special-overrides",
+    "special-ammo",
+    "Special ammo",
+    liveForm.specialAttack.ammoId,
+    snapshotForm.specialAttack.ammoId,
+    duelItemLabel(context, "ammo", liveForm.specialAttack.ammoId),
+    duelItemLabel(context, "ammo", snapshotForm.specialAttack.ammoId)
+  );
+  add(
+    "special-overrides",
+    "accuracy-override",
+    "Accuracy override",
+    liveForm.manualOverrides.accuracyBonus,
+    snapshotForm.manualOverrides.accuracyBonus
+  );
+  add(
+    "special-overrides",
+    "damage-override",
+    "Damage override",
+    liveForm.manualOverrides.damageBonus,
+    snapshotForm.manualOverrides.damageBonus
+  );
+  add(
+    "special-overrides",
+    "speed-override",
+    "Attack speed override",
+    liveForm.manualOverrides.attackSpeedSec,
+    snapshotForm.manualOverrides.attackSpeedSec
+  );
+  add(
+    "special-overrides",
+    "ring-of-wealth",
+    "Ring of wealth",
+    liveForm.ringOfWealth,
+    snapshotForm.ringOfWealth
+  );
+
+  for (const key of Object.keys(DUEL_TRIP_LABELS) as Array<keyof typeof DUEL_TRIP_LABELS>) {
+    const liveRaw = liveForm.trip[key];
+    const snapshotRaw = snapshotForm.trip[key];
+    let liveValue = duelOptionalValue(liveRaw);
+    let snapshotValue = duelOptionalValue(snapshotRaw);
+    if (key === "foodKey") {
+      liveValue = FOOD[String(liveRaw)]?.name ?? duelHumanizeId(String(liveRaw));
+      snapshotValue = FOOD[String(snapshotRaw)]?.name ?? duelHumanizeId(String(snapshotRaw));
+    } else if (key === "protect" || key === "prayerMode") {
+      liveValue = duelHumanizeId(String(liveRaw));
+      snapshotValue = duelHumanizeId(String(snapshotRaw));
+    }
+    add(
+      "trip",
+      `trip-${key}`,
+      DUEL_TRIP_LABELS[key],
+      liveRaw,
+      snapshotRaw,
+      liveValue,
+      snapshotValue
+    );
+  }
+
+  const orderedGroups = (Object.keys(DUEL_DIFF_CATEGORY_LABELS) as DuelSetupDiffCategoryId[])
+    .map((id) => ({ id, label: DUEL_DIFF_CATEGORY_LABELS[id], items: groups.get(id) ?? [] }))
+    .filter((group) => group.items.length > 0);
+  return {
+    changeCount: orderedGroups.reduce((total, group) => total + group.items.length, 0),
+    groups: orderedGroups,
+    sharedContextNote:
+      "Both setups are recalculated against the current target, cannon, loot policy and active prices. These shared inputs are not snapshot differences."
+  };
+}
+
+function finiteBest(values: ReadonlyArray<number | null>): number | null {
+  const finiteValues = values.filter((value): value is number => value != null && isFinite(value));
+  if (!finiteValues.length) return null;
+  return Math.max(...finiteValues);
+}
+
+function isBestDuelValue(
+  value: number | null,
+  best: number | null,
+  rowCount: number,
+  tolerance = 0.000001
+): boolean {
+  return value != null && best != null && rowCount > 1 && value >= best - tolerance;
+}
+
+export function createDuelComparisonViewModel(
+  form: CombatSetupFormState,
+  duelSnapshots: DuelSnapshotsState,
+  context: SimulationContext,
+  cannonByMonster: CannonByMonsterState = {},
+  lootPrefsByMonster: Record<string, Record<string, LootAction | string | undefined>> = {},
+  lootSettingsByMonster: LootSettingsByMonsterState = {}
+): DuelComparisonViewModel {
+  const currentForm = normalizeFormState(form);
+  const currentMonsterId = currentForm.monsterId;
+  const currentLootPrefs = lootPrefsByMonster[currentMonsterId] ?? {};
+  const normalizedSnapshots = normalizeDuelSnapshotsState(duelSnapshots).snapshots;
+  const liveVm = createSimulationViewModel(
+    currentForm,
+    context,
+    cannonByMonster,
+    currentLootPrefs,
+    lootSettingsByMonster,
+    { includeLootRows: false, includeHitDistributionAnalysis: false }
+  );
+  const liveBaseRow = duelBaseRowFromSimulation("duel-live", "live", null, "Live loadout", liveVm);
+  const snapshotEntries = normalizedSnapshots.map((snapshot) => {
+    const snapshotForm = normalizeFormState({
+      ...snapshot.form,
+      monsterId: currentMonsterId
+    });
+    const vm = createSimulationViewModel(
+      snapshotForm,
+      context,
+      cannonByMonster,
+      currentLootPrefs,
+      lootSettingsByMonster,
+      { includeLootRows: false, includeHitDistributionAnalysis: false }
+    );
+    return {
+      row: duelBaseRowFromSimulation(
+        `duel-snapshot:${snapshot.id}`,
+        "snapshot",
+        snapshot.id,
+        snapshot.name,
+        vm
+      ),
+      setupDiff: createDuelSetupDiffViewModel(currentForm, snapshotForm, context)
+    };
+  });
+  const snapshotBaseRows = snapshotEntries.map((entry) => entry.row);
+  const baseRows = [liveBaseRow, ...snapshotBaseRows];
+  const bestEffectiveXpPerHour = finiteBest(baseRows.map((row) => row.effectiveXpPerHour));
+  const bestEffectiveNetGpPerHour = finiteBest(baseRows.map((row) => row.effectiveNetGpPerHour));
+  const bestGpPerXp = finiteBest(baseRows.map((row) => row.gpPerXp));
+  const rows = baseRows.map((row, index) => ({
+    ...row,
+    setupDiff: index === 0 ? null : snapshotEntries[index - 1]!.setupDiff,
+    deltas: {
+      maxHit: row.maxHit - liveBaseRow.maxHit,
+      dps: row.dps - liveBaseRow.dps,
+      hitChance: row.hitChance - liveBaseRow.hitChance,
+      ttkSec: row.ttkSec - liveBaseRow.ttkSec,
+      killsPerTrip: row.killsPerTrip - liveBaseRow.killsPerTrip,
+      killsPerHour: row.killsPerHour - liveBaseRow.killsPerHour,
+      effectiveXpPerHour: row.effectiveXpPerHour - liveBaseRow.effectiveXpPerHour,
+      effectiveNetGpPerHour: row.effectiveNetGpPerHour - liveBaseRow.effectiveNetGpPerHour,
+      gpPerXp:
+        row.gpPerXp != null && liveBaseRow.gpPerXp != null
+          ? row.gpPerXp - liveBaseRow.gpPerXp
+          : null,
+      supplyCostPerHour: row.supplyCostPerHour - liveBaseRow.supplyCostPerHour
+    },
+    best: {
+      effectiveXpPerHour: isBestDuelValue(
+        row.effectiveXpPerHour,
+        bestEffectiveXpPerHour,
+        baseRows.length,
+        0.5
+      ),
+      effectiveNetGpPerHour: isBestDuelValue(
+        row.effectiveNetGpPerHour,
+        bestEffectiveNetGpPerHour,
+        baseRows.length,
+        0.5
+      ),
+      gpPerXp: isBestDuelValue(row.gpPerXp, bestGpPerXp, baseRows.length)
+    }
+  }));
+  const [liveRow, ...snapshotRows] = rows;
+
+  return {
+    monsterId: currentMonsterId,
+    monsterName: liveVm.monsterCard.monsterName,
+    snapshotCount: normalizedSnapshots.length,
+    snapshotLimit: MAX_DUEL_SNAPSHOTS,
+    liveRow,
+    snapshotRows,
+    rows
+  };
+}
+
+export function createDuelMatrixViewModel(
+  form: CombatSetupFormState,
+  duelSnapshots: DuelSnapshotsState,
+  context: SimulationContext,
+  cannonByMonster: CannonByMonsterState = {},
+  lootPrefsByMonster: Record<string, Record<string, LootAction | string | undefined>> = {},
+  lootSettingsByMonster: LootSettingsByMonsterState = {}
+): DuelMatrixViewModel {
+  const currentForm = normalizeFormState(form);
+  const normalizedSnapshots = normalizeDuelSnapshotsState(duelSnapshots).snapshots;
+  const setupDefinitions = [
+    {
+      id: "duel-live",
+      snapshotId: null,
+      source: "live" as const,
+      name: "Live setup",
+      form: currentForm
+    },
+    ...normalizedSnapshots.map((snapshot) => ({
+      id: `duel-snapshot:${snapshot.id}`,
+      snapshotId: snapshot.id,
+      source: "snapshot" as const,
+      name: snapshot.name,
+      form: normalizeFormState(snapshot.form)
+    }))
+  ];
+  const setupResults = setupDefinitions.map((setup) => {
+    const metadataVm = createSimulationViewModel(
+      { ...setup.form, monsterId: currentForm.monsterId },
+      context,
+      cannonByMonster,
+      lootPrefsByMonster[currentForm.monsterId] ?? {},
+      lootSettingsByMonster,
+      { includeLootRows: false, includeHitDistributionAnalysis: false }
+    );
+    const rowsByMonster = new Map(
+      createDenseCompareRows(
+        setup.form,
+        context,
+        DEFAULT_DENSE_COMPARE_SORT_STATE,
+        cannonByMonster,
+        lootPrefsByMonster,
+        {},
+        lootSettingsByMonster
+      ).map((row) => [row.monsterId, row])
+    );
+
+    return {
+      setup: {
+        id: setup.id,
+        snapshotId: setup.snapshotId,
+        source: setup.source,
+        name: setup.name,
+        combatStyle: setup.form.combatStyle,
+        loadoutLabel: duelLoadoutLabel(metadataVm)
+      } satisfies DuelMatrixSetupViewModel,
+      rowsByMonster
+    };
+  });
+  const setups = setupResults.map((result) => result.setup);
+  const monsters = Object.values(context.gameData.monsters).sort((left, right) =>
+    left.name.localeCompare(right.name)
+  );
+  const rows = monsters.map((monster) => {
+    const values = setupResults.map((result): DuelMatrixMetricValuesViewModel => {
+      const row = result.rowsByMonster.get(monster.id);
+      return {
+        dps: row?.dps ?? null,
+        effectiveXpPerHour: row?.xpPerHour ?? null,
+        effectiveNetGpPerHour: row?.netGpPerHour ?? null,
+        gpPerXp: row ? gpPerXpValue(row.netGpPerHour, row.xpPerHour) : null
+      };
+    });
+    const best = {
+      dps: finiteBest(values.map((value) => value.dps)),
+      effectiveXpPerHour: finiteBest(values.map((value) => value.effectiveXpPerHour)),
+      effectiveNetGpPerHour: finiteBest(values.map((value) => value.effectiveNetGpPerHour)),
+      gpPerXp: finiteBest(values.map((value) => value.gpPerXp))
+    };
+    const cells = setupResults.map((result, index): DuelMatrixCellViewModel => ({
+      setupId: result.setup.id,
+      values: values[index]!,
+      best: {
+        dps: isBestDuelValue(values[index]!.dps, best.dps, setups.length),
+        effectiveXpPerHour: isBestDuelValue(
+          values[index]!.effectiveXpPerHour,
+          best.effectiveXpPerHour,
+          setups.length,
+          0.5
+        ),
+        effectiveNetGpPerHour: isBestDuelValue(
+          values[index]!.effectiveNetGpPerHour,
+          best.effectiveNetGpPerHour,
+          setups.length,
+          0.5
+        ),
+        gpPerXp: isBestDuelValue(values[index]!.gpPerXp, best.gpPerXp, setups.length)
+      }
+    }));
+
+    return {
+      monsterId: monster.id,
+      monsterName: monster.name,
+      monsterLevel: monster.level ?? null,
+      isCurrentTarget: monster.id === currentForm.monsterId,
+      cells
+    };
+  });
+
+  return {
+    currentMonsterId: currentForm.monsterId,
+    monsterCount: rows.length,
+    setupCount: setups.length,
+    cellCount: rows.length * setups.length,
+    setups,
+    rows
+  };
+}

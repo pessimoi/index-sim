@@ -13,12 +13,11 @@ import {
 } from "../domain/economy";
 import { createScheduledStaticPriceSnapshotStatus } from "../adapters/market";
 import {
-  DataReliabilityError,
   createGameDataSnapshotFromLegacy,
   createPriceSetFromLegacyGameData,
-  parseJsonWithDuplicateKeyCheck,
   type LegacySnapshotInput
-} from "../data";
+} from "../data/legacy-adapter";
+import { DataReliabilityError, parseJsonWithDuplicateKeyCheck } from "../data/reliability";
 import {
   PRICE_SET_IMPORT_MAX_BYTES,
   ItemPriceMetadataSchema,

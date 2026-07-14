@@ -3,7 +3,7 @@ import type { HiscoresResponse } from "@/domain/shared";
 import type { HiscoresPreviewRow } from "../../state/hiscores";
 import type { HiscoresLookupNotice } from "../../controllers/hiscores-lookup";
 
-interface HiscoresPanelProps {
+export interface HiscoresPanelProps {
   statusLabel: "checking" | "available" | "disabled" | "unavailable";
   available: boolean;
   player: string;

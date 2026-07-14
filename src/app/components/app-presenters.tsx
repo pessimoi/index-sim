@@ -1,13 +1,9 @@
 import { useEffect, useId, useRef } from "react";
 import type { CombatStyle } from "@/domain/shared";
 import type { PriceImportNotice } from "../state/price-import";
-import { formatNumber, type DenseCompareScaleCellViewModel } from "../view-models/simulation";
-
-export interface SetupImportNotice {
-  tone: "success" | "error";
-  message: string;
-  details?: string[];
-}
+import type { InlineNoticeViewModel } from "../view-models/contracts";
+import { formatNumber } from "../view-models/formatting";
+import type { DenseCompareScaleCellViewModel } from "../view-models/compare";
 
 export interface ShareSetupDialogState {
   url: string;
@@ -67,7 +63,7 @@ export function InlineImportNotice({
   ariaLabel,
   className = ""
 }: {
-  notice: SetupImportNotice | PriceImportNotice;
+  notice: InlineNoticeViewModel | PriceImportNotice;
   ariaLabel: string;
   className?: string;
 }) {

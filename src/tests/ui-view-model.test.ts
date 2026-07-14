@@ -17,26 +17,29 @@ import {
 } from "../app/state/dense-compare";
 import { MAX_DUEL_SNAPSHOTS, createDuelSnapshot } from "../app/state/duel-snapshots";
 import {
-  ammoOptions,
+  createMonsterCardViewModel,
+  createSimulationViewModel
+} from "../app/view-models/simulation";
+import { optimizeLootPrefsForMonster } from "../app/view-models/loot";
+import { createPlannerViewModel } from "../app/view-models/planner";
+import {
   createCompareRows,
   createDenseCompareRows,
   createDenseCompareScaleModel,
-  createDuelComparisonViewModel,
-  createDuelMatrixViewModel,
-  createMonsterCardViewModel,
-  createPlannerViewModel,
-  createSimulationViewModel,
-  createStatsCombatRollDetailViewModel,
+  sortDenseCompareRows,
+  type DenseCompareRowViewModel
+} from "../app/view-models/compare";
+import { createDuelComparisonViewModel, createDuelMatrixViewModel } from "../app/view-models/duel";
+import { formatNumber } from "../app/view-models/formatting";
+import { createStatsCombatRollDetailViewModel } from "../app/view-models/stats";
+import {
+  ammoOptions,
   equipmentSlotOptions,
-  formatNumber,
   gearQuickActionForSlot,
   optimizeVisibleLoadout,
-  optimizeLootPrefsForMonster,
   spellOptions,
-  sortDenseCompareRows,
-  type DenseCompareRowViewModel,
   weaponOptions
-} from "../app/view-models/simulation";
+} from "../app/view-models/loadout";
 import { simulateFullSimulation } from "../domain/simulation";
 import { casketStats, HIGH_ALCH_MAGIC_XP_PER_CAST } from "../domain/trip";
 import { EQUIPMENT_SLOTS, type SimulationContext } from "../domain/shared";

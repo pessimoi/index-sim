@@ -19,7 +19,7 @@ import {
   createGameDataSnapshotFromLegacy,
   createPriceSetFromLegacyGameData,
   type LegacySnapshotInput
-} from "../data";
+} from "../data/legacy-adapter";
 import type { SimulationContext, SimulationRequest } from "../domain/shared";
 
 interface GoldenFixture {

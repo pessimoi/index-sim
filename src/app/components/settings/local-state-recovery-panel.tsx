@@ -4,7 +4,7 @@ import type {
   LocalStateHealthReport
 } from "../../state/local-state-health";
 import type { LocalStateClearPendingId } from "../../controllers/local-state-recovery";
-import { formatNumber } from "../../view-models/simulation";
+import { formatNumber } from "../../view-models/formatting";
 
 interface LocalStateRecoveryPanelProps {
   visible: boolean;

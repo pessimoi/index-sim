@@ -57,6 +57,10 @@ export interface MergeDuelSnapshotsResult {
 
 export const DEFAULT_DUEL_SNAPSHOTS_STATE: DuelSnapshotsState = { snapshots: [] };
 
+export function createDuelSnapshotId(nowMs = Date.now(), randomValue = Math.random()): string {
+  return `duel-${nowMs.toString(36)}-${randomValue.toString(36).slice(2, 8)}`;
+}
+
 export function normalizeDuelSnapshotName(name: string): string {
   return name.trim().replace(/\s+/g, " ");
 }

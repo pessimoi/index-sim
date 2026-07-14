@@ -1,5 +1,5 @@
 import { createGeneratedRuntimeContext } from "../adapters/generated";
-import { createFullSimulationInputForForm } from "../app/view-models/simulation";
+import { createFullSimulationInputForForm } from "../app/view-models/simulation-input";
 import { DEFAULT_FORM_STATE, normalizeFormState } from "../app/state/ui-state";
 import {
   analyzeRisk,

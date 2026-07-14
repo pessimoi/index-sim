@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import type { SetupSelectionOption } from "../state/ui-state";
-import { formatNumber } from "../view-models/simulation";
+import { formatNumber } from "../view-models/formatting";
 
 export type SelectOption = { id: string; label: string; hint?: string };
 

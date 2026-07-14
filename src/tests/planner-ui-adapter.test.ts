@@ -16,7 +16,7 @@ import {
   createPlannerDomainAdapter,
   createPlannerViewModel,
   plannerAllowedPool
-} from "../app/view-models/simulation";
+} from "../app/view-models/planner";
 
 describe("planner UI adapter", () => {
   it("maps planner UI state into domain planner input and options", async () => {

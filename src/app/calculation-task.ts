@@ -10,16 +10,14 @@ import type {
   CustomSetupsByMonsterState
 } from "./state/ui-state";
 import type { DuelSnapshotsState } from "./state/duel-snapshots";
+import { createDenseCompareRows, type DenseCompareRowViewModel } from "./view-models/compare";
+import { createDuelMatrixViewModel, type DuelMatrixViewModel } from "./view-models/duel";
 import {
-  createDenseCompareRows,
-  createDuelMatrixViewModel,
-  createFullSimulationInputForForm,
   createPlannerPanelViewModel,
   createPlannerViewModel,
-  type DenseCompareRowViewModel,
-  type DuelMatrixViewModel,
   type PlannerPanelViewModel
-} from "./view-models/simulation";
+} from "./view-models/planner";
+import { createFullSimulationInputForForm } from "./view-models/simulation-input";
 
 export interface DenseCompareCalculationRequest {
   kind: "dense-compare";

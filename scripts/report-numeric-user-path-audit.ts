@@ -17,10 +17,14 @@ import type { LootPrefsState } from "../src/app/state/loot-prefs";
 import type { LootSettingsByMonsterState } from "../src/app/state/loot-settings";
 import {
   createDenseCompareRows,
+  type DenseCompareRowViewModel
+} from "../src/app/view-models/compare";
+import {
   createDuelComparisonViewModel,
-  createDuelMatrixViewModel,
+  createDuelMatrixViewModel
+} from "../src/app/view-models/duel";
+import {
   createSimulationViewModel,
-  type DenseCompareRowViewModel,
   type SimulationViewModel
 } from "../src/app/view-models/simulation";
 import type { CombatStyle, SimulationContext } from "../src/domain/shared";

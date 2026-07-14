@@ -1,7 +1,7 @@
 import type { CannonOverlayResult } from "@/domain/trip";
 import { MetricList } from "../app-presenters";
 import { NumberField } from "../form-fields";
-import { formatNumber } from "../../view-models/simulation";
+import { formatNumber } from "../../view-models/formatting";
 
 export interface CannonPaneProps {
   hidden: boolean;

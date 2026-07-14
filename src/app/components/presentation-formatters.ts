@@ -1,4 +1,4 @@
-import { formatNumber } from "../view-models/simulation";
+import { formatNumber } from "../view-models/formatting";
 
 export function formatDelta(value: number): string {
   if (!Number.isFinite(value)) return "-";
@@ -9,6 +9,14 @@ export function formatDelta(value: number): string {
 export function signedPercent(value: number): string {
   if (!Number.isFinite(value)) return "-";
   return `${value >= 0 ? "+" : ""}${formatNumber(value, 1)}%`;
+}
+
+export function signedInteger(value: number): string {
+  return `${value > 0 ? "+" : ""}${formatNumber(value)}`;
+}
+
+export function yesNo(value: boolean): string {
+  return value ? "On" : "Off";
 }
 
 export function itemPriceMetadataLabel(value: string | undefined): string {

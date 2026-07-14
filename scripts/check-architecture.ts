@@ -17,6 +17,19 @@ const documentedBoundaryExceptions = new Set<string>();
 
 const forbiddenClientPrefixes = ["src/adapters/legacy-runtime/", "src/adapters/static-runtime/"];
 
+// These modules are invoked outside the src-to-src import graph by HTML, Vite,
+// Wrangler, Worker URL construction or repository scripts/tests. Every other
+// non-test source module must have at least one source importer.
+const documentedExternalEntrypoints = new Set([
+  "src/adapters/legacy-runtime/index.ts",
+  "src/adapters/static-runtime/index.ts",
+  "src/app/calculation-worker.ts",
+  "src/app/main.tsx",
+  "src/server/cloudflare-worker.ts",
+  "src/server/vite-hiscores-middleware.ts",
+  "src/server/vite-market-middleware.ts"
+]);
+
 function sourceLabel(fileName: string): string {
   return relative(projectRoot, fileName).split(sep).join("/");
 }
@@ -49,6 +62,9 @@ const compilerOptions: ts.CompilerOptions = {
 };
 
 const graph = new Map<string, string[]>(sourceFiles.map((fileName) => [fileName, []]));
+const sourceImporters = new Map<string, Set<string>>(
+  sourceFiles.map((fileName) => [fileName, new Set<string>()])
+);
 
 for (const fileName of sourceFiles) {
   const sourceText = readFileSync(fileName, "utf8");
@@ -63,7 +79,10 @@ for (const fileName of sourceFiles) {
     ).resolvedModule;
     if (!resolvedModule) continue;
     const importedFileName = resolve(resolvedModule.resolvedFileName);
-    if (sourceFileSet.has(importedFileName)) resolvedImports.add(importedFileName);
+    if (sourceFileSet.has(importedFileName)) {
+      resolvedImports.add(importedFileName);
+      sourceImporters.get(importedFileName)?.add(fileName);
+    }
   }
   graph.set(fileName, [...resolvedImports].sort());
 }
@@ -118,6 +137,25 @@ for (const fileName of sourceFiles) {
 }
 for (const cycle of [...cycleKeys].sort()) violations.push(`source import cycle: ${cycle}`);
 
+const observedExternalEntrypoints = new Set<string>();
+for (const fileName of sourceFiles) {
+  if ((sourceImporters.get(fileName)?.size ?? 0) > 0) continue;
+  const label = sourceLabel(fileName);
+  if (documentedExternalEntrypoints.has(label)) {
+    observedExternalEntrypoints.add(label);
+  } else {
+    violations.push(
+      `source module has no source importer or documented external entrypoint: ${label}`
+    );
+  }
+}
+
+for (const entrypoint of documentedExternalEntrypoints) {
+  if (!observedExternalEntrypoints.has(entrypoint)) {
+    violations.push(`stale or missing documented external entrypoint: ${entrypoint}`);
+  }
+}
+
 const clientEntry = resolve(sourceRoot, "app/main.tsx");
 const clientReachable = new Set<string>();
 
@@ -149,6 +187,7 @@ if (violations.length > 0) {
 } else {
   console.log(
     `Architecture check passed: ${sourceFiles.length} source modules, no cycles, ` +
-      `${clientReachable.size} client-reachable modules and ${acceptedExceptions.size} documented legacy-migration exceptions.`
+      `${clientReachable.size} client-reachable modules, ${observedExternalEntrypoints.size} documented external entrypoints ` +
+      `and ${acceptedExceptions.size} documented legacy-migration exceptions.`
   );
 }

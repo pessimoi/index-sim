@@ -2,7 +2,7 @@ import {
   createGameDataSnapshotFromLegacy,
   createPriceSetFromLegacyGameData,
   type LegacySnapshotInput
-} from "../../data";
+} from "../../data/legacy-adapter";
 import type {
   CombatStyle,
   EntityId,

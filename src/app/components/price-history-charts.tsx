@@ -1,5 +1,5 @@
 import type { PriceHistoryMoverRow, PriceHistoryTrendAnalysis } from "../state/price-history";
-import { formatNumber } from "../view-models/simulation";
+import { formatNumber } from "../view-models/formatting";
 import {
   itemPriceMetadataLabel,
   optionalDelta,
