@@ -1,5 +1,12 @@
 # Tietoturva-auditointi
 
+> Historiallinen auditointisnapshot 2026-07-05 tilanteesta. Root-tuotantopolun,
+> server-corejen, Cloudflare-adapterin ja nykyisten validointirajojen elävä kuvaus
+> on [arkkitehtuuridokumentissa](docs/technical/architecture.md) ja
+> [operaatio-ohjeessa](docs/operations/README.md). Alla oleva legacy-analyysi
+> säilytetään evidenssinä eikä sen vanhoja nykytila- tai polkuväitteitä pidä
+> käyttää ilman tarkistusta.
+
 Päiväys: 2026-07-05  
 Kohde: `/Users/pessi/index-sim`  
 Tyyppi: selainpohjainen, staattisesti ajettava simulaattori ilman palvelinpuolen koodia tässä repossa.

@@ -1,9 +1,10 @@
 # App composition-root refactor specification
 
-Status: phase 1, presenter API hygiene, runtime bootstrap, local-state recovery,
-Hiscores, rewrite setup and PriceSet controllers plus the first Cannon pane
-implemented through Goal 10, 2026-07-13. Later controller and pane phases remain
-separate goals.
+Status: shared presenters, ten focused controller slices, Cannon,
+Stats/Loadout, Compare/Duel, Planner, Risk, Loot/Trip, Economy/Settings, the pure
+MonsterCard rail and the bounded
+[Phase 4 composition review](app-composition-root-phase4-spec.md) are
+implemented, 2026-07-14. The phased D-093 composition-root refactor is closed.
 
 ## Problem
 
@@ -138,19 +139,77 @@ moves one low-coupling pane and all of its presentation-only derivation behind
 explicit calculated values and primitive action props. Schema-validated
 per-monster mutation and Trip synchronization remain in `App`.
 
-### Later Phase 3 feature panes - future goals, one pane family at a time
+### Phase 3B - Stats/Loadout pane and view-model owners (implemented)
 
-Extract pane components through typed view data and action props. Progress
-through Stats/Loadout, Compare/Duel, Loot/Trip/Risk, Planner and
-Economy/Settings as independent goals. A pane must not reconstruct simulation
-requests or bypass existing view-models.
+[The implemented Stats/Loadout specification](stats-loadout-pane-refactor-spec.md)
+defines this D-093 phase. It moves the pure Stats analysis and active
+Loadout presentation behind typed value/action props and splits their Stats,
+Loadout and active-assumption view-model families out of the cross-feature
+simulation module. `App` retains live form state, mutation, optimizer Apply/Undo
+and tab orchestration; domain, result, worker, persistence, DOM and CSS
+contracts remain unchanged.
 
-### Phase 4 - composition review (future goal)
+### Phase 3C - Compare/Duel panes, view models and calculation controllers (implemented)
 
-After the controllers and panes are separated, review remaining `App` helpers,
-co-locate feature-only types and remove obsolete forwarding code. Do not set a
-target line count: responsibility and dependency direction are the acceptance
-criteria.
+[The implemented Compare/Duel specification](compare-duel-pane-refactor-spec.md)
+defines this D-093 phase. It moves the pure Compare and Duel markup, splits
+their feature contracts/builders out of `simulation.ts`, and gives the current
+Dense and Duel-matrix worker lifecycles focused hook owners. `App` retains live
+form and snapshot mutation, persistence, recovery and Undo. Domain/result truth,
+worker messages, schemas, DOM, copy and CSS remain unchanged.
+
+### Phase 3D - Planner pane, view model and calculation controller (implemented)
+
+[The implemented Planner specification](planner-pane-refactor-spec.md) defines
+this D-093 phase. It moves the complete Planner markup and direct
+feature builders out of App/simulation, and gives the current
+explicit-Recompute Worker lifecycle a focused hook owner. `App` retains the
+versioned Planner draft state, persistence/recovery, typed draft mutations and
+tab composition. Planner algorithms, worker messages, schemas, DOM, copy and
+CSS remain unchanged.
+
+### Phase 3E - Risk pane, view model and analysis controller (implemented)
+
+[The implemented Risk specification](risk-pane-refactor-spec.md) defines this
+D-093 phase. It moves the complete Risk landmark and its
+feature-only contracts/formatters out of App, and gives the current transient
+controls plus explicit Run/Cancel Worker lifecycle a focused hook owner. `App`
+retains live form/context/cannon/loot sources, global status composition and the
+four fresh-only TTK/net-GP/Trip presentation bridges. Risk formulas, request
+messages, transient-state behavior, stale results, DOM, copy and CSS remain
+unchanged.
+
+### Phase 3F - Loot and Trip panes and view models (implemented)
+
+[The implemented Loot/Trip specification](loot-trip-pane-refactor-spec.md)
+defines this D-093 phase. It moves both complete landmarks and their
+feature-only presentation derivations out of App, gives Loot and Trip direct
+view-model owners, and splits the shared simulation-input mapping into a small
+cycle-free leaf. App retains the versioned setup form and per-monster loot
+states, persistence/recovery/share replacement, normalized mutation, global
+Undo/status, Active assumptions and cross-pane composition. Trip/loot/supply
+formulas, schemas, request/result shapes, DOM, copy and CSS remain unchanged.
+
+### Phase 3G - Economy/Settings pane family and price-data view models (implemented)
+
+[The Economy/Settings specification](economy-settings-pane-refactor-spec.md)
+defines the final currently identified Phase 3 pane family. It moves the exact
+shared Economy/Settings wrapper and child DOM to a pure component, gives price
+and hidden-tier presentation direct DOM-free owners and makes the Loot history
+bridge neutral. App retains PriceSet/recovery controllers, browser state,
+persistence transactions, manual/history mutation, tab composition and
+cross-pane routing. Price formulas, schemas, DOM, copy and CSS remain
+unchanged.
+
+### Phase 4 - composition review (implemented)
+
+[The Phase 4 final shell and ownership review specification](app-composition-root-phase4-spec.md)
+moves the remaining pure header/review/workbench shell and legacy-report
+presentation to direct owners, relocates a bounded set of feature helpers and
+removes obsolete forwarding code. App intentionally retains browser bootstrap,
+46 state cells, seven persistence effects, controller outcomes, multi-feature
+transactions and direct pane composition. There is no target line count:
+responsibility and dependency direction are the acceptance criteria.
 
 ## Compatibility contract
 
@@ -184,11 +243,16 @@ moved before or with the extraction. Golden fixtures need rerunning whenever a
 phase could affect request composition, even if no intended numeric change
 exists.
 
-## Open questions
+## Sequencing decision
 
-- Which feature pane provides the best first Phase 3 boundary after controller
-  extraction? Decide from dependency mapping and focused browser coverage, not
-  raw line count.
+- Phase 3G moved the measured post-Phase-3F Economy/Settings pane family and
+  cohesive price presentation derivation to direct pure owners without moving
+  browser transactions or cross-pane source state.
+- Phase 4 moved the measured post-Phase-3G pure shell, legacy presentation and
+  direct feature helpers without hiding App's browser state, persistence or
+  atomic cross-feature transactions in another monolith. The phased D-093 card
+  is complete; any further state/controller or large-module split requires
+  separate defect or measurement evidence.
 
 ## Phase 1 implementation evidence
 
@@ -317,3 +381,142 @@ exists.
   entry is 698,137 raw / 201,103 gzip bytes, the deferred generated snapshot is
   880,362 bytes and the 10-file/two-asset artifact is 1,953,715 bytes with
   SHA-256 `00193bd3b92bf8f1faf6c25eca880ff74f5106f483e3dd3998bf8966e33b62bf`.
+
+## Stats/Loadout implementation evidence
+
+- Pure pane components now own the Stats analysis and the contiguous active
+  Loadout/special/distribution family. `App` keeps live state, mutations,
+  optimizer Apply/Undo and tab orchestration, and no CSS, domain, request,
+  worker or persistence contract changed.
+- Focused leaf modules own shared contracts/number formatting, and direct
+  Stats, Loadout and active-assumption feature modules own their builders and
+  types without mutual imports or compatibility barrels.
+- `App.tsx` is 7,273 lines and `simulation.ts` is 2,583 lines. Architecture
+  passes at 88 source modules / 76 client-reachable modules / seven external
+  entrypoints with no cycle or exception.
+- Server-render pane and focused view-model coverage passes 150/150; the numeric
+  audit passes 5,958/5,958 comparisons, focused Chromium passes 4/4 and the full
+  production-preview gate passes 77/77. Full `npm run verify` passes 697 tests,
+  19 goldens and every non-network repository gate; the direct entry remains
+  inside D-094 at 701,528 raw / 202,769 gzip bytes. The canonical dedicated
+  visual port was sandbox-blocked, but the equivalent read-only run through the
+  standard E2E server passed 20/20 against the same 31 Darwin PNGs; no baseline
+  changed.
+
+## Compare/Duel implementation evidence
+
+- Direct Compare and Duel view-model modules now own their pure contracts and
+  builders, focused controller hooks own the existing Dense and Duel-matrix
+  lifecycles, and pure panes own both feature landmarks. `App` retains live
+  form/snapshot mutation, persistence, recovery, global status and Undo.
+- `App.tsx` is 6,387 lines with 51 React state cells; `simulation.ts` is 1,502
+  lines. Architecture passes at 94 source modules / 82 client-reachable modules
+  / seven external entrypoints with no cycle or exception.
+- Six focused suites pass 158/158, numeric paths pass 5,958/5,958, focused
+  Chromium passes 9/9 and complete Chromium passes 77/77. Full `npm run verify`
+  passes 704 tests and 19 goldens. The entry remains inside D-094 at 705,080 raw
+  / 204,250 gzip bytes. A fresh visual run was sandbox-blocked before browser
+  execution on both attempted local ports; no baseline or permanent config
+  changed, and the preceding read-only 20/20 Darwin comparison remains the
+  latest successful visual evidence.
+
+## Planner implementation evidence
+
+- Direct Planner view-model, calculation-controller and pane modules now own
+  feature adaptation/presentation contracts, the explicit-Recompute Worker
+  lifecycle and the complete pure landmark respectively. `App` retains the
+  versioned draft, persistence/recovery, bounded mutations and tab composition.
+- `App.tsx` is 5,965 lines with 49 React state cells; `simulation.ts` is 1,113
+  lines. Architecture passes at 97 source modules / 85 client-reachable modules
+  / seven external entrypoints with no cycle or exception.
+- The focused gate passes 129/129, Planner parity passes 16 cases / 32
+  comparisons with zero open rows, and all 19 goldens remain unchanged.
+  Focused Chromium passes 3/3, complete Chromium 77/77 and read-only Darwin
+  visual comparison 20/20 against the existing 31 PNGs.
+- Full `npm run verify` passes 52 files / 710 tests and 19 goldens. The
+  10-file/two-asset artifact totals 1,962,374 bytes with SHA-256
+  `42a68f4e48d4999548010cbad8c291efe8786d4b9d08407193376b9bf5e4d2cc`;
+  entry JavaScript remains inside D-094 at 706,650 raw / 205,198 gzip bytes.
+
+## Risk implementation evidence
+
+- A direct Risk view-model owns feature-only controls, defaults, status,
+  options and formatting; a focused controller owns transient state, exact
+  freshness and explicit Run/Cancel Worker orchestration; and a pure pane owns
+  the complete Risk landmark.
+- `App.tsx` is 5,608 lines with 46 React state cells. It retains live source and
+  global-status composition plus the four fresh-only TTK/net-GP/Trip bridges,
+  but no Risk state, task ref, lifecycle effect, helper, Run/Cancel handler or
+  pane markup.
+- Architecture passes at 100 source modules / 88 client-reachable modules /
+  seven external entrypoints with no cycle or exception. Focused tests pass
+  161/161, numeric paths 5,958/5,958, goldens 19/19 and complete Chromium
+  77/77. No domain, request, Worker, persistence, schema, CSS or visual baseline
+  changed.
+- Full `npm run verify` passes 54 files / 719 tests. The read-only Darwin visual
+  comparison passes 20/20 against 31 unchanged PNGs, and the 1,964,103-byte
+  artifact has SHA-256
+  `922eb19e75689664c2d4e6da9e34d4641b575ce09bbaf2edfb195eb8a77a21c2`;
+  entry JavaScript remains inside D-094 at 708,379 raw / 205,746 gzip bytes.
+
+## Loot/Trip implementation evidence
+
+- Direct Loot and Trip view-model modules own row/action/composition/history,
+  optimizer, policy, controls, recommendation, summaries and eight output
+  groups. Pure pane components own both complete landmarks, while the 46-line
+  simulation-input leaf serves simulation and calculation tasks without a
+  cycle or compatibility re-export.
+- `App.tsx` is 4,297 lines with the same 46 React state cells. It retains the
+  versioned setup and per-monster loot state, persistence/recovery/share/Undo,
+  normalized mutation, Active assumptions and cross-pane bridges, but no
+  Loot/Trip pane markup or feature-only presentation derivation.
+- `simulation.ts` is 476 lines. Architecture passes at 105 source modules / 93
+  client-reachable modules / seven external entrypoints with no cycle,
+  exception or orphan. Focused tests pass 238/238, numeric paths 5,958/5,958,
+  goldens 19/19, focused Chromium 13/13 and complete Chromium 77/77.
+- Full `npm run verify` passes 58 files / 730 tests. The read-only Darwin visual
+  comparison passes 20/20 against 31 unchanged PNGs, and the 1,966,525-byte
+  artifact has SHA-256
+  `3c247248df68cf2dd14d33e1f256b464f06a9cf975cb8af4f7790e2057fa5e6c`;
+  entry JavaScript remains inside D-094 at 709,990 raw / 206,326 gzip bytes.
+
+## Economy/Settings implementation evidence
+
+- The pure `EconomySettingsPane` owns the exact shared wrapper and all current
+  recovery, Settings Price data/Gear menu, Market, manual-price and Economy
+  history markup. Direct price-data and Settings view models own the moved
+  presentation derivation, and Loot consumes the neutral item-history contract
+  without a compatibility barrel or cycle.
+- `App.tsx` is 3,587 lines with the same 46 React state cells. It retains
+  browser state, persistence/controller transactions, mutation, topbar bridges,
+  cross-pane routing and tab composition, but no Economy/Settings child DOM or
+  price/tier presentation derivation.
+- Architecture passes at 108 source modules / 96 client-reachable modules /
+  seven external entrypoints with no cycle, exception or orphan. The new suites
+  pass 16/16 and the required combined focused gate passes 132/132.
+- Numeric paths pass 5,958/5,958, goldens 19/19, focused Chromium 8/8, complete
+  Chromium 77/77 and read-only Darwin visual comparison 20/20 against the same
+  31 PNGs. No baseline changed.
+- Full `npm run verify` passes 61 files / 746 tests. The 1,972,778-byte artifact
+  has SHA-256
+  `1d0bb317b35fec093c7128559fbd0f39de17623d9799dbfe8a4bed65425118c0`;
+  entry JavaScript remains inside D-094 at 716,243 raw / 208,034 gzip bytes.
+
+## Phase 4 implementation evidence
+
+- Direct DOM-free app-shell and legacy-migration view models own root
+  presentation; four pure shell components own the exact header, shared review,
+  legacy review and workbench DOM. Feature panes and the MonsterCard rail remain
+  visibly composed by App.
+- `App.tsx` is 2,534 lines with the same 46 React state cells. It retains
+  browser bootstrap, seven direct persistence effects, controller outcomes,
+  atomic setup/share/legacy/Undo transactions and pane model/action assembly.
+- Architecture passes at 114 source modules / 102 client-reachable modules /
+  seven external entrypoints with no cycle, exception or orphan. New tests pass
+  12/12 and the combined focused gate passes 278/278.
+- Numeric paths pass 5,958/5,958, goldens 19/19, focused Chromium 19/19,
+  complete Chromium 77/77 and read-only Darwin visual comparison 20/20 against
+  the unchanged 31 PNGs.
+- The 1,977,328-byte artifact has SHA-256
+  `bea79ca8f4dd82815ea01397b54ae7987d130bdaa6acbf5c316ecbf7b2188379`;
+  entry JavaScript remains inside D-094 at 720,793 raw / 208,801 gzip bytes.

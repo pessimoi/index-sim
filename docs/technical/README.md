@@ -17,6 +17,13 @@
 - [legacy-planner-parity-spec.md](legacy-planner-parity-spec.md): implemented archived Planner behavior comparison and gap-classification contract.
 - [legacy-migration-layer-refactor-spec.md](legacy-migration-layer-refactor-spec.md): ownership-only move of legacy-to-rewrite mapping from the generic storage adapter into app state.
 - [app-composition-root-refactor-spec.md](app-composition-root-refactor-spec.md): phased, behavior-preserving extraction of shared UI, browser-state controllers and feature panes from the rewrite composition root.
+- [app-composition-root-phase4-spec.md](app-composition-root-phase4-spec.md): implemented D-093 Phase 4 final extraction of pure root-shell and legacy-review presentation plus bounded helper ownership cleanup while App retains browser state, effects and multi-feature transactions.
+- [stats-loadout-pane-refactor-spec.md](stats-loadout-pane-refactor-spec.md): implemented D-093 extraction of Stats/Loadout panes and their feature view-model owners while App retains live state and orchestration.
+- [compare-duel-pane-refactor-spec.md](compare-duel-pane-refactor-spec.md): implemented D-093 Phase 3C extraction of Compare/Duel panes, direct feature view-model owners and their existing calculation lifecycles.
+- [planner-pane-refactor-spec.md](planner-pane-refactor-spec.md): implemented D-093 Phase 3D extraction of the Planner pane, direct feature view-model and explicit-Recompute calculation lifecycle.
+- [risk-pane-refactor-spec.md](risk-pane-refactor-spec.md): implemented D-093 Phase 3E extraction of the Risk pane, direct Risk UI contracts and explicit Run/Cancel analysis lifecycle.
+- [loot-trip-pane-refactor-spec.md](loot-trip-pane-refactor-spec.md): implemented D-093 Phase 3F extraction of the Loot and Trip panes, direct feature view models and a cycle-free simulation-input leaf.
+- [economy-settings-pane-refactor-spec.md](economy-settings-pane-refactor-spec.md): implemented D-093 Phase 3G extraction of the shared Economy/Settings pane family, direct price-data/Settings view models and neutral Loot history bridge.
 - [metric-list-presenter-hygiene-spec.md](metric-list-presenter-hygiene-spec.md): implemented generic-presenter ownership and component-API cleanup completed before controller extraction.
 - [runtime-bootstrap-controller-spec.md](runtime-bootstrap-controller-spec.md): implemented generated-runtime lifecycle, compatibility and startup PriceSet resolution extraction preserving the D-094 chunk boundary.
 - [local-state-recovery-controller-spec.md](local-state-recovery-controller-spec.md): implemented browser-state health/block/persist/clear orchestration and pure Settings recovery panel boundary.

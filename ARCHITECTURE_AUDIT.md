@@ -4,205 +4,300 @@ Päiväys: 2026-07-13
 
 Repo: `/Users/pessi/index-sim`
 
-Tarkastettu HEAD auditin alussa: `19c9557`
+Tarkastettu HEAD auditin alussa: `9935cbf1804508b046bdfef66aefac3261efeafb`
 
-Nykyarkkitehtuurin omistava dokumentti: [docs/technical/architecture.md](docs/technical/architecture.md)
+Nykyarkkitehtuurin omistava dokumentti:
+[docs/technical/architecture.md](docs/technical/architecture.md)
 
-Tämä tiedosto on auditointinäyttö, ei elävä arkkitehtuurin totuuslähde. Audit
-aloitettiin valmiiksi laajasti muokatusta työpuusta. Olemassa olevat muutokset
-suojattiin eikä tätä tulosta pidä tulkita kaikkien työpuun diffien tekijyydeksi.
+Tämä tiedosto on monikierroksisen auditin evidenssisnapshot, ei kilpaileva elävä
+arkkitehtuurin totuuslähde. Audit alkoi puhtaalta `master`-työpuulta. Tässä
+auditissa tehdyt muutokset ovat seurattavissa Git-diffistä, mutta niitä ei ole
+commitoitu tämän goalin yhteydessä.
 
-## Yhteenveto
+Toteutuksen jälkimerkintä 2026-07-13: suositus 1 toteutettiin
+[Stats/Loadout-speksin](docs/technical/stats-loadout-pane-refactor-spec.md)
+mukaisesti. Snapshotin alla olevat 7 725/4 978 rivin luvut ja suositusjärjestys
+kuvaavat auditointihetkeä; nykyiset omistajat, 7 273/2 583 rivin luvut ja
+validointievidenssi ovat elävissä arkkitehtuuri- ja testausdokumenteissa.
 
-Projektin aiemman auditin vakavimmat ongelmat on korjattu: tuotantopolku on
-Vite/React/TypeScript-sovellus, domain-laskenta saa eksplisiittisen
-`SimulationContext`-kontekstin, generoitu Revision 274 -snapshot on runtime-totuus,
-persistointi on versioitu, live-integraatiot on rajattu ja testaus-/julkaisuportti
-on kattava.
+## Tiivistelmä
 
-Nykyarkkitehtuuri on laskennan ja datan osalta selvästi kerrostettu. Audit ei
-löytänyt lähdemoduulien importtisyklejä eikä domainista ylempiin kerroksiin
-suuntautuvia riippuvuuksia. Suurin jäljellä oleva riski on UI:n keskittyminen.
-Goal 2:n ensimmäinen vaihe siirsi 1 322 riviä puhtaita kontrolleja ja esittäjiä
-`src/app/components`-alueelle, mutta 8 856-rivinen `src/app/App.tsx` omistaa vielä
-selaintallennuksen, import/export-virrat ja feature-paneelien orkestroinnin.
-Auditissa havaittu legacy-migraatioadapterin viiden app-state-riippuvuuden velka
-suljettiin Goal 1 -jatkossa D-092:n mukaisesti.
+Projektin nykyinen tuotantoarkkitehtuuri on terve laskenta-, data- ja
+runtime-rajoiltaan. TypeScript-moduuligraafissa ei ole syklejä, kiellettyjä
+kerrossuuntia, dokumentoituja poikkeuksia tai selittämättömiä orpomoduuleja.
+Domain on puhdas Reactista, DOMista, selaintallennuksesta ja verkosta. Root-app
+käyttää validoitua Revision 274 -snapshotia ja koostettua `FullSimulationResult`-
+totuutta; arkistoitu legacy-runtime ei ole client-entrypointista saavutettava.
 
-Auditin yhteydessä korjattiin tuotantorajan epäselvyys, lisättiin koneellinen
-arkkitehtuurigraafin tarkistus ja otettiin käyttöön TypeScriptin kuolleen koodin
-portit. Arkistoitua legacy-koodia ei poistettu, koska D-060 säilyttää sen
-testi-, regressio-, lähdevertailu- ja rollback-näyttönä.
+Audit ei löytänyt P0-tasoista tietoturva-, data- tai laskentaongelmaa. Suurin
+jäljellä oleva arkkitehtuuririski on UI-kerroksen vastuiden keskittyminen:
+`App.tsx` on siivouksen jälkeenkin 7 725 riviä ja
+`src/app/view-models/simulation.ts` 4 978 riviä. Ne eivät kahdenna domain-
+laskentaa, mutta useiden feature-perheiden yhteinen muutos- ja review-pinta on
+liian suuri.
 
-## Tarkastuksen laajuus
+Audit toteutti kolme käyttäytymisen säilyttävää siivousta:
 
-Tarkastus kattoi:
+- arkkitehtuuritarkistus hylkää nyt myös selittämättömät orvot lähdemoduulit ja
+  vanhentuneet ulkoisten entrypointien luokitukset;
+- laaja `src/data/index.ts`-barrel poistettiin ja legacy-/testikuluttajat tuovat
+  omistavat moduulit suoraan; ja
+- MonsterCard-rail irrotettiin `App.tsx`:stä omaksi puhtaaksi, kohdistetusti
+  testatuksi komponentiksi. Copy, propsit, CSS-luokat ja laskenta säilyivät.
 
-- tuotantoentrypointit, Vite- ja Cloudflare-polut
-- `src/app`, state-moduulit, view modelit ja worker-rajan
-- `src/domain`-moduulit ja koostetun simulaatiotuloksen omistajuuden
-- `src/data`, generoitu snapshot, skeemat ja markkinahintojen omistajuuden
-- selain-, storage-, generated-, market-, hiscores-, legacy- ja static-adapterit
-- server-coret, Vite-middlewaret ja Cloudflare Worker -adapterin
-- generaattori-, auditointi-, deploy- ja market writer -skriptit
-- yksikkö-, golden-, suorituskyky- ja selaintestausstrategian
-- arkistoidun legacy-runtimen säilytysperusteen
-- dokumentaation totuusjärjestyksen ja nykyiset päätösrajat
+## Priorisoitu löydöslista
 
-Todisteina käytettiin koodia, committed dataa, omistavia dokumentteja,
-TypeScript-resolverilla rakennettua moduuligraafia, staattisia hakuja sekä
-projektin omia validointikomentoja.
+| Prioriteetti | Tila | Löydös | Suositeltu käsittely |
+| --- | --- | --- | --- |
+| P0 | Ei löydöstä | Ei osoitettua kriittistä arkkitehtuuri-, turvallisuus- tai datavirhettä | Säilytä nykyiset portit |
+| P1 | Avoin | `App.tsx` koordinoi yhä lähes kaikkia workbench-featureita ja 20 React-state-solua | Jatka D-093-spekkiä yksi feature-perhe kerrallaan |
+| P1 | Avoin | 4 978-rivinen simulation-view-model yhdistää main/Stats-, compare/duel-, Planner-, loot-, optimizer- ja option-presentaatiot | Pilko kuluttajaperheittäin ilman uutta laskentatotuutta |
+| P2 | Avoin | `src/domain/trip/index.ts` on 3 097-rivinen loot/incoming/trip/supply-kokonaisuus | Sisäinen jako, nykyinen `src/domain/trip` export-pinta ja numerot ennallaan |
+| P2 | Avoin | `scripts/game-data-generator-core.ts` on 3 170-rivinen parseri-, impact- ja writer-omistaja | Jaa lähdeparseen, impact-evidenssiin ja output-kirjoitukseen |
+| P2 | Mitattava | Jokainen raskas taski luo uuden Workerin ja kloonaa täyden noin 1,07 MB game-dataa sisältävän `SimulationContext`in | Mittaa startup/clone ennen persistent-worker-spekkiä |
+| P2 | Avoin | Testi- ja dokumenttievidenssi on keskittynyt 5 021-, 3 680- ja 1 524-rivisiin omistajiin | Pilko feature-/päivättyihin osiin seuraavien muutosten yhteydessä |
+| P3 | Avoin | Hiscores- ja market-coret kahdentavat pienen timeout/error/rate-limit-rungon | Yhteistä vain molempien handler-testien suojaamana |
+| P3 | Avoin | Erityisesti simulation-view-model exporttaa runsaasti vain tiedoston sisällä käytettyjä sisätyyppejä | Kavenna export-pintaa feature-jaon yhteydessä |
+| Hyväksytty raja | Ei aktiivista työtä | Legacy/static-runtime sekä root `.js/.jsx` -lähteet ovat clientin ulkopuolista regression/reference/rollback-evidenssiä | Poista vain uuden D-060:n korvaavan päätöksen jälkeen |
+| Operatiivinen raja | Ulkoinen evidenssi | Cloudflare preview/production -smoke ja ensimmäinen konfiguroitu scheduled market -ajo eivät ole pääteltävissä checkoutista | Adopterin runbook, ei repo-refaktorointi |
 
-## Löydökset ja toimenpiteet
+## Tarkastuksen laajuus ja kierrokset
 
-### Korjattu: production browser -barrel vuoti legacy-rajan
+Audit tehtiin neljän erillisen tarkastelukierroksen kautta. Jokaisen kierroksen
+havainnot ristiintarkistettiin seuraavalla kierroksella ennen muutoksia.
 
-`src/adapters/browser/index.ts` re-exporttasi `loadBundledLegacyContext`-helperin
-ja legacy-bootstrap-tyypin. Tuotanto-UI tuo samasta barrelista oikeita
-selainhelpereitä, joten lähdekoodin staattinen graafi teki arkistoidusta
-legacy-runtimesta client-entrypointin saavutettavan, vaikka bundlerin tree shaking
-saattoi poistaa lopullisen koodin.
+### Kierros 1: topologia, entrypointit ja riippuvuussuunnat
 
-Korjaus:
+Tarkastettu:
 
-- legacy-re-export ja tarpeeton compatibility-tyyppialias poistettiin
-- legacyä tarvitsevat testit tuovat helperin suoraan
-  `src/adapters/legacy-runtime`-rajasta
-- uusi arkkitehtuuritarkistus estää `legacy-runtime`- ja `static-runtime`-polkujen
-  saavuttamisen `src/app/main.tsx`:stä
+- `index.html`, `src/app/main.tsx`, Web Worker -entry, Vite-config ja
+  Cloudflare Worker/Wrangler -entry;
+- kaikki ei-testilliset `src/**/*.ts` ja `src/**/*.tsx` TypeScript-resolverilla;
+- kerrossuunnat `app`, `adapters`, `data`, `domain`, `server`;
+- cycle-, client-reachability-, inbound- ja kerrosedge-tiedot; sekä
+- barrel-exportit ja lähdekoodin ulkopuolelta käynnistyvät moduulit.
 
-### Korjattu: arkkitehtuurirajat olivat vain dokumentoituja
+Lopullinen graafi:
 
-Uusi `npm run architecture:check` rakentaa kaikista ei-testillisistä `src/`
-TypeScript-moduuleista importtigraafin ja hylkää:
+- 81 lähdemoduulia;
+- 297 `src`-moduulien välistä edgeä;
+- 69 client-entrypointista saavutettavaa moduulia;
+- ei importtisyklejä;
+- ei kiellettyjä kerrossuuntia;
+- ei dokumentoituja poikkeuksia; ja
+- seitsemän eksplisiittistä ulkoista entrypointia:
+  `main.tsx`, calculation worker, Cloudflare Worker, kaksi Vite-middlewarea sekä
+  kaksi script/test/reference-adapteria.
 
-- importtisyklit
-- kielletyt kerrossuunnat
-- client-entrypointista saavutettavan arkistoidun runtimen
-- uudet dokumentoimattomat adapteri→app-poikkeukset
-- vanhentuneet poikkeusmerkinnät
+Kaikki inbound-juuret pystyttiin todentamaan HTML-, `new Worker(new URL(...))`-,
+Vite-, Wrangler- tai repository script/test -käynnistyksiksi. Auditissa ei
+löytynyt poistettavaa kokonaan irrallista TypeScript-tuotantomoduulia.
 
-Goal 2:n ensimmäisen extraction-vaiheen jälkeen tulos on 68 lähdemoduulia, 55
-client-entrypointista saavutettavaa moduulia, ei syklejä eikä yhtään
-arkkitehtuuripoikkeusta. Tarkistus kuuluu `npm run verify` -porttiin.
+### Kierros 2: omistajuudet, tila, UI, domain ja kuollut koodi
 
-### Korjattu: käyttämätön TypeScript-koodi ei ollut merge-portti
+Tarkastettu:
 
-Sekä selain- että Node/skripti-tsconfig käyttävät nyt asetuksia
-`noUnusedLocals` ja `noUnusedParameters`. Nykyinen koodi läpäisee portin. Tämä
-estää orvoksi jäävät importit, lokaalit, tyypit ja parametrit heti typecheckissä.
+- `App.tsx`:n importit, top-level-helperit, hookit, state/effect/memo-omistus ja
+  workbench-paneelien rajat;
+- `src/app/controllers`, `src/app/state`, `src/app/components` ja
+  `src/app/view-models/simulation.ts`;
+- `src/domain/combat`, `equipment`, `simulation`, `trip`, `risk`, `planner` ja
+  `economy`;
+- selainglobaalien, storage-, fetch- ja worker-käytön sijainti; sekä
+- lähdemoduulien inbound-reachability, laajat barrelit ja käyttämättömät
+  export-pinnat.
 
-### Osittain ratkaistu P1: `App.tsx` on liian suuri composition root
+Vahvistettu:
 
-Auditointihetken tiedosto oli noin 10 178 riviä / 408 KiB. Goal 2:n vaihe 1
-siirsi yhteiset kentät, dialogi-/status-esittäjät, combat-tuloskomponentit,
-hintahistoriakaaviot ja jaetut formaattorit viiteen side-effect-free
-`src/app/components`-moduuliin. `App.tsx` on nyt 8 856 riviä ja omistaa edelleen
-browser-state-orkestroinnin ja workbench-paneelien renderöinnin.
+- `src/domain` ei lue `window`, `document`, `localStorage` tai `fetch`-rajapintoja;
+- app-state ei vuoda `SimulationRequest`iin ilman eksplisiittistä adapterointia;
+- `FullSimulationResult` kokoaa numeerisen combat/trip/XP/economy-polun, eikä UI
+  ylläpidä rinnakkaista laskentatotuutta;
+- storage on versioitu ja skeemavalidoitu, ja rewrite-kohtainen legacy-mapping on
+  app-kerroksessa; ja
+- `noUnusedLocals`/`noUnusedParameters` suojaavat lokaaleja/importteja, mutta
+  eivät kokonaisia moduleita tai tarpeettoman laajoja export-pintoja.
 
-Domain-totuus ei ole tässä tiedostossa, joten nykytila ei aiheuta laskennan
-kahdentumista. Se kuitenkin kasvattaa regressio-, merge conflict- ja
-review-riskiä. Hyväksytty
-[vaiheistettu toteutusspeksi](docs/technical/app-composition-root-refactor-spec.md)
-jatkaa yksi vastuu kerrallaan:
+Korjattu:
 
-1. irrota matalan kytkennän paneeli tai browser-state-controller
-2. pidä state/request/view-model-skeemat ennallaan
-3. lisää tai säilytä focused unit + Playwright -näyttö
-4. jätä `App` vain koostamaan featuret
+- `src/data/index.ts` oli yleinen neljän alueen barrel, jota tuotantopuolella
+  käytti vain legacy-reference-bootstrap ja muuten testit. Suorat
+  `legacy-adapter`/`reliability`-tuonnit poistivat tarpeettoman rajapinnan.
+- MonsterCard oli puhdas noin 100-rivinen esityskomponentti `App.tsx`:n sisällä.
+  Se siirrettiin `src/app/components/panes/monster-card-panel.tsx`:ään ja sen
+  DOM/copy/presentaatiosopimus lukittiin focused server-render -testillä.
 
-Ensimmäinen toteutusvaihe ei muuttanut tilaa, copya, CSS-luokkia, laskentaa tai
-persistointia. Seuraavat selain-state-controllerit ja feature-paneelit jäävät
-erillisiksi goaleiksi, jotta jokaisella siirrolla on rajattu regressioevidenssi.
+Ei poistettu:
 
-### Ratkaistu jatkossa: legacy migration rikkoi puhdasta adapterisuuntaa
+- legacy `.js/.jsx` -lähteitä, legacy/static-adaptereita tai snapshotteja, koska
+  D-060 antaa niille aktiivisen golden/reference/readiness/rollback-roolin;
+- sisäisiä domain-helpereitä vain rivimäärän tai vähäisen importtimäärän vuoksi;
+  osa niistä on yhden koherentin moduulin sisäistä laskentaa; eikä
+- näkyvästi tarpeettomia export-avainsanoja laajana mekaanisena diffina, koska
+  niiden rajapinta kannattaa kaventaa samalla kun omistava moduuli pilkotaan.
 
-Auditointihetkellä `src/adapters/storage/legacy-migration.ts` toi viisi skeemaa
-`src/app/state/*`-alueelta. Goal 1 siirsi muuttumattoman muunnoslogiikan
-`src/app/state/legacy-storage-migration.ts`-omistukseen, jätti adapteriin vain
-geneerisen tallennusmekaniikan ja poisti kaikki viisi poikkeusta. D-092 ja
-[toteutusspeksi](docs/technical/legacy-migration-layer-refactor-spec.md) omistavat
-ratkaisun.
+### Kierros 3: data, runtime, suorituskyky, testaus, deploy ja turvallisuus
 
-### Avoin P2: suuret mutta koherentit moduulit
+Tarkastettu:
 
-Merkittävät keskittymät auditointihetkellä:
+- generated runtime -bootstrap, skeemat, price fallback/provenance ja readiness;
+- raw LostCity source -parserit, source coverage/impact ja revision bump -rajat;
+- numeric cross-path ja Planner legacy-parity;
+- worker-requestit, timeout/cancel/terminate-polku ja bundle-artifact;
+- framework-neutral API-coret, Vite-middlewaret, provider, Cloudflare Worker,
+  `_headers`, Wrangler ja scheduled market -workflow;
+- HTML/DOM-koodinsuoritusnielut, selainverkko, salaisuudet, localStorage ja
+  käyttäjän tiedosto-/fragmenttisyötteet; sekä
+- yksikkö-, golden-, functional-, visual- ja release-gate-omistus.
 
-- `src/domain/trip/index.ts`: noin 3 097 riviä
-- `scripts/game-data-generator-core.ts`: noin 3 170 riviä
-- `src/domain/planner/index.ts`: noin 1 388 riviä
-- `src/app/styles.css`: noin 5 256 riviä
+Dataevidenssi:
 
-Näistä ei löytynyt importtisyklejä tai väärää runtime-omistajuutta. Ne kannattaa
-pilkkoa sisäisiin moduuleihin vasta kun muutos voidaan tehdä julkinen export-pinta
-ja numerot ennallaan säilyttäen. Pelkkä rivimäärä ei ole poistoperuste.
+- generated runtime readiness on `ready`, blokkerit 0;
+- 381/381 aktiivisella hinnalla on metadata; 245 on eksplisiittisiä generated
+  fallback -rivejä;
+- dynaamisten loot-hintojen 39/49 mapping-kattavuus ja 10 puuttuvaa
+  species-specific unid -identiteettiä vastaavat hyväksyttyä D-087-rajaa;
+- LostCity source audit ratkaisee kaikki runtime-identiteetit ja 63/63 loot-
+  taulua ilman partial/unsupported-rivejä;
+- NPC attack -audit on committed-dokumentin kanssa ajantasainen;
+- 5 958 current-path-numeerista vertailua ovat ristiriidattomia; ja
+- Planner parity raportoi 16 casea / 32 vertailua, 0 review-riviä ja 0 rewrite-gap-riviä.
 
-### Ratkaistu P2: initial bundle on mitattu ja rajattu
+`npm run data:source-impact` raportoi kaksi `needs-review`-representative casea
+ja 22 informaatiotason outlieria. Tämä komento vertaa rajattua
+legacy-derived-referenceä in-memory source candidateen eikä omista aktiivisen
+Revision 274 -runtimen hyväksyntää. Aktiivisen runtimen committed revision-impact,
+readiness ja numeric audit ovat erilliset hyväksytyt totuusrajat. Löydös ei siis
+ole nykyisen root-runtimen regressio, mutta komennon tulkintaraja on pidettävä
+näkyvänä dokumentaatiossa.
 
-Goal 3:n viiden cold/warm-parin baseline vahvisti, että 1 069 141 tavun generoitu
-game-data oli staattisesti 1 562 480 tavun initial JavaScriptissä. D-094 siirtää
-vain generated-runtime-bootstrapin olemassa olevan loading/error-rajan taakse.
-Entry on nyt 683 659 tavua / 197 123 gzip ja deferred runtime -chunk 880 362
-tavua / 47 939 gzip.
+Turvallisuus- ja deploy-evidenssi:
 
-Samalla koneella cold FCP -mediaani parani 112 → 80 ms ja app-ready pysyi
-käytännössä samana 240 → 241 ms; warm app-ready oli 167 → 168 ms. Kokonais-JS:n
-cold-siirto ei pienentynyt, koska snapshot on edelleen vaadittu runtime-totuus.
-Artifact-gate estää regressiot 725 000 raw / 210 000 gzip entryrajoilla. Viten
-large-chunk-varoitusta ei piilotettu, eikä tulos oikeuta feature-paneelien
-automaattista lazy loadingia ilman erillistä speksiä.
+- production-React ei käytä `dangerouslySetInnerHTML`, `innerHTML`, `eval` tai
+  käyttäjäsyötteistä rakennettua koodinsuoritusta;
+- `new Function` esiintyy vain luotettujen repo-owned legacy-lähteiden
+  reference-sandboxissa ja readiness-scriptissä, ei client-entrypointissa;
+- käyttäjän JSON, selaintallennus, API-vastaukset ja share-fragmentit ovat
+  koko-, duplicate-key-, versio- ja skeemarajattuja;
+- provider käyttää fixed HTTPS originia, redirect/timeout/size/schema-rajoja ja
+  sanitisoituja virheitä;
+- Cloudflare reitittää API:n ennen SPA-fallbackia, tuntematon `/api/*` ei putoa
+  HTML:ään, ja CSP/security/cache-headerit ovat repo-omisteisia; ja
+- ei löytynyt kovakoodattua salaisuutta, auth-, cookie-, tietokanta- tai
+  server-managed user-state -pintaa.
 
-### Hyväksytty: legacy/reference-koodi ei ole kuollutta koodia
+Suorituskykyhavainto:
 
-Staattinen production-reachability-tarkistus löysi client-graafin ulkopuolelta
-`src/adapters/static-runtime/index.ts`:n. `src/app/calculation-worker.ts` näkyi
-myös tavalliselle importtiskannerille irrallisena, mutta se käynnistyy Worker
-URL -rajasta. Kumpikaan ei ole poistettava löydös.
+- entrybudjetti ja deferred generated chunk ovat jo mitattuja ja portitettuja;
+- calculation worker -bundle on noin 223 kB ja jokainen run luo uuden workerin;
+- request siirtää täydellisen `SimulationContext`in, jonka game-data-lähde on
+  1 069 141 tavua; ja
+- tästä seuraava clone/startup-kustannus on perusteltu hypoteesi, ei auditissa
+  mitattu käyttäjäpolun regressio. Persistent worker ei ole turvallinen
+  pikasiivous, koska se muuttaisi initialization-, request identity-, stale-
+  result-, cancellation- ja error-lifecyclea.
 
-Arkistoidut `.js`/`.jsx`-runtimet sekä legacy/static-adapterit ovat D-060:n
-mukaisesti golden-, regressio-, lähdevertailu-, snapshot-regenerointi- ja
-rollback-näyttöä. Niiden poistaminen vaatii erillisen päätöksen ja korvaavan
-evidenssin; audit ei laajentanut käyttäjän pyyntöä tämän päätöksen ohitse.
+### Kierros 4: ristiintarkistus ja dokumenttidrifti
 
-## Vahvistetut hyvät rajat
+Tarkastettu:
 
-- `src/domain` ei tuo app-, adapteri-, data- tai server-koodia.
-- Domain-laskenta ei lue DOMia, `window`-objekteja tai `localStoragea`.
-- `FullSimulationResult` kokoaa combat-, trip- ja XP/rate-totuuden yhdessä
-  domain-rajassa; UI/view model ei ylläpidä rinnakkaista laskentatotuutta.
-- Data- ja hintasyötteet validoidaan skeemoilla ja annetaan eksplisiittisesti.
-- Client, dev/preview middleware ja Cloudflare Worker käyttävät erillisiä
-  adaptereita yhteisten server-corejen ympärillä.
-- Raskaat Dense/Planner/Duel/Risk-polut on rajattu cancellable Workeriin.
-- Legacy-runtimen normaali tuotantobootstrap on poistettu.
-- Testi-, golden-, build-, artifact-, lint-, format- ja diff-portit ovat
-  repo-omisteisia ja dokumentoituja.
+- `README.md`, `AGENTS.md`, docs-indeksi, architecture/testing/product/
+  operations/decisions/backlog;
+- aiemmat architecture/security/project/documentation-audit -snapshotit;
+- nykyiset moduuli-, rivi-, testi-, browser- ja artifact-väitteet; sekä
+- hyväksytyt päätösrajat verrattuna toteutukseen.
+
+Korjattu dokumenttidrifti:
+
+- elävä architecture-dokumentti raportoi nyt 81/69-moduuligraafin, seitsemän
+  external entrypointia ja orphan-module-portin aiemman 78/65-väitteen sijaan;
+- App-riski raportoi nykyisen 7 725 rivin tilan ja MonsterCard-omistajan;
+- simulation-view-model-, Trip-, generator-, worker- ja testievidenssin
+  keskittymät on nostettu eläviin riskirajoihin ja backlogiin;
+- backlog ei enää väitä valmiin PriceSet-siirron olevan tekemättä; ja
+- vanhat security/project/documentation-auditit on merkitty näkyvästi
+  historiallisiksi, jotta niiden vanhoja entrypoint-, backend-, moduuli- tai
+  testiväitteitä ei lueta nykytilana.
+
+Auditissa tutkittiin myös hypoteesi Hiscores/market fixed-window limiterin
+Map-järjestysvirheestä. Aikajärjestyksen invariantti osoitti, että vanhentunut
+avaimen ikkuna poistetaan ennen uudelleenlisäystä ja aloitusjärjestys säilyy.
+Hypoteesi hylättiin eikä siitä tehty näennäistä bugikorjausta. Kahdennettu
+mekaniikka jää vain P3-yhteistämiskohteeksi.
+
+## Vahvistetut hyvät arkkitehtuurirajat
+
+- Root-tuotantopolku on npm/Vite/React/TypeScript, ei CDN/Babel/script-order.
+- Domain on puhdas, deterministinen ja eksplisiittisen contextin varassa.
+- Combat-, trip-, XP- ja economy-luvut kulkevat yhden composed-result-polun läpi.
+- Data-, PriceSet-, provenance-, history-, API- ja persistence-syötteet
+  validoidaan keskitetysti.
+- Generated Revision 274 -snapshot on root-runtime-totuus; legacy-derived bridge
+  on vain evidenssiä.
+- App-, adapter-, data-, domain- ja server-suunnat ovat koneellisesti portitettuja.
+- Heavy compare/planner/duel/risk-polut eivät blokkaa pääsäiettä ja ovat
+  cancellable/timeout-rajattuja.
+- Hiscores- ja market-handlerit ovat framework-neutral coreja adapterien alla.
+- Cloudflare/static security- ja artifact-budjetit ovat repo-omisteisia.
+- Unit-, golden-, numeric-, Planner parity-, source-, browser- ja visual-
+  evidenssi on poikkeuksellisen laaja tämän kokoiselle staattiselle sovellukselle.
+
+## Suositeltu toteutusjärjestys
+
+1. Tee Stats/Loadout-perheestä seuraava D-093-vaihe: irrota paneelikomponentit ja
+   niiden Stats/main-view-model-aliperhe yhdessä käyttäytymisen säilyttävässä
+   speksissä.
+2. Jatka Compare/Duel- ja Loot/Trip/Risk-perheisiin. Pidä worker request/result
+   ja `FullSimulationResult` vakaina jokaisessa vaiheessa.
+3. Erota Planner ja Economy/Settings viimeisinä, koska ne kytkeytyvät laajoihin
+   persistence/history/import-export-poluihin.
+4. Mittaa calculation-workerin initialization/clone/task-aika vähintään cold/
+   warm- ja per-task-erottelulla ennen persistent-worker-päätöstä.
+5. Pilko Trip-domain ja generator-core vasta omissa numero-/artifact-stabiileissa
+   refaktorigoaleissaan.
+6. Pilko suuret testi- ja historialliset evidenssitiedostot opportunistisesti
+   feature-muutosten mukana, ei omana laajana testien uudelleenkirjoituksena.
 
 ## Validointi
 
-Auditin aikana ajettiin:
+Auditin luku- ja kohdistetut tarkistukset:
 
-- `npm run architecture:check`: läpi, 68 moduulia, ei syklejä, 55 client-moduulia
-- `npm run typecheck`: läpi uusilla unused-porteilla
-- `npm run test`: 40 testitiedostoa / 624 testiä läpi
-- `npm run build`: läpi; suuri chunk -varoitus luokiteltiin yllä
-- `npm run verify`: läpi; 624 yksikkötestiä ja erilliset 19 legacy-goldenia,
-  typecheck, architecture check, build, artifact, lint, format ja diff-tarkistus
-- Cloudflare-artifact: 10 tiedostoa / 2 direct assetia / 3 JavaScript-chunkia /
-  1 939 237 tavua, entry 683 659 raw / 197 123 gzip, SHA-256
-  `1f86ddc20e24331e9f380b0b2e957a0dcb1e47d52612094d79eecbbf2c4fbbda`
-- `npm audit`: 0 haavoittuvuutta
-- `npm run test:e2e -- --workers=1`: 76/76 Chromium-testiä läpi
-- `npm run numeric:audit`: 5 958 current-path-vertailua, 0 ristiriitaa
-- `npm run planner:parity`: 16 casea / 32 vertailua, 0 review- tai rewrite-gap-riviä
-- `npm run runtime:readiness -- --example-limit 5`: `ready`, ei blokkereita
-- legacy `.js` -syntaksit ja committed price JSON -parsiminen: läpi
-- staattiset DOM/code execution- ja secret-haut: vain dokumentoidut trusted
-  legacy `new Function`- ja väärät positiiviset token/password-osumat
+- `npm run architecture:check`: 81 moduulia, 69 client-reachable, seitsemän
+  external entrypointia, ei syklejä tai poikkeuksia;
+- `npm run typecheck`: läpi;
+- MonsterCard/data/legacy/trip/XP/Planner/generated-runtime focused gate:
+  112/112 testiä läpi;
+- `npm run runtime:readiness -- --example-limit 5`: `ready`, 0 blokkereita;
+- `npm run numeric:audit`: 5 958 vertailua, 0 ristiriitaa;
+- `npm run planner:parity`: 19 testiä sekä 16/32 raportti, 0 review/gap;
+- `npm run data:source-audit`: kaikki runtime-identiteetit ratkaistu, 63/63 loot;
+- `npm run npc:attack-audit`: committed raportti current;
+- `npm run data:source-impact`: read-only tulkintaraja tarkastettu;
+- viiden committed JSON-artifactin parse: läpi;
+- staattiset DOM/code-execution/selainglobaali/salaisuushakukierrokset: ei uutta
+  production-blockeria; ja
+- `npm run verify`: 47 testitiedostoa / 695 testiä, 19 erillistä goldenia,
+  typecheck, architecture, build/artifact, lint, format ja diff läpi;
+- artifact: 10 tiedostoa, kolme JavaScript-chunkia, entry 698 311 raw / 201 062
+  gzip, total 1 953 919 tavua, SHA-256
+  `ca7eb0163c53462758a7c4b2f5b1d5d94c03484305103ddc9875c39ce254a188`;
+- `npm run test:e2e -- --workers=1`: 77/77 functional Chromium -testiä läpi;
+- `npm run test:e2e:visual -- --workers=1`: 20/20 testiä ja 31/31 hyväksyttyä
+  Darwin-baselinea muuttumattomina. Ensimmäinen sandbox-yritys pysähtyi
+  `listen EPERM 127.0.0.1:5174` -rajaan; hyväksytty localhost-uusinta meni läpi;
+- `npm audit --audit-level=high`: 0 haavoittuvuutta; ja
+- `git diff --check`: läpi ennen lopullista repository-porttia.
 
-## Jatkotoimet
+## Avoimet kysymykset
 
-1. Jatka `App.tsx`-spekkiä yksi browser-state-controller tai feature-perhe kerrallaan ilman laskentamuutoksia.
-2. Seuraa D-094-entrybudjettia; speksaa feature-paneelien lazy loading erikseen vain uuden mittausnäytön perusteella.
-3. Jatka legacy/reference-tiedostojen säilyttämistä D-060:n mukaisesti, kunnes
-   erillinen poistopäätös ja korvaava näyttö ovat olemassa.
+- Millä feature-perheellä D-093 jatkuu? Audit suosittelee Stats/Loadoutia, koska
+  se mahdollistaa myös simulation-view-modelin ensimmäisen luonnollisen jaon.
+- Onko yhden taskin worker-transfer/startup käyttäjän laitteilla merkittävä?
+  Lähdekoko yksin ei ratkaise tätä.
+- Milloin repository-local functional/visual gate halutaan kanoniseen remote
+  merge -ympäristöön? Nykyinen päätös ei vaadi yleistä CI-workflowta.
+- Kuka kerää ensimmäisen Cloudflare preview/production -smoken ja ensimmäisen
+  konfiguroidun scheduled-market-ajon evidenssin ennen julkisia live/current-
+  väitteitä?
+- Milloin legacy/reference-runtime voidaan poistaa? D-060:n korvaava päätös ja
+  legacyä ajavien golden/readiness-polkujen app-owned korvaajat puuttuvat vielä.

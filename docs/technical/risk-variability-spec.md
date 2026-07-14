@@ -332,9 +332,11 @@ risk domain and use explicit seeds.
   food sufficiency, trip/hour simulation, target probabilities and coverage.
 - `src/app/calculation-task.ts` runs `risk-analysis` through the existing
   one-shot cancellable worker boundary.
-- `src/app/App.tsx` exposes Risk controls, Run/Cancel, fresh/stale states, all
-  five requested outputs, coverage/warnings and compact ranges beside current
-  TTK, net-GP and Trip averages.
+- `src/app/view-models/risk.ts`, `src/app/controllers/use-risk-analysis.ts` and
+  `src/app/components/panes/risk-pane.tsx` own the Risk UI contracts,
+  Run/Cancel/freshness lifecycle and all five requested outputs with
+  coverage/warnings. `src/app/App.tsx` composes their fresh compact ranges
+  beside current TTK, net-GP and Trip averages.
 - `src/tests/risk-analysis.test.ts` has twelve deterministic domain cases;
   calculation-task coverage proves structured-clone and worker dispatch.
 - The repository verification gate passed 38 files/586 tests, 19/19 golden

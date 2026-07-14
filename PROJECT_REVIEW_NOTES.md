@@ -1,5 +1,11 @@
 # Projektin tiedostoittainen tarkastus
 
+> Historiallinen 2026-07-05 legacy-tarkastelusnapshot. Nykyinen root-sovellus on
+> Vite/React-rewrite, ja tämän tiedoston silloiset repo-, entrypoint-, backend- ja
+> testittömyysväitteet ovat vanhentuneita. Katso [nykyarkkitehtuuri](docs/technical/architecture.md)
+> ja [uusin arkkitehtuuriaudit](ARCHITECTURE_AUDIT.md); alla olevat löydökset
+> säilyvät arkistoidun runtimen evidenssinä.
+
 Päiväys: 2026-07-05  
 Kohde: `/Users/pessi/index-sim`  
 Rajaus: staattinen ja kevyt ajonaikainen tarkastus. Koodia ei korjattu.

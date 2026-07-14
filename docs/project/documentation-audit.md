@@ -1,5 +1,12 @@
 # Repository documentation audit
 
+> Historical evidence snapshot from an earlier 2026-07-13 worktree. Its file,
+> module and test counts and its then-failing typecheck note are not current.
+> See [the current architecture](../technical/architecture.md), [testing
+> summary](../technical/testing.md) and [latest repository-wide architecture
+> audit](../../ARCHITECTURE_AUDIT.md) for living/current facts. The detailed
+> ledger below is preserved as evidence of that audit window.
+
 - Status: completed against the current worktree
 - Audit date: 2026-07-13
 - Scope: every repository file returned by `rg --files --hidden -g '!.git' -g '!node_modules'`
