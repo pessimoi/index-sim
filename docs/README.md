@@ -54,6 +54,7 @@ This directory is the project memory layer for humans and AI agents. It keeps cu
 - Public deployment specification: [operations/public-deployment-spec.md](operations/public-deployment-spec.md)
 - Roadmap, backlog, decisions and ideas: [project/README.md](project/README.md)
 - Current worktree delivery specification: [project/worktree-delivery-spec.md](project/worktree-delivery-spec.md)
+- D-095 worker measurement commit specification: [project/d095-worker-measurement-commit-spec.md](project/d095-worker-measurement-commit-spec.md)
 - Repository handoff hardening specification: [project/handoff-hardening-spec.md](project/handoff-hardening-spec.md)
 - Current numeric user-path audit: [project/numeric-user-path-audit.md](project/numeric-user-path-audit.md)
 - Current Revision 274 NPC attack source audit: [project/npc-attack-source-audit.md](project/npc-attack-source-audit.md)

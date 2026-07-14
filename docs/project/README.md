@@ -13,6 +13,7 @@ This section owns planning material. Keep it light and keep implementation detai
 - [numeric-user-path-audit.md](numeric-user-path-audit.md): generated cross-path numeric consistency and large legacy-delta evidence.
 - [npc-attack-source-audit.md](npc-attack-source-audit.md): generated Revision 274 NPC attack-handler coverage and the still-open calculation decision package.
 - [worktree-delivery-spec.md](worktree-delivery-spec.md): review, commit grouping, validation and safe `origin/master` delivery plan for the current accumulated worktree.
+- [d095-worker-measurement-commit-spec.md](d095-worker-measurement-commit-spec.md): reviewable commit manifest for packaging Worker measurement and D-095 separately from D-096 and MonsterCard planning.
 - [handoff-hardening-spec.md](handoff-hardening-spec.md): fresh-clone onboarding, repository verification, source-pin maintenance and technical handoff acceptance.
 - [documentation-audit.md](documentation-audit.md): 2026-07-13 repository-wide file/documentation consistency audit and remaining maintenance questions.
 
