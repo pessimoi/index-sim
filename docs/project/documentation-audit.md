@@ -126,9 +126,9 @@ not cite an old count without its date and context.
 
 ## Open questions
 
-- Should `docs/technical/testing.md` be split into a short current command
-  owner and a separate dated evidence log? It is currently more than 1,300
-  lines and correct historical rows can obscure the current gate.
+- Resolved 2026-07-14: `docs/technical/testing.md` remains the current command
+  and strategy owner, while dated implementation, release and superseded
+  failure snapshots live in [testing-evidence.md](testing-evidence.md).
 - Should a future maintainer add an automated documentation consistency check
   for local links, package-script references, visual scenario/baseline counts
   and market logical-set filenames? No general merge CI owner is currently

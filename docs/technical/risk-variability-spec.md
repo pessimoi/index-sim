@@ -343,7 +343,7 @@ risk domain and use explicit seeds.
   tests, typecheck, production build/artifact validation, lint, format and diff
   checks. The representative 10,000-trial one-hour and 24-hour-block workloads
   completed in about 2.1 s and 1.8 s respectively in the local process.
-- The focused Playwright Risk case in `src/tests/e2e/scaffold.spec.ts` passes
+- The focused Playwright Risk case in `src/tests/e2e/*.spec.ts` passes
   1/1 in Chromium against the production preview. It covers Run, all five
   outputs, coverage and warning copy, source-change staleness and cancellation.
   The runtime pass exposed and closed a status-priority race where stale prior

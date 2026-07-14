@@ -1,11 +1,12 @@
 # Tietoturva-auditointi
 
-> Historiallinen auditointisnapshot 2026-07-05 tilanteesta. Root-tuotantopolun,
-> server-corejen, Cloudflare-adapterin ja nykyisten validointirajojen elävä kuvaus
-> on [arkkitehtuuridokumentissa](docs/technical/architecture.md) ja
-> [operaatio-ohjeessa](docs/operations/README.md). Alla oleva legacy-analyysi
-> säilytetään evidenssinä eikä sen vanhoja nykytila- tai polkuväitteitä pidä
-> käyttää ilman tarkistusta.
+> Historiallinen legacy-painotteinen auditointisnapshot 2026-07-05 tilanteesta.
+> Nykyinen 2026-07-14 tuotantopolun auditointievidenssi ja löydösrekisteri on
+> [docs/project/security-audit.md](docs/project/security-audit.md). Root-polun,
+> server-corejen, Cloudflare-adapterin ja validointirajojen elävä kuvaus on
+> [arkkitehtuuridokumentissa](docs/technical/architecture.md) ja
+> [operaatio-ohjeessa](docs/operations/README.md). Alla olevia vanhoja nykytila-
+> tai polkuväitteitä ei pidä käyttää ilman tarkistusta.
 
 Päiväys: 2026-07-05  
 Kohde: `/Users/pessi/index-sim`  

@@ -9,6 +9,9 @@ Tarkastettu HEAD auditin alussa: `9935cbf1804508b046bdfef66aefac3261efeafb`
 Nykyarkkitehtuurin omistava dokumentti:
 [docs/technical/architecture.md](docs/technical/architecture.md)
 
+Nykyinen 2026-07-14 tuotantopolun uudelleenauditointi ja luokitellut löydökset:
+[docs/project/architecture-audit.md](docs/project/architecture-audit.md)
+
 Tämä tiedosto on monikierroksisen auditin evidenssisnapshot, ei kilpaileva elävä
 arkkitehtuurin totuuslähde. Audit alkoi puhtaalta `master`-työpuulta. Tässä
 auditissa tehdyt muutokset ovat seurattavissa Git-diffistä, mutta niitä ei ole
@@ -16,9 +19,10 @@ commitoitu tämän goalin yhteydessä.
 
 Toteutuksen jälkimerkintä 2026-07-13: suositus 1 toteutettiin
 [Stats/Loadout-speksin](docs/technical/stats-loadout-pane-refactor-spec.md)
-mukaisesti. Snapshotin alla olevat 7 725/4 978 rivin luvut ja suositusjärjestys
-kuvaavat auditointihetkeä; nykyiset omistajat, 7 273/2 583 rivin luvut ja
-validointievidenssi ovat elävissä arkkitehtuuri- ja testausdokumenteissa.
+mukaisesti. Snapshotin alla olevat rivimäärät, graafiluvut ja suositusjärjestys
+kuvaavat vain auditointihetkeä; nykyiset omistajat, luvut ja validointievidenssi
+ovat elävissä arkkitehtuuri- ja testausdokumenteissa sekä yllä linkitetyssä
+uudelleenauditoinnissa.
 
 ## Tiivistelmä
 

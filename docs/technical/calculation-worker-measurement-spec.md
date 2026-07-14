@@ -201,6 +201,13 @@ back-to-back task demand or another measured requirement that makes roughly
 separate algorithmic finding: it exceeded the measurement-only 120-second
 ceiling and is not evidence for or against Worker persistence.
 
+The implemented
+[calculation Worker retention and persistent-trigger specification](calculation-worker-retention-spec.md)
+now owns the exact raw protocol, Dense/Planner/Duel/Risk freshness and
+cancellation invariants, quantitative reopen screening and the minimum
+hard-cancellation-safe persistent target. This document remains the timing and
+harness owner.
+
 Final validation passed 10/10 focused calculation/performance tests, 64/64
 Vitest files with 761/761 tests, 19/19 goldens, 5,958/5,958 numeric comparisons,
 the 114-source-module zero-cycle architecture gate, typecheck, lint, formatting,

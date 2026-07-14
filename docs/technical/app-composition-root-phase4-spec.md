@@ -533,10 +533,10 @@ npm run test -- \
   src/tests/legacy-migration-view-model.test.ts \
   src/tests/app-shell-view-model.test.ts \
   src/tests/app-shell-components.test.tsx \
-  src/tests/legacy-migration.test.ts \
+  src/tests/legacy-migration-*.test.ts \
   src/tests/shareable-setup.test.ts \
   src/tests/ui-adapters.test.ts \
-  src/tests/ui-view-model.test.ts
+  src/tests/*-view-model.test.ts
 npm run numeric:audit
 npm run test:golden
 npm run test:e2e -- --workers=1 --grep "loads the dense combat spreadsheet root|supports bounded keyboard navigation|keeps hiscores disabled|looks up hiscores|renders scheduled price status|keeps the desktop workbench|keeps a compact landscape workbench|keeps every workbench tab|explains setup ownership|reviews and imports compatible legacy|keeps legacy data|clears only known legacy|exports current rewrite setup|keeps setup import failures|keeps PriceSet import failures|creates a selectable setup link|reviews a shared setup|dismisses or rejects shared setup links|runs, invalidates and cancels modeled Risk"

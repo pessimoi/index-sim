@@ -517,16 +517,17 @@ Add focused tests:
   snapshot, dirty draft without auto-run, Recompute, cancellation, source
   freshness, failure and unmount.
 
-Existing Planner builder cases may remain in `planner-ui-adapter.test.ts` and
-`ui-view-model.test.ts` during the mechanical move. Split them only if this can
-be done without rewriting unrelated evidence.
+Existing Planner builder cases remained in `planner-ui-adapter.test.ts` and the
+combined UI view-model suite during the mechanical move. The later
+ARCH-2026-05 maintenance split moved the combined integration assertion
+unchanged into `simulation-view-model.test.ts`.
 
 Minimum focused gate:
 
 ```sh
 npm run typecheck
 npm run architecture:check
-npm run test -- src/tests/planner-domain.test.ts src/tests/planner-ui-state.test.ts src/tests/planner-ui-adapter.test.ts src/tests/ui-view-model.test.ts src/tests/calculation-task.test.ts src/tests/ui-performance.test.ts src/tests/planner-pane.test.ts src/tests/planner-controller.test.ts
+npm run test -- src/tests/planner-domain.test.ts src/tests/planner-ui-state.test.ts src/tests/planner-ui-adapter.test.ts src/tests/*-view-model.test.ts src/tests/calculation-task.test.ts src/tests/ui-performance.test.ts src/tests/planner-pane.test.ts src/tests/planner-controller.test.ts
 npm run planner:parity
 npm run test:golden
 npm run test:e2e -- --workers=1 -g "recomputes the Planner tab workflow|keeps Monsters, Planner and setup matrix calculations off the main event loop|keeps desktop table headers usable"

@@ -219,7 +219,7 @@ At minimum, keep the existing API, adapter, UI and browser coverage passing. Add
 Representative commands after implementation:
 
 ```sh
-npm run test -- src/tests/lostcity-hiscores-provider.test.ts src/tests/hiscores-server.test.ts src/tests/hiscores-adapter.test.ts src/tests/hiscores-ui-state.test.ts src/tests/ui-view-model.test.ts
+npm run test -- src/tests/lostcity-hiscores-provider.test.ts src/tests/hiscores-server.test.ts src/tests/hiscores-adapter.test.ts src/tests/hiscores-ui-state.test.ts src/tests/*-view-model.test.ts
 npm run typecheck
 npm run test:e2e
 npm run build

@@ -16,6 +16,11 @@ This section owns planning material. Keep it light and keep implementation detai
 - [d095-worker-measurement-commit-spec.md](d095-worker-measurement-commit-spec.md): reviewable commit manifest for packaging Worker measurement and D-095 separately from D-096 and MonsterCard planning.
 - [handoff-hardening-spec.md](handoff-hardening-spec.md): fresh-clone onboarding, repository verification, source-pin maintenance and technical handoff acceptance.
 - [documentation-audit.md](documentation-audit.md): 2026-07-13 repository-wide file/documentation consistency audit and remaining maintenance questions.
+- [testing-evidence.md](testing-evidence.md): dated validation, release and superseded failure snapshots; current commands remain in the technical testing guide.
+- [architecture-audit.md](architecture-audit.md): 2026-07-14 current production-path architecture audit, verified boundaries and classified maintenance findings.
+- [security-audit.md](security-audit.md): 2026-07-14 current production-path security audit, remediated workflow finding and residual operational questions.
+- [code-audit.md](code-audit.md): 2026-07-14 current production-path code audit, remediated low-severity defects and validation evidence.
+- [maintainability-cleanup.md](maintainability-cleanup.md): 2026-07-14 repository-wide dead-code, CSS, test ownership and documentation-truth cleanup evidence.
 
 ## Rules
 

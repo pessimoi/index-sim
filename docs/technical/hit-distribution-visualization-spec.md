@@ -216,7 +216,7 @@ Run at minimum:
 
 ```sh
 npm run typecheck
-npm run test -- src/tests/domain-core.test.ts src/tests/ui-view-model.test.ts
+npm run test -- src/tests/domain-core.test.ts src/tests/*-view-model.test.ts
 npm run test:e2e -- --workers=1 -g "hit distribution"
 git diff --check
 ```

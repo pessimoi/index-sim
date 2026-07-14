@@ -212,7 +212,7 @@ Suggested focused checks include:
 
 ```sh
 npm run test -- src/tests/data-generator.test.ts src/tests/data-economy.test.ts src/tests/market-writer.test.ts
-npm run test -- src/tests/planner-domain.test.ts src/tests/ui-view-model.test.ts src/tests/shareable-setup.test.ts
+npm run test -- src/tests/planner-domain.test.ts src/tests/*-view-model.test.ts src/tests/shareable-setup.test.ts
 npm run planner:parity
 npm run test:e2e:visual
 ```

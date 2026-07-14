@@ -392,7 +392,7 @@ Minimum focused gate:
 ```sh
 npm run typecheck
 npm run architecture:check
-npm run test -- src/tests/ui-view-model.test.ts src/tests/ui-adapters.test.ts src/tests/stats-loadout-panes.test.ts src/tests/cannon-pane.test.ts src/tests/monster-card-panel.test.ts
+npm run test -- src/tests/*-view-model.test.ts src/tests/ui-adapters.test.ts src/tests/stats-loadout-panes.test.ts src/tests/cannon-pane.test.ts src/tests/monster-card-panel.test.ts
 npm run numeric:audit
 npm run test:e2e -- --workers=1 -g "Stats|damage distribution|loadout|optimizes the visible whole loadout"
 npm run test:e2e:visual -- --workers=1

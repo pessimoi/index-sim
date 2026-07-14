@@ -1,6 +1,6 @@
 # Simulation and MonsterCard view-model refactor specification
 
-Status: Specced, not implemented.
+Status: Implemented on 2026-07-14.
 
 ## Purpose
 
@@ -31,10 +31,40 @@ Verified on 2026-07-14:
 - Direct external consumers are small:
   - `App.tsx` imports `monsterOptions()` and `createSimulationViewModel()`.
   - `MonsterCardPanel` and its test need only the `MonsterCardViewModel` type.
-  - `ui-view-model.test.ts` has focused MonsterCard assertions mixed into a
-    large multi-feature suite.
+  - The former combined UI view-model suite had focused MonsterCard assertions
+    mixed into a large multi-feature owner.
   - Compare and Duel continue to import `createSimulationViewModel()` for their
     current numeric paths.
+
+## Implementation result
+
+- `src/app/view-models/simulation.ts` is now a 213-line composition adapter and
+  exports only `SimulationViewModel`, `SimulationViewModelOptions` and
+  `createSimulationViewModel()`.
+- The new 278-line `src/app/view-models/monster-card.ts` owns the two public
+  MonsterCard types, standalone and supplied-combat builders, private detail
+  contracts and sorted target options.
+- `createSimulationViewModel()` passes the already composed
+  `FullSimulationResult.combat` into `createMonsterCardViewModelFromCombat()`;
+  `simulation.ts` no longer imports `simulateCombat()` or the presentation-only
+  formatting/loadout helpers.
+- App, the panel and direct tests import moved symbols from their new owner.
+  No compatibility barrel or re-export was added.
+- Six direct tests now own attack-type/defence mapping, sparse source fields,
+  setup badges/summaries, supplied-combat reuse and option sorting.
+  the combined suite retained one integrated composed-result assertion and
+  decreased from 93 to 90 cases. A later maintenance split moved that assertion
+  into `src/tests/simulation-view-model.test.ts` without changing its name.
+- The source graph is 115 modules / 103 client-reachable modules with seven
+  documented external entrypoints and no cycle, exception or orphan.
+- The required focused gate passes 117/117, numeric audit 5,958/5,958, goldens
+  19/19, focused/full Chromium 3/3 and 78/78, and read-only Darwin visual
+  comparison 20/20 without baseline changes.
+- Full `npm run verify` passes 68 test files / 770 tests plus 19 goldens. The
+  10-file/two-asset artifact remains inside D-094 at 1,977,448 total bytes and
+  720,510 raw / 208,681 gzip entry bytes; its ownership-only bundle identity is
+  SHA-256
+  `2f88f6dcf4768b6fdb64adfd8b8eb9b46eb7a34a8aa5b2d51ce0157b7fbd5e8f`.
 
 ## Non-goals
 
@@ -125,14 +155,14 @@ removes unused broad named exports from the main simulation adapter.
 ## Implementation phases
 
 1. Characterize the current MonsterCard behavior before moving code.
-   - Move or duplicate the focused MonsterCard cases out of the large
-     `ui-view-model.test.ts` into `src/tests/monster-card-view-model.test.ts`.
+   - Move or duplicate the focused MonsterCard cases out of the former combined
+     suite into `src/tests/monster-card-view-model.test.ts`.
    - Cover melee stab/slash/crush active defence, ranged and magic active
      defence, nullable missing stats/defence fields, setup badge text,
      weapon/ammo/spell/ring summary and target option sorting.
    - Keep at least one integrated `createSimulationViewModel().monsterCard`
-     assertion in `ui-view-model.test.ts` so the composed adapter remains
-     covered.
+     assertion in the combined suite so the composed adapter remains covered;
+     the later feature split keeps it in `simulation-view-model.test.ts`.
 
 2. Create `src/app/view-models/monster-card.ts`.
    - Move the MonsterCard helpers and target option sorting into the new file.
@@ -156,7 +186,7 @@ removes unused broad named exports from the main simulation adapter.
      the main adapter.
    - Do not add re-exports for moved symbols.
 
-5. Update living documentation after implementation.
+5. Update living documentation after implementation. Completed.
    - Mark this specification as implemented.
    - Update `docs/technical/architecture.md` with the new module count and
      line-count evidence.
@@ -187,7 +217,7 @@ Focused source checks:
 ```sh
 npm run typecheck
 npm run architecture:check
-npm run test -- src/tests/monster-card-view-model.test.ts src/tests/monster-card-panel.test.ts src/tests/ui-view-model.test.ts src/tests/app-shell-components.test.tsx src/tests/full-simulation-result.test.ts src/tests/rewrite-fixture.test.ts src/tests/ui-performance.test.ts src/tests/compare-duel-panes.test.ts src/tests/compare-duel-controllers.test.ts
+npm run test -- src/tests/monster-card-view-model.test.ts src/tests/monster-card-panel.test.ts src/tests/*-view-model.test.ts src/tests/app-shell-components.test.tsx src/tests/full-simulation-result.test.ts src/tests/rewrite-fixture.test.ts src/tests/ui-performance.test.ts src/tests/compare-duel-panes.test.ts src/tests/compare-duel-controllers.test.ts
 ```
 
 Numeric and artifact checks:

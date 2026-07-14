@@ -232,7 +232,7 @@ Phase 1 requires:
 ```sh
 npm run typecheck
 npm run architecture:check
-npm run test -- src/tests/ui-adapters.test.ts src/tests/ui-view-model.test.ts
+npm run test -- src/tests/ui-adapters.test.ts src/tests/*-view-model.test.ts
 npm run test:e2e -- --workers=1
 npm run verify
 git diff --check

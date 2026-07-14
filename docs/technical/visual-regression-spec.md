@@ -4,7 +4,7 @@
 - Date: 2026-07-10
 - Owner: technical testing
 - Source: promoted from `docs/project/idea-inbox.md`
-- Related current evidence: `docs/technical/testing.md`, `playwright.config.ts`, `src/tests/e2e/scaffold.spec.ts`
+- Related current evidence: `docs/technical/testing.md`, `playwright.config.ts`, `src/tests/e2e/*.spec.ts`
 
 ## Feature-inventory check
 

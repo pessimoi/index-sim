@@ -16,15 +16,17 @@
 - [hit-distribution-visualization-spec.md](hit-distribution-visualization-spec.md): implemented discrete normal-versus-special hit-distribution comparison contract.
 - [legacy-planner-parity-spec.md](legacy-planner-parity-spec.md): implemented archived Planner behavior comparison and gap-classification contract.
 - [legacy-migration-layer-refactor-spec.md](legacy-migration-layer-refactor-spec.md): ownership-only move of legacy-to-rewrite mapping from the generic storage adapter into app state.
+- [legacy-migration-internal-split-spec.md](legacy-migration-internal-split-spec.md): implemented responsibility split of the app-owned legacy migration facade, inspectors, setup mapper and focused tests without changing migration policy.
 - [app-composition-root-refactor-spec.md](app-composition-root-refactor-spec.md): phased, behavior-preserving extraction of shared UI, browser-state controllers and feature panes from the rewrite composition root.
 - [app-composition-root-phase4-spec.md](app-composition-root-phase4-spec.md): implemented D-093 Phase 4 final extraction of pure root-shell and legacy-review presentation plus bounded helper ownership cleanup while App retains browser state, effects and multi-feature transactions.
+- [app-composition-root-retention-spec.md](app-composition-root-retention-spec.md): implemented ARCH-2026-03 retention contract, verified App ownership inventory and evidence-based triggers for any future feature-specific extraction.
 - [stats-loadout-pane-refactor-spec.md](stats-loadout-pane-refactor-spec.md): implemented D-093 extraction of Stats/Loadout panes and their feature view-model owners while App retains live state and orchestration.
 - [compare-duel-pane-refactor-spec.md](compare-duel-pane-refactor-spec.md): implemented D-093 Phase 3C extraction of Compare/Duel panes, direct feature view-model owners and their existing calculation lifecycles.
 - [planner-pane-refactor-spec.md](planner-pane-refactor-spec.md): implemented D-093 Phase 3D extraction of the Planner pane, direct feature view-model and explicit-Recompute calculation lifecycle.
 - [risk-pane-refactor-spec.md](risk-pane-refactor-spec.md): implemented D-093 Phase 3E extraction of the Risk pane, direct Risk UI contracts and explicit Run/Cancel analysis lifecycle.
 - [loot-trip-pane-refactor-spec.md](loot-trip-pane-refactor-spec.md): implemented D-093 Phase 3F extraction of the Loot and Trip panes, direct feature view models and a cycle-free simulation-input leaf.
 - [economy-settings-pane-refactor-spec.md](economy-settings-pane-refactor-spec.md): implemented D-093 Phase 3G extraction of the shared Economy/Settings pane family, direct price-data/Settings view models and neutral Loot history bridge.
-- [simulation-monster-card-view-model-refactor-spec.md](simulation-monster-card-view-model-refactor-spec.md): specced ownership-only split of the remaining MonsterCard presentation model and target option builder out of the main simulation adapter.
+- [simulation-monster-card-view-model-refactor-spec.md](simulation-monster-card-view-model-refactor-spec.md): implemented ownership-only split of the MonsterCard presentation model and target option builder out of the main simulation adapter.
 - [metric-list-presenter-hygiene-spec.md](metric-list-presenter-hygiene-spec.md): implemented generic-presenter ownership and component-API cleanup completed before controller extraction.
 - [runtime-bootstrap-controller-spec.md](runtime-bootstrap-controller-spec.md): implemented generated-runtime lifecycle, compatibility and startup PriceSet resolution extraction preserving the D-094 chunk boundary.
 - [local-state-recovery-controller-spec.md](local-state-recovery-controller-spec.md): implemented browser-state health/block/persist/clear orchestration and pure Settings recovery panel boundary.
@@ -34,7 +36,11 @@
 - [cannon-pane-extraction-spec.md](cannon-pane-extraction-spec.md): implemented first low-coupling feature-pane extraction with explicit calculated presentation and action props.
 - [startup-bundle-performance-spec.md](startup-bundle-performance-spec.md): measured cold/warm startup, deterministic entry-JavaScript budgets and generated-runtime bootstrap splitting.
 - [calculation-worker-measurement-spec.md](calculation-worker-measurement-spec.md): measured production one-shot Worker construction, full-request posting, startup/delivery, execution and response phases; D-095 retains the cancellable lifecycle.
+- [calculation-worker-retention-spec.md](calculation-worker-retention-spec.md): implemented D-095 one-shot protocol/controller retention contract, quantified persistent-Worker reopen triggers and hard-cancellation-safe future target.
+- [feature-test-suite-split-spec.md](feature-test-suite-split-spec.md): implemented ARCH-2026-05 split of functional Playwright, composed view-model and current/topic/historical testing owners with title and gate preservation.
 - [large-module-structural-split-assessment.md](large-module-structural-split-assessment.md): D-096 evidence review that keeps Trip and game-data-generator internal splits conditional until a concrete maintenance trigger exists.
+- [trip-domain-retention-spec.md](trip-domain-retention-spec.md): implemented Trip-specific D-096 retention contract, calculation invariants, future dependency direction and evidence-based split triggers.
+- [game-data-generator-core-retention-spec.md](game-data-generator-core-retention-spec.md): implemented generator-specific D-096 retention contract for parser direction, path/output hygiene, deterministic artifacts and evidence-based split triggers.
 - [risk-variability-spec.md](risk-variability-spec.md): implemented kill, food, trip, timed-GP and target-probability distribution contract.
 - [source-backed-incoming-damage-spec.md](source-backed-incoming-damage-spec.md): implemented typed NPC attack-profile and shared Trip/Risk incoming-damage contract.
 - [source-backed-requirements-npc-size-spec.md](source-backed-requirements-npc-size-spec.md): implemented generated numeric item requirements and NPC-size contract.
@@ -47,13 +53,20 @@
 - [live-integrations-spec.md](live-integrations-spec.md): hiscores lookup and live market sync product/API specification.
 - [hiscores-live-implementation-spec.md](hiscores-live-implementation-spec.md): implemented Hiscores provider/runtime contract and adopter live-evidence runbook.
 - [testing.md](testing.md): current validation commands and future test strategy.
+- [testing/runtime-data-deployment.md](testing/runtime-data-deployment.md): source audits, generated data, local-state health, market artifacts and deployment validation.
+- [testing/domain-and-integrations.md](testing/domain-and-integrations.md): golden, performance, domain, schema and same-origin integration testing.
+- [testing/ui-state-and-browser.md](testing/ui-state-and-browser.md): feature view-model, persistence, controller, pane and browser coverage.
 
 ## Related evidence
 
 - [../project/npc-attack-source-audit.md](../project/npc-attack-source-audit.md): generated Revision 274 NPC attack-handler coverage and open decision package.
-- [../../ARCHITECTURE_AUDIT.md](../../ARCHITECTURE_AUDIT.md): detailed architecture audit snapshot.
+- [../project/architecture-audit.md](../project/architecture-audit.md): current production-path architecture audit and classified maintenance findings.
+- [../project/security-audit.md](../project/security-audit.md): current production-path security audit, remediated workflow finding and residual operational questions.
+- [../project/code-audit.md](../project/code-audit.md): current production-path code audit, fixed low-severity defects and focused regression evidence.
+- [../project/testing-evidence.md](../project/testing-evidence.md): dated validation, release and superseded failure snapshots that no longer belong in the current command owner.
+- [../../ARCHITECTURE_AUDIT.md](../../ARCHITECTURE_AUDIT.md): historical 2026-07-13 architecture audit and implementation snapshot.
 - [../../PROJECT_REVIEW_NOTES.md](../../PROJECT_REVIEW_NOTES.md): file-by-file review findings.
-- [../../SECURITY_AUDIT.md](../../SECURITY_AUDIT.md): security audit snapshot.
+- [../../SECURITY_AUDIT.md](../../SECURITY_AUDIT.md): historical legacy-focused security audit snapshot.
 
 ## Current validation commands
 

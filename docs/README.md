@@ -48,7 +48,11 @@ This directory is the project memory layer for humans and AI agents. It keeps cu
 - Visual regression specification: [technical/visual-regression-spec.md](technical/visual-regression-spec.md)
 - Live integrations specification: [technical/live-integrations-spec.md](technical/live-integrations-spec.md)
 - Hiscores live implementation specification: [technical/hiscores-live-implementation-spec.md](technical/hiscores-live-implementation-spec.md)
+- Feature test-suite split specification: [technical/feature-test-suite-split-spec.md](technical/feature-test-suite-split-spec.md)
 - Testing strategy and commands: [technical/testing.md](technical/testing.md)
+- Detailed runtime/data/deployment tests: [technical/testing/runtime-data-deployment.md](technical/testing/runtime-data-deployment.md)
+- Detailed domain/integration tests: [technical/testing/domain-and-integrations.md](technical/testing/domain-and-integrations.md)
+- Detailed UI/state/browser tests: [technical/testing/ui-state-and-browser.md](technical/testing/ui-state-and-browser.md)
 - Running, build and deploy notes: [operations/README.md](operations/README.md)
 - Scheduled market live-evidence specification: [operations/market-live-evidence-spec.md](operations/market-live-evidence-spec.md)
 - Public deployment specification: [operations/public-deployment-spec.md](operations/public-deployment-spec.md)
@@ -59,6 +63,11 @@ This directory is the project memory layer for humans and AI agents. It keeps cu
 - Current numeric user-path audit: [project/numeric-user-path-audit.md](project/numeric-user-path-audit.md)
 - Current Revision 274 NPC attack source audit: [project/npc-attack-source-audit.md](project/npc-attack-source-audit.md)
 - Current repository documentation audit: [project/documentation-audit.md](project/documentation-audit.md)
+- Current production-path architecture audit: [project/architecture-audit.md](project/architecture-audit.md)
+- Current production-path security audit: [project/security-audit.md](project/security-audit.md)
+- Current production-path code audit: [project/code-audit.md](project/code-audit.md)
+- Current maintainability and dead-code cleanup audit: [project/maintainability-cleanup.md](project/maintainability-cleanup.md)
+- Dated testing and release evidence: [project/testing-evidence.md](project/testing-evidence.md)
 
 ## Supporting audit snapshots
 
@@ -92,7 +101,8 @@ These files are useful evidence, but they are not the living source of truth. Pr
 - The phased `App.tsx` composition-root extraction contract belongs in [technical/app-composition-root-refactor-spec.md](technical/app-composition-root-refactor-spec.md).
 - The independently implementable composition-root goals belong in [technical/metric-list-presenter-hygiene-spec.md](technical/metric-list-presenter-hygiene-spec.md), [technical/runtime-bootstrap-controller-spec.md](technical/runtime-bootstrap-controller-spec.md), [technical/local-state-recovery-controller-spec.md](technical/local-state-recovery-controller-spec.md), [technical/hiscores-lookup-controller-spec.md](technical/hiscores-lookup-controller-spec.md), [technical/setup-file-transfer-controller-spec.md](technical/setup-file-transfer-controller-spec.md), [technical/price-set-transfer-controller-spec.md](technical/price-set-transfer-controller-spec.md), [technical/cannon-pane-extraction-spec.md](technical/cannon-pane-extraction-spec.md), [technical/stats-loadout-pane-refactor-spec.md](technical/stats-loadout-pane-refactor-spec.md), [technical/compare-duel-pane-refactor-spec.md](technical/compare-duel-pane-refactor-spec.md), [technical/planner-pane-refactor-spec.md](technical/planner-pane-refactor-spec.md), [technical/risk-pane-refactor-spec.md](technical/risk-pane-refactor-spec.md), [technical/loot-trip-pane-refactor-spec.md](technical/loot-trip-pane-refactor-spec.md), [technical/economy-settings-pane-refactor-spec.md](technical/economy-settings-pane-refactor-spec.md), [technical/simulation-monster-card-view-model-refactor-spec.md](technical/simulation-monster-card-view-model-refactor-spec.md) and [technical/app-composition-root-phase4-spec.md](technical/app-composition-root-phase4-spec.md).
 - Production entry budgets, paired cold/warm measurement and generated-runtime code splitting belong in [technical/startup-bundle-performance-spec.md](technical/startup-bundle-performance-spec.md).
-- Calculation-worker startup, structured-clone/request-transfer and execution evidence belongs in [technical/calculation-worker-measurement-spec.md](technical/calculation-worker-measurement-spec.md).
+- Calculation-worker startup, structured-clone/request-transfer and execution evidence belongs in [technical/calculation-worker-measurement-spec.md](technical/calculation-worker-measurement-spec.md); the accepted one-shot lifecycle and persistent-Worker reopen/implementation boundary belongs in [technical/calculation-worker-retention-spec.md](technical/calculation-worker-retention-spec.md).
+- Functional Playwright, composed view-model and testing-document ownership belongs in [technical/feature-test-suite-split-spec.md](technical/feature-test-suite-split-spec.md); current commands remain in [technical/testing.md](technical/testing.md) and dated results in [project/testing-evidence.md](project/testing-evidence.md).
 - Trip and game-data-generator split activation evidence belongs in [technical/large-module-structural-split-assessment.md](technical/large-module-structural-split-assessment.md).
 - Hiscores and live market sync requirements belong in [technical/live-integrations-spec.md](technical/live-integrations-spec.md).
 - Hiscores provider/runtime execution work belongs in [technical/hiscores-live-implementation-spec.md](technical/hiscores-live-implementation-spec.md).
@@ -102,6 +112,11 @@ These files are useful evidence, but they are not the living source of truth. Pr
 - Generated numeric cross-path and legacy-delta evidence belongs in [project/numeric-user-path-audit.md](project/numeric-user-path-audit.md).
 - Generated Revision 274 NPC attack-handler evidence belongs in [project/npc-attack-source-audit.md](project/npc-attack-source-audit.md).
 - Repository-wide documentation audit evidence belongs in [project/documentation-audit.md](project/documentation-audit.md); current facts still belong in their owning living documents.
+- Current architecture audit evidence belongs in [project/architecture-audit.md](project/architecture-audit.md); current boundaries still belong in technical architecture, accepted choices in decisions and future work in backlog.
+- Current security audit evidence belongs in [project/security-audit.md](project/security-audit.md); runtime and deployment facts still belong in architecture and operations, accepted choices in decisions and future hardening in backlog.
+- Current code audit evidence belongs in [project/code-audit.md](project/code-audit.md); durable runtime and validation facts still belong in architecture, testing and backlog.
+- Repository-wide dead-code, CSS, test-ownership and documentation-truth cleanup evidence belongs in [project/maintainability-cleanup.md](project/maintainability-cleanup.md); living boundaries remain in architecture and current commands in testing.
+- Dated validation, release and superseded failure snapshots belong in [project/testing-evidence.md](project/testing-evidence.md); current commands and required gates remain in [technical/testing.md](technical/testing.md).
 - Accepted choices and open decision boundaries belong in [project/decisions.md](project/decisions.md).
 - Future work belongs in [project/roadmap.md](project/roadmap.md), [project/backlog.md](project/backlog.md) or [project/idea-inbox.md](project/idea-inbox.md).
 

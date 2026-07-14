@@ -64,8 +64,8 @@ It must not import `src/app`.
 - `src/app/App.tsx` imports migration orchestration from the app-state owner.
 - `src/app/state/legacy-migration.ts` imports the legacy key enum from its sibling
   app-state module.
-- `src/tests/legacy-migration.test.ts` tests the app-state migration owner
-  directly.
+- the `src/tests/legacy-migration-*.test.ts` suites test the app-state migration
+  owner through its stable public facade.
 
 ## Compatibility contract
 
@@ -116,7 +116,7 @@ Required focused checks:
 ```sh
 npm run typecheck
 npm run architecture:check
-npm run test -- src/tests/legacy-migration.test.ts src/tests/ui-adapters.test.ts
+npm run test -- src/tests/legacy-migration-*.test.ts src/tests/ui-adapters.test.ts
 git diff --check
 ```
 

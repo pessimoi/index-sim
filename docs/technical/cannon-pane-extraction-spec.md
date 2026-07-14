@@ -121,7 +121,7 @@ interaction and persistence authority.
 Required validation:
 
 ```sh
-npm run test -- src/tests/cannon-pane.test.ts src/tests/ui-view-model.test.ts src/tests/trip-loot-supply.test.ts
+npm run test -- src/tests/cannon-pane.test.ts src/tests/*-view-model.test.ts src/tests/trip-loot-supply.test.ts
 npm run typecheck
 npm run architecture:check
 npm run test:e2e -- --workers=1 --grep "cannon"

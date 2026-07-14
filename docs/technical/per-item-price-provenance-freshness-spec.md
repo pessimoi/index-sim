@@ -559,7 +559,7 @@ The implementation handoff must run at least:
 ```sh
 npm run typecheck
 npm run test -- src/tests/market-writer.test.ts src/tests/market-adapter.test.ts src/tests/data-economy.test.ts
-npm run test -- src/tests/market-ui-state.test.ts src/tests/ui-adapters.test.ts src/tests/trip-loot-supply.test.ts src/tests/ui-view-model.test.ts
+npm run test -- src/tests/market-ui-state.test.ts src/tests/ui-adapters.test.ts src/tests/trip-loot-supply.test.ts src/tests/*-view-model.test.ts
 npm run runtime:readiness -- --example-limit 5
 npm run test:golden
 npm run deploy:verify-artifact

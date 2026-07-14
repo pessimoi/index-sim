@@ -310,7 +310,7 @@ The implementation handoff must run at least:
 
 ```sh
 npm run typecheck
-npm run test -- src/tests/trip-loot-supply.test.ts src/tests/ui-view-model.test.ts src/tests/data-generator.test.ts
+npm run test -- src/tests/trip-loot-supply.test.ts src/tests/*-view-model.test.ts src/tests/data-generator.test.ts
 npm run test:golden
 npm run runtime:readiness -- --example-limit 5
 npm run numeric:audit

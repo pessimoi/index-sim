@@ -3,6 +3,13 @@
 Status: completed on 2026-07-14 under D-096. This is an assessment, not an
 implementation specification.
 
+Follow-up: the Trip half now has an implemented, independently actionable
+[retention and split-trigger specification](trip-domain-retention-spec.md).
+The generator half likewise has an implemented
+[retention and split-trigger specification](game-data-generator-core-retention-spec.md).
+This combined document remains the evidence snapshot; the two direct contracts
+own future activation and validation independently.
+
 ## Question
 
 Should `src/domain/trip/index.ts` and `scripts/game-data-generator-core.ts` be

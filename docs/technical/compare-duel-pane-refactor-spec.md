@@ -469,16 +469,16 @@ Add focused tests:
   freshness, stale matrix and explicit rebuild. These may use a small existing
   Worker test double; do not duplicate browser calculation code.
 
-Existing Dense/Duel cases may remain in `ui-view-model.test.ts` during the
-mechanical move. Split them into feature files only if that can be done without
-rewriting unrelated tests.
+Existing Dense/Duel cases remained in the combined UI view-model suite during
+the mechanical move. The later ARCH-2026-05 maintenance split moved them
+unchanged into `compare-view-model.test.ts` and `duel-view-model.test.ts`.
 
 Minimum focused gate:
 
 ```sh
 npm run typecheck
 npm run architecture:check
-npm run test -- src/tests/ui-view-model.test.ts src/tests/ui-adapters.test.ts src/tests/calculation-task.test.ts src/tests/ui-performance.test.ts src/tests/compare-duel-panes.test.ts src/tests/compare-duel-controllers.test.ts
+npm run test -- src/tests/*-view-model.test.ts src/tests/ui-adapters.test.ts src/tests/calculation-task.test.ts src/tests/ui-performance.test.ts src/tests/compare-duel-panes.test.ts src/tests/compare-duel-controllers.test.ts
 npm run numeric:audit
 npm run test:e2e -- --workers=1 -g "dense combat spreadsheet root|bounded keyboard navigation|saved setup comparison|all-monster saved setup matrix|main event loop|dense compare calculation freshness|filters dense compare rows|dense XP and net GP scale|dense row markers"
 npm run test:e2e -- --workers=1

@@ -565,7 +565,7 @@ Minimum focused gate:
 ```sh
 npm run typecheck
 npm run architecture:check
-npm run test -- src/tests/risk-analysis.test.ts src/tests/calculation-task.test.ts src/tests/trip-loot-supply.test.ts src/tests/ui-view-model.test.ts src/tests/risk-pane.test.ts src/tests/risk-controller.test.ts
+npm run test -- src/tests/risk-analysis.test.ts src/tests/calculation-task.test.ts src/tests/trip-loot-supply.test.ts src/tests/*-view-model.test.ts src/tests/risk-pane.test.ts src/tests/risk-controller.test.ts
 npm run numeric:audit
 npm run test:golden
 npm run test:e2e -- --workers=1 -g "runs, invalidates and cancels modeled Risk analysis|keeps compact setup actions, Risk controls and setup summaries readable|uses popup search for every primary long-choice field"
