@@ -31,7 +31,3 @@ export function createLegacyDerivedStaticRuntimeContext(
     source: "legacy-derived-static-snapshot"
   };
 }
-
-export async function loadLegacyDerivedStaticRuntimeContext(): Promise<StaticRuntimeBootstrapResult> {
-  return createLegacyDerivedStaticRuntimeContext();
-}

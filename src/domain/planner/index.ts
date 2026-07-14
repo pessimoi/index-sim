@@ -422,10 +422,6 @@ export function xpAt(level: number): number {
   return XP[Math.max(1, Math.min(99, Math.floor(level)))] ?? 0;
 }
 
-export function xpBetween(_skill: PlannerSkill, from: number, to: number): number {
-  return Math.max(0, xpAt(to) - xpAt(from));
-}
-
 function fallbackRequirementWarning(itemId: EntityId): SimulationWarning {
   return {
     code: "manual-planner-requirement-fallback",

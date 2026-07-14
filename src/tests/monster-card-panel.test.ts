@@ -1,7 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MonsterCardPanel } from "../app/components/panes/monster-card-panel";
-import type { MonsterCardViewModel } from "../app/view-models/simulation";
+import type { MonsterCardViewModel } from "../app/view-models/monster-card";
 
 const card: MonsterCardViewModel = {
   monsterId: "fixture_monster",

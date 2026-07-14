@@ -29,13 +29,6 @@ export const PriceSourceSchema: z.ZodType<PriceSource> = z.enum([
   "manual"
 ]);
 
-export const EquipmentBonusesSchema = z.object(
-  Object.fromEntries(BONUS_KEYS.map((key) => [key, NumericSchema])) as Record<
-    (typeof BONUS_KEYS)[number],
-    typeof NumericSchema
-  >
-);
-
 const OptionalEquipmentBonusesSchema = z.object(
   Object.fromEntries(BONUS_KEYS.map((key) => [key, NumericSchema.optional()])) as Record<
     (typeof BONUS_KEYS)[number],
@@ -411,8 +404,6 @@ export const GameDataSnapshotSchema = z
       }
     }
   });
-
-export type ValidatedGameDataSnapshot = z.infer<typeof GameDataSnapshotSchema>;
 
 export function parseGameDataSnapshot(input: unknown): GameDataSnapshot {
   return GameDataSnapshotSchema.parse(input) as GameDataSnapshot;

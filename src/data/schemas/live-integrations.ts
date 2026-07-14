@@ -405,9 +405,6 @@ export const MarketUpstreamFixtureItemSchema = z
 
 export const MarketUpstreamFixtureItemsSchema = z.array(MarketUpstreamFixtureItemSchema);
 
-export type ValidatedHiscoresResponse = z.infer<typeof HiscoresResponseSchema>;
-export type ValidatedMarketSyncResponse = z.infer<typeof MarketSyncResponseSchema>;
-export type ValidatedMarketSourceMapping = z.infer<typeof MarketSourceMappingSchema>;
 export type MarketUpstreamFixtureItem = z.infer<typeof MarketUpstreamFixtureItemSchema>;
 
 export interface MarketSyncRequestValidationOptions {
@@ -444,10 +441,6 @@ export function parseHiscoresStatusResponseJson(
     "Hiscores status response",
     options
   );
-}
-
-export function parseIntegrationErrorResponse(input: unknown): IntegrationErrorResponse {
-  return parseWithSchema(IntegrationErrorResponseSchema, input, "Integration error response");
 }
 
 export function parseIntegrationErrorResponseJson(

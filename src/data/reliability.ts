@@ -1,10 +1,5 @@
 export type DataReliabilityErrorCode = "duplicate_ids" | "duplicate_keys" | "invalid_json";
 
-export interface DataReliabilityIssue {
-  path: string;
-  message: string;
-}
-
 export class DataReliabilityError extends Error {
   readonly code: DataReliabilityErrorCode;
   readonly issues: string[];

@@ -186,15 +186,6 @@ export const PriceSetSchema = z
     }
   });
 
-export const LegacyPriceHistorySnapshotSchema = z
-  .object({
-    t: z.number().int().nonnegative(),
-    prices: PriceMapSchema
-  })
-  .strict();
-
-export const LegacyPriceHistorySchema = z.array(LegacyPriceHistorySnapshotSchema);
-
 export const PriceHistoryEvaluationSchema = z.discriminatedUnion("result", [
   z
     .object({
@@ -245,10 +236,8 @@ export const PriceHistorySchema: z.ZodType<PriceHistoryArtifactV2> = z.preproces
   PriceHistoryArtifactV2Schema
 );
 
-export type ValidatedPriceSet = z.infer<typeof PriceSetSchema>;
 export type ValidatedPriceHistory = z.infer<typeof PriceHistorySchema>;
 export type ValidatedPriceHistorySnapshot = z.infer<typeof PriceHistorySnapshotSchema>;
-export type ValidatedItemPriceMetadata = z.infer<typeof ItemPriceMetadataSchema>;
 export type ScheduledPriceProvenanceArtifact = z.infer<
   typeof ScheduledPriceProvenanceArtifactSchema
 >;

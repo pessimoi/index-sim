@@ -207,7 +207,8 @@ import {
   type DenseCompareUiState
 } from "./state/dense-compare";
 import { plannerAllowedPool } from "./view-models/planner";
-import { createSimulationViewModel, monsterOptions } from "./view-models/simulation";
+import { monsterOptions } from "./view-models/monster-card";
+import { createSimulationViewModel } from "./view-models/simulation";
 import {
   lootActionLabel,
   optimizeLootPrefsForMonster,
@@ -442,6 +443,8 @@ export function App() {
     onDownload: downloadJsonFile
   });
   const persistLocalState = localStateRecovery.persist;
+  const shouldSkipPersistLocalState = localStateRecovery.shouldSkipPersist;
+  const blockedLocalStateIds = localStateRecovery.blockedIds;
   const persistImportedSetup = useCallback(
     (setup: SavedSetupState) => persistLocalState("rewrite-setup", setupStorageOptions, setup),
     [persistLocalState]
@@ -587,10 +590,9 @@ export function App() {
     return next;
   }, [context, lootPrefsByMonster]);
 
-  /* eslint-disable react-hooks/exhaustive-deps -- These effects synchronize versioned app state to browser storage and surface sanitized storage failures. */
   useEffect(() => {
-    if (!readyToPersist || localStateRecovery.shouldSkipPersist("rewrite-setup")) return;
-    localStateRecovery.persist(
+    if (!readyToPersist || shouldSkipPersistLocalState("rewrite-setup")) return;
+    persistLocalState(
       "rewrite-setup",
       setupStorageOptions,
       savedSetupFromForm(
@@ -608,47 +610,84 @@ export function App() {
     defaultForm,
     denseCompareForGameData,
     form,
-    localStateRecovery.blockedIds,
+    blockedLocalStateIds,
+    persistLocalState,
     readyToPersist,
+    shouldSkipPersistLocalState,
     setupMode
   ]);
 
   useEffect(() => {
-    if (!readyToPersist || localStateRecovery.shouldSkipPersist("loot-prefs")) return;
-    localStateRecovery.persist("loot-prefs", lootPrefsStorageOptions, lootPrefsForGameData);
-  }, [localStateRecovery.blockedIds, lootPrefsForGameData, readyToPersist]);
+    if (!readyToPersist || shouldSkipPersistLocalState("loot-prefs")) return;
+    persistLocalState("loot-prefs", lootPrefsStorageOptions, lootPrefsForGameData);
+  }, [
+    blockedLocalStateIds,
+    lootPrefsForGameData,
+    persistLocalState,
+    readyToPersist,
+    shouldSkipPersistLocalState
+  ]);
 
   useEffect(() => {
-    if (!readyToPersist || localStateRecovery.shouldSkipPersist("loot-settings")) return;
-    localStateRecovery.persist("loot-settings", lootSettingsStorageOptions, lootSettingsByMonster);
-  }, [localStateRecovery.blockedIds, lootSettingsByMonster, readyToPersist]);
+    if (!readyToPersist || shouldSkipPersistLocalState("loot-settings")) return;
+    persistLocalState("loot-settings", lootSettingsStorageOptions, lootSettingsByMonster);
+  }, [
+    blockedLocalStateIds,
+    lootSettingsByMonster,
+    persistLocalState,
+    readyToPersist,
+    shouldSkipPersistLocalState
+  ]);
 
   useEffect(() => {
-    if (!readyToPersist || localStateRecovery.shouldSkipPersist("hidden-gear-tiers")) return;
-    localStateRecovery.persist("hidden-gear-tiers", hiddenGearTiersStorageOptions, hiddenGearTiers);
-  }, [hiddenGearTiers, localStateRecovery.blockedIds, readyToPersist]);
+    if (!readyToPersist || shouldSkipPersistLocalState("hidden-gear-tiers")) return;
+    persistLocalState("hidden-gear-tiers", hiddenGearTiersStorageOptions, hiddenGearTiers);
+  }, [
+    blockedLocalStateIds,
+    hiddenGearTiers,
+    persistLocalState,
+    readyToPersist,
+    shouldSkipPersistLocalState
+  ]);
 
   useEffect(() => {
-    if (!readyToPersist || localStateRecovery.shouldSkipPersist("duel-snapshots")) return;
-    localStateRecovery.persist("duel-snapshots", duelSnapshotsStorageOptions, duelSnapshots);
-  }, [duelSnapshots, localStateRecovery.blockedIds, readyToPersist]);
+    if (!readyToPersist || shouldSkipPersistLocalState("duel-snapshots")) return;
+    persistLocalState("duel-snapshots", duelSnapshotsStorageOptions, duelSnapshots);
+  }, [
+    blockedLocalStateIds,
+    duelSnapshots,
+    persistLocalState,
+    readyToPersist,
+    shouldSkipPersistLocalState
+  ]);
 
   useEffect(() => {
     if (
       !readyToPersist ||
       priceHistory.snapshots.length === 0 ||
-      localStateRecovery.shouldSkipPersist("price-history")
+      shouldSkipPersistLocalState("price-history")
     ) {
       return;
     }
-    localStateRecovery.persist("price-history", priceHistoryStorageOptions, priceHistory);
-  }, [localStateRecovery.blockedIds, priceHistory, readyToPersist]);
+    persistLocalState("price-history", priceHistoryStorageOptions, priceHistory);
+  }, [
+    blockedLocalStateIds,
+    persistLocalState,
+    priceHistory,
+    readyToPersist,
+    shouldSkipPersistLocalState
+  ]);
 
   useEffect(() => {
-    if (!readyToPersist || localStateRecovery.shouldSkipPersist("planner-ui")) return;
-    localStateRecovery.persist("planner-ui", plannerUiStorageOptions, plannerState);
-  }, [localStateRecovery.blockedIds, plannerState, readyToPersist]);
-  /* eslint-enable react-hooks/exhaustive-deps */
+    if (!readyToPersist || shouldSkipPersistLocalState("planner-ui")) return;
+    persistLocalState("planner-ui", plannerUiStorageOptions, plannerState);
+  }, [
+    blockedLocalStateIds,
+    persistLocalState,
+    plannerState,
+    readyToPersist,
+    shouldSkipPersistLocalState
+  ]);
 
   const currentLootRowIds = useMemo(() => {
     if (!context) return [];
@@ -708,9 +747,9 @@ export function App() {
       createPriceHistorySummaryPresentation({
         analysisState: priceHistorySources.analysisState,
         activePriceSet: context?.priceSet ?? null,
-        evaluatedAt: new Date()
+        evaluatedAt: new Date(priceAgeNowMs)
       }),
-    [context?.priceSet, priceHistorySources.analysisState]
+    [context?.priceSet, priceAgeNowMs, priceHistorySources.analysisState]
   );
   const lootPriceHistoryByItem: Readonly<Record<string, ItemPriceHistoryContext>> =
     economyHistory.lootHistoryByItem;

@@ -10,7 +10,7 @@ import type { FullSimulationResult } from "@/domain/simulation";
 import { HIGH_ALCH_MAGIC_XP_PER_CAST, type TripLootSupplyResult } from "@/domain/trip";
 import type { CombatSetupFormState } from "../state/ui-state";
 import type { CalculationWarningViewModel } from "./contracts";
-import { formatNumber } from "./formatting";
+import { formatDuration, formatNumber } from "./formatting";
 
 export interface HitDistributionBucketViewModel {
   id: string;
@@ -1042,13 +1042,7 @@ function formatOptionalPercent(value: number | null): string {
 }
 
 function formatOptionalDuration(value: number | null): string {
-  if (value == null) return "-";
-  if (value < 60) return `${formatNumber(value, 1)}s`;
-  const minutes = Math.floor(value / 60);
-  const remainingSeconds = Math.round(value % 60)
-    .toString()
-    .padStart(2, "0");
-  return `${minutes}:${remainingSeconds}`;
+  return value == null ? "-" : formatDuration(value);
 }
 
 function statsCombatRollMetric(

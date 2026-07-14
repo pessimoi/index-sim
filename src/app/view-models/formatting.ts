@@ -16,9 +16,8 @@ export function formatDuration(seconds: number): string {
   if (seconds === Number.POSITIVE_INFINITY) return "unlimited";
   if (!Number.isFinite(seconds)) return "-";
   if (seconds < 60) return `${formatNumber(seconds, 1)}s`;
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = Math.round(seconds % 60)
-    .toString()
-    .padStart(2, "0");
+  const roundedSeconds = Math.round(seconds);
+  const minutes = Math.floor(roundedSeconds / 60);
+  const remainingSeconds = (roundedSeconds % 60).toString().padStart(2, "0");
   return `${minutes}:${remainingSeconds}`;
 }

@@ -61,7 +61,7 @@ export function loadPersisted<T>(options: VersionedStorageOptions<T>): LoadPersi
   } catch {
     return { status: "unavailable", value: null, reason: "read_failed" };
   }
-  if (!raw) return { status: "missing", value: null };
+  if (raw === null) return { status: "missing", value: null };
   if (byteLength(raw) > (options.maxBytes ?? DEFAULT_PERSISTED_STATE_MAX_BYTES)) {
     return { status: "invalid", value: null, reason: "body_too_large" };
   }

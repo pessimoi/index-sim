@@ -30,7 +30,6 @@ export const WORKBENCH_TABS = [
 ] as const;
 
 export type WorkbenchTabId = (typeof WORKBENCH_TABS)[number]["id"];
-export type WorkbenchNavigationKey = "ArrowLeft" | "ArrowRight" | "Home" | "End";
 
 export const COMBAT_STYLE_OPTIONS: SelectOptionViewModel[] = [
   { id: "melee", label: "melee" },

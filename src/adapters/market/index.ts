@@ -582,26 +582,8 @@ async function errorFromResponse(
   }
 }
 
-export async function readTextFile(
-  file: File,
-  options: PriceSetImportOptions = {}
-): Promise<string> {
-  const maxBytes = options.maxBytes ?? PRICE_SET_IMPORT_MAX_BYTES;
-  if (file.size > maxBytes) {
-    throw new Error(`Price file exceeds ${maxBytes} bytes`);
-  }
-  return file.text();
-}
-
 export function parsePriceSetFileText(text: string, options: PriceSetImportOptions = {}): PriceSet {
   return parsePriceSetJson(text, { maxBytes: options.maxBytes });
-}
-
-export async function readPriceSetFile(
-  file: File,
-  options: PriceSetImportOptions = {}
-): Promise<PriceSet> {
-  return parsePriceSetFileText(await readTextFile(file, options), options);
 }
 
 export async function fetchPriceSet(

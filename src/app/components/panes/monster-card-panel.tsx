@@ -1,6 +1,6 @@
 import { BOOST_SELECTION_OPTIONS, PRAYER_SELECTION_OPTIONS } from "../../state/ui-state";
 import { formatNumber } from "../../view-models/formatting";
-import type { MonsterCardViewModel } from "../../view-models/simulation";
+import type { MonsterCardViewModel } from "../../view-models/monster-card";
 import { SearchableSelectField, type SelectOption } from "../form-fields";
 import { signedInteger, yesNo } from "../presentation-formatters";
 

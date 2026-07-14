@@ -2145,12 +2145,6 @@ th {
   padding: 0.7rem;
 }
 
-.field-hint {
-  color: #6d7785;
-  font-size: 0.68rem;
-  min-height: 0.8rem;
-}
-
 .bonus-summary {
   display: grid;
   gap: 0.8rem;
@@ -2486,24 +2480,6 @@ th {
   padding: 0.25rem 0.45rem;
 }
 
-.loot-impact-list {
-  color: #aeb9c8;
-  min-width: 16rem;
-}
-
-.loot-impact-list span {
-  display: inline-block;
-  margin-right: 0.55rem;
-  white-space: nowrap;
-}
-
-.loot-detail-grid {
-  color: #aeb9c8;
-  display: grid;
-  gap: 0.2rem;
-  margin-top: 0.3rem;
-}
-
 .loot-impact-cell {
   min-width: 28rem;
 }
@@ -2821,14 +2797,6 @@ th {
 
 .cannon-output-grid .metric strong {
   font-size: 1rem;
-}
-
-.placeholder-pane {
-  border-bottom: 1px solid #26303d;
-  display: grid;
-  gap: 0.65rem;
-  min-width: 0;
-  padding: 0.65rem 0;
 }
 
 .duel-pane {
@@ -3975,8 +3943,7 @@ th {
   gap: 0.2rem;
 }
 
-.row-state-marker,
-.row-custom-marker {
+.row-state-marker {
   border: 1px solid #3b4b61;
   border-radius: 999px;
   color: #9fb0c5;
@@ -4027,20 +3994,10 @@ th {
   margin-top: 1rem;
 }
 
-.setup-panel {
-  align-self: start;
-  border-right: 1px solid #26303d;
-  display: grid;
-  gap: 1rem;
-  padding-right: 1rem;
-}
-
-.setup-panel section,
 .band {
   min-width: 0;
 }
 
-.setup-panel h2,
 .band h2 {
   color: #d8dee8;
   font-size: 0.84rem;
@@ -4155,7 +4112,6 @@ th {
 }
 
 .level-grid,
-.gear-grid,
 .planner-targets {
   display: grid;
   gap: 0.55rem;
@@ -4265,7 +4221,6 @@ th {
   display: none;
 }
 
-.market-report,
 .price-history-summary {
   color: #aeb9c8;
   display: flex;
@@ -4273,84 +4228,6 @@ th {
   font-size: 0.78rem;
   gap: 0.45rem 0.8rem;
   margin: 0.55rem 0 0;
-}
-
-.market-report-warnings,
-.market-report-detail-panel {
-  flex-basis: 100%;
-  min-width: 0;
-}
-
-.market-report-warnings {
-  border-left: 2px solid #7c6536;
-  display: grid;
-  gap: 0.35rem;
-  line-height: 1.35;
-  margin-top: 0.25rem;
-  padding-left: 0.6rem;
-}
-
-.market-report-warnings strong {
-  color: #f1c45b;
-  font-size: 0.72rem;
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
-.market-report-warnings span {
-  overflow-wrap: anywhere;
-}
-
-.market-report-warnings .info {
-  color: #aeb9c8;
-}
-
-.market-report-warnings .warning {
-  color: #ffd58a;
-}
-
-.market-report-warnings .error {
-  color: #ffb4b4;
-}
-
-.market-report-detail-panel {
-  display: grid;
-  gap: 0.5rem;
-  margin-top: 0.45rem;
-  overflow-x: auto;
-}
-
-.market-report-filters {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  margin-bottom: 0;
-  min-width: min(100%, 360px);
-}
-
-.market-report-detail-panel table {
-  min-width: 680px;
-}
-
-.market-report-detail-panel td {
-  vertical-align: top;
-}
-
-.market-report-detail-panel td span,
-.market-report-detail-panel td small {
-  display: block;
-}
-
-.market-report-detail-panel td small {
-  color: #7e8a99;
-  font-size: 0.7rem;
-  margin-top: 0.15rem;
-}
-
-.market-report-item-failed td {
-  color: #ffb4b4;
-}
-
-.market-report-item-skipped td {
-  color: #ffd58a;
 }
 
 .economy-history-panel {
@@ -4598,12 +4475,6 @@ th {
   }
 }
 
-.toggle-grid {
-  display: grid;
-  gap: 0.4rem;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
 .toggle {
   align-items: center;
   border: 1px solid #2a3544;
@@ -4619,14 +4490,7 @@ th {
   inline-size: 1rem;
 }
 
-.results-panel {
-  display: grid;
-  gap: 1rem;
-  min-width: 0;
-}
-
-.summary-strip,
-.metric-row {
+.summary-strip {
   display: grid;
   gap: 0.7rem;
   grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
@@ -4682,52 +4546,9 @@ th {
   text-decoration: underline;
 }
 
-.content-grid {
-  display: grid;
-  gap: 1rem;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
 .band {
   border-top: 1px solid #26303d;
   padding-top: 0.85rem;
-}
-
-.detail-list {
-  color: #c8d2df;
-  display: grid;
-  gap: 0.4rem;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin-top: 0.8rem;
-}
-
-.detail-list span {
-  border: 1px solid #26303d;
-  border-radius: 6px;
-  padding: 0.5rem;
-}
-
-.phase-list {
-  display: grid;
-  gap: 0.35rem;
-  list-style: none;
-  margin: 0.85rem 0 0;
-  padding: 0;
-}
-
-.phase-list li {
-  align-items: center;
-  border-bottom: 1px solid #26303d;
-  display: grid;
-  gap: 0.5rem;
-  grid-template-columns: 0.85fr 0.75fr 0.85fr 1.2fr;
-  min-height: 2.25rem;
-}
-
-.phase-list span,
-.phase-list strong {
-  min-width: 0;
-  overflow-wrap: anywhere;
 }
 
 .loading,
@@ -4845,7 +4666,6 @@ th {
   }
 
   .level-grid,
-  .gear-grid,
   .planner-targets {
     gap: 0.4rem;
   }
@@ -5058,7 +4878,6 @@ th {
   .workspace,
   .workbench-shell,
   .setup-context-bar,
-  .content-grid,
   .service-strip,
   .economy-pane,
   .movers-grid,
@@ -5104,12 +4923,6 @@ th {
   .compact-stance-field,
   .compact-target-field {
     grid-column: span 2;
-  }
-
-  .setup-panel {
-    border-right: 0;
-    border-bottom: 1px solid #26303d;
-    padding: 0 0 1rem;
   }
 
   .player-sidebar {
@@ -5240,17 +5053,13 @@ th {
   }
 
   .level-grid,
-  .gear-grid,
-  .toggle-grid,
   .monster-stat-grid,
   .monster-setup-grid,
   .active-assumption-row,
   .planner-targets,
   .planner-skill-row,
   .planner-toggle-row,
-  .planner-gear-slot-header,
-  .detail-list,
-  .phase-list li {
+  .planner-gear-slot-header {
     grid-template-columns: 1fr;
   }
 

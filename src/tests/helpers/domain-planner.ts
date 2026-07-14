@@ -9,12 +9,7 @@ import type {
   SimulationContext,
   SimulationRequest
 } from "../../domain/shared";
-import {
-  buildPlan,
-  type PlannerInput,
-  type PlannerOptions,
-  type PlannerPlan
-} from "../../domain/planner";
+import { type PlannerInput, type PlannerPlan } from "../../domain/planner";
 import {
   buildLegacyInput,
   createLegacyRuntime,
@@ -183,14 +178,6 @@ export function summarizePlan(plan: PlannerPlan): PlannerGoldenSummary {
       dpsAfter: stableNumber(unlock.dpsAfter)
     }))
   };
-}
-
-export function buildPlannerPlanForDefinition(
-  definition: LegacyCaseDefinition,
-  options: PlannerOptions
-) {
-  const { runtime, context } = createPlannerRuntime();
-  return buildPlan(plannerInputFromDefinition(runtime, definition), context, options);
 }
 
 function optionalString(value: unknown): string | undefined {

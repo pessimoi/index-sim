@@ -136,10 +136,6 @@ export function lookupItemPrice(priceSet: PriceSet, itemId: EntityId): PriceLook
   };
 }
 
-export function lookupAlchValue(priceSet: PriceSet, itemId: EntityId): PriceLookupResult {
-  return lookupPrice(priceSet, itemId, "alch-value", priceSet.alchValues);
-}
-
 export function collectMissingPriceWarnings(
   priceSet: PriceSet,
   itemIds: Iterable<EntityId>,

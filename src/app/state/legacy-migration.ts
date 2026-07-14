@@ -10,5 +10,3 @@ export const LegacyMigrationDismissedStateSchema = z
     foundKeys: z.array(z.enum(LEGACY_STORAGE_KEYS)).default([])
   })
   .strict();
-
-export type LegacyMigrationDismissedState = z.infer<typeof LegacyMigrationDismissedStateSchema>;

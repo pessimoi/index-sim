@@ -44,7 +44,6 @@ export const DenseCompareSortStateSchema = z
   .strict();
 
 export type DenseCompareSortKey = z.infer<typeof DenseCompareSortKeySchema>;
-export type DenseCompareSortDirection = z.infer<typeof DenseCompareSortDirectionSchema>;
 export type DenseCompareSortState = z.infer<typeof DenseCompareSortStateSchema>;
 
 export const DEFAULT_DENSE_COMPARE_SORT_STATE: DenseCompareSortState = {
