@@ -24,6 +24,7 @@
 - [risk-pane-refactor-spec.md](risk-pane-refactor-spec.md): implemented D-093 Phase 3E extraction of the Risk pane, direct Risk UI contracts and explicit Run/Cancel analysis lifecycle.
 - [loot-trip-pane-refactor-spec.md](loot-trip-pane-refactor-spec.md): implemented D-093 Phase 3F extraction of the Loot and Trip panes, direct feature view models and a cycle-free simulation-input leaf.
 - [economy-settings-pane-refactor-spec.md](economy-settings-pane-refactor-spec.md): implemented D-093 Phase 3G extraction of the shared Economy/Settings pane family, direct price-data/Settings view models and neutral Loot history bridge.
+- [simulation-monster-card-view-model-refactor-spec.md](simulation-monster-card-view-model-refactor-spec.md): specced ownership-only split of the remaining MonsterCard presentation model and target option builder out of the main simulation adapter.
 - [metric-list-presenter-hygiene-spec.md](metric-list-presenter-hygiene-spec.md): implemented generic-presenter ownership and component-API cleanup completed before controller extraction.
 - [runtime-bootstrap-controller-spec.md](runtime-bootstrap-controller-spec.md): implemented generated-runtime lifecycle, compatibility and startup PriceSet resolution extraction preserving the D-094 chunk boundary.
 - [local-state-recovery-controller-spec.md](local-state-recovery-controller-spec.md): implemented browser-state health/block/persist/clear orchestration and pure Settings recovery panel boundary.
