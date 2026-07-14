@@ -47,6 +47,13 @@ artifact with Playwright Chromium; it is workstation evidence rather than a
 universal latency SLA. The release gate separately enforces deterministic entry
 JavaScript byte budgets.
 
+Measure the real one-shot calculation Worker with
+`npm run worker:measure -- --runs 5`. It builds an isolated local harness and
+reports paired cold/warm construction, request posting, startup/delivery,
+execution and response timing for Dense, Planner, Duel and Risk. Results are
+workstation evidence; the command does not alter the production artifact or
+enable a persistent Worker.
+
 The accepted production target is one Cloudflare Worker with Static Assets.
 Cloudflare Builds should run `npm run deploy:cloudflare:build` for `master`, then
 `npm run deploy:cloudflare`; non-production versions use

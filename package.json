@@ -40,6 +40,7 @@
     "typecheck": "tsc -b",
     "architecture:check": "$NODE node_modules/vite-node/vite-node.mjs --config vitest.config.ts scripts/check-architecture.ts",
     "startup:measure": "$NODE scripts/measure-startup.mjs",
+    "worker:measure": "$NODE scripts/measure-calculation-worker.mjs",
     "lint": "$NODE node_modules/eslint/bin/eslint.js .",
     "format:check": "$NODE node_modules/prettier/bin/prettier.cjs --check ."
   },

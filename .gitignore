@@ -5,6 +5,7 @@ backup
 .sources/
 node_modules
 dist
+.worker-measurement-dist
 coverage
 playwright-report
 test-results

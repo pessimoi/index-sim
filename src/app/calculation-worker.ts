@@ -1,25 +1,17 @@
 import {
-  executeCalculationTask,
-  type CalculationRequest,
-  type CalculationWorkerResponse
+  executeCalculationWorkerInput,
+  type CalculationWorkerInput,
+  type CalculationWorkerOutput
 } from "./calculation-task";
 
 interface CalculationWorkerScope {
-  onmessage: ((event: MessageEvent<CalculationRequest>) => void) | null;
-  postMessage(message: CalculationWorkerResponse): void;
+  onmessage: ((event: MessageEvent<CalculationWorkerInput>) => void) | null;
+  postMessage(message: CalculationWorkerOutput): void;
 }
 
 const workerScope = globalThis as unknown as CalculationWorkerScope;
+const absoluteNow = (): number => performance.timeOrigin + performance.now();
 
 workerScope.onmessage = (event) => {
-  const request = event.data;
-  try {
-    workerScope.postMessage({
-      ok: true,
-      kind: request.kind,
-      result: executeCalculationTask(request)
-    } as CalculationWorkerResponse);
-  } catch {
-    workerScope.postMessage({ ok: false, kind: request.kind, error: "calculation_failed" });
-  }
+  workerScope.postMessage(executeCalculationWorkerInput(event.data, absoluteNow));
 };

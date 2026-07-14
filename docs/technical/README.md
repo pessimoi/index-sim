@@ -32,6 +32,7 @@
 - [price-set-transfer-controller-spec.md](price-set-transfer-controller-spec.md): implemented PriceSet import/acceptance/export/reset transaction extraction with typed caller-owned runtime application.
 - [cannon-pane-extraction-spec.md](cannon-pane-extraction-spec.md): implemented first low-coupling feature-pane extraction with explicit calculated presentation and action props.
 - [startup-bundle-performance-spec.md](startup-bundle-performance-spec.md): measured cold/warm startup, deterministic entry-JavaScript budgets and generated-runtime bootstrap splitting.
+- [calculation-worker-measurement-spec.md](calculation-worker-measurement-spec.md): measured production one-shot Worker construction, full-request posting, startup/delivery, execution and response phases; D-095 retains the cancellable lifecycle.
 - [risk-variability-spec.md](risk-variability-spec.md): implemented kill, food, trip, timed-GP and target-probability distribution contract.
 - [source-backed-incoming-damage-spec.md](source-backed-incoming-damage-spec.md): implemented typed NPC attack-profile and shared Trip/Risk incoming-damage contract.
 - [source-backed-requirements-npc-size-spec.md](source-backed-requirements-npc-size-spec.md): implemented generated numeric item requirements and NPC-size contract.

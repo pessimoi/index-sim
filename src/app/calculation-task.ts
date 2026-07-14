@@ -122,3 +122,66 @@ export function executeCalculationTask<T extends CalculationRequest>(
 export type CalculationWorkerResponse<T extends CalculationRequest = CalculationRequest> =
   | { ok: true; kind: T["kind"]; result: CalculationResult<T> }
   | { ok: false; kind: T["kind"]; error: "calculation_failed" };
+
+export const CALCULATION_WORKER_MEASUREMENT_TYPE = "calculation-worker-measurement" as const;
+
+export interface CalculationWorkerMeasurementRequest<
+  T extends CalculationRequest = CalculationRequest
+> {
+  type: typeof CALCULATION_WORKER_MEASUREMENT_TYPE;
+  request: T;
+}
+
+export interface CalculationWorkerExecutionTiming {
+  receivedAtMs: number;
+  startedAtMs: number;
+  finishedAtMs: number;
+}
+
+export interface CalculationWorkerMeasurementResponse<
+  T extends CalculationRequest = CalculationRequest
+> {
+  type: typeof CALCULATION_WORKER_MEASUREMENT_TYPE;
+  kind: T["kind"];
+  response: CalculationWorkerResponse<T>;
+  timing: CalculationWorkerExecutionTiming;
+}
+
+export type CalculationWorkerInput = CalculationRequest | CalculationWorkerMeasurementRequest;
+export type CalculationWorkerOutput =
+  CalculationWorkerResponse | CalculationWorkerMeasurementResponse;
+
+function isMeasurementRequest(
+  input: CalculationWorkerInput
+): input is CalculationWorkerMeasurementRequest {
+  return "type" in input && input.type === CALCULATION_WORKER_MEASUREMENT_TYPE;
+}
+
+export function executeCalculationWorkerInput(
+  input: CalculationWorkerInput,
+  now: () => number
+): CalculationWorkerOutput {
+  const measured = isMeasurementRequest(input);
+  const request = measured ? input.request : input;
+  const receivedAtMs = now();
+  const startedAtMs = now();
+  let response: CalculationWorkerResponse;
+  try {
+    response = {
+      ok: true,
+      kind: request.kind,
+      result: executeCalculationTask(request)
+    } as CalculationWorkerResponse;
+  } catch {
+    response = { ok: false, kind: request.kind, error: "calculation_failed" };
+  }
+  const finishedAtMs = now();
+
+  if (!measured) return response;
+  return {
+    type: CALCULATION_WORKER_MEASUREMENT_TYPE,
+    kind: request.kind,
+    response,
+    timing: { receivedAtMs, startedAtMs, finishedAtMs }
+  };
+}

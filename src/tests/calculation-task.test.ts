@@ -2,9 +2,14 @@ import { createGeneratedRuntimeContext } from "../adapters/generated";
 import {
   CalculationTaskCancelledError,
   CalculationTaskError,
-  startCalculationTask
+  startCalculationTask,
+  startMeasuredCalculationTask
 } from "../app/calculation-worker-client";
-import { executeCalculationTask } from "../app/calculation-task";
+import {
+  CALCULATION_WORKER_MEASUREMENT_TYPE,
+  executeCalculationTask,
+  executeCalculationWorkerInput
+} from "../app/calculation-task";
 import { DEFAULT_PLANNER_UI_STATE } from "../app/state/planner";
 import { DEFAULT_FORM_STATE } from "../app/state/ui-state";
 
@@ -100,6 +105,105 @@ describe("calculation task boundary", () => {
     worker.respond({ ok: true, kind: "dense-compare", result: [] });
     await expect(task.promise).resolves.toEqual([]);
     expect(worker.terminated).toBe(true);
+  });
+
+  it("keeps raw worker responses unchanged and wraps only explicit measurement requests", () => {
+    const request = denseRequest();
+    const raw = executeCalculationWorkerInput(request, () => 10);
+    expect(raw).toMatchObject({ ok: true, kind: "dense-compare" });
+    expect(raw).not.toHaveProperty("type");
+
+    const times = [20, 21, 35];
+    const measured = executeCalculationWorkerInput(
+      { type: CALCULATION_WORKER_MEASUREMENT_TYPE, request },
+      () => times.shift() ?? 35
+    );
+    expect(measured).toMatchObject({
+      type: CALCULATION_WORKER_MEASUREMENT_TYPE,
+      kind: "dense-compare",
+      response: { ok: true, kind: "dense-compare" },
+      timing: { receivedAtMs: 20, startedAtMs: 21, finishedAtMs: 35 }
+    });
+  });
+
+  it("measures the real worker phases from aligned deterministic clocks", async () => {
+    const worker = new FakeWorker();
+    const request = denseRequest();
+    const times = [100, 102, 103, 105, 150];
+    const task = startMeasuredCalculationTask(
+      request,
+      () => worker as unknown as Worker,
+      1_000,
+      () => times.shift() ?? 150
+    );
+    expect(worker.posted).toEqual({
+      type: CALCULATION_WORKER_MEASUREMENT_TYPE,
+      request
+    });
+
+    worker.respond({
+      type: CALCULATION_WORKER_MEASUREMENT_TYPE,
+      kind: "dense-compare",
+      response: { ok: true, kind: "dense-compare", result: [] },
+      timing: { receivedAtMs: 120, startedAtMs: 121, finishedAtMs: 140 }
+    });
+
+    await expect(task.promise).resolves.toEqual({
+      result: [],
+      timing: {
+        workerCreateMs: 2,
+        requestPostMs: 2,
+        startupAndRequestDeliveryMs: 15,
+        workerQueueMs: 1,
+        executionMs: 19,
+        responseDeliveryMs: 10,
+        totalMs: 50,
+        clockAligned: true
+      }
+    });
+    expect(worker.terminated).toBe(true);
+  });
+
+  it("keeps measured work cancellable, bounded and sanitized", async () => {
+    const cancelledWorker = new FakeWorker();
+    const cancelled = startMeasuredCalculationTask(
+      denseRequest(),
+      () => cancelledWorker as unknown as Worker
+    );
+    cancelled.cancel();
+    await expect(cancelled.promise).rejects.toBeInstanceOf(CalculationTaskCancelledError);
+    expect(cancelledWorker.terminated).toBe(true);
+
+    const invalidWorker = new FakeWorker();
+    const invalid = startMeasuredCalculationTask(
+      denseRequest(),
+      () => invalidWorker as unknown as Worker
+    );
+    invalidWorker.respond({
+      type: CALCULATION_WORKER_MEASUREMENT_TYPE,
+      kind: "planner",
+      response: { ok: false, kind: "planner", error: "calculation_failed" },
+      timing: { receivedAtMs: 1, startedAtMs: 2, finishedAtMs: 3 }
+    });
+    await expect(invalid.promise).rejects.toBeInstanceOf(CalculationTaskError);
+    expect(invalidWorker.terminated).toBe(true);
+
+    const cloneFailureWorker = new ThrowingPostWorker();
+    const cloneFailure = startMeasuredCalculationTask(
+      denseRequest(),
+      () => cloneFailureWorker as unknown as Worker
+    );
+    await expect(cloneFailure.promise).rejects.toEqual(new CalculationTaskError());
+    expect(cloneFailureWorker.terminated).toBe(true);
+
+    const timeoutWorker = new FakeWorker();
+    const timedOut = startMeasuredCalculationTask(
+      denseRequest(),
+      () => timeoutWorker as unknown as Worker,
+      1
+    );
+    await expect(timedOut.promise).rejects.toBeInstanceOf(CalculationTaskError);
+    expect(timeoutWorker.terminated).toBe(true);
   });
 
   it("cancels work and sanitizes invalid worker responses", async () => {

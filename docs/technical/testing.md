@@ -4,12 +4,12 @@
 
 The latest complete production-preview Chromium gate passed 77/77 on
 2026-07-14 after the App composition-root Phase 4 extraction. Full
-`npm run verify` passes 64 test files / 758 unit tests, 19 explicit goldens,
+`npm run verify` passes 64 test files / 761 unit tests, 19 explicit goldens,
 typecheck, the 114-source-module/102-client-reachable-module/seven-external-entrypoint
 zero-cycle architecture check, build/artifact budgets, lint, formatting and
-diff checks. The 10-file artifact entry is 720,793 raw / 208,801 gzip bytes and
-remains inside D-094 budgets; total bytes are 1,977,328 and SHA-256 is
-`bea79ca8f4dd82815ea01397b54ae7987d130bdaa6acbf5c316ecbf7b2188379`.
+diff checks. The 10-file artifact entry is 720,793 raw / 208,770 gzip bytes and
+remains inside D-094 budgets; total bytes are 1,977,623 and SHA-256 is
+`8c18ea8b096e82b7d45a31f29d32d361def834dc91774c7a795eecb6c5668017`.
 Earlier 57/57, 58/58, 63/63, 73/73, 74/74 or 76/76 counts in the historical
 evidence log below are superseded run snapshots. The latest read-only Darwin
 visual comparison passed 20/20 after Phase 4 against the
@@ -30,6 +30,21 @@ passes 19/19, complete Chromium 77/77 and read-only Darwin visual comparison
 10-file/two-asset artifact totals 1,977,328 bytes with SHA-256
 `bea79ca8f4dd82815ea01397b54ae7987d130bdaa6acbf5c316ecbf7b2188379`;
 entry JavaScript remains inside D-094 at 720,793 raw / 208,801 gzip bytes.
+
+Calculation-worker D-095 validation note, 2026-07-14: the typed measurement
+envelope leaves raw production request/responses unchanged and adds three
+focused worker-boundary cases; the combined calculation/performance gate passes
+10/10. `npm run worker:measure -- --runs 5` completed 80 production-worker tasks
+across typical/heavy Dense, Planner, Duel and Risk cases, and the matching
+summary capture completed another 80 with all clocks aligned. Warm request
+posting for 0.90-1.09 MB JSON-shaped inputs is 1.6-2.3 ms median,
+startup/delivery 31.8-56.7 ms and total non-execution overhead about 34-59 ms.
+Dense has the largest relative share at about 25% while remaining 137.7-140.8
+ms median total; Planner, Risk and heavy Duel are execution-dominated. D-095
+retains the cancellable one-shot worker. Numeric audit remains 5,958/5,958 and
+goldens 19/19. The measurement artifact is isolated from `dist`; the production
+artifact remains 10 files/two assets and totals 1,977,623 bytes with SHA-256
+`8c18ea8b096e82b7d45a31f29d32d361def834dc91774c7a795eecb6c5668017`.
 
 Risk Phase 3E validation note, 2026-07-13: `risk-controller.test.ts` adds five
 cases for defaults/options, explicit Run, stale retention, source cancellation,
@@ -1086,6 +1101,31 @@ npm run test:e2e -- --grep "keeps Compare, Planner and Duel worker calculations 
 ```
 
 Tests should continue to cover level-input updates because that path has already shown visible jank. Do not move formulas or calculated output into worker-owned persistence; requests/results stay structured-cloneable and superseded work must remain cancellable.
+
+Measure the real production Worker phases locally with:
+
+```sh
+npm run worker:measure -- --runs 5
+```
+
+The command builds an isolated `.worker-measurement-dist` harness, starts a
+localhost preview and uses Playwright Chromium for five cold/warm pairs of the
+typical and heavy Dense, Planner, Duel and Risk profiles. Default output includes
+raw samples; add `--summary-only` for a concise repeat. It reports Worker
+construction, sender-side request posting, startup/request delivery, execution,
+response delivery, total time and UTF-8 JSON payload sizes. These are local
+workstation comparisons, not merge-blocking wall-clock budgets.
+
+The D-095 Apple M2 / Node 22.19.0 / Chromium 149 evidence measured warm median
+request posting at 1.6-2.3 ms for 0.90-1.09 MB requests and startup/delivery at
+31.8-56.7 ms. Dense typical/heavy totals were 140.8/137.7 ms with roughly 25%
+non-execution share; typical Duel was 244.0 ms/14.9%. Planner, Risk and heavy
+Duel spent 96-99% in execution. All 160 tasks across the raw and concise
+five-pair captures completed with aligned clocks. The initial all-skills-at-99
+Planner stress candidate exceeded the measurement-only 120-second ceiling and
+is an algorithmic stress finding, not a persistent-worker result. D-095 retains
+the one-shot lifecycle until low-end-device, production or repeated-task
+evidence establishes a material task-start regression.
 
 ## Domain core tests
 

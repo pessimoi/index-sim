@@ -57,6 +57,7 @@ The legacy `views.jsx` `ArchitectureBoard` is only a docs-link panel. Treat the 
 - Archived legacy styling: `styles.css` plus inline styles in `views.jsx`
 - Same-origin service boundaries: `src/server`, `src/adapters/hiscores`, `src/adapters/market`
 - Rewrite implementation: `src/app`, `src/domain`, `src/data`, `src/adapters`, `src/tests`
+- Calculation Worker measurement: `scripts/measure-calculation-worker.mjs`, `scripts/worker-measurement-browser.ts`, `npm run worker:measure`
 - Documentation map: `docs/README.md`
 
 The root app path is now the Vite rewrite and boots from the validated source-backed generated Revision 274 snapshot. The legacy-derived static bridge and legacy browser runtime files remain regression/reference, fixture and rollback evidence, not the production entrypoint.
