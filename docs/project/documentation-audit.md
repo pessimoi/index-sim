@@ -24,7 +24,8 @@ corrections were:
   runtime is script-order and `window.*` driven;
 - the repository owns framework-neutral Hiscores/market handlers, Vite
   middleware and a Cloudflare Worker adapter even though it has no stateful
-  simulation backend, auth service or database;
+  simulation backend, auth service or general application database; D-097 later
+  added one disabled aggregate-only rate-limit Durable Object;
 - the active market artifact is a three-file
   `prices.json`/`price-provenance.json`/`price-history.json` logical set, not the
   older two-file writer contract;

@@ -14,7 +14,7 @@ The repo now uses the Vite/React rewrite as the root app path. The old CDN/Babel
 Current verified facts:
 
 - `README.md` states Revision 274 and identifies the committed price snapshot as captured on 12 July 2026. The machine-readable source of truth is `prices.json._scraped_at`, which matches `price-provenance.json.capturedAt`.
-- `index.html` mounts `src/app/main.tsx` through Vite.
+- `index.html` renders a non-empty `starting` shell, installs the DOM-only startup guard and then mounts `src/app/main.tsx` through Vite. The existing React branches replace that shell with canonical `starting`, `ready` or `error` state.
 - `legacy/index.html` can load the old local scripts in script-tag order for reference and parity work.
 - Archived legacy UI text mentions `python run_sim.py`, `/api/prices`, `/api/scrape` and `/api/hiscores`.
 - The production rewrite UI uses service availability states for live integrations and must not instruct users to run `python run_sim.py`.
@@ -28,11 +28,39 @@ Rewrite scaffold commands:
 
 ```sh
 npm run dev
+npm run dev:checked
+npm run test:startup:dev
 npm run build
 npm run preview
 ```
 
-The Vite dev server serves the rewrite UI from the root `index.html`. Use `legacy/index.html` only for archived legacy reference work. The dev configuration serves `planner.jsx` and `views.jsx` unchanged so the archive's browser-side Babel path is not rewritten by Vite before it runs.
+The Vite dev server serves the rewrite UI from the root `index.html`. Raw
+`npm run dev` is browser-independent and unverified: Vite's listening output
+does not prove that React, the generated runtime and the initial workbench
+rendered. `npm run dev:checked` owns agent handoff. It starts a strict-port Vite
+child on `127.0.0.1:5173` by default, verifies a fresh Chromium navigation and
+prints the user-facing URL only in its final `APP_READY` line. An explicit
+bounded port override can be passed after `--`.
+
+`npm run test:startup:dev` uses a separate strict test port, forces bounded Vite
+dependency re-optimization, checks the normal `ready` path and a controlled
+pre-React `error` path, verifies direct JSON/HEAD and transformed raw-module
+price routes, then closes its browser and server. Both checked commands require
+installed Playwright Chromium; when it is absent, use
+`npx playwright install chromium` and rerun. They use committed data and do not
+call a live Hiscores or market provider.
+
+If the requested port is occupied, inspect the listener separately or choose an
+explicit free port. The checked command never kills or silently reuses an
+unknown process. On readiness failure it exits non-zero, prints bounded browser
+and Vite diagnostics and reaps its managed child. A static `starting` shell
+remains visible if the application entry cannot load; detectable entry or
+bootstrap failures render fixed sanitized `error` copy instead of an empty
+root.
+
+Use `legacy/index.html` only for archived legacy reference work. The dev
+configuration serves `planner.jsx` and `views.jsx` unchanged so the archive's
+browser-side Babel path is not rewritten by Vite before it runs.
 
 Run temporary scripts, local caches and generated helper files from inside this repository. Avoid `/tmp` or other external scratch paths for project work unless a human explicitly approves, because endpoint security on the user's work machine may flag those runs.
 
@@ -43,9 +71,10 @@ Current hiscores run behavior:
 - Vite dev and preview expose same-origin `GET /api/hiscores/status` and `GET /api/hiscores?player=...` through repo-owned middleware.
 - Vite dev and preview inject the D-061 first-party 2004Scape JSON provider. The provider calls a fixed HTTPS origin server-side, rejects redirects, bounds the response, maps only skill types 1-7 and sanitizes provider failures.
 - `src/server/cloudflare-worker.ts` injects the same provider for production, routes `/api/*` before SPA fallback, returns unknown API paths as sanitized JSON and adds no-store/security headers.
-- `wrangler.jsonc` serves `dist` through Static Assets, enables provider preview URLs and disables Workers Logs observability plus Logpush under D-065.
+- `wrangler.jsonc` serves `dist` through Static Assets, enables provider preview URLs, disables Workers Logs observability plus Logpush under D-065 and creates D-097's SQLite Durable Object binding/migration with global enforcement explicitly `off`.
 - When the upstream is unavailable, the rewrite keeps the player-name input and manual Player level fields usable and shows the existing non-blocking service failure state.
-- No runtime secret, account model, database or scheduled Hiscores job is configured. The bounded Cloudflare client address is used only as an ephemeral in-isolate rate-limit key.
+- No runtime secret, account model, general database or scheduled Hiscores job is configured. The bounded Cloudflare client address is used only as an ephemeral in-isolate rate-limit key; D-097's disabled coordinator stores only aggregate provider-window state.
+- Any future Cloudflare WAF abuse rule or activation of the implemented strict provider-wide budget follows the conditional [Hiscores distributed/global rate-limit specification](../technical/hiscores-global-rate-limit-spec.md).
 
 Current market run behavior:
 
@@ -98,9 +127,10 @@ Current state:
 - Rewrite preview: `npm run preview`.
 - Repository handoff/release gate: `npm run verify`.
 - D-066 Cloudflare release gate: `npm run deploy:cloudflare:build`.
+- Account-free Wrangler bundle/binding/migration check: `npm run deploy:cloudflare:dry-run`.
 - Exact Wrangler preview upload: `npm run deploy:cloudflare:preview`.
 - Exact Wrangler production deploy: `npm run deploy:cloudflare`.
-- Both deploy commands rebuild/revalidate `dist` and pin Wrangler `4.109.0`; they cannot upload an unchecked artifact or float the CLI version.
+- Dry-run, preview and production release commands rebuild/revalidate `dist` and use lockfile-pinned Wrangler `4.109.0` through Node 22; upload commands cannot publish an unchecked artifact or float the CLI version.
 - Artifact validation: `npm run deploy:verify-artifact` after a build.
 - Deployed HTTPS smoke: `npm run deploy:smoke -- --origin <https-origin> --hiscores-mode enabled` after a Cloudflare preview exists.
 - Cloudflare account/Git connection and deployed evidence are adopter operations under D-067; no custom domain is required for preview.
@@ -129,12 +159,13 @@ X-Content-Type-Options: nosniff
 Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
 ```
 
-The current rewrite browser talks to same-origin live integration endpoints only, so static deployments should keep `connect-src 'self'` unless a separately accepted runtime requires more. If a future implementation adds browser-side upstream probes, tighten `connect-src` to the exact approved origins and document the source in [../project/decisions.md](../project/decisions.md). Do not add a database, user-triggered scraper or shared cloud state as part of deploy hardening.
+The current rewrite browser talks to same-origin live integration endpoints only, so static deployments should keep `connect-src 'self'` unless a separately accepted runtime requires more. If a future implementation adds browser-side upstream probes, tighten `connect-src` to the exact approved origins and document the source in [../project/decisions.md](../project/decisions.md). Do not add a general database, user-triggered scraper or shared cloud state as part of deploy hardening; D-097's aggregate provider-budget object is the only accepted narrow exception.
 
 The [current security audit](../project/security-audit.md) found no critical or
-high-severity issue. Its main open runtime risk is that the Hiscores fixed-window
-limiter is scoped to one Worker isolate and is therefore not a global abuse
-control. HSTS, CSP frame policy and concrete Cloudflare log/header evidence
+high-severity issue. D-097 now provides a disabled strict aggregate Hiscores
+provider budget; its open runtime risk is activation without an accepted quota,
+D-065 account evidence or singleton load proof. The local limiter and any WAF
+rule remain separate abuse controls. HSTS, CSP frame policy and concrete Cloudflare log/header evidence
 remain adopter decisions and checks owned by
 [public-deployment-spec.md](public-deployment-spec.md); do not silently promote
 them into verified production facts.

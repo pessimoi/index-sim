@@ -1,10 +1,11 @@
 # Hiscores live implementation specification
 
 - Status: repository implementation complete; adopter deployment evidence gated
-- Date: 2026-07-11
+- Date: 2026-07-14
 - Owner: technical docs
 - Source: conditional backlog work and the remaining `Hiscores` feature-inventory gap
 - Contract owner: [live-integrations-spec.md](live-integrations-spec.md)
+- Conditional rate-limit owner: [hiscores-global-rate-limit-spec.md](hiscores-global-rate-limit-spec.md)
 - Related decisions: [D-015, D-022, D-044, D-061, D-065 and D-066](../project/decisions.md)
 
 ## Purpose
@@ -29,12 +30,13 @@ D-067 does not require the current maintainer to own or operate a Cloudflare acc
 The existing code owns these stable contracts:
 
 - `src/adapters/hiscores` owns browser-side status and lookup parsing.
-- `src/server/hiscores-core.ts` owns `GET /api/hiscores/status`, `GET /api/hiscores?player=...`, input/output validation, sanitized errors, request timeout and memory rate limiting.
+- `src/server/hiscores-core.ts` owns `GET /api/hiscores/status`, `GET /api/hiscores?player=...`, input/output validation, sanitized errors, bounded provider/provider-budget timeouts, memory client limiting and the asynchronous aggregate budget seam.
+- `src/server/hiscores-global-rate-limit.ts` owns D-097's fixed-window aggregate budget, Cloudflare configuration validation and SQLite Durable Object; it stores no player/query/client identity.
 - `src/server/lostcity-hiscores-provider.ts` owns the fixed-origin D-061 upstream request, allowlisted JSON mapping, XP normalization, redirect refusal, response bounds and sanitized provider failures. The upstream announcement documents `date`, but the observed player endpoint may omit it; the parser accepts both forms and does not expose or depend on that field.
 - `src/server/vite-hiscores-middleware.ts` adapts that core handler to local Vite dev and preview.
 - `vite.config.ts` injects the source-backed provider for local dev and preview.
-- `src/server/cloudflare-worker.ts` injects the same provider into the D-066 production runtime, routes API requests before static SPA fallback, adds API security headers and returns sanitized JSON for unknown/error paths.
-- `wrangler.jsonc` deploys the `dist` artifact and Worker as one root-path unit, routes `/api/*` Worker-first and disables Workers Logs observability plus Logpush.
+- `src/server/cloudflare-worker.ts` injects the same provider and D-097 environment-backed gate into the D-066 production runtime, routes API requests before static SPA fallback, adds API security headers and returns sanitized JSON for unknown/error paths.
+- `wrangler.jsonc` deploys the `dist` artifact and Worker as one root-path unit, routes `/api/*` Worker-first, creates the D-097 SQLite binding/v1 migration with mode `off` and disables Workers Logs observability plus Logpush.
 - the UI applies only the seven returned combat skills after user review and retains manual level editing as the fallback.
 
 The live implementation must conform to those contracts. It must not make the browser call or parse the upstream directly.
@@ -48,7 +50,7 @@ D-061 accepts the first-party 2004Scape [Hiscores API](https://2004.lostcity.rs/
 - accepted mapping: type 1 Attack, 2 Defence, 3 Strength, 4 Hitpoints, 5 Ranged, 6 Prayer and 7 Magic
 - stored XP is divided by 10 and truncated according to the source documentation
 - partial skill rows remain usable with sanitized warnings; no supported rows map to hiscores not-found
-- upstream rate limits are respected through the existing same-origin 30/minute guard and provider rate-limit mapping
+- upstream rate limits are respected through the active same-origin 30/minute client guard and provider rate-limit mapping; D-097's aggregate guard is implemented but disabled until an accepted quota exists
 
 HTML parsing and a parser-dependency decision are no longer needed.
 
@@ -60,6 +62,7 @@ D-066 selects Cloudflare Workers + Static Assets. The implementation provides:
 - no runtime secret or user-controlled upstream configuration
 - request timeout and cancellation
 - bounded in-isolate rate limiting keyed by the trusted Cloudflare client-address header plus upstream 429 handling
+- disabled-by-default strict aggregate provider-budget coordination with a one-second fail-closed gate
 - response headers and routing before SPA fallback
 - disabled provider observability/Logpush under D-065
 
@@ -132,8 +135,8 @@ Production configuration must:
 ### Rate limiting and caching
 
 - Preserve the existing application-level limit as a minimum behavioral contract.
-- Treat the current Cloudflare in-isolate limiter as a bounded best-effort guard; verify upstream 429 behavior on preview and add a separately accepted provider rate-limit binding only if deployed evidence shows the distributed edge needs it.
-- Do not add a database solely for rate limiting or cache in this slice.
+- Treat the current Cloudflare in-isolate limiter as a bounded best-effort guard. Any additional location-scoped edge rule or strict global provider budget follows the activation, privacy, architecture and rollout boundary in [hiscores-global-rate-limit-spec.md](hiscores-global-rate-limit-spec.md); a Workers Rate Limiting binding alone is not a global counter.
+- Do not add a general database or shared player cache. D-097's dedicated Durable Object persists aggregate window/count/config state only.
 - Do not share cached player lookups between users unless an explicit privacy and freshness policy is accepted.
 - A short provider-safe status cache may be added only when it cannot disclose player data and is covered by tests.
 
@@ -152,7 +155,9 @@ Provider branding or attribution may be added only when required by the accepted
 
 ## Security and privacy requirements
 
-- No authentication, account, tenant, payment, database or admin model is introduced.
+- No authentication, account, tenant, payment, general application database or
+  admin model is introduced. D-097's aggregate provider-window state is the only
+  narrow persistence exception.
 - Player names are untrusted input and remain bounded by the existing validation contract.
 - Upstream URL and request headers are server-controlled; the provider must not create an SSRF primitive.
 - Redirects must be rejected or their final origin revalidated against the allowlist.
@@ -262,6 +267,7 @@ Do not record raw upstream payloads, real player profiles, credentials, local ab
 - [x] Existing same-origin API and browser contracts remain stable
 - [x] Missing configuration fails to a sanitized manual-fallback state
 - [x] Production routing, no-store and bounded in-isolate rate limiting are verified in focused Worker tests
+- [x] D-097 aggregate gate ordering, persistence, concurrency, fail-closed behavior, configuration and Wrangler binding/migration dry-run are verified
 - [ ] The same routing, headers and rate-limit behavior are verified on Cloudflare preview/production
 - [ ] No player name, raw payload or credential leaks through logs, API errors or UI copy
 - [x] Opt-in live smoke evidence is recorded without raw personal data

@@ -1,7 +1,7 @@
 # Live integrations specification
 
 - Status: repository implementation complete; adopter environment evidence gated
-- Date: 2026-07-11
+- Date: 2026-07-14
 - Owner: technical docs
 - Related decisions: [D-015](../project/decisions.md), [D-021](../project/decisions.md), [D-033](../project/decisions.md), [D-061](../project/decisions.md), [D-062](../project/decisions.md), [D-065](../project/decisions.md), [D-066](../project/decisions.md)
 - Legacy evidence: `views.jsx` `HiscoresLookup`, `views.jsx` `SettingsPane`, `market.js`
@@ -11,6 +11,7 @@
 This document owns the product and API contracts. The remaining implementation and operations phases are split into:
 
 - [hiscores-live-implementation-spec.md](hiscores-live-implementation-spec.md): authoritative provider, D-066 Cloudflare runtime, privacy and adopter deployed-evidence runbook for Hiscores.
+- [hiscores-global-rate-limit-spec.md](hiscores-global-rate-limit-spec.md): implemented disabled strict provider-wide budget plus conditional activation and location-scoped abuse-control boundary.
 - [../operations/market-live-evidence-spec.md](../operations/market-live-evidence-spec.md): live response verification, network hardening, cron configuration and scheduled-current evidence for market prices.
 - [../operations/public-deployment-spec.md](../operations/public-deployment-spec.md): Cloudflare public hosting, release and rollback work.
 
@@ -124,6 +125,7 @@ unless their dependency is accepted and implemented.
 | Hiscores          | Rewrite UI shows player input, same-origin status/lookup, validated adapter, preview/apply for combat skills and disabled/unavailable manual fallback copy without `run_sim.py` instructions.                                                                                | Preserve input validation, same-origin calls, timeout, rate-limit and sanitized-error boundaries for every provider runtime.      | `release-required` | These are required safety boundaries for the accepted hiscores workflow and current provider-enabled Vite implementation.                                                                                                                                                                     | Keep provider wiring behind the existing contract; do not bypass validation in UI code.                        |
 | Hiscores          | D-061 accepts the first-party 2004Scape JSON API and the server-only provider maps its type 1-7 rows. The parser accepts both the documented `date` field and the observed live shape that omits it.                                                                         | Keep the authoritative source contract fixture-backed and out of browser code.                                                    | `release-required` | The source/provider slice is implemented with fixed-origin, redirect, response-bound, schema and sanitized-error guards. The optional source timestamp is not used by the app.                                                                                                                | Keep provider tests mocked and update fixtures only against reviewed first-party contract evidence.            |
 | Hiscores          | D-066 implements the same-origin production runtime as one Cloudflare Worker + Static Assets deployment with Worker-first `/api/*` and exact root paths.                                                                                                                     | An adopter connects its Cloudflare account/repository and verifies preview/production routing.                                    | `adopter-evidence` | Repository runtime/config/tests are complete; D-067 does not require an operated Cloudflare version for repository handoff.                                                                                                                                                                   | Run the exact Cloudflare build/upload commands and deployed smoke before claiming live availability.           |
+| Hiscores          | D-097 implements one deterministic SQLite Durable Object aggregate provider budget behind a one-second fail-closed gate; Wrangler binding/migration exists with committed mode `off`.                                                                                        | An adopter accepts a positive fixed-window provider quota, verifies D-065 account behavior and enables enforcement.               | `adopter-evidence` | WAF and Workers Rate Limiting counters are not global. The repository implementation stores aggregate count/window/config state only, but the exact quota and singleton load envelope are not inferred from code.                                                                             | Run the account-free dry-run now; enable only through the global rate-limit rollout/rollback checklist.        |
 | Hiscores          | The source-backed provider is injected into Vite dev/preview and the Cloudflare Worker behind the same handler.                                                                                                                                                              | Deployed live lookup and upstream failure evidence for a concrete instance.                                                       | `adopter-evidence` | Local fixture and opt-in upstream evidence pass, but deployed behavior cannot be inferred from repository code alone.                                                                                                                                                                         | Collect sanitized Cloudflare preview evidence without committing player data.                                  |
 | Hiscores          | D-065 forbids persistent player/query logs; D-066 disables Workers Logs observability and Logpush and emits no custom logs. Client address is only an ephemeral bounded rate-limit key.                                                                                      | The operator verifies account-side observability, Tail Workers and external drains remain off.                                    | `adopter-evidence` | Repository configuration closes the implementation gap, while account/dashboard state is environment evidence.                                                                                                                                                                                | Verify D-065 on the version preview before public lookup traffic.                                              |
 | Hiscores          | Legacy `sim_hiscore_player` compatible import can seed the rewrite-owned last-player key.                                                                                                                                                                                    | Legacy `run_sim.py` `/api/hiscores` UI instructions and missing-backend assumptions.                                              | `legacy-only`      | Archived `views.jsx` evidence can mention this path, but production rewrite copy must use service-aware status/manual fallback.                                                                                                                                                               | Keep classified through release-copy audit; do not add legacy copy to `src/app`.                               |
@@ -133,7 +135,9 @@ unless their dependency is accepted and implemented.
 The product decision accepts repo-owned integration boundaries and D-066 chooses
 Cloudflare Workers + Static Assets for production Hiscores. Market price refresh
 does not use a database or cache provider; it uses scheduled repo automation plus
-static JSON artifacts.
+static JSON artifacts. D-097 adds only one dedicated aggregate Hiscores
+provider-budget Durable Object; it is not player storage, a general database or a
+market-state change.
 
 Acceptable implementation shapes for the first pass:
 
@@ -421,7 +425,7 @@ Requirements:
 - No arbitrary URL, host, path or slug from browser input.
 - Bounded request body size.
 - Bounded item count per sync.
-- Rate limiting per process or deployment unit.
+- Rate limiting per runtime instance plus D-097's implemented, disabled strict-global Hiscores gate; activation and any distributed WAF claim follow [hiscores-global-rate-limit-spec.md](hiscores-global-rate-limit-spec.md).
 - Timeouts on upstream requests.
 - Sanitized error messages that do not expose filesystem paths, stack traces or raw upstream bodies.
 - No secrets required for the first implementation.
@@ -482,9 +486,9 @@ Current implementation note: the first contract/fixture slice exists in `src/dom
 - Add repo-owned handlers for the typed API contract.
 - Add upstream allowlists, timeouts, rate limits and sanitized errors.
 - Do not add production user-triggered market upstream refresh.
-- Keep databases out of scope for the same-origin service.
+- Keep general databases and player caches out of scope for the same-origin service; D-097's dedicated aggregate rate state is the only accepted exception.
 
-Current hiscores implementation note: `src/server/hiscores-core.ts` provides a framework-neutral status/lookup handler and `src/server/vite-hiscores-middleware.ts` exposes it in Vite dev/preview. The handler validates player input, uses a per-process lookup rate limit, enforces a provider timeout and returns sanitized `IntegrationErrorResponse` payloads for bad-request, not-found, rate-limited, upstream-unavailable, upstream-invalid and internal-error paths. The default provider is disabled and performs no live upstream call.
+Current hiscores implementation note: `src/server/hiscores-core.ts` provides a framework-neutral status/lookup handler and `src/server/vite-hiscores-middleware.ts` exposes it in Vite dev/preview. The handler validates player input, uses a per-process client limit, checks an asynchronous one-second provider-budget gate, enforces a provider timeout and returns sanitized `IntegrationErrorResponse` payloads for bad-request, not-found, rate-limited, upstream-unavailable, upstream-invalid and internal-error paths. Local/default runtimes use an allow-all gate. D-097's Cloudflare adapter injects one deterministic SQLite Durable Object aggregate gate with committed mode `off`; no default test performs a live upstream call.
 
 Current market implementation note: `src/server/market-core.ts` provides a framework-neutral status/sync handler and `src/server/vite-market-middleware.ts` exposes it in Vite dev/preview. The handler validates body size, request JSON, item count, item allowlist and same-origin request shape; expands current-monster/all-supported item sets through `src/data/market-sync-items.ts`; enforces a per-process sync rate limit and provider timeout; and returns sanitized `IntegrationErrorResponse` payloads. The default provider is disabled and performs no live upstream call.
 

@@ -3,14 +3,14 @@
 ## Current state
 
 The latest complete production-preview Chromium gate passed 78/78 on
-2026-07-14 after the ARCH-2026-05 feature test-suite split. Full
-`npm run verify` passes 78 test files / 770 unit tests, 19 explicit goldens,
+2026-07-15 after the local startup reliability implementation. Full
+`npm run verify` passes 80 test files / 787 unit tests, 19 explicit goldens,
 typecheck, the
-121-source-module/109-client-reachable-module/seven-external-entrypoint
+124-source-module/109-client-reachable-module/eight-external-entrypoint
 zero-cycle architecture check, build/artifact budgets, lint, formatting and
-diff checks. The 10-file artifact entry is 720,422 raw / 208,739 gzip bytes and
-remains inside D-094 budgets; total bytes are 1,974,877 and SHA-256 is
-`babdae8745eff2ec18ae99c9c7978a2b830480315abae8c3a6121d97e43048e3`.
+diff checks. The 10-file artifact entry is 721,534 raw / 209,167 gzip bytes and
+remains inside D-094 budgets; total bytes are 1,976,282 and SHA-256 is
+`fa514545d3cfdaf3ddfbe1e4e2b17d0737b57c3dd8e793afa0c7af2056b227e6`.
 Earlier functional counts are superseded snapshots recorded in the linked
 evidence log. The latest read-only Darwin visual comparison passed 20/20 after
 the repository-wide dead-selector cleanup against the same 31 reviewed
@@ -19,8 +19,8 @@ start returned `listen EPERM` on port 5174; the approved localhost-only
 read-only rerun passed without a baseline or configuration write. Baseline
 writes remain explicit and require image-diff and privacy review. The
 verification gate skipped dependency audit under its network-disabled policy;
-the separate current production-path security audit reported zero known
-vulnerabilities.
+the separate current `npm audit --json` run covered 353 dependencies and
+reported zero known vulnerabilities.
 
 Detailed dated implementation, release and superseded failure snapshots live in [the testing evidence log](../project/testing-evidence.md); they are evidence, not current command truth.
 
@@ -64,6 +64,20 @@ It reports raw samples and medians for cold fresh-context navigation and warm
 same-context reload. Timing values are workstation evidence, not merge budgets;
 the deterministic raw/gzip entry limits are enforced by artifact validation.
 
+For the development-server startup boundary, run:
+
+```sh
+npm run test:startup:dev
+```
+
+This check starts a fresh strict-port Vite process, forces bounded dependency
+re-optimization, attaches browser diagnostics before first navigation, waits
+for the canonical `ready` marker, exercises a controlled pre-React failure and
+proves direct JSON/HEAD versus transformed raw-module scheduled-price routing.
+It closes its server and browser and calls no live provider. Installed
+Playwright Chromium and localhost binding are environment prerequisites, so the
+command remains separate from browser-independent `npm run verify`.
+
 Use [rewrite-parity-report.md](rewrite-parity-report.md) to interpret which user-visible calculation areas are currently legacy-parity certified, partially covered or not ported.
 
 Accepted parity policy: legacy results are regression evidence, not the final truth source. Keep golden tests to catch accidental changes, but allow documented intentional deltas when the current accepted LostCityRS/Content revision or another accepted source shows the legacy app should be replaced.
@@ -93,6 +107,16 @@ npm run format:check
 ```
 
 Playwright and visual suites remain separate environment-dependent gates.
+
+For an account-free Cloudflare bundle check after deployment-shape changes, run:
+
+```sh
+npm run deploy:cloudflare:dry-run
+```
+
+This reruns typecheck/build/artifact validation and then uses the lockfile-pinned
+Wrangler through Node 22 to validate Worker exports, assets, environment values,
+the Durable Object binding and its migration without uploading a version.
 
 Node 22 and npm 10 are the repository runtime contract. `.nvmrc`, the root
 `package.json` engines and the scheduled workflow use the same major versions.
@@ -152,6 +176,7 @@ node -e "for (const f of ['prices.json','price-provenance.json','alch.json','pri
 - Documentation-only: `git diff --check`.
 - Architecture/module boundaries: `npm run typecheck`, `npm run architecture:check`, focused tests for moved imports, `npm run build` and `git diff --check`.
 - UI-only: `npm run typecheck`, focused UI/view-model tests, browser smoke when visible behavior changes and `git diff --check`.
+- Startup shell, entrypoint, Vite middleware or local-start orchestration: `npm run typecheck`, `npm run architecture:check`, `npm run test -- src/tests/startup-guard.test.ts src/tests/vite-config.test.ts src/tests/deployment-readiness.test.ts`, `npm run test:startup:dev`, `npm run build`, `npm run startup:measure -- --runs 5`, `npm run test:e2e -- --workers=1` and `git diff --check`.
 - Combat math: `npm run test` and `npm run test:golden`.
 - Combat/equipment domain changes: `npm run test`, including `src/tests/domain-core.test.ts`, and `npm run test:golden`. Run `src/tests/trip-loot-supply.test.ts` and `src/tests/xp-parity.test.ts` too when timing, DPS, prayer, recoil or incoming-damage outputs can affect trip or XP results.
 - Composed simulation result contract or main view-model result-source changes: run `npm run typecheck` and `npm run test -- src/tests/full-simulation-result.test.ts src/tests/domain-core.test.ts src/tests/trip-loot-supply.test.ts src/tests/xp-parity.test.ts src/tests/*-view-model.test.ts src/tests/data-economy.test.ts`. This validates the `CombatSimulationResult`/`FullSimulationResult` boundary against current combat, trip, XP, economy and UI view-model evidence without requiring Playwright unless visible UI behavior changes.

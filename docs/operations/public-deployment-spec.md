@@ -1,10 +1,10 @@
 # Public deployment specification
 
 - Status: repository handoff ready; adopter deployment checklist not executed
-- Date: 2026-07-11
+- Date: 2026-07-14
 - Owner: operations docs
 - Source: conditional public-release and deploy-hardening backlog work
-- Related documents: [README.md](README.md), [../technical/architecture.md](../technical/architecture.md), [../technical/testing.md](../technical/testing.md), [../technical/live-integrations-spec.md](../technical/live-integrations-spec.md), [../technical/hiscores-live-implementation-spec.md](../technical/hiscores-live-implementation-spec.md)
+- Related documents: [README.md](README.md), [../technical/architecture.md](../technical/architecture.md), [../technical/testing.md](../technical/testing.md), [../technical/live-integrations-spec.md](../technical/live-integrations-spec.md), [../technical/hiscores-live-implementation-spec.md](../technical/hiscores-live-implementation-spec.md), [../technical/hiscores-global-rate-limit-spec.md](../technical/hiscores-global-rate-limit-spec.md)
 
 ## Purpose
 
@@ -24,8 +24,8 @@ The repository currently has:
 - Node 22/npm 10 alignment through `.nvmrc`, package engines and the current workflow
 - `npm run deploy:verify-artifact` for deterministic root-path artifact, market-contract and hygiene checks
 - `npm run deploy:smoke` for bounded provider-preview HTTPS route/header/cache/status checks
-- exact Cloudflare Worker build/preview/deploy commands, `wrangler.jsonc` and static `_headers`; account ownership and any custom domain belong to the adopter
-- no database, auth, account, tenant, payment or admin service
+- exact Cloudflare Worker build/dry-run/preview/deploy commands, `wrangler.jsonc` and static `_headers`; account ownership and any custom domain belong to the adopter
+- D-097's SQLite Durable Object binding/migration with enforcement `off`; no general database, auth, account, tenant, payment or admin service
 
 `npm run preview` is a local build-verification server and must not be used as the public production server.
 
@@ -42,6 +42,7 @@ The selected Cloudflare target provides:
 - immutable static asset hosting for the Vite build
 - root document and SPA fallback control
 - same-origin function, edge or server routing for live Hiscores
+- disabled-by-default aggregate Hiscores provider-budget coordination
 - server-only environment/configuration values
 - response headers per route class
 - deployment from an immutable commit/artifact
@@ -80,11 +81,19 @@ below; it must not bypass the validation gate.
 ### Logs and player names
 
 `wrangler.jsonc` explicitly disables Workers Logs observability and Logpush. The
-Worker contains no `console` telemetry and persists no request data. The bounded
-`CF-Connecting-IP` value is used only as an ephemeral in-isolate rate-limit key.
+Worker contains no `console` telemetry and persists no player, query or client
+identity. The bounded `CF-Connecting-IP` value is used only as an ephemeral
+in-isolate rate-limit key; D-097's coordinator stores aggregate window state
+only when enforcement is enabled.
 Before public traffic, verify the deployed settings still show observability off
 and no Tail Worker, Logpush job or external log drain captures request URLs. See
 [hiscores-live-implementation-spec.md](../technical/hiscores-live-implementation-spec.md).
+
+No WAF rate-limiting rule is configured. The strict provider-wide implementation
+and binding exist, but committed mode is `off`. Before activating either, follow
+[hiscores-global-rate-limit-spec.md](../technical/hiscores-global-rate-limit-spec.md)
+and verify Security Events/Analytics query handling separately: disabling Worker
+logs does not prove that account-level security products omit the `player` query.
 
 ### Release identifier and ownership
 
@@ -205,21 +214,24 @@ If visual baselines are platform-specific, use the reviewed baseline platform or
 
 Connect the Cloudflare Worker project with these exact settings:
 
-| Setting                       | Value                               |
-| ----------------------------- | ----------------------------------- |
-| Worker name                   | `index-sim`                         |
-| Git repository                | `pessimoi/index-sim`                |
-| Production branch             | `master`                            |
-| Root directory                | repository root                     |
-| Build command                 | `npm run deploy:cloudflare:build`   |
-| Deploy command                | `npm run deploy:cloudflare`         |
-| Non-production deploy command | `npm run deploy:cloudflare:preview` |
-| Runtime variables/secrets     | none                                |
+| Setting                       | Value                                                     |
+| ----------------------------- | --------------------------------------------------------- |
+| Worker name                   | `index-sim`                                               |
+| Git repository                | `pessimoi/index-sim`                                      |
+| Production branch             | `master`                                                  |
+| Root directory                | repository root                                           |
+| Build command                 | `npm run deploy:cloudflare:build`                         |
+| Account-free bundle check     | `npm run deploy:cloudflare:dry-run`                       |
+| Deploy command                | `npm run deploy:cloudflare`                               |
+| Non-production deploy command | `npm run deploy:cloudflare:preview`                       |
+| Runtime variables/secrets     | `HISCORES_GLOBAL_RATE_LIMIT_MODE=off`; no runtime secrets |
 
-The deploy commands rebuild and revalidate `dist`, then fetch exact Wrangler
-`4.109.0`; they do not float to the latest release. `wrangler.jsonc` owns the Worker name, current compatibility
-date, static binding, Worker-first API routes, SPA fallback, preview URLs and
-disabled observability/Logpush. Cloudflare's account connection and generated
+The release commands rebuild and revalidate `dist`, then run lockfile-pinned
+Wrangler `4.109.0` directly through the repository's Node 22 runtime; they do not
+float to the latest release. `wrangler.jsonc` owns the Worker name, current
+compatibility date, static and Durable Object bindings, v1 SQLite migration,
+Worker-first API routes, SPA fallback, preview URLs, disabled global enforcement
+and disabled observability/Logpush. Cloudflare's account connection and generated
 build token remain provider-managed and must not enter this repository.
 
 ## Deployment smoke checks
@@ -294,7 +306,8 @@ which includes Worker code, static assets, bindings and compatibility settings.
 Requirements:
 
 - provider supports promoting/redeploying that exact target without source-history rewrite
-- no database migration or server state is required to restore the application
+- rollback does not delete, recreate or rewrite the D-097 Durable Object
+  namespace; a pre-D-097 target may leave that aggregate state unused
 - rollback restores matching static assets and market JSON from one coherent release
 - Hiscores can be disabled independently when its provider fails, while manual levels remain usable
 - after rollback, repeat root/assets/market/header/Hiscores-status smoke checks
@@ -304,7 +317,9 @@ Do not use force push as deployment rollback. A source correction after a bad re
 
 ## Security, privacy and tenant review
 
-- No authentication, account, tenant, database, payment or admin system is introduced.
+- No authentication, account, tenant, general application database, payment or
+  admin system is introduced. D-097's aggregate window counter is the only
+  server-managed state.
 - No tenant data exists and there is no tenant-isolation change.
 - Browser-local setups, collections, history and player name remain local; deployment must not add telemetry for their contents.
 - Server-side configuration stays outside the client bundle and repository.
@@ -326,12 +341,14 @@ Do not use force push as deployment rollback. A source correction after a bad re
 
 - implemented exact build/deploy commands, artifact directory, API-first routing, SPA fallback, cache and headers
 - implemented the server-only LostCity provider without runtime secrets
+- implemented D-097's aggregate provider-budget binding/migration with committed mode `off`
 - preview URLs and production branch deploy the same root-path contract; custom domain remains later
 - provider-specific files are limited to the Worker entrypoint, Wrangler config and static header file
 
 ### Goal 3: Implement release validation (complete)
 
 - implemented Cloudflare-aware artifact validation and focused tests
+- implemented the account-free lockfile-pinned Wrangler bundle/binding/migration dry-run
 - implemented bounded post-deploy HTTP smoke for routes, caches, headers, market files, API fallback and Hiscores status mode
 - full quality gate is encoded in `npm run deploy:cloudflare:build`; immutable preview execution is an adopter environment check
 

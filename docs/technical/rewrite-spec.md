@@ -33,7 +33,10 @@ Verified current facts:
 - Main UI is in `views.jsx`; planner UI is in `planner.jsx`.
 - Data and prices are spread across `gamedata.js`, `prices.json`, `alch.json`, `price-history.json`, market imports and `localStorage`.
 - A npm-based TypeScript/Vite/Vitest rewrite implementation owns the root app path in `src/`.
-- No CI config, database or backend source exists in this checkout.
+- No general GitHub Actions CI config, application database schema or stateful
+  simulation backend exists in this checkout. The only workflow is the scheduled
+  market writer; `src/server` owns narrow same-origin integration handlers and
+  D-097's disabled aggregate Hiscores provider-budget Durable Object.
 - Archived legacy UI references `/api/prices`, `/api/scrape`, `/api/hiscores` and `run_sim.py`. The production rewrite uses typed same-origin live integration endpoints with disabled default providers; `run_sim.py` is absent.
 
 Do not infer a backend, database or deploy target from stale UI text.
@@ -62,10 +65,16 @@ Do not add these unless a human explicitly accepts the decision:
 - server-side rendering
 - public API
 - scheduled backend market jobs
-- shared cloud state
+- shared cloud state beyond D-097's aggregate-only Hiscores provider-budget
+  object
 - marketplace/hiscores backend behavior beyond the accepted [live integrations spec](live-integrations-spec.md)
 
-The first rewrite remains static-first. D-066 later selected Cloudflare Workers + Static Assets after the live Hiscores constraints were known; the only dynamic service is the narrow same-origin provider adapter, with no database or simulation backend.
+The first rewrite remains static-first. D-066 later selected Cloudflare Workers
+
+- Static Assets after the live Hiscores constraints were known. Dynamic scope is
+  limited to the narrow same-origin provider adapter and D-097's disabled
+  aggregate-only rate state; there is no general application database or
+  simulation backend.
 
 ## 5. Recommended technology stack
 
@@ -617,7 +626,9 @@ Current acceptance status: the 2026-07-06 consolidated release-evidence pass is 
 
 - Initial scaffold uses npm; changing away from npm remains an open future decision.
 - Backend/runtime: still required for accepted hiscores if direct browser APIs are not viable, but concrete framework, hosting, cache and deployment shape remain undecided. Market price refresh uses scheduled static JSON instead of a user-triggered backend sync path.
-- Database: no database for market price refresh; broader database use is still undecided.
+- Database: no database for market price refresh; D-097 accepts only its
+  aggregate Hiscores provider-budget Durable Object, and broader application
+  database use is still undecided.
 - Live integrations: implement hiscores and market price refresh according to [live-integrations-spec.md](live-integrations-spec.md); hiscores waits for the authoritative API answer.
 - Price history: `price-history.json` keeps 12-hour points for 90 days and one latest point per older UTC day; Economy loads it read-only beside local comparisons. The item-page writer, catalog audit, crawler-policy review, live dry-run and root URL configuration are evidenced. A concrete first successful scheduled run is adopter evidence before a scheduled-current claim.
 - Data generator implementation: `npm run data:generate` reads the pinned raw Revision 274 checkout and writes the active schema-valid source pin, game-data snapshot and revision-impact report. Every expected runtime identity and all 63 core-loot tables resolve, and runtime readiness has zero blockers. Normalized `index-sim-source-slice` inputs remain fixture-only parser/schema tests.

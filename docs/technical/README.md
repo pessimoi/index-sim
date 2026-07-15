@@ -35,6 +35,7 @@
 - [price-set-transfer-controller-spec.md](price-set-transfer-controller-spec.md): implemented PriceSet import/acceptance/export/reset transaction extraction with typed caller-owned runtime application.
 - [cannon-pane-extraction-spec.md](cannon-pane-extraction-spec.md): implemented first low-coupling feature-pane extraction with explicit calculated presentation and action props.
 - [startup-bundle-performance-spec.md](startup-bundle-performance-spec.md): measured cold/warm startup, deterministic entry-JavaScript budgets and generated-runtime bootstrap splitting.
+- [dev-startup-reliability-spec.md](dev-startup-reliability-spec.md): implemented non-empty pre-React startup shell, canonical readiness states, real Vite-dev first-navigation smoke and checked agent localhost handoff.
 - [calculation-worker-measurement-spec.md](calculation-worker-measurement-spec.md): measured production one-shot Worker construction, full-request posting, startup/delivery, execution and response phases; D-095 retains the cancellable lifecycle.
 - [calculation-worker-retention-spec.md](calculation-worker-retention-spec.md): implemented D-095 one-shot protocol/controller retention contract, quantified persistent-Worker reopen triggers and hard-cancellation-safe future target.
 - [feature-test-suite-split-spec.md](feature-test-suite-split-spec.md): implemented ARCH-2026-05 split of functional Playwright, composed view-model and current/topic/historical testing owners with title and gate preservation.
@@ -52,6 +53,7 @@
 - [visual-regression-spec.md](visual-regression-spec.md): deterministic Playwright screenshot coverage and baseline policy.
 - [live-integrations-spec.md](live-integrations-spec.md): hiscores lookup and live market sync product/API specification.
 - [hiscores-live-implementation-spec.md](hiscores-live-implementation-spec.md): implemented Hiscores provider/runtime contract and adopter live-evidence runbook.
+- [hiscores-global-rate-limit-spec.md](hiscores-global-rate-limit-spec.md): D-097 disabled strict global provider-budget implementation and conditional activation/distributed-abuse specification.
 - [testing.md](testing.md): current validation commands and future test strategy.
 - [testing/runtime-data-deployment.md](testing/runtime-data-deployment.md): source audits, generated data, local-state health, market artifacts and deployment validation.
 - [testing/domain-and-integrations.md](testing/domain-and-integrations.md): golden, performance, domain, schema and same-origin integration testing.

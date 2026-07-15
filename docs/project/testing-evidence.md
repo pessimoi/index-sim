@@ -5,7 +5,51 @@ It does not own current commands, required gates or test strategy; those remain 
 [the testing guide](../technical/testing.md). Counts and artifact hashes below
 apply only to the source state described by each entry.
 
-## 2026-07-13–14 structural validation snapshots
+## 2026-07-13–15 structural validation snapshots
+
+Local development startup reliability validation note, 2026-07-15: the static
+root now exposes readable `starting` and no-JavaScript content before the
+external DOM-only guard and application entry. Existing React branches own the
+single canonical `starting`/`ready`/`error` marker. The fresh strict-port
+`npm run test:startup:dev` smoke first hit the managed sandbox's expected
+`listen EPERM`; the approved localhost rerun passed with one `ready` marker,
+zero startup warnings, one sanitized controlled-failure `error` marker, direct
+JSON and HEAD responses as `application/json; charset=utf-8`, and the Vite raw
+transform as `text/javascript`. Focused startup/middleware/deployment suites
+pass 20/20. The complete production-preview Chromium gate passes 78/78, and
+full `npm run verify` passes 80 files / 787 tests plus 19 goldens,
+architecture 124/109 with eight external entrypoints, typecheck,
+build/artifact, lint, format and diff gates. The 10-file/two-asset artifact is
+1,976,282 bytes, entry JavaScript 721,534 raw / 209,167 gzip, three JavaScript
+chunks and SHA-256
+`fa514545d3cfdaf3ddfbe1e4e2b17d0737b57c3dd8e793afa0c7af2056b227e6`.
+Five paired canonical-marker samples on Playwright Chromium 149.0.7827.55 have
+304 ms cold and 203 ms warm app-ready medians, with 32 ms cold and 16 ms warm
+first-contentful-paint medians. These are current-workstation evidence, not a
+universal latency budget or a replacement for D-094's accepted before/after
+comparison.
+The final checked user handoff emitted
+`APP_READY http://127.0.0.1:5173/` after a fresh Chromium probe and left that
+verified managed Vite process running.
+
+D-097 global Hiscores provider-budget validation note, 2026-07-14: the
+runtime-neutral handler checks the asynchronous aggregate gate after validated
+input and the in-isolate client limiter but before the provider. One
+deterministically named SQLite Durable Object atomically persists only fixed
+60-second window/config/count state; mode `off` bypasses the binding, while
+invalid enforcing configuration, coordinator failure and the one-second gate
+timeout fail closed without a provider request. The focused core/coordinator/
+Worker/adapter/provider command passes 5 files / 39 tests. The account-free
+lockfile-pinned Wrangler 4.109.0 dry run recognizes the Durable Object binding,
+v1 SQLite migration, Static Assets binding and committed `off` variable without
+uploading. Full `npm run verify` passes 79 files / 782 tests plus 19 goldens,
+architecture 122/109, typecheck, build/artifact, lint, format and diff gates.
+Separate `npm audit --json` covers 353 dependencies with zero known
+vulnerabilities. The server-only change leaves the 10-file/two-asset artifact
+at 1,974,877 bytes, entry JavaScript 720,422 raw / 208,739 gzip and SHA-256
+`babdae8745eff2ec18ae99c9c7978a2b830480315abae8c3a6121d97e43048e3`.
+Enforcement, quota, WAF configuration and deployed rollback evidence remain
+intentionally unclaimed.
 
 Repository-wide maintainability cleanup validation note, 2026-07-14: 21
 unused declarations/helpers and the proven dead rewrite/legacy selector

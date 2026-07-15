@@ -80,15 +80,17 @@ read-only comparison run.
 
 ## Cloudflare deployment validation
 
-Focused D-066 tests cover Worker routing, same-origin Hiscores responses,
-ephemeral client-address rate-limit keys, sanitized API fallback, static binding
-failure, Wrangler routing/log settings and the `_headers` contract:
+Focused D-066/D-097 tests cover Worker routing, same-origin Hiscores responses,
+ephemeral client-address rate-limit keys, aggregate budget ordering/state/failure,
+sanitized API fallback, static/Durable Object bindings, migration, pinned release
+runner, Wrangler routing/log settings and the `_headers` contract:
 
 ```sh
-npm run test -- src/tests/cloudflare-worker.test.ts src/tests/deployment-readiness.test.ts src/tests/hiscores-server.test.ts src/tests/lostcity-hiscores-provider.test.ts src/tests/workflow-security.test.ts
+npm run test -- src/tests/cloudflare-worker.test.ts src/tests/hiscores-global-rate-limit.test.ts src/tests/deployment-readiness.test.ts src/tests/hiscores-server.test.ts src/tests/lostcity-hiscores-provider.test.ts src/tests/workflow-security.test.ts
 npm run typecheck
 npm run build
 npm run deploy:verify-artifact
+npm run deploy:cloudflare:dry-run
 ```
 
 `workflow-security.test.ts` statically requires immutable commit-SHA pins for
@@ -123,10 +125,12 @@ hashed assets, stable market JSON and Hiscores status, and rejects an unknown
 
 The focused tests use synthetic artifacts and mocked responses. They make no
 live upstream or deployment request. Cloudflare Builds uses
-`npm run deploy:cloudflare:build`, then exact Wrangler 4.109.0 through
+`npm run deploy:cloudflare:build`, then lockfile-pinned Wrangler 4.109.0 through
 `npm run deploy:cloudflare`; `deploy:cloudflare:preview` uploads a version preview.
-The managed local environment cannot resolve the npm registry, so the real
-Wrangler bundle/upload and provider preview remain external evidence.
+`npm run deploy:cloudflare:dry-run` validates the real Worker/assets bundle,
+D-097 Durable Object export/binding/migration and committed `off` mode without an
+account or upload. Provider preview and deployed privacy/routing remain external
+evidence.
 
 Acceptance/security passes should also run:
 
@@ -212,9 +216,9 @@ For live integration release-copy audits, also run the narrower command below an
 rg -n "run_sim.py|/api/prices|/api/scrape|/api/hiscores" index.html legacy/index.html src views.jsx planner.jsx market.js docs
 ```
 
-The npm scripts use npm's `$NODE` value for Node-based tool commands. This keeps commands on the active NVM Node version even if a parent `node_modules/.bin/node` appears earlier in `PATH`. `npm run verify` is implemented by the shared gate mode in `scripts/run-cloudflare-release.mjs`; update that one command sequence instead of maintaining separate handoff and deploy checklists in code.
+The npm scripts use npm's `$NODE` value for Node-based tool commands. This keeps commands on the active NVM Node version even if a parent `node_modules/.bin/node` appears earlier in `PATH`. The Cloudflare release runner invokes the pinned Wrangler JavaScript entry through that same Node binary and keeps npm/Wrangler cache, config and logs inside ignored `.npm-cache` and `.wrangler` directories with Wrangler telemetry disabled. `npm run verify` is implemented by the shared gate mode in `scripts/run-cloudflare-release.mjs`; update that one command sequence instead of maintaining separate handoff and deploy checklists in code.
 
-Use repository-local caches and helper files for tests. For example, this project uses `.npm-cache` for npm commands. Do not place project scripts in `/tmp` or another external scratch directory unless a human explicitly approves.
+Use repository-local caches and helper files for tests. This project uses `.npm-cache` for npm commands and `.wrangler` for Wrangler config/cache/logs. Do not place project scripts in `/tmp` or another external scratch directory unless a human explicitly approves.
 
 Playwright smoke tests are configured, but browser binaries may need to be installed separately before running:
 

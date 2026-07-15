@@ -47,8 +47,8 @@ It runs five paired samples by default:
 
 1. A cold navigation in a fresh browser context with an empty HTTP cache.
 2. A warm reload in the same context so immutable hashed assets may be reused.
-3. Both samples wait for the existing `Monster card` landmark, which appears
-   only after generated runtime context and the initial view model are ready.
+3. Both samples wait for `[data-app-startup-state="ready"]`, which is emitted
+   only after generated runtime context and the initial workbench are ready.
 4. Each sample reports app-ready, DOMContentLoaded, load and first-contentful-
    paint times plus request, transfer, decoded and JavaScript resource bytes.
 5. The report includes every sample and the median; it writes no repository

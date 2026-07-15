@@ -181,6 +181,8 @@ Market freshness is scheduled-only. The item-page adapter, robust estimator, wor
 The hiscores same-origin implementation tests live in:
 
 - `src/tests/hiscores-server.test.ts`
+- `src/tests/hiscores-global-rate-limit.test.ts`
+- `src/tests/cloudflare-worker.test.ts`
 - `src/tests/lostcity-hiscores-provider.test.ts`
 - `src/tests/hiscores-adapter.test.ts`
 - `src/tests/hiscores-ui-state.test.ts`
@@ -190,11 +192,18 @@ The hiscores same-origin implementation tests live in:
 Run focused coverage with:
 
 ```sh
-npm run test -- src/tests/hiscores-lookup-controller.test.ts src/tests/hiscores-ui-state.test.ts src/tests/hiscores-adapter.test.ts src/tests/local-state-recovery-controller.test.ts src/tests/live-integrations.test.ts
+npm run test -- src/tests/hiscores-server.test.ts src/tests/hiscores-global-rate-limit.test.ts src/tests/cloudflare-worker.test.ts src/tests/hiscores-adapter.test.ts src/tests/hiscores-lookup-controller.test.ts src/tests/hiscores-ui-state.test.ts src/tests/local-state-recovery-controller.test.ts src/tests/live-integrations.test.ts
 ```
 
 They cover:
 
+- D-097 gate ordering after input/local limiting and before provider lookup, plus
+  sanitized `429`, one-second timeout and fail-closed `503` behavior
+- atomic concurrent fixed-window grants, rollover, persistent aggregate-only
+  state, corrupt-state/clock rejection and coordinator request/response bounds
+- Cloudflare `off`/`enforce` configuration, deterministic object identity,
+  missing-binding failure, SQLite binding/migration and the pinned Node 22
+  Wrangler dry-run contract
 - disabled-provider status and lookup behavior at the runtime-neutral handler boundary
 - first-party JSON type 1-7 mapping, stored-XP normalization and partial-skill warnings
 - fixed HTTPS origin, redirect refusal, abort propagation and sanitized fetch/stream failures
