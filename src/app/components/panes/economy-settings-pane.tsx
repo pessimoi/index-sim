@@ -302,8 +302,9 @@ export function EconomySettingsPane({ model, actions }: EconomySettingsPaneProps
         </div>
         <ScheduledSnapshotSummary prices={prices} />
         <p className="inline-status neutral">
-          Market upstream refresh is scheduled, not user-triggered. Import a PriceSet file to
-          override market prices locally. High alch always uses current generated game data.
+          Automatic market upstream refresh is currently disabled. Import a PriceSet file to
+          override committed market prices locally. High alch always uses current generated game
+          data.
         </p>
         <div className="market-sync-bar">
           <label className="file-button">

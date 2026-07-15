@@ -58,7 +58,7 @@ The legacy `views.jsx` `ArchitectureBoard` is only a docs-link panel. Treat the 
 - Legacy runtime reference/bootstrap generator: `src/adapters/legacy-runtime`
 - Generated runtime replacement readiness adapter: `src/adapters/generated`
 - Generated runtime commands: `scripts/report-generated-runtime-readiness.ts`, `scripts/write-legacy-derived-runtime-snapshot.ts`, `npm run runtime:readiness`, `npm run runtime:coverage-plan`, `npm run runtime:write-legacy-derived`
-- Scheduled market price workflow: `.github/workflows/update-market-prices.yml`
+- Disabled scheduled market workflow template: `.github/disabled-workflows/update-market-prices.yml`
 - Provider-neutral deployment validation: `scripts/deployment-readiness-core.ts`, `scripts/verify-public-deployment.ts`, `npm run deploy:verify-artifact`, `npm run deploy:smoke`
 - Production deployment target: Cloudflare Worker + Static Assets through `src/server/cloudflare-worker.ts`, `wrangler.jsonc`, `public/_headers`, `npm run deploy:cloudflare:build`, `npm run deploy:cloudflare:dry-run`, `npm run deploy:cloudflare:preview`, `npm run deploy:cloudflare`
 - Rewrite styling: `src/app/styles.css`
@@ -72,7 +72,7 @@ The legacy `views.jsx` `ArchitectureBoard` is only a docs-link panel. Treat the 
 
 The root app path is now the Vite rewrite and boots from the validated source-backed generated Revision 274 snapshot. The legacy-derived static bridge and legacy browser runtime files remain regression/reference, fixture and rollback evidence, not the production entrypoint.
 
-No general GitHub Actions CI config, application database schema or stateful simulation backend exists in this checkout. D-097 adds one dedicated SQLite Durable Object for aggregate Hiscores provider-budget state, committed with enforcement `off`. The only GitHub Actions workflow is the scheduled market price writer. D-066 selects Cloudflare Workers Builds as the optional production build/deploy integration; D-067 leaves account connection and live-operation evidence to a future adopter.
+No active GitHub Actions workflow, general application database schema or stateful simulation backend exists in this checkout. D-099 moves the retained scheduled market writer template outside `.github/workflows` because the current maintainer has no Actions capacity; re-enabling it requires an explicit capacity and freshness-policy decision. D-097 adds one dedicated SQLite Durable Object for aggregate Hiscores provider-budget state, committed with enforcement `off`. D-066 selects Cloudflare Workers Builds as the optional production build/deploy integration; D-067 leaves account connection and live-operation evidence to a future adopter.
 
 ## Change recipes
 
@@ -93,7 +93,7 @@ No general GitHub Actions CI config, application database schema or stateful sim
 
 ### API or backend change
 
-- Current state: repo-owned framework-neutral Hiscores and market handlers, Vite middleware and a Cloudflare Worker adapter exist under `src/server`. D-097's disabled aggregate Hiscores provider-budget Durable Object is the only server-managed state; no stateful simulation backend, general database, auth service or `run_sim.py` exists. `/api/prices` and `/api/scrape` are archived legacy references; the rewrite uses `/api/hiscores` and compatibility `/api/market/*` boundaries while scheduled static prices own production market freshness.
+- Current state: repo-owned framework-neutral Hiscores and market handlers, Vite middleware and a Cloudflare Worker adapter exist under `src/server`. D-097's disabled aggregate Hiscores provider-budget Durable Object is the only server-managed state; no stateful simulation backend, general database, auth service or `run_sim.py` exists. `/api/prices` and `/api/scrape` are archived legacy references; the rewrite uses `/api/hiscores` and compatibility `/api/market/*` boundaries while the committed static price snapshot owns current production market values. Automatic market refresh is disabled under D-099.
 - Ask a human before adding another backend framework, server-managed state, auth or a changed deployment shape.
 - Read first: [docs/operations/README.md](docs/operations/README.md), [docs/project/decisions.md](docs/project/decisions.md).
 - Update docs: operations, architecture, testing and decisions.

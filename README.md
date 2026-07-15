@@ -8,8 +8,8 @@ Committed price snapshot captured 12 July 2026
 
 The production app path is the Vite/React rewrite:
 
-Use Node 22 and npm 10. `.nvmrc`, `package.json` and the repository workflow use
-the same major-version contract. From a fresh clone:
+Use Node 22 and npm 10. `.nvmrc` and `package.json` use the same major-version
+contract. From a fresh clone:
 
 ```sh
 nvm use

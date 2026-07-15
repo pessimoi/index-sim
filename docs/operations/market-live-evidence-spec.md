@@ -1,17 +1,17 @@
 # Scheduled market live-evidence specification
 
-- Status: repository handoff ready; adopter scheduled-current evidence gated
+- Status: writer retained; automatic GitHub Actions execution disabled under D-099
 - Date: 2026-07-10
 - Owner: operations docs
 - Source: conditional backlog work and accepted decisions D-021, D-033, D-034 and D-053
 - Contract owner: [../technical/live-integrations-spec.md](../technical/live-integrations-spec.md)
-- Workflow: [../../.github/workflows/update-market-prices.yml](../../.github/workflows/update-market-prices.yml)
+- Disabled workflow template: [../../.github/disabled-workflows/update-market-prices.yml](../../.github/disabled-workflows/update-market-prices.yml)
 
 ## Purpose
 
-Verify the real `markets.lostcity.rs` response contract, safely configure the scheduled writer and define the evidence an adopter collects from its first successful GitHub Actions cron run. The runtime, writer and repository configuration are complete under D-067; the observed run is required only before a concrete deployment claims that shared market prices are scheduled-current.
+Verify the real `markets.lostcity.rs` response contract, preserve the hardened writer and define the evidence required if an adopter later restores GitHub Actions cron. The runtime and writer remain complete under D-067, while D-099 disables automatic execution because the current maintainer has no Actions capacity.
 
-This specification does not change the accepted architecture: twice-daily GitHub Actions writes validated static JSON to the same repository, and browser users never trigger the upstream fetch.
+The retained architecture still permits twice-daily GitHub Actions to write validated static JSON to the same repository, but only after an explicit D-099 re-enable decision. Browser users never trigger the upstream fetch.
 
 ## Feature-inventory check
 
@@ -30,7 +30,7 @@ The repository already has:
 - duplicate, unknown-item, canonical mapping and output validation gates
 - 12-hour shared history for 90 days plus one latest point per older UTC day
 - no-op behavior when generated files are unchanged
-- `.github/workflows/update-market-prices.yml` at 00:15 and 12:15 UTC
+- disabled `.github/disabled-workflows/update-market-prices.yml` template with retained 00:15 and 12:15 UTC cron
 - same-repo commit-if-diff with `GITHUB_TOKEN` and `contents: write`
 - a repository variable boundary named `MARKET_PRICES_UPSTREAM_URL`
 - workflow guards that allow only the two approved market files to change
@@ -76,15 +76,22 @@ Repository configuration evidence from 2026-07-10:
 - the newer failed run checked out `95aa0df`, which predates the final item-page/catalog/history hardening, so it must not be rerun or promoted as current evidence
 - no successful configured cron had been observed at repository handoff; no manual dispatch or user-triggered refresh was added, and a future adopter verifies its own run before a scheduled-current claim
 
+D-099 update from 2026-07-15: the current maintainer has no remaining GitHub
+Actions capacity, so the hardened template moved to
+`.github/disabled-workflows/update-market-prices.yml`. No active workflow or
+cron exists. The historical configuration evidence above remains useful only
+for a future explicit re-enable review.
+
 ## Preconditions
 
 Before any live fetch:
 
-1. keep the configured base exactly `https://markets.lostcity.rs/`; item paths are derived from the allowlist
-2. recheck that public crawler policy still permits the sequential twice-daily item-page reads
-3. confirm the response contains no credentials, player information or other data that must not enter the workflow
-4. retain the completed fetch hardening requirements below
-5. ensure the repository and target branch permit the workflow's same-repo commit with `GITHUB_TOKEN`
+1. accept sufficient GitHub Actions capacity and explicitly reopen D-099
+2. keep the configured base exactly `https://markets.lostcity.rs/`; item paths are derived from the allowlist
+3. recheck that public crawler policy still permits the sequential twice-daily item-page reads
+4. confirm the response contains no credentials, player information or other data that must not enter the workflow
+5. retain the completed fetch hardening requirements below
+6. ensure the repository and target branch permit the workflow's same-repo commit with `GITHUB_TOKEN`
 
 The endpoint variable is configuration, not a secret, but it must contain no username, password, token or signed query value.
 
@@ -156,9 +163,11 @@ The check must:
 
 Review differences against the committed market snapshots without accepting unexplained mass deletion, timestamp regression, implausible price distributions or unknown canonical identities.
 
-### Phase 3: Configure repository automation
+### Phase 3: Explicitly restore repository automation
 
-Set `MARKET_PRICES_UPSTREAM_URL` as a repository Actions variable only after the path is verified.
+Move the retained template back under `.github/workflows` only after D-099 is
+explicitly reopened. Set or reconfirm `MARKET_PRICES_UPSTREAM_URL` as a
+repository Actions variable only after the path is verified.
 
 Configuration checks:
 
@@ -171,15 +180,17 @@ Configuration checks:
 
 Do not duplicate the URL in browser code or public runtime configuration.
 
-Completed 2026-07-10: repository-variable readback matched the exact approved root. The
-workflow still has only scheduled triggers and `contents: write` permission. D-085 later
-expanded its changed-file allowlist to the validated `prices.json`,
-`price-provenance.json` and `price-history.json` logical set. This completes repository
-configuration but does not substitute for current-allowlist Phase 4 evidence.
+Historical 2026-07-10 evidence: repository-variable readback matched the exact
+approved root. The retained template still has only scheduled triggers and
+`contents: write` permission. D-085 later expanded its changed-file allowlist
+to the validated `prices.json`, `price-provenance.json` and
+`price-history.json` logical set. D-099 supersedes its active configuration;
+future restoration must revalidate these facts.
 
 ### Phase 4: Adopter observes the first scheduled run
 
-Wait for the existing cron rather than adding a manual upstream-refresh trigger. For the first successful run, verify:
+After explicitly restoring the template, wait for its cron rather than adding
+a manual upstream-refresh trigger. For the first successful run, verify:
 
 - the writer fetched one first page per approved mapping sequentially
 - validation and focused tests passed
@@ -204,7 +215,11 @@ Update release evidence only after a successful scheduled run and market-file re
 - known source limitations
 - date by which freshness must be rechecked
 
-Only then may product/operations copy say that prices are scheduled-current. If later runs fail or become stale, copy and status surfaces must fall back to dated/stale wording rather than retaining an unsupported current claim.
+Only then may product/operations copy say that prices are scheduled-current.
+While D-099 remains active, copy must say automatic refresh is disabled. If a
+restored schedule later fails or becomes stale, copy and status surfaces must
+fall back to dated/stale wording rather than retaining an unsupported current
+claim.
 
 ## Failure behavior
 

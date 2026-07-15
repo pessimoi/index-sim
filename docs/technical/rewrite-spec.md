@@ -33,10 +33,11 @@ Verified current facts:
 - Main UI is in `views.jsx`; planner UI is in `planner.jsx`.
 - Data and prices are spread across `gamedata.js`, `prices.json`, `alch.json`, `price-history.json`, market imports and `localStorage`.
 - A npm-based TypeScript/Vite/Vitest rewrite implementation owns the root app path in `src/`.
-- No general GitHub Actions CI config, application database schema or stateful
-  simulation backend exists in this checkout. The only workflow is the scheduled
-  market writer; `src/server` owns narrow same-origin integration handlers and
-  D-097's disabled aggregate Hiscores provider-budget Durable Object.
+- No active GitHub Actions workflow, application database schema or stateful
+  simulation backend exists in this checkout. D-099 retains the scheduled
+  market writer template under `.github/disabled-workflows`; `src/server` owns
+  narrow same-origin integration handlers and D-097's disabled aggregate
+  Hiscores provider-budget Durable Object.
 - Archived legacy UI references `/api/prices`, `/api/scrape`, `/api/hiscores` and `run_sim.py`. The production rewrite uses typed same-origin live integration endpoints with disabled default providers; `run_sim.py` is absent.
 
 Do not infer a backend, database or deploy target from stale UI text.
@@ -286,10 +287,10 @@ Accepted target source:
 
 - Use `markets.lostcity.rs` as the target source for live/current market prices.
 - The accepted history direction is to keep a latest `PriceSet` plus retained 12-hour price history snapshots.
-- Market refresh is scheduled-only repo automation. It writes `prices.json` and `price-history.json`, validates them and commits only real diffs. Generated game data owns high alch.
-- The scheduler is GitHub Actions cron at 00:15 and 12:15 UTC, using the repository `GITHUB_TOKEN` with `contents: write` and no `workflow_dispatch` manual trigger.
+- The retained market writer writes `prices.json` and `price-history.json`, validates them and commits only real diffs when used through the archived template. Generated game data owns high alch.
+- The retained scheduler template is GitHub Actions cron at 00:15 and 12:15 UTC, using the repository `GITHUB_TOKEN` with `contents: write` and no `workflow_dispatch` manual trigger. D-099 keeps it outside `.github/workflows`, so no automatic run is active.
 - Do not add databases, user-triggered upstream refresh or deploy-specific shared storage for market prices.
-- The local writer, normalized fixture contract, D-062 item-page adapter/estimator, catalog-audited mapping, public crawler-policy review, full 80-mapping live dry-run, exact root Actions variable and scheduled workflow are present. First successful configured scheduled-run evidence is not present yet.
+- The local writer, normalized fixture contract, D-062 item-page adapter/estimator, catalog-audited mapping, public crawler-policy review, full 80-mapping live dry-run, exact root Actions variable and archived hardened workflow template are present. D-099 disables automatic execution; first successful configured scheduled-run evidence remains a future re-enable gate.
 
 Core model:
 
@@ -310,7 +311,7 @@ Rules:
 - Simulation must receive a `PriceSet`; it must not discover one from browser state.
 - Imported prices must be validated before use.
 - Missing prices must produce structured warnings, not silent global fallback mutation.
-- Shared price history snapshots are file-backed in `price-history.json`; the local scheduled writer, fixture-evidenced raw upstream adapter and GitHub Actions commit-if-diff workflow are present. Live response verification and repository upstream URL configuration are evidenced; a future operator verifies its first scheduled run before a scheduled-current claim.
+- Shared price history snapshots are file-backed in `price-history.json`; the local writer, fixture-evidenced raw upstream adapter and archived hardened commit-if-diff template are present. D-099 disables automatic execution. A future operator must explicitly restore the template, recheck the upstream contract and verify its first scheduled run before a scheduled-current claim.
 
 Current implementation note: `src/data/schemas` validates `GameDataSnapshot`, item/drop/equipment data, `PriceSet` imports and committed price history. `src/data/legacy-adapter.ts` can adapt the current legacy runtime objects into a validated snapshot. `src/domain/economy` provides pure lookup helpers that return structured missing-price or missing-alch warnings without mutating the `PriceSet`.
 

@@ -7,6 +7,38 @@ apply only to the source state described by each entry.
 
 ## 2026-07-13–15 structural validation snapshots
 
+D-099 GitHub Actions disablement validation note, 2026-07-15: the only
+repository workflow was moved from `.github/workflows` to the retained
+`.github/disabled-workflows/update-market-prices.yml` template. The focused
+workflow-security and deployment-readiness suites pass 17/17, including an
+explicit assertion that no active workflow YAML exists. The affected Economy
+and shell Chromium specs pass 25/25 with the disabled-refresh copy. Full
+`npm run verify` passes 80 files / 788 tests plus 19 goldens, architecture
+124/109 with eight external entrypoints, typecheck, build/artifact, lint,
+format and diff gates. The resulting 10-file/two-asset artifact is 1,976,291
+bytes with a 721,543 raw / 209,175 gzip entry, three JavaScript chunks and
+SHA-256
+`fea2d14a96a429d221c695e8aed699a8231ac6c6f8c0dc188dcf48cadc120f39`.
+The committed/imported/manual price paths remain available; no scheduled-run
+freshness evidence is claimed while D-099 is active.
+
+D-098 direct-entry budget rebaseline validation note, 2026-07-15: the release
+gate now allows 800,000 raw / 230,000 gzip direct entry JavaScript while
+retaining D-094's asynchronous generated-runtime boundary. The focused
+deployment-readiness suite passes 13/13, typecheck and the 124/109/eight-root
+architecture check pass, and full `npm run verify` passes 80 files / 787 tests
+plus 19 goldens, build/artifact, lint, format and diff gates. The unchanged
+10-file/two-asset artifact is 1,976,282 bytes with a 721,534 raw / 209,167 gzip
+entry, three JavaScript chunks and SHA-256
+`fa514545d3cfdaf3ddfbe1e4e2b17d0737b57c3dd8e793afa0c7af2056b227e6`;
+the 880,362-byte generated runtime remains a separate deferred chunk. The first
+sandboxed startup measurement reached the expected `listen EPERM` boundary;
+the approved localhost rerun completed five cold/warm pairs on Playwright
+Chromium 149.0.7827.55 with 236/167 ms app-ready and 28/20 ms
+first-contentful-paint medians. The rebaseline changes no artifact, chunk,
+startup behavior or total-transfer claim and does not create a universal
+wall-clock SLA.
+
 Local development startup reliability validation note, 2026-07-15: the static
 root now exposes readable `starting` and no-JavaScript content before the
 external DOM-only guard and application entry. Existing React branches own the

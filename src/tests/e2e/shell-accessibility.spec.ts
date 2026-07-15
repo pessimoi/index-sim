@@ -69,7 +69,7 @@ test("loads the dense combat spreadsheet root", async ({ page }) => {
   await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Economy" }).click();
   const market = page.locator('section[aria-label="Market price data"]');
   await expect(
-    market.getByText("Market upstream refresh is scheduled, not user-triggered.").first()
+    market.getByText("Automatic market upstream refresh is currently disabled.").first()
   ).toBeVisible();
   await expect(market.getByLabel("Scheduled price snapshot summary")).toContainText(
     "Status Loaded"
@@ -225,7 +225,7 @@ test("renders scheduled price status and keeps local PriceSet overrides separate
   const activePriceSetSummary = market.getByLabel("Market active PriceSet summary");
   const scheduledSummary = market.getByLabel("Scheduled price snapshot summary");
 
-  await expect(market).toContainText("Market upstream refresh is scheduled, not user-triggered.");
+  await expect(market).toContainText("Automatic market upstream refresh is currently disabled.");
   await expect(scheduledSummary).toContainText("Status Loaded");
   await expect(scheduledSummary).toContainText("Label Scheduled static prices");
   await expect(activePriceSetSummary).toContainText("Active source Scheduled snapshot");

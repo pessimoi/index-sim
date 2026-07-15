@@ -67,15 +67,19 @@ The deployment artifact verifier owns the direct assets referenced by
 - direct entry JavaScript gzip bytes
 - total JavaScript chunk count
 
-The accepted post-split limits are:
+The original D-094 post-split limits were 725,000 raw / 210,000 gzip bytes.
+After the accepted feature and ownership work grew the direct entry to 721,534
+raw / 209,167 gzip bytes without returning the generated snapshot to it, D-098
+rebaselines the maintained release limits to:
 
-- entry JavaScript: at most 725,000 raw bytes
-- entry JavaScript: at most 210,000 gzip bytes
+- entry JavaScript: at most 800,000 raw bytes
+- entry JavaScript: at most 230,000 gzip bytes
 
-Both limits leave headroom over the measured implementation while preventing
-the generated snapshot from silently returning to the entry. The gate does not
-cap total artifact bytes because the accepted current-revision snapshot is
-required runtime truth.
+Both limits leave maintainable headroom over the measured implementation while
+remaining far below the 1,562,480-byte pre-split entry and therefore preventing
+the generated snapshot from silently returning to the entry. D-098 changes no
+chunk boundary or startup behavior. The gate does not cap total artifact bytes
+because the accepted current-revision snapshot is required runtime truth.
 
 ## Accepted split boundary
 

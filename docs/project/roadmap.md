@@ -40,7 +40,7 @@ Implementation requirements for the rewrite live in [../technical/rewrite-spec.m
 5. Add accepted live integrations. Repository implementation complete.
    - Hiscores lookup and market price refresh should follow [../technical/live-integrations-spec.md](../technical/live-integrations-spec.md).
    - Hiscores has a safe manual-level fallback, the D-061 first-party JSON provider and the D-066 Cloudflare same-origin production Worker. D-065/D-066 disable request collection. A future adopter verifies deployed routing/privacy/live behavior before claiming public availability.
-   - Market prices target catalog-audited `markets.lostcity.rs/items/{slug}` pages; scheduled-only GitHub Actions writes `prices.json` and compacted shared `price-history.json`. Generated Revision 274 data owns high alch. Public crawler policy, full live dry-run and exact root variable are evidenced. A future adopter verifies its first successful cron before claiming scheduled-current prices.
+   - Market prices retain the catalog-audited `markets.lostcity.rs/items/{slug}` writer, committed `prices.json` and compacted shared `price-history.json`; generated Revision 274 data owns high alch. D-099 disables the GitHub Actions cron because the current maintainer has no Actions capacity. A future adopter must explicitly re-enable the archived hardened template and verify its first successful cron before claiming scheduled-current prices.
    - Shared setups, accounts and database storage remain open decisions.
 
 ## Not in scope yet
@@ -49,4 +49,4 @@ Implementation requirements for the rewrite live in [../technical/rewrite-spec.m
 - Database-backed persistence.
 - Public API contract.
 - Request-triggered or server-managed market jobs beyond the accepted repository scheduler.
-- A general merge-blocking CI system or automatically operated public deployment. The repository-owned Cloudflare build/deploy package and scheduled market workflow exist, but account connection, live operation and any remote merge gate remain adopter decisions.
+- A general merge-blocking CI system or automatically operated public deployment. The repository-owned Cloudflare build/deploy package exists, while D-099 leaves no active GitHub Actions workflows; account connection, live operation, market-cron re-enablement and any remote merge gate remain adopter decisions.

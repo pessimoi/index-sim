@@ -1,3 +1,5 @@
+# Disabled under D-099. Move this file back under .github/workflows only after
+# an explicit capacity and freshness-policy decision.
 name: Update market prices
 
 on:

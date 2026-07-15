@@ -151,7 +151,7 @@ test("keeps market UI scheduled-only when the compatibility sync API exists", as
   await expect(page.getByLabel("Selected item price provenance")).toContainText("Origin");
   await expect(page.getByLabel("Selected item price provenance")).toContainText("Freshness");
   await expect(market.getByRole("button", { name: /Sync|Refresh|Scrape/ })).toHaveCount(0);
-  await expect(market).toContainText("Market upstream refresh is scheduled, not user-triggered.");
+  await expect(market).toContainText("Automatic market upstream refresh is currently disabled.");
   const bodyText = await page.locator("body").innerText();
   expect(bodyText).not.toContain("/api/prices");
   expect(bodyText).not.toContain("/api/scrape");

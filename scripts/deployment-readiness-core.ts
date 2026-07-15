@@ -25,8 +25,8 @@ const HASHED_ASSET_PATTERN =
 const TEXT_FILE_PATTERN = /(?:^_headers$|\.(?:css|html|js|json|txt)$)/i;
 const MAX_HTTP_BODY_BYTES = 5_000_000;
 const MAX_API_BODY_BYTES = 100_000;
-export const MAX_ENTRY_JAVASCRIPT_BYTES = 725_000;
-export const MAX_ENTRY_JAVASCRIPT_GZIP_BYTES = 210_000;
+export const MAX_ENTRY_JAVASCRIPT_BYTES = 800_000;
+export const MAX_ENTRY_JAVASCRIPT_GZIP_BYTES = 230_000;
 
 export const DEPLOYMENT_SMOKE_TIMEOUT_MS = 15_000;
 export { DEPLOYMENT_CSP };

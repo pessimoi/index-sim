@@ -366,7 +366,7 @@ unsupported unidentified-herb ids. Its 2026-07-12 no-write live parser check
 reported eight updated plus four retained/skipped rows without committing the
 candidate values.
 
-The scheduled workflow runs only at 00:15 and 12:15 UTC, has no `workflow_dispatch`, requires `MARKET_PRICES_UPSTREAM_URL` to be the exact reviewed root, validates focused tests/JSON/diffs, rejects changes outside `prices.json`, `price-provenance.json` and `price-history.json`, and commits only real three-file diffs. The opt-in 2026-07-10 live dry-run passed for the original 80 mappings with 69 updated plus 11 retained/skipped rows and no writes. The D-087 twelve-row expansion separately passed its parser dry-run on 2026-07-12; a complete 92-row configured cron is still adopter evidence. The exact repository variable was configured and read back on 2026-07-10. Under D-067, a future operator collects first-successful-run evidence before using scheduled-current copy; it is not a repository test gap.
+D-099 keeps no YAML workflow under `.github/workflows`. The archived template at `.github/disabled-workflows/update-market-prices.yml` retains only the 00:15 and 12:15 UTC schedule, has no `workflow_dispatch`, requires `MARKET_PRICES_UPSTREAM_URL` to be the exact reviewed root, validates focused tests/JSON/diffs, rejects changes outside `prices.json`, `price-provenance.json` and `price-history.json`, and commits only real three-file diffs if explicitly restored. The opt-in 2026-07-10 live dry-run passed for the original 80 mappings with 69 updated plus 11 retained/skipped rows and no writes. D-087's twelve-row expansion passed its parser dry-run on 2026-07-12. A future operator must accept Actions capacity, recheck upstream policy, restore the template and collect first-successful-run evidence before using scheduled-current copy.
 
 Freshness and release-evidence checks for the scheduled market path:
 
@@ -376,7 +376,7 @@ git log -1 --format="%h %cI %s" -- prices.json price-provenance.json price-histo
 git diff --check
 ```
 
-For release-copy evidence, also run the live integration release-copy audit below and classify every hit. D-053 keeps live scheduled-market workflow evidence out of the V1/trusted-tester gate when the release is described as static/bundled/imported price limited. Scheduled-current market-price copy requires the latest successful `Update market prices` GitHub Actions run on the release branch after `MARKET_PRICES_UPSTREAM_URL` is configured. A failed run leaves the previous committed snapshot active; a no-op successful run is freshness evidence but does not change `_scraped_at` or create a commit.
+For release-copy evidence, also run the live integration release-copy audit below and classify every hit. Under D-099, current copy must say automatic refresh is disabled and describe the committed/imported/manual price paths. Scheduled-current copy requires a later explicit workflow restore and successful run after current upstream review.
 
 Other focused tests validate committed market/provenance/history files, capture/key parity, generated fallback metadata, selected/local v1 migrations, alias metadata, same-origin logical-set loading and the rule that shared loading writes neither selected state nor local history. Playwright checks shared history without localStorage writes, local capture/clear isolation, scheduled status, provenance detail, import/reset and stale backend-copy absence.
 

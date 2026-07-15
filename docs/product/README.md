@@ -61,7 +61,7 @@ Current app does not provide:
 Implemented optional integrations:
 
 - repo-owned Hiscores lookup with local Vite and Cloudflare production adapters
-- repo-owned scheduled market sync with numeric, item-provenance and versioned history outputs
+- repo-owned market snapshot writer with numeric, item-provenance and versioned history outputs; D-099 currently disables its GitHub Actions schedule
 
 The implementation target for those live integrations is [../technical/live-integrations-spec.md](../technical/live-integrations-spec.md).
 

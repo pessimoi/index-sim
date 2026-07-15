@@ -4,13 +4,13 @@
 
 The latest complete production-preview Chromium gate passed 78/78 on
 2026-07-15 after the local startup reliability implementation. Full
-`npm run verify` passes 80 test files / 787 unit tests, 19 explicit goldens,
+`npm run verify` passes 80 test files / 788 unit tests, 19 explicit goldens,
 typecheck, the
 124-source-module/109-client-reachable-module/eight-external-entrypoint
 zero-cycle architecture check, build/artifact budgets, lint, formatting and
-diff checks. The 10-file artifact entry is 721,534 raw / 209,167 gzip bytes and
-remains inside D-094 budgets; total bytes are 1,976,282 and SHA-256 is
-`fa514545d3cfdaf3ddfbe1e4e2b17d0737b57c3dd8e793afa0c7af2056b227e6`.
+diff checks. The 10-file artifact entry is 721,543 raw / 209,175 gzip bytes and
+remains inside the D-098-rebased D-094 budgets; total bytes are 1,976,291 and SHA-256 is
+`fea2d14a96a429d221c695e8aed699a8231ac6c6f8c0dc188dcf48cadc120f39`.
 Earlier functional counts are superseded snapshots recorded in the linked
 evidence log. The latest read-only Darwin visual comparison passed 20/20 after
 the repository-wide dead-selector cleanup against the same 31 reviewed
