@@ -8,6 +8,23 @@
   "observability": {
     "enabled": false
   },
+  "vars": {
+    "HISCORES_GLOBAL_RATE_LIMIT_MODE": "off"
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "HISCORES_GLOBAL_RATE_LIMITER",
+        "class_name": "HiscoresGlobalRateLimit"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["HiscoresGlobalRateLimit"]
+    }
+  ],
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",

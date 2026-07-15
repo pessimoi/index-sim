@@ -15,6 +15,7 @@ import type {
 export const HISCORES_API_PATH = "/api/hiscores";
 export const HISCORES_STATUS_API_PATH = "/api/hiscores/status";
 export const HISCORES_PROVIDER_TIMEOUT_MS = 4_000;
+export const HISCORES_PROVIDER_BUDGET_TIMEOUT_MS = 1_000;
 export const HISCORES_LOOKUP_RATE_LIMIT_PER_MINUTE = 30;
 export const HISCORES_RATE_LIMIT_MAX_CLIENTS = 10_000;
 
@@ -108,9 +109,15 @@ export interface HiscoresRateLimiter {
   check(key: string): HiscoresRateLimitResult;
 }
 
+export interface HiscoresProviderBudgetGate {
+  check(): Promise<HiscoresRateLimitResult>;
+}
+
 export interface HiscoresApiHandlerOptions {
   provider?: HiscoresProvider;
   rateLimiter?: HiscoresRateLimiter;
+  providerBudgetGate?: HiscoresProviderBudgetGate;
+  providerBudgetTimeoutMs?: number;
   timeoutMs?: number;
 }
 
@@ -250,6 +257,11 @@ async function providerStatus(provider: HiscoresProvider, requestsPerMinute: num
 export function createHiscoresApiHandler(options: HiscoresApiHandlerOptions = {}) {
   const provider = options.provider ?? createDisabledHiscoresProvider();
   const rateLimiter = options.rateLimiter ?? createMemoryHiscoresRateLimiter();
+  const providerBudgetGate = options.providerBudgetGate ?? {
+    check: async () => ({ allowed: true })
+  };
+  const providerBudgetTimeoutMs =
+    options.providerBudgetTimeoutMs ?? HISCORES_PROVIDER_BUDGET_TIMEOUT_MS;
   const timeoutMs = options.timeoutMs ?? HISCORES_PROVIDER_TIMEOUT_MS;
 
   return async function handleHiscoresApiRequest(
@@ -293,6 +305,18 @@ export function createHiscoresApiHandler(options: HiscoresApiHandlerOptions = {}
     if (!rateLimit.allowed) {
       return errorResponse("rate-limited", {
         retryAfterSeconds: rateLimit.retryAfterSeconds
+      });
+    }
+
+    let providerBudget: HiscoresRateLimitResult;
+    try {
+      providerBudget = await withTimeout(providerBudgetTimeoutMs, () => providerBudgetGate.check());
+    } catch {
+      return errorResponse("upstream-unavailable");
+    }
+    if (!providerBudget.allowed) {
+      return errorResponse("rate-limited", {
+        retryAfterSeconds: providerBudget.retryAfterSeconds
       });
     }
 

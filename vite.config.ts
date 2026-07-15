@@ -20,7 +20,13 @@ const scheduledPriceAssetFiles = [
 const archivedLegacyJsxFiles = new Set(["planner.jsx", "views.jsx"]);
 const hiscoresProvider = createLostCityHiscoresProvider();
 
-export function isDirectScheduledPriceAssetRequest(requestUrlValue: string | undefined): boolean {
+export function isDirectScheduledPriceAssetRequest(
+  requestMethod: string | undefined,
+  requestUrlValue: string | undefined
+): boolean {
+  const method = requestMethod?.toUpperCase();
+  if (method !== "GET" && method !== "HEAD") return false;
+
   const requestUrl = new URL(requestUrlValue ?? "/", "http://localhost");
   const pathname = requestUrl.pathname.replace(/^\/+/, "");
   return (
@@ -56,7 +62,7 @@ function scheduledPriceAssetsPlugin(): Plugin {
     server: Pick<ViteDevServer | PreviewServer, "middlewares">
   ) => {
     server.middlewares.use((request, response, next) => {
-      if (!isDirectScheduledPriceAssetRequest(request.url)) {
+      if (!isDirectScheduledPriceAssetRequest(request.method, request.url)) {
         next();
         return;
       }
@@ -65,7 +71,11 @@ function scheduledPriceAssetsPlugin(): Plugin {
 
       response.statusCode = 200;
       response.setHeader("Content-Type", "application/json; charset=utf-8");
-      response.end(readFileSync(join(projectRoot, pathname)));
+      response.end(
+        request.method?.toUpperCase() === "HEAD"
+          ? undefined
+          : readFileSync(join(projectRoot, pathname))
+      );
     });
   };
 

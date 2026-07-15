@@ -1425,9 +1425,10 @@ export function App() {
 
   if (fatalError) {
     return (
-      <main className="app-shell">
+      <main className="app-shell" data-app-startup-state="error">
         <section className="fatal" role="alert">
           <h1>2004scape Combat Simulator</h1>
+          <p>The simulator could not start. Reload the page and try again.</p>
           <p>{fatalError}</p>
         </section>
       </main>
@@ -1436,8 +1437,8 @@ export function App() {
 
   if (!context || !viewModel || !derivedViewModel) {
     return (
-      <main className="app-shell">
-        <section className="loading" aria-live="polite">
+      <main className="app-shell" data-app-startup-state="starting">
+        <section className="loading" role="status" aria-live="polite">
           {status}
         </section>
       </main>
@@ -2147,7 +2148,7 @@ export function App() {
   });
 
   return (
-    <main className="app-shell">
+    <main className="app-shell" data-app-startup-state="ready">
       <AppHeader
         hiscores={{
           statusLabel: hiscores.statusLabel,

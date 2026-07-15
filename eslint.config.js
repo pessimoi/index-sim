@@ -9,6 +9,7 @@ export default [
       "node_modules/**",
       ".sources/**",
       ".vite/**",
+      ".wrangler/**",
       ".worker-measurement-dist/**",
       "dist/**",
       "coverage/**",

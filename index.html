@@ -10,7 +10,15 @@
     <title>2004scape Combat Simulator</title>
   </head>
   <body>
-    <div id="root"></div>
-    <script type="module" src="/src/app/main.tsx"></script>
+    <div id="root">
+      <main class="app-shell" data-app-startup-state="starting">
+        <section class="loading" role="status" aria-live="polite">
+          Starting 2004scape Combat Simulator...
+        </section>
+        <noscript>JavaScript is required to run the simulator.</noscript>
+      </main>
+    </div>
+    <script type="module" src="/src/app/startup-guard.ts"></script>
+    <script type="module" data-app-entry src="/src/app/main.tsx"></script>
   </body>
 </html>

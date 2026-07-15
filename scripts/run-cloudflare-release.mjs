@@ -1,15 +1,23 @@
 import { spawnSync } from "node:child_process";
 
 const command = process.argv[2];
-if (!new Set(["gate", "preview", "deploy"]).has(command)) {
-  console.error("Usage: node scripts/run-cloudflare-release.mjs gate|preview|deploy");
+if (!new Set(["gate", "dry-run", "preview", "deploy"]).has(command)) {
+  console.error("Usage: node scripts/run-cloudflare-release.mjs gate|dry-run|preview|deploy");
   process.exit(2);
 }
 
 function run(executable, args) {
   const result = spawnSync(executable, args, {
     stdio: "inherit",
-    env: { ...process.env, NODE: process.execPath }
+    env: {
+      ...process.env,
+      NODE: process.execPath,
+      npm_config_cache: ".npm-cache",
+      XDG_CACHE_HOME: ".wrangler/cache",
+      XDG_CONFIG_HOME: ".wrangler/config",
+      WRANGLER_LOG_PATH: ".wrangler/logs",
+      WRANGLER_SEND_METRICS: "false"
+    }
   });
   if (result.error) {
     console.error("Repository verification command could not start");
@@ -69,10 +77,10 @@ if (command === "gate") {
 }
 
 buildAndVerify();
-const npmCli = process.env.npm_execpath;
-if (!npmCli) {
-  console.error("Cloudflare deploy requires npm_execpath");
-  process.exit(1);
-}
-const wranglerArgs = command === "preview" ? ["versions", "upload"] : ["deploy"];
-runNode(npmCli, "exec", "--yes", "--package=wrangler@4.109.0", "--", "wrangler", ...wranglerArgs);
+const wranglerArgs =
+  command === "preview"
+    ? ["versions", "upload"]
+    : command === "dry-run"
+      ? ["deploy", "--dry-run", "--outdir", ".wrangler/dry-run"]
+      : ["deploy"];
+runNode("node_modules/wrangler/bin/wrangler.js", ...wranglerArgs);

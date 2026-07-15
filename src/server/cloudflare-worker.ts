@@ -1,16 +1,23 @@
 import {
   createHiscoresApiHandler,
+  createMemoryHiscoresRateLimiter,
   type HiscoresApiHandlerOptions,
   type HiscoresApiResponse
 } from "./hiscores-core";
+import {
+  createCloudflareHiscoresProviderBudgetGate,
+  type CloudflareHiscoresGlobalRateLimitEnvironment
+} from "./hiscores-global-rate-limit";
 import { createLostCityHiscoresProvider } from "./lostcity-hiscores-provider";
 import { DEPLOYMENT_SECURITY_HEADERS } from "./deployment-security";
+
+export { HiscoresGlobalRateLimit } from "./hiscores-global-rate-limit";
 
 export interface CloudflareAssetsBinding {
   fetch(request: Request): Promise<Response>;
 }
 
-export interface CloudflareWorkerEnvironment {
+export interface CloudflareWorkerEnvironment extends CloudflareHiscoresGlobalRateLimitEnvironment {
   ASSETS: CloudflareAssetsBinding;
 }
 
@@ -64,14 +71,19 @@ function trustedClientAddress(request: Request): string | undefined {
 export function createCloudflareWorker(
   options: HiscoresApiHandlerOptions = {}
 ): CloudflareWorkerHandler {
-  const handleHiscoresApiRequest = createHiscoresApiHandler({
-    ...options,
-    provider: options.provider ?? createLostCityHiscoresProvider()
-  });
+  const provider = options.provider ?? createLostCityHiscoresProvider();
+  const rateLimiter = options.rateLimiter ?? createMemoryHiscoresRateLimiter();
 
   return {
     async fetch(request, environment) {
       try {
+        const handleHiscoresApiRequest = createHiscoresApiHandler({
+          ...options,
+          provider,
+          rateLimiter,
+          providerBudgetGate:
+            options.providerBudgetGate ?? createCloudflareHiscoresProviderBudgetGate(environment)
+        });
         const url = new URL(request.url);
         const hiscoresResponse = await handleHiscoresApiRequest({
           method: request.method,

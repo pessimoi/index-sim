@@ -94,6 +94,44 @@ describe("Cloudflare production worker", () => {
     expect(keys).toEqual(["192.0.2.10", "same-origin-client"]);
   });
 
+  it("injects the enforcing global provider budget and preserves sanitized failures", async () => {
+    const lookup = vi.fn(provider().lookup);
+    const worker = createCloudflareWorker({ provider: { ...provider(), lookup } });
+    const { environment } = assets();
+    const getByName = vi.fn(() => ({
+      fetch: vi.fn(async () => Response.json({ allowed: false, retryAfterSeconds: 11 }))
+    }));
+    const limited = await worker.fetch(
+      new Request("https://index-sim.example/api/hiscores?player=Fixture"),
+      {
+        ...environment,
+        HISCORES_GLOBAL_RATE_LIMIT_MODE: "enforce",
+        HISCORES_GLOBAL_RATE_LIMIT_REQUESTS_PER_MINUTE: "5",
+        HISCORES_GLOBAL_RATE_LIMITER: { getByName }
+      }
+    );
+
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get("Retry-After")).toBe("11");
+    expect(await limited.json()).toMatchObject({
+      error: { code: "rate-limited", retryAfterSeconds: 11 }
+    });
+    expect(lookup).not.toHaveBeenCalled();
+    expect(getByName).toHaveBeenCalledTimes(1);
+
+    const missingBinding = await worker.fetch(
+      new Request("https://index-sim.example/api/hiscores?player=Fixture"),
+      {
+        ...environment,
+        HISCORES_GLOBAL_RATE_LIMIT_MODE: "enforce",
+        HISCORES_GLOBAL_RATE_LIMIT_REQUESTS_PER_MINUTE: "5"
+      }
+    );
+    expect(missingBinding.status).toBe(503);
+    expect(await missingBinding.text()).not.toContain("binding");
+    expect(lookup).not.toHaveBeenCalled();
+  });
+
   it("returns a sanitized API 404 before the SPA fallback", async () => {
     const worker = createCloudflareWorker({ provider: provider() });
     const { environment, fetch } = assets(new Response("<html>SPA</html>"));
@@ -139,6 +177,9 @@ describe("Cloudflare production worker", () => {
       preview_urls: boolean;
       logpush: boolean;
       observability: { enabled: boolean };
+      vars: Record<string, string>;
+      durable_objects: { bindings: Array<Record<string, string>> };
+      migrations: Array<Record<string, unknown>>;
       assets: Record<string, unknown>;
     };
 
@@ -149,6 +190,23 @@ describe("Cloudflare production worker", () => {
       preview_urls: true,
       logpush: false,
       observability: { enabled: false },
+      vars: {
+        HISCORES_GLOBAL_RATE_LIMIT_MODE: "off"
+      },
+      durable_objects: {
+        bindings: [
+          {
+            name: "HISCORES_GLOBAL_RATE_LIMITER",
+            class_name: "HiscoresGlobalRateLimit"
+          }
+        ]
+      },
+      migrations: [
+        {
+          tag: "v1",
+          new_sqlite_classes: ["HiscoresGlobalRateLimit"]
+        }
+      ],
       assets: {
         directory: "./dist",
         binding: "ASSETS",
@@ -156,16 +214,40 @@ describe("Cloudflare production worker", () => {
         run_worker_first: ["/api", "/api/*"]
       }
     });
+    expect(config.vars).not.toHaveProperty("HISCORES_GLOBAL_RATE_LIMIT_REQUESTS_PER_MINUTE");
     for (const statefulKey of [
-      "vars",
       "kv_namespaces",
       "d1_databases",
-      "durable_objects",
       "r2_buckets",
       "queues",
       "tail_consumers"
     ]) {
       expect(config).not.toHaveProperty(statefulKey);
     }
+  });
+
+  it("pins a Node-22-compatible Wrangler dry-run with repository-local tool state", () => {
+    const packageJson = JSON.parse(readFileSync(resolve("package.json"), "utf8")) as {
+      scripts: Record<string, string>;
+      devDependencies: Record<string, string>;
+    };
+    const releaseScript = readFileSync(resolve("scripts/run-cloudflare-release.mjs"), "utf8");
+    const eslintConfig = readFileSync(resolve("eslint.config.js"), "utf8");
+    const prettierIgnore = readFileSync(resolve(".prettierignore"), "utf8");
+
+    expect(packageJson.devDependencies.wrangler).toBe("4.109.0");
+    expect(packageJson.scripts["deploy:cloudflare:dry-run"]).toBe(
+      "$NODE scripts/run-cloudflare-release.mjs dry-run"
+    );
+    expect(releaseScript).toContain(
+      'runNode("node_modules/wrangler/bin/wrangler.js", ...wranglerArgs)'
+    );
+    expect(releaseScript).toContain('WRANGLER_SEND_METRICS: "false"');
+    expect(releaseScript).toContain('WRANGLER_LOG_PATH: ".wrangler/logs"');
+    expect(releaseScript).toContain('"--outdir", ".wrangler/dry-run"');
+    expect(releaseScript).not.toContain('"--outdir", "dist/');
+    expect(releaseScript).not.toContain("--package=wrangler@");
+    expect(eslintConfig).toContain('".wrangler/**"');
+    expect(prettierIgnore.split(/\r?\n/u)).toContain(".wrangler");
   });
 });

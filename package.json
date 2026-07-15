@@ -10,6 +10,7 @@
   "scripts": {
     "verify": "$NODE scripts/run-cloudflare-release.mjs gate",
     "dev": "$NODE node_modules/vite/bin/vite.js --config vite.config.ts",
+    "dev:checked": "$NODE scripts/dev-startup.mjs serve",
     "build": "$NODE node_modules/typescript/bin/tsc -b && $NODE node_modules/vite/bin/vite.js build --config vite.config.ts",
     "preview": "$NODE node_modules/vite/bin/vite.js preview --config vite.config.ts",
     "test": "$NODE node_modules/vitest/vitest.mjs run --config vitest.config.ts",
@@ -32,9 +33,11 @@
     "deploy:verify-artifact": "$NODE node_modules/vite-node/vite-node.mjs --config vitest.config.ts scripts/verify-public-deployment.ts artifact",
     "deploy:smoke": "$NODE node_modules/vite-node/vite-node.mjs --config vitest.config.ts scripts/verify-public-deployment.ts http",
     "deploy:cloudflare:build": "$NODE scripts/run-cloudflare-release.mjs gate",
+    "deploy:cloudflare:dry-run": "$NODE scripts/run-cloudflare-release.mjs dry-run",
     "deploy:cloudflare:preview": "$NODE scripts/run-cloudflare-release.mjs preview",
     "deploy:cloudflare": "$NODE scripts/run-cloudflare-release.mjs deploy",
     "test:e2e": "playwright test",
+    "test:startup:dev": "$NODE scripts/dev-startup.mjs check",
     "test:e2e:visual": "playwright test --config playwright.visual.config.ts",
     "test:e2e:visual:update": "playwright test --config playwright.visual.config.ts --update-snapshots",
     "typecheck": "tsc -b",
@@ -64,6 +67,7 @@
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.62.1",
     "vite": "^7.3.6",
-    "vitest": "^3.2.6"
+    "vitest": "^3.2.6",
+    "wrangler": "4.109.0"
   }
 }

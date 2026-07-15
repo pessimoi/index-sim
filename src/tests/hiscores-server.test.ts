@@ -140,6 +140,105 @@ describe("hiscores API handler", () => {
     expect(second?.headers["Retry-After"]).toBe("60");
   });
 
+  it("checks the provider-wide budget after local limiting and before lookup", async () => {
+    const calls: string[] = [];
+    const provider = fixtureProvider();
+    provider.lookup = (request, context) => {
+      calls.push("provider");
+      return fixtureProvider().lookup(request, context);
+    };
+    const handle = createHiscoresApiHandler({
+      provider,
+      rateLimiter: {
+        requestsPerMinute: 30,
+        check: () => {
+          calls.push("local");
+          return { allowed: true };
+        }
+      },
+      providerBudgetGate: {
+        check: async () => {
+          calls.push("global");
+          return { allowed: true };
+        }
+      }
+    });
+
+    expect((await handle({ method: "GET", url: "/api/hiscores?player=Fixture" }))?.status).toBe(
+      200
+    );
+    expect(calls).toEqual(["local", "global", "provider"]);
+  });
+
+  it("does not consume global budget for status, invalid or locally limited requests", async () => {
+    const check = vi.fn(async () => ({ allowed: true }));
+    const handle = createHiscoresApiHandler({
+      provider: fixtureProvider(),
+      rateLimiter: {
+        requestsPerMinute: 30,
+        check: () => ({ allowed: false, retryAfterSeconds: 8 })
+      },
+      providerBudgetGate: { check }
+    });
+
+    expect((await handle({ method: "GET", url: "/api/hiscores/status" }))?.status).toBe(200);
+    expect((await handle({ method: "GET", url: "/api/hiscores?player=../invalid" }))?.status).toBe(
+      400
+    );
+    expect((await handle({ method: "GET", url: "/api/hiscores?player=Fixture" }))?.status).toBe(
+      429
+    );
+    expect(check).not.toHaveBeenCalled();
+  });
+
+  it("returns the existing 429 contract when the global budget is exhausted", async () => {
+    const lookup = vi.fn(fixtureProvider().lookup);
+    const provider = { ...fixtureProvider(), lookup };
+    const response = await createHiscoresApiHandler({
+      provider,
+      providerBudgetGate: {
+        check: async () => ({ allowed: false, retryAfterSeconds: 17 })
+      }
+    })({ method: "GET", url: "/api/hiscores?player=Fixture" });
+
+    expect(response?.status).toBe(429);
+    expect(response?.headers["Retry-After"]).toBe("17");
+    expect(
+      parseBody<{ error: { code: string; retryAfterSeconds: number } }>(response?.body ?? "")
+    ).toMatchObject({
+      error: { code: "rate-limited", retryAfterSeconds: 17 }
+    });
+    expect(lookup).not.toHaveBeenCalled();
+  });
+
+  it("fails closed when the global budget gate fails or times out", async () => {
+    const lookup = vi.fn(fixtureProvider().lookup);
+    const provider = { ...fixtureProvider(), lookup };
+    const failed = await createHiscoresApiHandler({
+      provider,
+      providerBudgetGate: { check: async () => Promise.reject(new Error("private state")) }
+    })({ method: "GET", url: "/api/hiscores?player=Fixture" });
+    const timedOut = await createHiscoresApiHandler({
+      provider,
+      providerBudgetGate: { check: () => new Promise(() => undefined) },
+      providerBudgetTimeoutMs: 1
+    })({ method: "GET", url: "/api/hiscores?player=Fixture" });
+
+    for (const response of [failed, timedOut]) {
+      expect(response?.status).toBe(503);
+      expect(
+        parseBody<{ error: { code: string; message: string } }>(response?.body ?? "")
+      ).toMatchObject({
+        error: {
+          code: "upstream-unavailable",
+          message: "Hiscores provider is unavailable"
+        }
+      });
+      expect(response?.body).not.toContain("private state");
+    }
+    expect(lookup).not.toHaveBeenCalled();
+  });
+
   it("bounds ephemeral rate-limit client state and releases expired entries", () => {
     let currentTime = 1_000;
     const limiter = createMemoryHiscoresRateLimiter({

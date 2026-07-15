@@ -25,6 +25,7 @@ const documentedExternalEntrypoints = new Set([
   "src/adapters/static-runtime/index.ts",
   "src/app/calculation-worker.ts",
   "src/app/main.tsx",
+  "src/app/startup-guard.ts",
   "src/server/cloudflare-worker.ts",
   "src/server/vite-hiscores-middleware.ts",
   "src/server/vite-market-middleware.ts"

@@ -97,7 +97,7 @@ function summarize(samples) {
 
 async function readMetrics(page) {
   await page.waitForLoadState("load");
-  await page.locator('[aria-label="Monster card"]').waitFor({ state: "visible" });
+  await page.locator('[data-app-startup-state="ready"]').waitFor({ state: "visible" });
   return page.evaluate(() => {
     const navigation = globalThis.performance.getEntriesByType("navigation")[0];
     const resources = globalThis.performance.getEntriesByType("resource");
