@@ -238,7 +238,11 @@ type IntegrationErrorResponse = {
 };
 ```
 
-Open question: the authoritative 2004scape hiscores upstream URL and response format are not present in this repo. Implementation must verify and document the approved source before shipping.
+Accepted provider contract: D-061 fixes the first-party
+`https://2004.lostcity.rs/api/hiscores/player/:username` JSON source and
+`src/server/lostcity-hiscores-provider.ts` owns its bounded mapping behind the
+same-origin API. A changed upstream contract requires reviewed provider and
+schema evidence; the current repository implementation is not source-blocked.
 
 ### `GET /api/market/status`
 
@@ -592,6 +596,10 @@ Current status: the same-origin compatibility API, scheduled-only UI, imported-p
 
 - Which custom domain, if any, should be added after the D-066 provider preview passes?
 - Does the connected Cloudflare account show Workers Logs, Logpush, Tail Workers and external drains disabled as configured?
-- What is the authoritative market API or scrape contract for `markets.lostcity.rs`?
-- What exact live `markets.lostcity.rs` API/scrape response contract should the scheduled writer rely on in GitHub Actions?
-- Should remaining legacy market localStorage keys, especially full price history and unsupported metadata keys, be migrated or intentionally ignored?
+- If D-062's accepted first-page `markets.lostcity.rs/items/{slug}` Inertia contract changes, what reviewed replacement contract and migration evidence should supersede it?
+
+D-049/D-063 close the current legacy market-storage boundary: compatible
+current prices may import, generated alch values win, scrape metadata clears
+only on confirmed Clear and full legacy price history remains
+review-only/not migrated. Changing that policy requires a new explicit
+product/storage decision rather than more implementation under this spec.

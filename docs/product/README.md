@@ -111,9 +111,12 @@ visible when a component price is missing. Whether to add a separate
 
 ## Product open questions
 
-- Which v1 workflows need exact legacy UI parity versus improved UI with the same end-user capability?
+- Should a future release raise the accepted V1 parity bar beyond the completed visible workflows, and for which exact user path?
 - Which known bugs should become documented intentional deltas instead of parity targets?
 - Which custom domain, if any, should be added after the Cloudflare provider preview and live Hiscores evidence pass?
-- Should saved setups survive the rewrite through migration?
-- Should future/hypothetical planner gear be exposed at all before it exists in canonical data?
-- Should legacy browser setup keys be migrated into the rewrite UI, or left as legacy-only state?
+
+Setup/custom/Cannon/Duel migration and compatible preference/price import are
+implemented under the accepted D-042 boundary. D-048 keeps legacy Planner state
+review-only, D-049 does the same for full legacy price history and D-047 keeps
+future/hypothetical Planner gear out of V1. Reopening any of those boundaries
+requires a new explicit decision; they are not current product questions.

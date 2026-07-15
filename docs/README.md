@@ -62,6 +62,7 @@ This directory is the project memory layer for humans and AI agents. It keeps cu
 - Current worktree delivery specification: [project/worktree-delivery-spec.md](project/worktree-delivery-spec.md)
 - D-095 worker measurement commit specification: [project/d095-worker-measurement-commit-spec.md](project/d095-worker-measurement-commit-spec.md)
 - Repository handoff hardening specification: [project/handoff-hardening-spec.md](project/handoff-hardening-spec.md)
+- Documentation truth cleanup specification: [project/documentation-truth-cleanup-spec.md](project/documentation-truth-cleanup-spec.md)
 - Current numeric user-path audit: [project/numeric-user-path-audit.md](project/numeric-user-path-audit.md)
 - Current Revision 274 NPC attack source audit: [project/npc-attack-source-audit.md](project/npc-attack-source-audit.md)
 - Current repository documentation audit: [project/documentation-audit.md](project/documentation-audit.md)
@@ -112,6 +113,7 @@ These files are useful evidence, but they are not the living source of truth. Pr
 - D-097 strict provider-budget implementation, activation and any future distributed Hiscores abuse control belong in [technical/hiscores-global-rate-limit-spec.md](technical/hiscores-global-rate-limit-spec.md).
 - Scheduled market live evidence and public deployment execution work belong in [operations/market-live-evidence-spec.md](operations/market-live-evidence-spec.md) and [operations/public-deployment-spec.md](operations/public-deployment-spec.md).
 - Reviewable commit grouping and delivery of the current worktree belong in [project/worktree-delivery-spec.md](project/worktree-delivery-spec.md).
+- The bounded post-handoff documentation truth cleanup belongs in [project/documentation-truth-cleanup-spec.md](project/documentation-truth-cleanup-spec.md); current facts remain in their existing product, technical, operations and project owners.
 - Validation commands belong in [technical/testing.md](technical/testing.md).
 - Generated numeric cross-path and legacy-delta evidence belongs in [project/numeric-user-path-audit.md](project/numeric-user-path-audit.md).
 - Generated Revision 274 NPC attack-handler evidence belongs in [project/npc-attack-source-audit.md](project/npc-attack-source-audit.md).

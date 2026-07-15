@@ -283,8 +283,9 @@ The unit path verifies every generated monster row, live/snapshot metric
 composition, best markers and snapshot immutability. The browser path verifies
 that the matrix is absent before the user requests it, builds from live plus a
 saved setup, exposes all generated monster rows, switches metrics, filters rows
-and keeps horizontal overflow inside the workbench. These tests do not add a
-worker, persist matrix output or call live upstreams.
+and keeps horizontal overflow inside the workbench. The matrix uses the
+accepted typed one-shot calculation Worker; these tests do not persist matrix
+output or call live upstreams.
 
 For the optional all-fixture browser-display expansion, use:
 
@@ -299,11 +300,13 @@ loot-setting state without starting the archived browser runtime. The unit test
 validates every mapped setup and finite generated-runtime metric. The Playwright
 case reloads each setup through the versioned rewrite browser-storage envelopes
 and compares all ten visible metric-strip values with the same source-backed
-view-model result. The focused production-preview browser case passes 1/1, and
-the expanded default Playwright gate passes 63/63. The first focused run found
-that the browser's dynamically loaded scheduled snapshot had dropped generated
-item/alch fallbacks; `src/app/state/market-sync.ts` now composes those fallbacks
-without overriding scheduled values, with focused unit coverage.
+view-model result. The case remains part of the default Playwright gate;
+[technical testing](../testing.md) owns the current command and latest summary,
+while [testing evidence](../../project/testing-evidence.md) owns dated results.
+The first focused run found that the browser's dynamically loaded scheduled
+snapshot had dropped generated item/alch fallbacks;
+`src/app/state/market-sync.ts` now composes those fallbacks without overriding
+scheduled values, with focused unit coverage.
 
 In the managed Codex sandbox, Node-based localhost connections can fail with `EPERM`.
 When that happens, run `npm run test:e2e` with explicit sandbox escalation instead of

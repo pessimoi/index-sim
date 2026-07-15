@@ -3,8 +3,7 @@
 These ideas are intentionally not backlog items yet. Do not implement them until promoted.
 
 - Account-backed saved setups.
-- Server-side market scraper with scheduled snapshots.
+- Server-managed or request-triggered market service beyond the accepted scheduled repository writer.
 - Database-backed price history.
-- Web Worker for compare and planner calculations.
 - Separate publishable domain-core package.
 - Public API for simulation requests.
