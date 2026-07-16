@@ -569,6 +569,69 @@ th {
   border-bottom: 0;
 }
 
+.player-profile .section-title-row h3 {
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.player-profile-list {
+  display: grid;
+  gap: 0;
+  margin: 0;
+}
+
+.player-profile-row {
+  align-items: start;
+  border-top: 1px solid #202833;
+  display: grid;
+  gap: 0.45rem;
+  grid-template-columns: minmax(4.7rem, 0.75fr) minmax(0, 1fr);
+  padding: 0.38rem 0;
+}
+
+.player-profile-row dt {
+  color: #7f8b9a;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.player-profile-row dd {
+  color: #dce5ef;
+  font-size: 0.72rem;
+  font-weight: 700;
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.player-profile-row dd.ready {
+  color: #81d5bd;
+}
+
+.player-profile-row dd.warning {
+  color: #f2c45b;
+}
+
+.player-profile-row dd.info {
+  color: #9cc9ff;
+}
+
+.player-profile-actions {
+  display: grid;
+  gap: 0.4rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.player-profile-actions button {
+  min-height: 2rem;
+  padding: 0.35rem 0.4rem;
+}
+
 .monster-rail {
   border-left: 1px solid #26303d;
   min-height: 0;
@@ -4618,7 +4681,7 @@ th {
     border: 1px solid #26303d;
     gap: 0;
     grid-template-columns:
-      clamp(210px, 20vw, 250px) minmax(0, 1fr)
+      clamp(190px, 17vw, 220px) minmax(0, 1fr)
       clamp(230px, 23vw, 285px);
     min-height: 0;
     overflow: hidden;

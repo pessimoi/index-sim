@@ -62,7 +62,18 @@ export interface AppShellSetupViewModel {
   derivedAccuracyPlaceholder: string;
   derivedDamagePlaceholder: string;
   derivedSpeedPlaceholder: string;
+  playerProfile: PlayerProfileViewModel;
   setupGuide: readonly [SetupGuideRowViewModel, SetupGuideRowViewModel, SetupGuideRowViewModel];
+}
+
+export interface PlayerProfileRowViewModel {
+  label: string;
+  value: string;
+  tone?: "ready" | "warning" | "info";
+}
+
+export interface PlayerProfileViewModel {
+  rows: PlayerProfileRowViewModel[];
 }
 
 export interface SetupGuideRowViewModel {
@@ -171,9 +182,16 @@ export function createAppShellSetupViewModel(input: {
   form: CombatSetupFormState;
   hasCurrentCustomSetup: boolean;
   activeSetupIsCustom: boolean;
+  weaponName: string;
+  ammoName: string;
+  spellName: string;
+  styleName: string;
+  effectiveAccuracy: number;
+  effectiveDamage: number;
   derivedAccuracyBonus: number;
   derivedDamageBonus: number;
   derivedAttackSpeedSec: number;
+  setupRequirementWarningCount: number;
   potionCarrySummary: string;
   prayerRestoreSourceSummary: string;
   lootPolicySummary: string;
@@ -186,6 +204,23 @@ export function createAppShellSetupViewModel(input: {
       : "Default setup";
   const prayerSelection = setupSelectionSummary(form.prayers, PRAYER_SELECTION_OPTIONS);
   const boostSelection = setupSelectionSummary(form.boosts, BOOST_SELECTION_OPTIONS);
+  const manualOverrideCount = Object.values(form.manualOverrides).filter(
+    (value) => value !== null
+  ).length;
+  const secondaryLoadoutRow =
+    form.combatStyle === "ranged"
+      ? { label: "Ammo", value: input.ammoName }
+      : form.combatStyle === "magic"
+        ? { label: "Spell", value: input.spellName }
+        : { label: "Stance", value: input.styleName.replace(/\s+\([^)]*\)$/, "") };
+  const statusParts = [
+    input.setupRequirementWarningCount > 0
+      ? `${formatNumber(input.setupRequirementWarningCount)} requirement ${input.setupRequirementWarningCount === 1 ? "warning" : "warnings"}`
+      : null,
+    manualOverrideCount > 0
+      ? `${formatNumber(manualOverrideCount)} manual ${manualOverrideCount === 1 ? "override" : "overrides"}`
+      : null
+  ].filter((part): part is string => part !== null);
 
   return {
     primarySkill: primaryLevelKey(form.combatStyle),
@@ -202,6 +237,32 @@ export function createAppShellSetupViewModel(input: {
     derivedAccuracyPlaceholder: formatSignedInteger(input.derivedAccuracyBonus),
     derivedDamagePlaceholder: formatSignedInteger(input.derivedDamageBonus),
     derivedSpeedPlaceholder: formatNumber(input.derivedAttackSpeedSec, 1),
+    playerProfile: {
+      rows: [
+        { label: "Weapon", value: input.weaponName },
+        secondaryLoadoutRow,
+        {
+          label: "Attack speed",
+          value: `${formatNumber(input.derivedAttackSpeedSec, 1)} s`
+        },
+        {
+          label: "Effective levels",
+          value: `ACC ${formatNumber(input.effectiveAccuracy)} · DMG ${formatNumber(input.effectiveDamage)}`
+        },
+        { label: "Prayers", value: prayerSelection },
+        { label: "Boosts", value: boostSelection },
+        {
+          label: "Status",
+          value: statusParts.length > 0 ? statusParts.join(" · ") : "Requirements met",
+          tone:
+            input.setupRequirementWarningCount > 0
+              ? "warning"
+              : manualOverrideCount > 0
+                ? "info"
+                : "ready"
+        }
+      ]
+    },
     setupGuide: [
       {
         target: "loadout",

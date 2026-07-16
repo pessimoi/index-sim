@@ -215,6 +215,35 @@ export function WorkbenchShell({
               onChange={actions.setStyle}
             />
           </section>
+          <section className="sidebar-section player-profile" aria-label="Active player setup">
+            <div className="section-title-row">
+              <h3>Active setup</h3>
+            </div>
+            <dl className="player-profile-list">
+              {shellSetup.playerProfile.rows.map((row) => (
+                <div className="player-profile-row" key={row.label}>
+                  <dt>{row.label}</dt>
+                  <dd className={row.tone}>{row.value}</dd>
+                </div>
+              ))}
+            </dl>
+            <div className="player-profile-actions">
+              <button
+                type="button"
+                aria-label="Open loadout"
+                onClick={() => actions.activateTab("loadout")}
+              >
+                Loadout
+              </button>
+              <button
+                type="button"
+                aria-label="View stats"
+                onClick={() => actions.activateTab("stats")}
+              >
+                Stats
+              </button>
+            </div>
+          </section>
         </aside>
 
         <section className="workbench-center" aria-label="Workbench center">

@@ -62,9 +62,16 @@ describe("app shell view model", () => {
       form,
       hasCurrentCustomSetup: true,
       activeSetupIsCustom: false,
+      weaponName: "Staff of air",
+      ammoName: "None",
+      spellName: "Fire strike",
+      styleName: "Accurate",
+      effectiveAccuracy: 88,
+      effectiveDamage: 91,
       derivedAccuracyBonus: 12,
       derivedDamageBonus: 0,
       derivedAttackSpeedSec: 2.4,
+      setupRequirementWarningCount: 0,
       potionCarrySummary: "2 sets",
       prayerRestoreSourceSummary: "Altar",
       lootPolicySummary: "3 loot"
@@ -88,6 +95,15 @@ describe("app shell view model", () => {
     });
     expect(viewModel.setupGuide.map((row) => row.target)).toEqual(["loadout", "trip", "loot"]);
     expect(viewModel.setupGuide[0]?.value).toBe("incredible + steel skin · magic");
+    expect(viewModel.playerProfile.rows).toEqual([
+      { label: "Weapon", value: "Staff of air" },
+      { label: "Spell", value: "Fire strike" },
+      { label: "Attack speed", value: "2.4 s" },
+      { label: "Effective levels", value: "ACC 88 · DMG 91" },
+      { label: "Prayers", value: "incredible + steel skin" },
+      { label: "Boosts", value: "magic" },
+      { label: "Status", value: "Requirements met", tone: "ready" }
+    ]);
   });
 
   it("presents ready, warning and invalid shared setup reviews", () => {

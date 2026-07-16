@@ -395,7 +395,7 @@ The default desktop workbench must use the legacy three-zone shell:
 Chrome
 +---------------+------------------------------------+------------------+
 | PlayerSidebar | SetupBar + TabBar + active pane    | MonsterCard      |
-| 280px         | minmax(0, 1fr)                     | 320px            |
+| 220px         | minmax(0, 1fr)                     | 320px            |
 +---------------+------------------------------------+------------------+
 ```
 
@@ -410,6 +410,11 @@ Required behavior:
 Current implementation note: the rewrite now has the three-zone workbench shell:
 left PlayerSidebar, center setup context bar plus horizontally scrollable
 legacy-order TabBar and active pane routing, and a right-side MonsterCard rail.
+The narrower PlayerSidebar keeps level and style inputs at the top and adds one
+read-only Active setup profile for the current weapon, stance/ammo/spell,
+attack speed, effective accuracy/damage levels, prayers, boosts and requirement
+or manual-override status. Its actions only navigate to Loadout and Stats; it
+does not duplicate target-, Trip-, loot- or price-dependent output metrics.
 The left rail, center pane and MonsterCard rail have independent scroll
 containers on desktop. On mobile the zones stack in workflow order, with
 MonsterCard after the active pane. The final default-pane decision remains open.

@@ -170,9 +170,16 @@ describe("app shell components", () => {
       form: DEFAULT_FORM_STATE,
       hasCurrentCustomSetup: false,
       activeSetupIsCustom: false,
+      weaponName: "Rune scimitar",
+      ammoName: "None",
+      spellName: "None",
+      styleName: "Accurate",
+      effectiveAccuracy: 75,
+      effectiveDamage: 80,
       derivedAccuracyBonus: 5,
       derivedDamageBonus: 6,
       derivedAttackSpeedSec: 2.4,
+      setupRequirementWarningCount: 0,
       potionCarrySummary: "2 sets",
       prayerRestoreSourceSummary: "None",
       lootPolicySummary: "Loot defaults"
@@ -241,6 +248,7 @@ describe("app shell components", () => {
       'aria-label="Setup quick navigation"',
       'aria-label="Workbench shell"',
       'aria-label="Player sidebar"',
+      'aria-label="Active player setup"',
       'aria-label="Setup context"',
       'aria-label="Workbench tabs"',
       'aria-label="Active workbench pane"',
@@ -255,6 +263,11 @@ describe("app shell components", () => {
     );
     expect(markup).toContain('id="workbench-tab-loadout" type="button" role="tab"');
     expect(markup).toContain("Melee setup");
+    expect(markup).toContain("Active setup");
+    expect(markup).toContain("Rune scimitar");
+    expect(markup).toContain("Requirements met");
+    expect(markup).toContain("Open loadout");
+    expect(markup).toContain("View stats");
     expect(markup).toContain("Effective XP/hr");
     expect(markup).not.toContain('aria-label="Effective trip rates"');
     expect(markup).toContain('hidden=""');

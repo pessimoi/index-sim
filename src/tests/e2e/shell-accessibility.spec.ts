@@ -331,9 +331,16 @@ test("shows Stats XP routing and trip summary plus setup damage distribution", a
   await page.goto("/");
 
   const playerSidebar = page.getByLabel("Player sidebar");
+  const activePlayerSetup = playerSidebar.getByLabel("Active player setup");
   const setupContext = page.getByLabel("Setup context");
   await expect(playerSidebar).not.toContainText("Effective XP/hr");
   await expect(playerSidebar).not.toContainText("Net GP/hr");
+  await expect(activePlayerSetup).toContainText("Rune scimitar");
+  await expect(activePlayerSetup).toContainText("Attack speed");
+  await expect(activePlayerSetup).toContainText("Effective levels");
+  await expect(activePlayerSetup).toContainText("Requirements met");
+  await expect(activePlayerSetup.getByRole("button", { name: "Open loadout" })).toBeVisible();
+  await expect(activePlayerSetup.getByRole("button", { name: "View stats" })).toBeVisible();
   await expect(setupContext).toContainText("DPS");
   await expect(setupContext).toContainText("Effective XP/hr");
   await expect(setupContext).toContainText("Net GP/hr");
