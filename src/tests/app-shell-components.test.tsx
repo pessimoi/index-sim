@@ -184,8 +184,6 @@ describe("app shell components", () => {
       ttkSec: 30,
       killsPerHour: 100,
       effectiveXpPerHour: 20_000,
-      playerEffectiveXpPerHour: 20_000,
-      cannonEffectiveXpPerHour: 0,
       gpPerHour: 5_000,
       effectiveNetGpPerHour: -1_000,
       supplyCostPerKill: 60,
@@ -257,6 +255,8 @@ describe("app shell components", () => {
     );
     expect(markup).toContain('id="workbench-tab-loadout" type="button" role="tab"');
     expect(markup).toContain("Melee setup");
+    expect(markup).toContain("Effective XP/hr");
+    expect(markup).not.toContain('aria-label="Effective trip rates"');
     expect(markup).toContain('hidden=""');
   });
 });

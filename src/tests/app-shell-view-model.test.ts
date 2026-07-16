@@ -140,8 +140,6 @@ describe("app shell view model", () => {
       ttkSec: 30,
       killsPerHour: 100,
       effectiveXpPerHour: 25_000,
-      playerEffectiveXpPerHour: 20_000,
-      cannonEffectiveXpPerHour: 5_000,
       gpPerHour: 10_000,
       effectiveNetGpPerHour: -2_000,
       supplyCostPerKill: 120,
@@ -172,11 +170,10 @@ describe("app shell view model", () => {
       visible: true,
       message: "Supplies 120 GP/kill exceed loot 100 GP/kill by 20 GP."
     });
-    expect(viewModel.sidebarMetrics.map((metric) => metric.label)).toEqual([
+    expect(viewModel.contextMetrics.map((metric) => metric.label)).toEqual([
+      "DPS",
       "Effective XP/hr",
-      "Net GP/hr",
-      "Player XP/hr",
-      "Cannon XP/hr"
+      "Net GP/hr"
     ]);
   });
 });

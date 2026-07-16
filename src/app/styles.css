@@ -707,19 +707,10 @@ th {
   text-transform: uppercase;
 }
 
-.sidebar-metrics {
-  display: grid;
-  gap: 0.5rem;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  min-width: 0;
-}
-
-.sidebar-metrics .metric,
 .setup-context-metrics .metric {
   min-height: 2.55rem;
 }
 
-.sidebar-metrics .metric strong,
 .setup-context-metrics .metric strong {
   font-size: 1rem;
 }
@@ -874,12 +865,16 @@ th {
   gap: 0.45rem;
   grid-template-columns:
     minmax(78px, 0.7fr) minmax(64px, 0.5fr) minmax(118px, 1fr) minmax(64px, 0.5fr)
-    minmax(130px, 1.1fr) minmax(118px, 1fr) minmax(118px, 1fr) minmax(110px, 0.8fr)
+    minmax(170px, 1.25fr) minmax(118px, 1fr) minmax(118px, 1fr) minmax(110px, 0.8fr)
     minmax(110px, 0.8fr) minmax(110px, 0.8fr) minmax(72px, 0.55fr)
     minmax(205px, 1.6fr);
   min-width: 0;
   overflow-x: auto;
   padding: 0.65rem 0;
+}
+
+.compact-setup-strip .compact-selection-field {
+  min-width: 9.5rem;
 }
 
 .dense-metric-strip {
@@ -1850,7 +1845,7 @@ th {
   align-items: start;
   display: grid;
   gap: 0.55rem;
-  grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   min-width: 0;
 }
 
@@ -2220,7 +2215,7 @@ th {
   align-items: end;
   display: grid;
   gap: 0.55rem;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   min-width: 0;
 }
 
@@ -2613,7 +2608,7 @@ th {
   align-items: start;
   display: grid;
   gap: 0.55rem;
-  grid-template-columns: repeat(auto-fit, minmax(105px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
   min-width: 0;
 }
 
@@ -4585,6 +4580,7 @@ th {
   .app-shell {
     font-family:
       ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: 0.82rem;
     gap: 0.45rem;
     height: 100dvh;
     min-height: 0;
@@ -4687,18 +4683,25 @@ th {
     padding: 0.25rem 0.4rem;
   }
 
-  .sidebar-metrics {
-    gap: 0.35rem;
-  }
-
-  .sidebar-metrics .metric,
   .setup-context-metrics .metric {
     min-height: 2.15rem;
   }
 
-  .sidebar-metrics .metric strong,
+  .setup-context-metrics .metric span {
+    font-size: 0.66rem;
+  }
+
   .setup-context-metrics .metric strong {
     font-size: 0.88rem;
+  }
+
+  .source-detail-distribution .metric strong,
+  .special-output .metric strong,
+  .risk-summary .metric strong,
+  .loot-output .metric strong,
+  .trip-output .metric strong,
+  .cannon-output-grid .metric strong {
+    font-size: 0.82rem;
   }
 
   .hiscores-form {
@@ -4715,7 +4718,7 @@ th {
     gap: 0.45rem;
     grid-template-columns:
       minmax(100px, 0.65fr) minmax(190px, 1fr) minmax(160px, 1fr)
-      minmax(180px, 1fr);
+      minmax(200px, 1fr);
     padding: 0.45rem 0;
   }
 
@@ -5003,8 +5006,7 @@ th {
   }
 
   .setup-context-metrics,
-  .setup-context-actions,
-  .sidebar-metrics {
+  .setup-context-actions {
     grid-template-columns: 1fr;
   }
 

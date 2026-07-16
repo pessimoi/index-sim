@@ -108,7 +108,6 @@ export interface NetGpGuidanceViewModel {
 }
 
 export interface WorkbenchResultViewModel {
-  sidebarMetrics: ShellDisplayMetricViewModel[];
   contextMetrics: ShellDisplayMetricViewModel[];
   metrics: WorkbenchMetricViewModel[];
   netGpGuidance: NetGpGuidanceViewModel;
@@ -287,8 +286,6 @@ export function createWorkbenchResultViewModel(input: {
   ttkSec: number;
   killsPerHour: number;
   effectiveXpPerHour: number;
-  playerEffectiveXpPerHour: number;
-  cannonEffectiveXpPerHour: number;
   gpPerHour: number;
   effectiveNetGpPerHour: number;
   supplyCostPerKill: number;
@@ -303,23 +300,9 @@ export function createWorkbenchResultViewModel(input: {
 }): WorkbenchResultViewModel {
   const risk = input.risk;
   return {
-    sidebarMetrics: [
-      {
-        label: "Effective XP/hr",
-        value: formatNumber(input.effectiveXpPerHour),
-        tone: "teal"
-      },
-      {
-        label: "Net GP/hr",
-        value: formatNumber(input.effectiveNetGpPerHour),
-        tone: "gold"
-      },
-      { label: "Player XP/hr", value: formatNumber(input.playerEffectiveXpPerHour) },
-      { label: "Cannon XP/hr", value: formatNumber(input.cannonEffectiveXpPerHour) }
-    ],
     contextMetrics: [
       { label: "DPS", value: formatNumber(input.effectiveDps, 2), tone: "teal" },
-      { label: "XP/hr", value: formatNumber(input.effectiveXpPerHour), tone: "teal" },
+      { label: "Effective XP/hr", value: formatNumber(input.effectiveXpPerHour), tone: "teal" },
       { label: "Net GP/hr", value: formatNumber(input.effectiveNetGpPerHour), tone: "gold" }
     ],
     metrics: [

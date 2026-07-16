@@ -214,9 +214,6 @@ export function WorkbenchShell({
               options={styleOptions}
               onChange={actions.setStyle}
             />
-            <div className="sidebar-metrics" aria-label="Effective trip rates">
-              <MetricList items={result.sidebarMetrics} />
-            </div>
           </section>
         </aside>
 

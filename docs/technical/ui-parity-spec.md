@@ -114,6 +114,12 @@ change the form, simulation request, prices, persistence or supply formulas.
 
 ### Metric Strip
 
+The selected-monster context bar is the only always-visible owner of the compact
+DPS, effective XP/hr and net GP/hr summary. PlayerSidebar remains input-focused
+and does not duplicate those target-, Trip-, loot- and price-dependent results.
+Stats owns the detailed player and cannon XP routing. The fuller Stats/Compare
+metric strip may repeat the current values inside its analysis context.
+
 Required cells, in order:
 
 1. DPS
@@ -499,18 +505,19 @@ Required controls and displays:
 - Combat type segmented control.
 - Levels, with fields filtered by combat type plus Defence, HP and Prayer.
 - Stance/style control, including weapon-specific melee stance names and attack type.
-- Effective trip rates: XP/hr, net GP/hr and XP/hr by skill.
+- No persistent target- or Trip-derived result metrics; the selected-monster
+  context bar owns the compact DPS, effective XP/hr and net GP/hr summary, and
+  Stats owns detailed XP routing.
 
 Current implementation note: the PlayerSidebar is present in the root rewrite.
 It exposes combat-type switching, combat-style-filtered level fields plus
-Defence/HP/Prayer, stance/style selection and key effective rates. The
+Defence/HP/Prayer and stance/style selection. The
 service-aware Hiscores lookup and bounded preview/apply popover are owned by the
 global header utility. The header keeps Player lookup directly after the
 non-growing product brand instead of centering it in leftover space. A
 successful preview opens automatically and dismisses on `Escape`, an outside
 pointer action or its own summary control; `Escape` returns focus to that
-control. Full skill-XP row ownership and broader gear controls remain later
-parity work.
+control.
 
 ### SetupBar
 

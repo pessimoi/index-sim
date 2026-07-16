@@ -2130,8 +2130,6 @@ export function App() {
     ttkSec: viewModel.combat.ttkSec,
     killsPerHour: viewModel.trip.killsPerHour,
     effectiveXpPerHour: viewModel.effectiveXpPerHour,
-    playerEffectiveXpPerHour: viewModel.playerEffectiveXpPerHour,
-    cannonEffectiveXpPerHour: viewModel.cannonEffectiveXpPerHour,
     gpPerHour: viewModel.trip.gpPerHour,
     effectiveNetGpPerHour: viewModel.trip.effectiveNetGpPerHour,
     supplyCostPerKill: viewModel.trip.supply.supplyCostPerKill,

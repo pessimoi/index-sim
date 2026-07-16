@@ -329,6 +329,15 @@ test("renders scheduled price status and keeps local PriceSet overrides separate
 test("shows Stats XP routing and trip summary plus setup damage distribution", async ({ page }) => {
   test.setTimeout(90_000);
   await page.goto("/");
+
+  const playerSidebar = page.getByLabel("Player sidebar");
+  const setupContext = page.getByLabel("Setup context");
+  await expect(playerSidebar).not.toContainText("Effective XP/hr");
+  await expect(playerSidebar).not.toContainText("Net GP/hr");
+  await expect(setupContext).toContainText("DPS");
+  await expect(setupContext).toContainText("Effective XP/hr");
+  await expect(setupContext).toContainText("Net GP/hr");
+
   await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Stats" }).click();
 
   const analysis = page.getByLabel("Stats analysis");
