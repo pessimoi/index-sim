@@ -416,11 +416,14 @@ describe("price file schemas", () => {
     expect(status.scheduledPriceSet?.itemPrices.rune_scimitar).toBeGreaterThan(0);
     expect(status.scheduledPriceSet?.alchValues.rune_scimitar).toBeGreaterThan(0);
     expect(status.scheduledPriceSet?.itemPriceMetadata?.rune_2h).toMatchObject({
+      valueOrigin: "market-observation",
+      sourceId: "markets.lostcity.rs",
+      sourceSlug: "rune_2h_sword"
+    });
+    expect(status.scheduledPriceSet?.itemPriceMetadata?.adamant_arrow).toMatchObject({
       valueOrigin: "legacy-static",
       refreshStatus: "not-evaluated",
-      sourceId: "markets.lostcity.rs",
-      sourceSlug: "rune_2h_sword",
-      reasonCode: "legacy-metadata-unavailable"
+      reasonCode: "outside-market-allowlist"
     });
     expect(status.scheduledPriceSet?.itemPrices).not.toHaveProperty("_scraped_at");
     expect(status.itemCount).toBeGreaterThan(0);

@@ -5,6 +5,7 @@ import {
   withGeneratedAlchAuthority
 } from "../adapters/generated";
 import { createLegacyDerivedStaticRuntimeContext } from "../adapters/static-runtime";
+import pricesText from "../../prices.json?raw";
 import {
   formatGeneratedRuntimeReadinessMarkdown,
   formatSourceSliceCoveragePlanMarkdown,
@@ -64,12 +65,13 @@ describe("generated runtime adapter", () => {
       "Scheduled static prices + generated item fallbacks"
     );
     expect(result.context.priceSet.source).toBe("scraped");
-    expect(result.context.priceSet.itemPrices.rune_scimitar).toBe(22000);
+    const committedPrices = JSON.parse(pricesText) as Record<string, number>;
+    expect(result.context.priceSet.itemPrices.rune_scimitar).toBe(committedPrices.rune_scimitar);
     expect(result.context.priceSet.itemPrices["1dose2defense"]).toBe(132);
     expect(result.context.priceSet.itemPriceMetadata?.rune_scimitar).toMatchObject({
-      valueOrigin: "legacy-static",
-      refreshStatus: "not-evaluated",
-      quality: "unknown"
+      valueOrigin: "market-observation",
+      sourceId: "markets.lostcity.rs",
+      sourceSlug: "rune_scimitar"
     });
     expect(result.context.priceSet.itemPriceMetadata?.["1dose2defense"]).toMatchObject({
       valueOrigin: "generated-object-cost",

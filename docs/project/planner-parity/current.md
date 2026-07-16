@@ -259,20 +259,20 @@ GP/hour planning remains finite when rune costs outweigh loot value.
 - Rewrite step order: magic -> magic
 - Rewrite warning codes: `price-fallback-used`
 - Legacy digest: `9dbd0105c727379a`
-- Rewrite digest: `709a443da9d76fe6`
+- Rewrite digest: `a7e6bf4bb45d8a3c`
 
 | Path                        | Kind   | Legacy         | Rewrite       |
 | --------------------------- | ------ | -------------- | ------------- |
 | `$.end.config.spellId`      | value  | fire_bolt      | fire_strike   |
 | `$.end.dps`                 | number | 1.829934       | 1.219956      |
-| `$.end.metricValue`         | number | -164731.276636 | -47561.886499 |
+| `$.end.metricValue`         | number | -164731.276636 | -46781.521196 |
 | `$.phases[0].endDps`        | number | 1.829934       | 1.219956      |
-| `$.phases[0].endMetric`     | number | -164731.276636 | -47561.886499 |
+| `$.phases[0].endMetric`     | number | -164731.276636 | -46781.521196 |
 | `$.phases[0].startDps`      | number | 1.822994       | 1.215329      |
-| `$.phases[0].startMetric`   | number | -165079.604202 | -47794.717062 |
+| `$.phases[0].startMetric`   | number | -165079.604202 | -47012.881161 |
 | `$.start.config.spellId`    | value  | fire_bolt      | fire_strike   |
 | `$.start.dps`               | number | 1.822994       | 1.215329      |
-| `$.start.metricValue`       | number | -165079.604202 | -47794.717062 |
+| `$.start.metricValue`       | number | -165079.604202 | -47012.881161 |
 | `$.steps[0].config.spellId` | value  | fire_bolt      | fire_strike   |
 | `$.steps[0].dps`            | number | 1.826533       | 1.217689      |
 

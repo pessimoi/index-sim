@@ -713,9 +713,9 @@ test("matches browser-rendered numeric snapshots for loot action and trip overri
       "MAX HIT": "16.4",
       "HIT %": "88.9%",
       "XP/HR": "21,573",
-      "GP/HR NET": "-3,945",
+      "GP/HR NET": "-15,939",
       "KILLS/HR": "235",
-      "GP/KILL": "1,022",
+      "GP/KILL": "944",
       "SUPPLY/KILL": "1,047"
     },
     tripSummary: {
@@ -727,17 +727,17 @@ test("matches browser-rendered numeric snapshots for loot action and trip overri
       "Kills/trip": "6.1",
       "Effective K/hr": "45",
       "Recoil/kill": "4.5 dmg",
-      "Recoil gp/kill": "93"
+      "Recoil gp/kill": "96"
     },
     tripManual: {
       DPS: "2.59",
       "MAX HIT": "16.4",
       "HIT %": "75.5%",
       "XP/HR": "20,093",
-      "GP/HR NET": "-58,260",
+      "GP/HR NET": "-55,804",
       "KILLS/HR": "80",
-      "GP/KILL": "1,785",
-      "SUPPLY/KILL": "3,073"
+      "GP/KILL": "1,838",
+      "SUPPLY/KILL": "3,071"
     }
   });
 });

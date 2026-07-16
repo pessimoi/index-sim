@@ -2,7 +2,7 @@
 
 Revision 274
 
-Committed price snapshot captured 12 July 2026
+Committed price snapshot captured 16 July 2026
 
 ## Quick start
 

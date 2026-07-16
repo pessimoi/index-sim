@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "capturedAt": "2026-07-12T03:54:50.000Z",
+  "capturedAt": "2026-07-16T16:36:55.000Z",
   "refreshSource": "markets.lostcity.rs",
   "items": {
     "adamant_arrow": {
@@ -23,11 +23,17 @@
     },
     "adamant_full_helm": {
       "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
+      "refreshStatus": "retained",
       "quality": "unknown",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "adamant_full_helm",
-      "reasonCode": "legacy-metadata-unavailable"
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "latestCandidateAt": "2026-05-23T06:05:31.000Z",
+      "sourceObservations": 4,
+      "usableObservations": 3,
+      "acceptedObservations": 3,
+      "rejectedObservations": 1,
+      "reasonCode": "latest-observation-too-old"
     },
     "adamant_kiteshield": {
       "valueOrigin": "legacy-static",
@@ -49,11 +55,16 @@
     },
     "adamant_platelegs": {
       "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
+      "refreshStatus": "retained",
       "quality": "unknown",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "adamant_platelegs",
-      "reasonCode": "legacy-metadata-unavailable"
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 2,
+      "usableObservations": 2,
+      "acceptedObservations": 2,
+      "rejectedObservations": 0,
+      "reasonCode": "insufficient-observations"
     },
     "adamant_sq_shield": {
       "valueOrigin": "legacy-static",
@@ -63,35 +74,55 @@
     },
     "adamantite_bar": {
       "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
+      "refreshStatus": "retained",
       "quality": "unknown",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "adamantite_bar",
-      "reasonCode": "legacy-metadata-unavailable"
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 6,
+      "usableObservations": 2,
+      "acceptedObservations": 2,
+      "rejectedObservations": 4,
+      "reasonCode": "insufficient-observations"
     },
     "adamantite_ore": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "medium",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "adamantite_ore",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-06-19T01:35:10.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 8,
+      "usableObservations": 6,
+      "acceptedObservations": 5,
+      "rejectedObservations": 3
     },
     "air_talisman": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "medium",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "air_talisman",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-09T20:45:31.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 7,
+      "acceptedObservations": 6,
+      "rejectedObservations": 4
     },
     "airrune": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "high",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "airrune",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-16T15:15:17.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0
     },
     "antifire_potion": {
       "valueOrigin": "legacy-static",
@@ -106,44 +137,69 @@
       "reasonCode": "outside-market-allowlist"
     },
     "big_bones": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "high",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "big_bones",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-16T15:27:54.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0
     },
     "bloodrune": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "medium",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "bloodrune",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-15T20:48:55.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 9,
+      "usableObservations": 9,
+      "acceptedObservations": 9,
+      "rejectedObservations": 0
     },
     "body_talisman": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "medium",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "body_talisman",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-13T19:42:35.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 9,
+      "rejectedObservations": 1
     },
     "bodyrune": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "low",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "bodyrune",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-12T14:43:32.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 9,
+      "usableObservations": 4,
+      "acceptedObservations": 4,
+      "rejectedObservations": 5
     },
     "bronze_arrow": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "high",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "bronze_arrow",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-16T15:11:52.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0
     },
     "bronze_dart": {
       "valueOrigin": "legacy-static",
@@ -152,76 +208,122 @@
       "reasonCode": "outside-market-allowlist"
     },
     "chaos_talisman": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "medium",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "chaos_talisman",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-14T15:47:58.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 7,
+      "rejectedObservations": 3
     },
     "chaosrune": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "high",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "chaosrune",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-16T04:11:52.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0
     },
     "coal": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "medium",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "coal",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-16T12:14:10.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 9,
+      "usableObservations": 9,
+      "acceptedObservations": 9,
+      "rejectedObservations": 0
     },
     "cosmic_talisman": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "medium",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "cosmic_talisman",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-05T20:19:36.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0
     },
     "cosmicrune": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "medium",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "cosmicrune",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-13T01:21:05.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 9,
+      "usableObservations": 9,
+      "acceptedObservations": 8,
+      "rejectedObservations": 1
     },
     "cow_hide": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "high",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "cow_hide",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-16T00:19:19.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0
     },
     "deathrune": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "high",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "deathrune",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-15T23:02:43.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0
     },
     "diamond": {
       "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
+      "refreshStatus": "retained",
       "quality": "unknown",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "diamond",
-      "reasonCode": "legacy-metadata-unavailable"
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "latestCandidateAt": "2026-06-14T16:53:21.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0,
+      "reasonCode": "latest-observation-too-old"
     },
     "dragon_bones": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "high",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "dragon_bones",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-16T15:42:31.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0
     },
     "dragon_longsword": {
       "valueOrigin": "legacy-static",
@@ -229,13 +331,31 @@
       "quality": "unknown",
       "reasonCode": "outside-market-allowlist"
     },
+    "dragon_med_helm": {
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "high",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "dragon_med_helm",
+      "valueObservedAt": "2026-07-16T07:19:29.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0
+    },
     "dragon_spear": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "high",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "dragon_spear",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-14T19:39:59.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0
     },
     "dragonhide_black": {
       "valueOrigin": "legacy-static",
@@ -244,20 +364,30 @@
       "reasonCode": "outside-market-allowlist"
     },
     "dragonhide_blue": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "high",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "dragonhide_blue",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-16T15:42:05.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0
     },
     "dragonhide_green": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "medium",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "dragonhide_green",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-16T05:37:10.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 9,
+      "usableObservations": 9,
+      "acceptedObservations": 9,
+      "rejectedObservations": 0
     },
     "dragonhide_red": {
       "valueOrigin": "legacy-static",
@@ -265,29 +395,57 @@
       "quality": "unknown",
       "reasonCode": "outside-market-allowlist"
     },
+    "dragonshield_a": {
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "high",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "dragonshield_a",
+      "valueObservedAt": "2026-07-14T00:56:25.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0
+    },
     "dragonstone": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "medium",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "dragonstone",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-12T21:17:31.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 8,
+      "rejectedObservations": 2
     },
     "earthrune": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "high",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "earthrune",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-13T22:24:43.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0
     },
     "emerald": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "high",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "emerald",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-11T16:54:11.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0
     },
     "eye_of_newt": {
       "valueOrigin": "legacy-static",
@@ -302,36 +460,56 @@
       "reasonCode": "outside-market-allowlist"
     },
     "fire_battlestaff": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "high",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "fire_battlestaff",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-12T22:23:36.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0
     },
     "firerune": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "high",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "firerune",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-15T16:28:58.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0
     },
     "gold_bar": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "medium",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "gold_bar",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-14T02:01:00.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 9,
+      "usableObservations": 9,
+      "acceptedObservations": 9,
+      "rejectedObservations": 0
     },
     "gold_ore": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "medium",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "gold_ore",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-15T11:27:44.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 7,
+      "rejectedObservations": 3
     },
     "granite_shield": {
       "valueOrigin": "legacy-static",
@@ -346,100 +524,160 @@
       "reasonCode": "outside-market-allowlist"
     },
     "herb_avantoe": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "high",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "avantoe",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-16T08:44:24.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0
     },
     "herb_cadantine": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "high",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "cadantine",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-15T00:17:05.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0
     },
     "herb_dwarf_weed": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "medium",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "dwarf_weed",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-16T00:17:32.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 9,
+      "rejectedObservations": 1
     },
     "herb_guam": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "high",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "guam_leaf",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-14T22:20:35.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0
     },
     "herb_harralander": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "high",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "harralander",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-16T02:28:24.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0
     },
     "herb_irit": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "high",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "irit_leaf",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-13T03:54:22.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0
     },
     "herb_kwuarm": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "high",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "kwuarm",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-14T22:33:14.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0
     },
     "herb_lantadyme": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "high",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "lantadyme",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-15T15:38:50.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0
     },
     "herb_marrentill": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "high",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "marentill",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-13T20:34:59.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0
     },
     "herb_ranarr": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "high",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "ranarr_weed",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-15T13:10:44.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0
     },
     "herb_tarromin": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "high",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "tarromin",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-14T13:39:47.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0
     },
     "iron_arrow": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "high",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "iron_arrow",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-15T13:57:36.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0
     },
     "iron_bar": {
       "valueOrigin": "legacy-static",
@@ -460,44 +698,69 @@
       "reasonCode": "outside-market-allowlist"
     },
     "iron_ore": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "high",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "iron_ore",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-16T00:37:46.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0
     },
     "lawrune": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "high",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "lawrune",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-16T15:35:09.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0
     },
     "limpwurt_root": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "high",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "limpwurt_root",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-16T07:18:57.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0
     },
     "lobster": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "medium",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "lobster",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-16T00:53:51.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 8,
+      "usableObservations": 8,
+      "acceptedObservations": 8,
+      "rejectedObservations": 0
     },
     "loop_half_key": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "medium",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "keyhalf2",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-15T20:19:22.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 9,
+      "usableObservations": 9,
+      "acceptedObservations": 9,
+      "rejectedObservations": 0
     },
     "magic_potion": {
       "valueOrigin": "legacy-static",
@@ -518,12 +781,17 @@
       "reasonCode": "outside-market-allowlist"
     },
     "mindrune": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "high",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "mindrune",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-15T23:06:02.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0
     },
     "mithril_2h_sword": {
       "valueOrigin": "legacy-static",
@@ -544,12 +812,17 @@
       "reasonCode": "outside-market-allowlist"
     },
     "mithril_bar": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "high",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "mithril_bar",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-16T16:21:44.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0
     },
     "mithril_battleaxe": {
       "valueOrigin": "legacy-static",
@@ -559,11 +832,16 @@
     },
     "mithril_chainbody": {
       "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
+      "refreshStatus": "retained",
       "quality": "unknown",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "mithril_chainbody",
-      "reasonCode": "legacy-metadata-unavailable"
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 0,
+      "usableObservations": 0,
+      "acceptedObservations": 0,
+      "rejectedObservations": 0,
+      "reasonCode": "source-item-unavailable"
     },
     "mithril_dart": {
       "valueOrigin": "legacy-static",
@@ -573,11 +851,16 @@
     },
     "mithril_kiteshield": {
       "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
+      "refreshStatus": "retained",
       "quality": "unknown",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "mithril_kiteshield",
-      "reasonCode": "legacy-metadata-unavailable"
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 4,
+      "usableObservations": 2,
+      "acceptedObservations": 2,
+      "rejectedObservations": 2,
+      "reasonCode": "insufficient-observations"
     },
     "mithril_mace": {
       "valueOrigin": "legacy-static",
@@ -586,12 +869,17 @@
       "reasonCode": "outside-market-allowlist"
     },
     "mithril_ore": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "medium",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "mithril_ore",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-13T00:59:17.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 9,
+      "usableObservations": 9,
+      "acceptedObservations": 9,
+      "rejectedObservations": 0
     },
     "mithril_platebody": {
       "valueOrigin": "legacy-static",
@@ -607,11 +895,16 @@
     },
     "mithril_sq_shield": {
       "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
+      "refreshStatus": "retained",
       "quality": "unknown",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "mithril_sq_shield",
-      "reasonCode": "legacy-metadata-unavailable"
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 0,
+      "usableObservations": 0,
+      "acceptedObservations": 0,
+      "rejectedObservations": 0,
+      "reasonCode": "source-item-unavailable"
     },
     "mithril_sword": {
       "valueOrigin": "legacy-static",
@@ -620,20 +913,30 @@
       "reasonCode": "outside-market-allowlist"
     },
     "nature_talisman": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "medium",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "nature_talisman",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-01T19:55:29.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0
     },
     "naturerune": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "medium",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "naturerune",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-16T03:41:03.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 7,
+      "rejectedObservations": 3
     },
     "prayer_potion": {
       "valueOrigin": "legacy-static",
@@ -654,60 +957,95 @@
       "reasonCode": "outside-market-allowlist"
     },
     "ring_of_recoil": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "high",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "ring_of_recoil",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-12T04:32:22.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0
     },
     "ruby": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "medium",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "ruby",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-05T06:43:45.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0
     },
     "rune_2h": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "medium",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "rune_2h_sword",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-04T04:11:33.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 7,
+      "acceptedObservations": 7,
+      "rejectedObservations": 3
     },
     "rune_arrow": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "high",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "rune_arrow",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-15T00:43:13.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0
     },
     "rune_battleaxe": {
       "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
+      "refreshStatus": "retained",
       "quality": "unknown",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "rune_battleaxe",
-      "reasonCode": "legacy-metadata-unavailable"
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 0,
+      "usableObservations": 0,
+      "acceptedObservations": 0,
+      "rejectedObservations": 0,
+      "reasonCode": "source-item-unavailable"
     },
     "rune_chainbody": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "medium",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "rune_chainbody",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-10T00:00:34.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 6,
+      "acceptedObservations": 6,
+      "rejectedObservations": 4
     },
     "rune_dagger": {
       "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
+      "refreshStatus": "retained",
       "quality": "unknown",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "rune_dagger",
-      "reasonCode": "legacy-metadata-unavailable"
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 1,
+      "usableObservations": 1,
+      "acceptedObservations": 1,
+      "rejectedObservations": 0,
+      "reasonCode": "insufficient-observations"
     },
     "rune_dart": {
       "valueOrigin": "legacy-static",
@@ -716,20 +1054,30 @@
       "reasonCode": "outside-market-allowlist"
     },
     "rune_full_helm": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "high",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "rune_full_helm",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-16T16:15:45.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0
     },
     "rune_kiteshield": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "medium",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "rune_kiteshield",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-16T16:15:55.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 9,
+      "rejectedObservations": 1
     },
     "rune_knife": {
       "valueOrigin": "legacy-static",
@@ -745,11 +1093,16 @@
     },
     "rune_med_helm": {
       "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
+      "refreshStatus": "retained",
       "quality": "unknown",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "rune_med_helm",
-      "reasonCode": "legacy-metadata-unavailable"
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 2,
+      "usableObservations": 1,
+      "acceptedObservations": 1,
+      "rejectedObservations": 1,
+      "reasonCode": "insufficient-observations"
     },
     "rune_platebody": {
       "valueOrigin": "legacy-static",
@@ -764,20 +1117,30 @@
       "reasonCode": "outside-market-allowlist"
     },
     "rune_scimitar": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "high",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "rune_scimitar",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-15T21:30:28.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0
     },
     "rune_sq_shield": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "low",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "rune_sq_shield",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-09T16:11:12.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 6,
+      "usableObservations": 3,
+      "acceptedObservations": 3,
+      "rejectedObservations": 3
     },
     "rune_warhammer": {
       "valueOrigin": "legacy-static",
@@ -785,29 +1148,57 @@
       "quality": "unknown",
       "reasonCode": "outside-market-allowlist"
     },
+    "runite_bar": {
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "medium",
+      "sourceId": "markets.lostcity.rs",
+      "sourceSlug": "runite_bar",
+      "valueObservedAt": "2026-07-15T04:54:37.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 9,
+      "acceptedObservations": 9,
+      "rejectedObservations": 1
+    },
     "sapphire": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "high",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "sapphire",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-15T13:28:50.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0
     },
     "shark": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "high",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "shark",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-15T23:01:19.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0
     },
     "silver_ore": {
       "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
+      "refreshStatus": "retained",
       "quality": "unknown",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "silver_ore",
-      "reasonCode": "legacy-metadata-unavailable"
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 2,
+      "acceptedObservations": 2,
+      "rejectedObservations": 8,
+      "reasonCode": "insufficient-observations"
     },
     "snape_grass": {
       "valueOrigin": "legacy-static",
@@ -816,28 +1207,43 @@
       "reasonCode": "outside-market-allowlist"
     },
     "soulrune": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "medium",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "soulrune",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-06T08:43:08.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0
     },
     "steel_arrow": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "high",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "steel_arrow",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-16T15:48:46.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0
     },
     "steel_bar": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "high",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "steel_bar",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-16T00:26:35.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0
     },
     "steel_dart": {
       "valueOrigin": "legacy-static",
@@ -876,68 +1282,108 @@
       "reasonCode": "outside-market-allowlist"
     },
     "swordfish": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "medium",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "swordfish",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-16T14:57:56.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 8,
+      "usableObservations": 8,
+      "acceptedObservations": 8,
+      "rejectedObservations": 0
     },
     "tooth_half_key": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "medium",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "keyhalf1",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-15T00:30:47.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 8,
+      "usableObservations": 8,
+      "acceptedObservations": 8,
+      "rejectedObservations": 0
     },
     "tuna": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "medium",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "tuna",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-15T13:41:45.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 6,
+      "usableObservations": 6,
+      "acceptedObservations": 6,
+      "rejectedObservations": 0
     },
     "uncut_diamond": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "medium",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "uncut_diamond",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-09T08:04:44.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0
     },
     "uncut_dragonstone": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "medium",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "uncut_dragonstone",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-16T12:57:18.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 9,
+      "usableObservations": 9,
+      "acceptedObservations": 8,
+      "rejectedObservations": 1
     },
     "uncut_emerald": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "medium",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "uncut_emerald",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-03T01:47:56.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0
     },
     "uncut_ruby": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "medium",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "uncut_ruby",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-06T18:57:03.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 9,
+      "rejectedObservations": 1
     },
     "uncut_sapphire": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "medium",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "uncut_sapphire",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-15T17:12:41.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 9,
+      "rejectedObservations": 1
     },
     "unicorn_horn_dust": {
       "valueOrigin": "legacy-static",
@@ -946,12 +1392,17 @@
       "reasonCode": "outside-market-allowlist"
     },
     "unidentified_guam": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "medium",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "unidentified_guam",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-16T01:39:01.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 8,
+      "rejectedObservations": 2
     },
     "vial_water": {
       "valueOrigin": "legacy-static",
@@ -966,12 +1417,17 @@
       "reasonCode": "outside-market-allowlist"
     },
     "waterrune": {
-      "valueOrigin": "legacy-static",
-      "refreshStatus": "not-evaluated",
-      "quality": "unknown",
+      "valueOrigin": "market-observation",
+      "refreshStatus": "observed",
+      "quality": "high",
       "sourceId": "markets.lostcity.rs",
       "sourceSlug": "waterrune",
-      "reasonCode": "legacy-metadata-unavailable"
+      "valueObservedAt": "2026-07-15T23:25:13.000Z",
+      "evaluatedAt": "2026-07-16T16:36:55.000Z",
+      "sourceObservations": 10,
+      "usableObservations": 10,
+      "acceptedObservations": 10,
+      "rejectedObservations": 0
     },
     "weapon_poison": {
       "valueOrigin": "legacy-static",

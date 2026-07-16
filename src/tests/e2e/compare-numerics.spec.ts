@@ -285,18 +285,18 @@ test("matches browser-rendered dense numeric snapshots", async ({ page }) => {
       ttk: "12.8s",
       killsPerHour: "235",
       xpPerHour: "21,573",
-      gpPerKill: "527",
-      gpPerHour: "123,616",
-      netGpPerHour: "-80,221"
+      gpPerKill: "524",
+      gpPerHour: "122,913",
+      netGpPerHour: "-80,658"
     },
     defaultMeleeResults: {
       DPS: "3.05",
       "MAX HIT": "16.4",
       "HIT %": "88.9%",
       "XP/HR": "21,573",
-      "GP/HR NET": "-80,221",
+      "GP/HR NET": "-80,658",
       "KILLS/HR": "235",
-      "GP/KILL": "527",
+      "GP/KILL": "524",
       "SUPPLY/KILL": "1,047"
     },
     rangedSafespot: {
@@ -306,19 +306,19 @@ test("matches browser-rendered dense numeric snapshots", async ({ page }) => {
       ttk: "45.6s",
       killsPerHour: "73",
       xpPerHour: "14,525",
-      gpPerKill: "628",
-      gpPerHour: "46,025",
-      netGpPerHour: "-181,242"
+      gpPerKill: "654",
+      gpPerHour: "47,935",
+      netGpPerHour: "-179,519"
     },
     rangedSafespotResults: {
       DPS: "1.96",
       "MAX HIT": "10.0",
       "HIT %": "70.6%",
       "XP/HR": "14,525",
-      "GP/HR NET": "-181,242",
+      "GP/HR NET": "-179,519",
       "KILLS/HR": "73",
-      "GP/KILL": "628",
-      "SUPPLY/KILL": "4,971"
+      "GP/KILL": "654",
+      "SUPPLY/KILL": "4,955"
     },
     cannonRanged: {
       hit: "80.7%",
@@ -327,19 +327,19 @@ test("matches browser-rendered dense numeric snapshots", async ({ page }) => {
       ttk: "8.5s",
       killsPerHour: "326",
       xpPerHour: "37,421",
-      gpPerKill: "92",
-      gpPerHour: "29,967",
-      netGpPerHour: "-475,441"
+      gpPerKill: "95",
+      gpPerHour: "30,902",
+      netGpPerHour: "-474,446"
     },
     cannonRangedResults: {
       DPS: "2.24",
       "MAX HIT": "10.0",
       "HIT %": "80.7%",
       "XP/HR": "37,421",
-      "GP/HR NET": "-475,441",
+      "GP/HR NET": "-474,446",
       "KILLS/HR": "326",
-      "GP/KILL": "92",
-      "SUPPLY/KILL": "2,818"
+      "GP/KILL": "95",
+      "SUPPLY/KILL": "2,815"
     },
     cannonOutput: {
       "Effective targets": "2.5",
@@ -348,7 +348,7 @@ test("matches browser-rendered dense numeric snapshots", async ({ page }) => {
       "Balls/kill": "4.41",
       "Cannon Ranged XP/hr": "45,075",
       "Effective XP/hr": "37,421",
-      "Effective net GP/hr": "-475,441",
+      "Effective net GP/hr": "-474,446",
       "Ball cost/hr": "744,459",
       "Ball cost/kill": "1,763",
       "Ball price": "400",
@@ -476,18 +476,18 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
       ttk: "12.8s",
       killsPerHour: "235",
       xpPerHour: "21,573",
-      gpPerKill: "527",
-      gpPerHour: "123,616",
-      netGpPerHour: "-80,221"
+      gpPerKill: "524",
+      gpPerHour: "122,913",
+      netGpPerHour: "-80,658"
     },
     meleeBaselineResults: {
       DPS: "3.05",
       "MAX HIT": "16.4",
       "HIT %": "88.9%",
       "XP/HR": "21,573",
-      "GP/HR NET": "-80,221",
+      "GP/HR NET": "-80,658",
       "KILLS/HR": "235",
-      "GP/KILL": "527",
+      "GP/KILL": "524",
       "SUPPLY/KILL": "1,047"
     },
     meleeAlchRelevant: {
@@ -497,19 +497,19 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
       ttk: "23.2s",
       killsPerHour: "140",
       xpPerHour: "18,290",
-      gpPerKill: "490",
-      gpPerHour: "68,821",
-      netGpPerHour: "-97,515"
+      gpPerKill: "497",
+      gpPerHour: "69,752",
+      netGpPerHour: "-96,869"
     },
     meleeAlchRelevantResults: {
       DPS: "2.81",
       "MAX HIT": "16.4",
       "HIT %": "82.1%",
       "XP/HR": "18,290",
-      "GP/HR NET": "-97,515",
+      "GP/HR NET": "-96,869",
       "KILLS/HR": "140",
-      "GP/KILL": "490",
-      "SUPPLY/KILL": "1,791"
+      "GP/KILL": "497",
+      "SUPPLY/KILL": "1,789"
     },
     rangedSafespot: {
       hit: "70.6%",
@@ -518,19 +518,19 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
       ttk: "45.6s",
       killsPerHour: "73",
       xpPerHour: "14,525",
-      gpPerKill: "628",
-      gpPerHour: "46,025",
-      netGpPerHour: "-181,242"
+      gpPerKill: "654",
+      gpPerHour: "47,935",
+      netGpPerHour: "-179,519"
     },
     rangedSafespotResults: {
       DPS: "1.96",
       "MAX HIT": "10.0",
       "HIT %": "70.6%",
       "XP/HR": "14,525",
-      "GP/HR NET": "-181,242",
+      "GP/HR NET": "-179,519",
       "KILLS/HR": "73",
-      "GP/KILL": "628",
-      "SUPPLY/KILL": "4,971"
+      "GP/KILL": "654",
+      "SUPPLY/KILL": "4,955"
     },
     rangedCannon: {
       hit: "80.7%",
@@ -539,19 +539,19 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
       ttk: "8.5s",
       killsPerHour: "326",
       xpPerHour: "37,421",
-      gpPerKill: "92",
-      gpPerHour: "29,967",
-      netGpPerHour: "-475,441"
+      gpPerKill: "95",
+      gpPerHour: "30,902",
+      netGpPerHour: "-474,446"
     },
     rangedCannonResults: {
       DPS: "2.24",
       "MAX HIT": "10.0",
       "HIT %": "80.7%",
       "XP/HR": "37,421",
-      "GP/HR NET": "-475,441",
+      "GP/HR NET": "-474,446",
       "KILLS/HR": "326",
-      "GP/KILL": "92",
-      "SUPPLY/KILL": "2,818"
+      "GP/KILL": "95",
+      "SUPPLY/KILL": "2,815"
     },
     magicSafespot: {
       hit: "35.7%",
@@ -560,19 +560,19 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
       ttk: "1:33",
       killsPerHour: "37",
       xpPerHour: "21,210",
-      gpPerKill: "6,617",
-      gpPerHour: "246,718",
-      netGpPerHour: "-449,256"
+      gpPerKill: "6,597",
+      gpPerHour: "245,973",
+      netGpPerHour: "-442,830"
     },
     magicSafespotResults: {
       DPS: "1.19",
       "MAX HIT": "20.0",
       "HIT %": "35.7%",
       "XP/HR": "21,210",
-      "GP/HR NET": "-449,256",
+      "GP/HR NET": "-442,830",
       "KILLS/HR": "37",
-      "GP/KILL": "6,617",
-      "SUPPLY/KILL": "37,574"
+      "GP/KILL": "6,597",
+      "SUPPLY/KILL": "37,111"
     },
     customLootSettings: {
       hit: "72.4%",
@@ -581,18 +581,18 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
       ttk: "40.9s",
       killsPerHour: "67",
       xpPerHour: "8,443",
-      gpPerKill: "6,217",
-      gpPerHour: "419,040",
-      netGpPerHour: "72,687"
+      gpPerKill: "6,187",
+      gpPerHour: "417,020",
+      netGpPerHour: "71,843"
     },
     customLootSettingsResults: {
       DPS: "1.97",
       "MAX HIT": "22.9",
       "HIT %": "72.4%",
       "XP/HR": "8,443",
-      "GP/HR NET": "72,687",
+      "GP/HR NET": "71,843",
       "KILLS/HR": "67",
-      "GP/KILL": "6,217",
+      "GP/KILL": "6,187",
       "SUPPLY/KILL": "3,634"
     }
   });

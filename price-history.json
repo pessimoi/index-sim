@@ -3,6 +3,7 @@
   "snapshots": [
     {
       "t": 1782137163,
+      "kind": "legacy-unknown",
       "prices": {
         "adamant_arrow": 135,
         "adamant_dart": 180,
@@ -115,11 +116,11 @@
         "weapon_poison": 11000,
         "white_berries": 1230
       },
-      "kind": "legacy-unknown",
       "evaluations": {}
     },
     {
       "t": 1782305289,
+      "kind": "legacy-unknown",
       "prices": {
         "adamant_arrow": 137,
         "adamant_dart": 180,
@@ -233,11 +234,11 @@
         "weapon_poison": 11000,
         "white_berries": 1230
       },
-      "kind": "legacy-unknown",
       "evaluations": {}
     },
     {
       "t": 1782426402,
+      "kind": "legacy-unknown",
       "prices": {
         "adamant_arrow": 138,
         "adamant_axe": 6500,
@@ -368,11 +369,11 @@
         "weapon_poison": 11000,
         "white_berries": 1230
       },
-      "kind": "legacy-unknown",
       "evaluations": {}
     },
     {
       "t": 1782462286,
+      "kind": "legacy-unknown",
       "prices": {
         "adamant_arrow": 138,
         "adamant_axe": 6500,
@@ -503,11 +504,11 @@
         "weapon_poison": 11000,
         "white_berries": 1230
       },
-      "kind": "legacy-unknown",
       "evaluations": {}
     },
     {
       "t": 1782552630,
+      "kind": "legacy-unknown",
       "prices": {
         "adamant_arrow": 144,
         "adamant_axe": 6500,
@@ -638,11 +639,11 @@
         "weapon_poison": 11000,
         "white_berries": 1230
       },
-      "kind": "legacy-unknown",
       "evaluations": {}
     },
     {
       "t": 1782577364,
+      "kind": "legacy-unknown",
       "prices": {
         "adamant_arrow": 144,
         "adamant_axe": 6500,
@@ -773,11 +774,11 @@
         "weapon_poison": 11000,
         "white_berries": 1230
       },
-      "kind": "legacy-unknown",
       "evaluations": {}
     },
     {
       "t": 1782634597,
+      "kind": "legacy-unknown",
       "prices": {
         "adamant_arrow": 144,
         "adamant_axe": 6500,
@@ -907,11 +908,11 @@
         "weapon_poison": 11000,
         "white_berries": 1230
       },
-      "kind": "legacy-unknown",
       "evaluations": {}
     },
     {
       "t": 1782912215,
+      "kind": "legacy-unknown",
       "prices": {
         "adamant_arrow": 143,
         "adamant_axe": 6500,
@@ -1041,11 +1042,11 @@
         "weapon_poison": 11000,
         "white_berries": 1230
       },
-      "kind": "legacy-unknown",
       "evaluations": {}
     },
     {
       "t": 1783090759,
+      "kind": "legacy-unknown",
       "prices": {
         "adamant_arrow": 143,
         "adamant_axe": 6500,
@@ -1175,11 +1176,11 @@
         "weapon_poison": 11000,
         "white_berries": 1230
       },
-      "kind": "legacy-unknown",
       "evaluations": {}
     },
     {
       "t": 1783778094,
+      "kind": "legacy-unknown",
       "prices": {
         "adamant_arrow": 143,
         "adamant_axe": 6500,
@@ -1318,11 +1319,11 @@
         "weapon_poison": 11000,
         "white_berries": 1230
       },
-      "kind": "legacy-unknown",
       "evaluations": {}
     },
     {
       "t": 1783828490,
+      "kind": "legacy-unknown",
       "prices": {
         "adamant_arrow": 143,
         "adamant_axe": 6500,
@@ -1461,8 +1462,672 @@
         "weapon_poison": 11000,
         "white_berries": 1230
       },
-      "kind": "legacy-unknown",
       "evaluations": {}
+    },
+    {
+      "t": 1784219815,
+      "kind": "writer-evaluated",
+      "prices": {
+        "adamant_arrow": 143,
+        "adamant_axe": 6500,
+        "adamant_dart": 180,
+        "adamant_full_helm": 5000,
+        "adamant_kiteshield": 8600,
+        "adamant_med_helm": 812,
+        "adamant_platebody": 21800,
+        "adamant_platelegs": 21500,
+        "adamant_sq_shield": 10000,
+        "adamantite_bar": 4520,
+        "adamantite_ore": 870,
+        "air_talisman": 620,
+        "airrune": 34,
+        "antifire_potion": 4227,
+        "ashes": 206,
+        "big_bones": 420,
+        "bloodrune": 820,
+        "body_talisman": 702,
+        "bodyrune": 14,
+        "bronze_arrow": 16,
+        "bronze_dart": 30,
+        "chaos_talisman": 4800,
+        "chaosrune": 155,
+        "coal": 497,
+        "cosmic_talisman": 9000,
+        "cosmicrune": 244,
+        "cow_hide": 360,
+        "deathrune": 247,
+        "diamond": 3480,
+        "dragon_bones": 2940,
+        "dragon_longsword": 126000,
+        "dragon_med_helm": 118000,
+        "dragon_spear": 330000,
+        "dragonhide_black": 3660,
+        "dragonhide_blue": 2830,
+        "dragonhide_green": 2420,
+        "dragonhide_red": 3110,
+        "dragonshield_a": 738000,
+        "dragonstone": 182400,
+        "earthrune": 14,
+        "emerald": 3660,
+        "eye_of_newt": 245,
+        "feather": 19,
+        "fire_battlestaff": 11600,
+        "firerune": 20,
+        "gold_bar": 361,
+        "gold_ore": 1110,
+        "granite_shield": 241000,
+        "guam_leaf": 350,
+        "herb_avantoe": 4840,
+        "herb_cadantine": 3560,
+        "herb_dwarf_weed": 9150,
+        "herb_guam": 378,
+        "herb_harralander": 2470,
+        "herb_irit": 4000,
+        "herb_kwuarm": 3780,
+        "herb_lantadyme": 3680,
+        "herb_marrentill": 76,
+        "herb_ranarr": 5400,
+        "herb_tarromin": 900,
+        "iron_arrow": 18,
+        "iron_bar": 480,
+        "iron_dart": 39,
+        "iron_knife": 48,
+        "iron_ore": 314,
+        "lawrune": 397,
+        "limpwurt_root": 2780,
+        "lobster": 197,
+        "loop_half_key": 88000,
+        "magic_potion": 12567,
+        "magic_staff": 553,
+        "mcannonball": 400,
+        "mindrune": 26,
+        "mithril_2h_sword": 1220,
+        "mithril_arrow": 73,
+        "mithril_axe": 4250,
+        "mithril_bar": 2240,
+        "mithril_battleaxe": 674,
+        "mithril_chainbody": 830,
+        "mithril_dart": 80,
+        "mithril_kiteshield": 4333,
+        "mithril_mace": 11,
+        "mithril_ore": 494,
+        "mithril_platebody": 10300,
+        "mithril_spear": 10000,
+        "mithril_sq_shield": 596,
+        "mithril_sword": 167,
+        "nature_talisman": 10000,
+        "naturerune": 330,
+        "prayer_potion": 5920,
+        "ranging_potion": 11173,
+        "restore_potion": 813,
+        "ring_of_recoil": 860,
+        "ruby": 1520,
+        "rune_2h": 50800,
+        "rune_arrow": 318,
+        "rune_battleaxe": 24618,
+        "rune_chainbody": 41600,
+        "rune_dagger": 15000,
+        "rune_dart": 1000,
+        "rune_full_helm": 29000,
+        "rune_kiteshield": 41800,
+        "rune_knife": 2000,
+        "rune_longsword": 18860,
+        "rune_med_helm": 12250,
+        "rune_platebody": 22501,
+        "rune_platelegs": 43680,
+        "rune_scimitar": 25000,
+        "rune_sq_shield": 33333,
+        "rune_warhammer": 24560,
+        "runite_bar": 11600,
+        "sapphire": 750,
+        "shark": 750,
+        "silver_ore": 308,
+        "snape_grass": 1160,
+        "soulrune": 7200,
+        "steel_arrow": 39,
+        "steel_bar": 1440,
+        "steel_dart": 57,
+        "super_antipoison": 3967,
+        "super_attack": 1387,
+        "super_defence": 1520,
+        "super_set": 7307,
+        "super_strength": 4400,
+        "swordfish": 304,
+        "tooth_half_key": 124000,
+        "tuna": 148,
+        "uncut_diamond": 5100,
+        "uncut_dragonstone": 192000,
+        "uncut_emerald": 3980,
+        "uncut_ruby": 3040,
+        "uncut_sapphire": 1200,
+        "unicorn_horn_dust": 2260,
+        "unidentified_guam": 1760,
+        "vial_water": 347,
+        "water_talisman": 500,
+        "waterrune": 21,
+        "weapon_poison": 11000,
+        "white_berries": 1230
+      },
+      "evaluations": {
+        "adamant_full_helm": {
+          "result": "retained",
+          "reasonCode": "latest-observation-too-old"
+        },
+        "adamant_javelin": {
+          "result": "retained",
+          "reasonCode": "source-item-unavailable"
+        },
+        "adamant_platelegs": {
+          "result": "retained",
+          "reasonCode": "insufficient-observations"
+        },
+        "adamantite_bar": {
+          "result": "retained",
+          "reasonCode": "insufficient-observations"
+        },
+        "adamantite_ore": {
+          "result": "observed",
+          "sourceSlug": "adamantite_ore",
+          "valueObservedAt": "2026-06-19T01:35:10.000Z",
+          "quality": "medium"
+        },
+        "air_talisman": {
+          "result": "observed",
+          "sourceSlug": "air_talisman",
+          "valueObservedAt": "2026-07-09T20:45:31.000Z",
+          "quality": "medium"
+        },
+        "airrune": {
+          "result": "observed",
+          "sourceSlug": "airrune",
+          "valueObservedAt": "2026-07-16T15:15:17.000Z",
+          "quality": "high"
+        },
+        "bass": {
+          "result": "retained",
+          "reasonCode": "insufficient-observations"
+        },
+        "big_bones": {
+          "result": "observed",
+          "sourceSlug": "big_bones",
+          "valueObservedAt": "2026-07-16T15:27:54.000Z",
+          "quality": "high"
+        },
+        "bloodrune": {
+          "result": "observed",
+          "sourceSlug": "bloodrune",
+          "valueObservedAt": "2026-07-15T20:48:55.000Z",
+          "quality": "medium"
+        },
+        "body_talisman": {
+          "result": "observed",
+          "sourceSlug": "body_talisman",
+          "valueObservedAt": "2026-07-13T19:42:35.000Z",
+          "quality": "medium"
+        },
+        "bodyrune": {
+          "result": "observed",
+          "sourceSlug": "bodyrune",
+          "valueObservedAt": "2026-07-12T14:43:32.000Z",
+          "quality": "low"
+        },
+        "bolt": {
+          "result": "retained",
+          "reasonCode": "insufficient-observations"
+        },
+        "bones": {
+          "result": "retained",
+          "reasonCode": "source-item-unavailable"
+        },
+        "bronze_arrow": {
+          "result": "observed",
+          "sourceSlug": "bronze_arrow",
+          "valueObservedAt": "2026-07-16T15:11:52.000Z",
+          "quality": "high"
+        },
+        "chaos_talisman": {
+          "result": "observed",
+          "sourceSlug": "chaos_talisman",
+          "valueObservedAt": "2026-07-14T15:47:58.000Z",
+          "quality": "medium"
+        },
+        "chaosrune": {
+          "result": "observed",
+          "sourceSlug": "chaosrune",
+          "valueObservedAt": "2026-07-16T04:11:52.000Z",
+          "quality": "high"
+        },
+        "coal": {
+          "result": "observed",
+          "sourceSlug": "coal",
+          "valueObservedAt": "2026-07-16T12:14:10.000Z",
+          "quality": "medium"
+        },
+        "cosmic_talisman": {
+          "result": "observed",
+          "sourceSlug": "cosmic_talisman",
+          "valueObservedAt": "2026-07-05T20:19:36.000Z",
+          "quality": "medium"
+        },
+        "cosmicrune": {
+          "result": "observed",
+          "sourceSlug": "cosmicrune",
+          "valueObservedAt": "2026-07-13T01:21:05.000Z",
+          "quality": "medium"
+        },
+        "cow_hide": {
+          "result": "observed",
+          "sourceSlug": "cow_hide",
+          "valueObservedAt": "2026-07-16T00:19:19.000Z",
+          "quality": "high"
+        },
+        "deathrune": {
+          "result": "observed",
+          "sourceSlug": "deathrune",
+          "valueObservedAt": "2026-07-15T23:02:43.000Z",
+          "quality": "high"
+        },
+        "diamond": {
+          "result": "retained",
+          "reasonCode": "latest-observation-too-old"
+        },
+        "dragon_bones": {
+          "result": "observed",
+          "sourceSlug": "dragon_bones",
+          "valueObservedAt": "2026-07-16T15:42:31.000Z",
+          "quality": "high"
+        },
+        "dragon_med_helm": {
+          "result": "observed",
+          "sourceSlug": "dragon_med_helm",
+          "valueObservedAt": "2026-07-16T07:19:29.000Z",
+          "quality": "high"
+        },
+        "dragon_spear": {
+          "result": "observed",
+          "sourceSlug": "dragon_spear",
+          "valueObservedAt": "2026-07-14T19:39:59.000Z",
+          "quality": "high"
+        },
+        "dragonhide_blue": {
+          "result": "observed",
+          "sourceSlug": "dragonhide_blue",
+          "valueObservedAt": "2026-07-16T15:42:05.000Z",
+          "quality": "high"
+        },
+        "dragonhide_green": {
+          "result": "observed",
+          "sourceSlug": "dragonhide_green",
+          "valueObservedAt": "2026-07-16T05:37:10.000Z",
+          "quality": "medium"
+        },
+        "dragonshield_a": {
+          "result": "observed",
+          "sourceSlug": "dragonshield_a",
+          "valueObservedAt": "2026-07-14T00:56:25.000Z",
+          "quality": "high"
+        },
+        "dragonstone": {
+          "result": "observed",
+          "sourceSlug": "dragonstone",
+          "valueObservedAt": "2026-07-12T21:17:31.000Z",
+          "quality": "medium"
+        },
+        "earthrune": {
+          "result": "observed",
+          "sourceSlug": "earthrune",
+          "valueObservedAt": "2026-07-13T22:24:43.000Z",
+          "quality": "high"
+        },
+        "emerald": {
+          "result": "observed",
+          "sourceSlug": "emerald",
+          "valueObservedAt": "2026-07-11T16:54:11.000Z",
+          "quality": "high"
+        },
+        "fire_battlestaff": {
+          "result": "observed",
+          "sourceSlug": "fire_battlestaff",
+          "valueObservedAt": "2026-07-12T22:23:36.000Z",
+          "quality": "high"
+        },
+        "firerune": {
+          "result": "observed",
+          "sourceSlug": "firerune",
+          "valueObservedAt": "2026-07-15T16:28:58.000Z",
+          "quality": "high"
+        },
+        "gold_bar": {
+          "result": "observed",
+          "sourceSlug": "gold_bar",
+          "valueObservedAt": "2026-07-14T02:01:00.000Z",
+          "quality": "medium"
+        },
+        "gold_ore": {
+          "result": "observed",
+          "sourceSlug": "gold_ore",
+          "valueObservedAt": "2026-07-15T11:27:44.000Z",
+          "quality": "medium"
+        },
+        "herb_avantoe": {
+          "result": "observed",
+          "sourceSlug": "avantoe",
+          "valueObservedAt": "2026-07-16T08:44:24.000Z",
+          "quality": "high"
+        },
+        "herb_cadantine": {
+          "result": "observed",
+          "sourceSlug": "cadantine",
+          "valueObservedAt": "2026-07-15T00:17:05.000Z",
+          "quality": "high"
+        },
+        "herb_dwarf_weed": {
+          "result": "observed",
+          "sourceSlug": "dwarf_weed",
+          "valueObservedAt": "2026-07-16T00:17:32.000Z",
+          "quality": "medium"
+        },
+        "herb_guam": {
+          "result": "observed",
+          "sourceSlug": "guam_leaf",
+          "valueObservedAt": "2026-07-14T22:20:35.000Z",
+          "quality": "high"
+        },
+        "herb_harralander": {
+          "result": "observed",
+          "sourceSlug": "harralander",
+          "valueObservedAt": "2026-07-16T02:28:24.000Z",
+          "quality": "high"
+        },
+        "herb_irit": {
+          "result": "observed",
+          "sourceSlug": "irit_leaf",
+          "valueObservedAt": "2026-07-13T03:54:22.000Z",
+          "quality": "high"
+        },
+        "herb_kwuarm": {
+          "result": "observed",
+          "sourceSlug": "kwuarm",
+          "valueObservedAt": "2026-07-14T22:33:14.000Z",
+          "quality": "high"
+        },
+        "herb_lantadyme": {
+          "result": "observed",
+          "sourceSlug": "lantadyme",
+          "valueObservedAt": "2026-07-15T15:38:50.000Z",
+          "quality": "high"
+        },
+        "herb_marrentill": {
+          "result": "observed",
+          "sourceSlug": "marentill",
+          "valueObservedAt": "2026-07-13T20:34:59.000Z",
+          "quality": "high"
+        },
+        "herb_ranarr": {
+          "result": "observed",
+          "sourceSlug": "ranarr_weed",
+          "valueObservedAt": "2026-07-15T13:10:44.000Z",
+          "quality": "high"
+        },
+        "herb_tarromin": {
+          "result": "observed",
+          "sourceSlug": "tarromin",
+          "valueObservedAt": "2026-07-14T13:39:47.000Z",
+          "quality": "high"
+        },
+        "iron_arrow": {
+          "result": "observed",
+          "sourceSlug": "iron_arrow",
+          "valueObservedAt": "2026-07-15T13:57:36.000Z",
+          "quality": "high"
+        },
+        "iron_ore": {
+          "result": "observed",
+          "sourceSlug": "iron_ore",
+          "valueObservedAt": "2026-07-16T00:37:46.000Z",
+          "quality": "high"
+        },
+        "lawrune": {
+          "result": "observed",
+          "sourceSlug": "lawrune",
+          "valueObservedAt": "2026-07-16T15:35:09.000Z",
+          "quality": "high"
+        },
+        "limpwurt_root": {
+          "result": "observed",
+          "sourceSlug": "limpwurt_root",
+          "valueObservedAt": "2026-07-16T07:18:57.000Z",
+          "quality": "high"
+        },
+        "lobster": {
+          "result": "observed",
+          "sourceSlug": "lobster",
+          "valueObservedAt": "2026-07-16T00:53:51.000Z",
+          "quality": "medium"
+        },
+        "loop_half_key": {
+          "result": "observed",
+          "sourceSlug": "keyhalf2",
+          "valueObservedAt": "2026-07-15T20:19:22.000Z",
+          "quality": "medium"
+        },
+        "mindrune": {
+          "result": "observed",
+          "sourceSlug": "mindrune",
+          "valueObservedAt": "2026-07-15T23:06:02.000Z",
+          "quality": "high"
+        },
+        "mithril_bar": {
+          "result": "observed",
+          "sourceSlug": "mithril_bar",
+          "valueObservedAt": "2026-07-16T16:21:44.000Z",
+          "quality": "high"
+        },
+        "mithril_chainbody": {
+          "result": "retained",
+          "reasonCode": "source-item-unavailable"
+        },
+        "mithril_kiteshield": {
+          "result": "retained",
+          "reasonCode": "insufficient-observations"
+        },
+        "mithril_ore": {
+          "result": "observed",
+          "sourceSlug": "mithril_ore",
+          "valueObservedAt": "2026-07-13T00:59:17.000Z",
+          "quality": "medium"
+        },
+        "mithril_sq_shield": {
+          "result": "retained",
+          "reasonCode": "source-item-unavailable"
+        },
+        "nature_talisman": {
+          "result": "observed",
+          "sourceSlug": "nature_talisman",
+          "valueObservedAt": "2026-07-01T19:55:29.000Z",
+          "quality": "medium"
+        },
+        "naturerune": {
+          "result": "observed",
+          "sourceSlug": "naturerune",
+          "valueObservedAt": "2026-07-16T03:41:03.000Z",
+          "quality": "medium"
+        },
+        "ring_of_recoil": {
+          "result": "observed",
+          "sourceSlug": "ring_of_recoil",
+          "valueObservedAt": "2026-07-12T04:32:22.000Z",
+          "quality": "high"
+        },
+        "ruby": {
+          "result": "observed",
+          "sourceSlug": "ruby",
+          "valueObservedAt": "2026-07-05T06:43:45.000Z",
+          "quality": "medium"
+        },
+        "rune_2h": {
+          "result": "observed",
+          "sourceSlug": "rune_2h_sword",
+          "valueObservedAt": "2026-07-04T04:11:33.000Z",
+          "quality": "medium"
+        },
+        "rune_arrow": {
+          "result": "observed",
+          "sourceSlug": "rune_arrow",
+          "valueObservedAt": "2026-07-15T00:43:13.000Z",
+          "quality": "high"
+        },
+        "rune_battleaxe": {
+          "result": "retained",
+          "reasonCode": "source-item-unavailable"
+        },
+        "rune_chainbody": {
+          "result": "observed",
+          "sourceSlug": "rune_chainbody",
+          "valueObservedAt": "2026-07-10T00:00:34.000Z",
+          "quality": "medium"
+        },
+        "rune_dagger": {
+          "result": "retained",
+          "reasonCode": "insufficient-observations"
+        },
+        "rune_full_helm": {
+          "result": "observed",
+          "sourceSlug": "rune_full_helm",
+          "valueObservedAt": "2026-07-16T16:15:45.000Z",
+          "quality": "high"
+        },
+        "rune_javelin": {
+          "result": "retained",
+          "reasonCode": "insufficient-observations"
+        },
+        "rune_kiteshield": {
+          "result": "observed",
+          "sourceSlug": "rune_kiteshield",
+          "valueObservedAt": "2026-07-16T16:15:55.000Z",
+          "quality": "medium"
+        },
+        "rune_med_helm": {
+          "result": "retained",
+          "reasonCode": "insufficient-observations"
+        },
+        "rune_scimitar": {
+          "result": "observed",
+          "sourceSlug": "rune_scimitar",
+          "valueObservedAt": "2026-07-15T21:30:28.000Z",
+          "quality": "high"
+        },
+        "rune_spear": {
+          "result": "retained",
+          "reasonCode": "insufficient-observations"
+        },
+        "rune_sq_shield": {
+          "result": "observed",
+          "sourceSlug": "rune_sq_shield",
+          "valueObservedAt": "2026-07-09T16:11:12.000Z",
+          "quality": "low"
+        },
+        "runite_bar": {
+          "result": "observed",
+          "sourceSlug": "runite_bar",
+          "valueObservedAt": "2026-07-15T04:54:37.000Z",
+          "quality": "medium"
+        },
+        "sapphire": {
+          "result": "observed",
+          "sourceSlug": "sapphire",
+          "valueObservedAt": "2026-07-15T13:28:50.000Z",
+          "quality": "high"
+        },
+        "shark": {
+          "result": "observed",
+          "sourceSlug": "shark",
+          "valueObservedAt": "2026-07-15T23:01:19.000Z",
+          "quality": "high"
+        },
+        "silver_ore": {
+          "result": "retained",
+          "reasonCode": "insufficient-observations"
+        },
+        "soulrune": {
+          "result": "observed",
+          "sourceSlug": "soulrune",
+          "valueObservedAt": "2026-07-06T08:43:08.000Z",
+          "quality": "medium"
+        },
+        "steel_arrow": {
+          "result": "observed",
+          "sourceSlug": "steel_arrow",
+          "valueObservedAt": "2026-07-16T15:48:46.000Z",
+          "quality": "high"
+        },
+        "steel_bar": {
+          "result": "observed",
+          "sourceSlug": "steel_bar",
+          "valueObservedAt": "2026-07-16T00:26:35.000Z",
+          "quality": "high"
+        },
+        "swordfish": {
+          "result": "observed",
+          "sourceSlug": "swordfish",
+          "valueObservedAt": "2026-07-16T14:57:56.000Z",
+          "quality": "medium"
+        },
+        "tooth_half_key": {
+          "result": "observed",
+          "sourceSlug": "keyhalf1",
+          "valueObservedAt": "2026-07-15T00:30:47.000Z",
+          "quality": "medium"
+        },
+        "tuna": {
+          "result": "observed",
+          "sourceSlug": "tuna",
+          "valueObservedAt": "2026-07-15T13:41:45.000Z",
+          "quality": "medium"
+        },
+        "uncut_diamond": {
+          "result": "observed",
+          "sourceSlug": "uncut_diamond",
+          "valueObservedAt": "2026-07-09T08:04:44.000Z",
+          "quality": "medium"
+        },
+        "uncut_dragonstone": {
+          "result": "observed",
+          "sourceSlug": "uncut_dragonstone",
+          "valueObservedAt": "2026-07-16T12:57:18.000Z",
+          "quality": "medium"
+        },
+        "uncut_emerald": {
+          "result": "observed",
+          "sourceSlug": "uncut_emerald",
+          "valueObservedAt": "2026-07-03T01:47:56.000Z",
+          "quality": "medium"
+        },
+        "uncut_ruby": {
+          "result": "observed",
+          "sourceSlug": "uncut_ruby",
+          "valueObservedAt": "2026-07-06T18:57:03.000Z",
+          "quality": "medium"
+        },
+        "uncut_sapphire": {
+          "result": "observed",
+          "sourceSlug": "uncut_sapphire",
+          "valueObservedAt": "2026-07-15T17:12:41.000Z",
+          "quality": "medium"
+        },
+        "unidentified_guam": {
+          "result": "observed",
+          "sourceSlug": "unidentified_guam",
+          "valueObservedAt": "2026-07-16T01:39:01.000Z",
+          "quality": "medium"
+        },
+        "waterrune": {
+          "result": "observed",
+          "sourceSlug": "waterrune",
+          "valueObservedAt": "2026-07-15T23:25:13.000Z",
+          "quality": "high"
+        }
+      }
     }
   ]
 }
