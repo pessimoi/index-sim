@@ -89,7 +89,12 @@ validated origin/freshness row. Economy distinguishes snapshot capture time
 from item observation and refresh-evaluation times, shows observed quality,
 retained/static/imported/generated counts and explains the selected item.
 Retained, legacy and generated-fallback values remain usable; used values emit
-bounded, deduplicated confidence warnings instead of silently appearing fresh.
+bounded, deduplicated confidence notes instead of silently appearing fresh.
+Only missing or explicit fallback values consumed by the current monetary
+calculation create a compact Result issue. Loot keeps alternative-price context
+beside the affected row, while Economy exposes every active issue and note in
+one collapsed `Price data notes` disclosure. Exact one-GP coins and configured
+but unused supplies do not create aggregate price noise.
 
 Dynamic loot tables also publish their exact price dependency set from the
 same Trip-domain descriptors that calculate their value. Market diagnostics

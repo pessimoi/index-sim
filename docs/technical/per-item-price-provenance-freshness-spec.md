@@ -613,8 +613,10 @@ Implemented on 2026-07-12 under D-085:
 - Economy shows aggregate item metadata counts and selected-item provenance,
   freshness, quality and bounded reason detail. Shared trend points distinguish
   observed, retained, carried-forward, migrated legacy and local captures.
-- Trip/Economy warnings are emitted only for used retained, unknown-freshness
-  or generated-fallback values and deduplicate by code plus supplying item id.
+- Trip price notices retain consumer, current-result relevance and optional
+  Loot-row context. Economy aggregates only values used by the active monetary
+  calculation and deduplicates by code, supplying item and consumer/row
+  context; inactive alternative prices remain row-local Loot notes.
 - Vite assets, Cloudflare headers, artifact/public deployment checks and the
   scheduled workflow now require the provenance sidecar with matching capture
   time and numeric key set.

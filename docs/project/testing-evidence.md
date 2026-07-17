@@ -5,6 +5,41 @@ It does not own current commands, required gates or test strategy; those remain 
 [the testing guide](../technical/testing.md). Counts and artifact hashes below
 apply only to the source state described by each entry.
 
+## 2026-07-17 price-warning relevance and presentation
+
+D-101 implementation validation confirms that price notices retain structured
+item/consumer/current-result/Loot-row context, while Result, Loot and Economy
+render their non-duplicated ownership contracts. The focused domain,
+view-model and component command passes 8 files / 103 tests. It includes Bury
+and Skip exclusion, exact one-GP coin suppression, active versus zero-use food
+and cannonball paths, issue/note classification, item labels, row-local nested
+notices, absence from Active assumptions and the complete controlled Economy
+disclosure. `npm run typecheck`, lint, the 124/109/eight-entrypoint architecture
+gate, 19/19 golden tests and `git diff --check` pass.
+
+The focused production-preview Chromium run passes 35/35 across
+`cannon-trip-loot.spec.ts` and `shell-accessibility.spec.ts`, including the
+imported-PriceSet Result/Loot/Economy flow, disclosure focus transfer and the
+absence of passive price-list overflow. Port 5173 already belonged to the
+repository's checked development server, so this run used an otherwise
+identical temporary port-5174 config that was removed after the run. The
+production build passes with 221 modules. Artifact validation reports 10 files,
+two assets, 2,093,064 total bytes, 735,789 raw / 213,457 gzip entry JavaScript,
+three JavaScript chunks and SHA-256
+`724822183fbcdc86db42999385cde02e4eba4fd2b920d02735e9f220dbdce164`.
+
+The complete unit suite excluding the independently stale Planner parity audit
+passes 79 files / 791 tests. Full `npm run verify` reaches 79 passing files and
+796 passing tests out of 797, then stops at the Planner baseline assertion: all
+reference-context rows gained `incoming-attack-compatibility-fallback`, and two
+current-product magic rows gained `incoming-attack-partial-model`. The committed
+baseline already contains `price-fallback-used`, so this is not a D-101 price-
+notice delta and its generated baseline/report were left unchanged. A final
+repository-wide `npm run format:check` is separately blocked by concurrent
+PriceSet-import edits in `src/app/components/panes/economy-settings-pane.tsx`;
+the D-101 source and documentation set passed Prettier before that external
+edit arrived.
+
 ## 2026-07-13–15 structural validation snapshots
 
 D-099 GitHub Actions disablement validation note, 2026-07-15: the only

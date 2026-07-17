@@ -1,6 +1,6 @@
 # Price warning relevance and presentation specification
 
-Status: specified on 2026-07-17; implementation has not started.
+Status: implemented on 2026-07-17.
 
 ## Purpose
 
@@ -369,6 +369,32 @@ is a regression signal.
 - Primary UI uses item display names and consequence-first language.
 - No price data, formula, persistence, provider or numeric output changes.
 - Focused unit/browser, accessibility, golden and repository gates pass.
+
+## Implemented result
+
+- `SimulationWarning.priceContext` now carries the `loot`, `supply` or
+  `cannon` consumer, current-result relevance and optional Loot row id without
+  parsing warning text.
+- Loot valuation separates active calculation warnings from displayed
+  alternative-price notes. Bury, Skip and unused Alch sale prices stay outside
+  the aggregate current-result collection, while exact `coins = 1` suppresses
+  market-provenance noise.
+- Food, potion, prayer, recoil, ammo, rune and cannonball warnings enter the
+  aggregate only when their active consumption path is non-zero.
+- `src/app/view-models/price-data.ts` owns issue/note classification, display
+  labels, consequence-first copy, deterministic ordering and Loot-row groups.
+- Result renders only a compact active missing/fallback issue with a
+  `Review price data` action. Active assumptions and Stats source detail no
+  longer duplicate price notes.
+- Loot renders notices beside the supplying row or nested contributor. Economy
+  owns the complete native `Price data notes (N)` disclosure; it is collapsed
+  during ordinary navigation and opened/focused by the Result action.
+- Price values, formulas, PriceSet selection, persistence, provider policy and
+  request schemas are unchanged.
+- Focused unit, Chromium, type, lint, architecture, golden, build and artifact
+  checks pass. [The dated testing evidence](../project/testing-evidence.md#2026-07-17-price-warning-relevance-and-presentation)
+  records the unrelated Planner-baseline and untracked-document blockers in
+  the repository-wide wrapper.
 
 ## Documentation updates when implemented
 

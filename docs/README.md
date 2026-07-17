@@ -17,7 +17,7 @@ This directory is the project memory layer for humans and AI agents. It keeps cu
 - Source-backed incoming damage specification: [technical/source-backed-incoming-damage-spec.md](technical/source-backed-incoming-damage-spec.md)
 - Source-backed casket valuation specification: [technical/source-backed-casket-valuation-spec.md](technical/source-backed-casket-valuation-spec.md)
 - Per-item price provenance and freshness specification: [technical/per-item-price-provenance-freshness-spec.md](technical/per-item-price-provenance-freshness-spec.md)
-- Current-result price warning relevance and presentation specification: [technical/price-warning-relevance-presentation-spec.md](technical/price-warning-relevance-presentation-spec.md)
+- Implemented current-result price warning relevance and presentation specification: [technical/price-warning-relevance-presentation-spec.md](technical/price-warning-relevance-presentation-spec.md)
 - Dynamic loot market dependency coverage specification: [technical/dynamic-loot-market-dependency-coverage-spec.md](technical/dynamic-loot-market-dependency-coverage-spec.md)
 - Conditional loot presentation specification: [technical/conditional-loot-presentation-spec.md](technical/conditional-loot-presentation-spec.md)
 - Manual item price overrides specification: [technical/manual-item-price-overrides-spec.md](technical/manual-item-price-overrides-spec.md)

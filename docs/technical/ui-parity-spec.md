@@ -151,16 +151,16 @@ Required behavior:
 
 - Show a subdued `Default assumptions active` state when no summary rows are active.
 - Show at most five priority rows by default, with a `+N more` expandable list for overflow.
-- Prioritize calculation confidence warnings, then custom setup/cannon/manual combat overrides, loot/economy modifiers, trip-rate modifiers and settings modifiers.
+- Prioritize non-price calculation confidence warnings, then custom setup/cannon/manual combat overrides, loot/economy modifiers, trip-rate modifiers and settings modifiers.
 - Include a `Review` action per row that switches to the owning workbench tab without resetting or mutating the underlying setting.
 - Include a `Reset` action only for active rows with a narrow, already-owned reset path: manual combat overrides, current-monster cannon settings, current-monster loot settings, current-monster loot action overrides, explicit safespot override, Trip scarce spot enablement and hidden gear tiers.
 - Reset actions must affect only the row's modifier family, keep `Review` available, announce a short status message and stay keyboard/screen-reader accessible.
-- Keep calculation confidence warnings, special fallback warnings, active PriceSet/source rows, custom setup rows, protection prayer, inherited Trip high-alch rows, manual Trip controls and supply settings review-only until a separate unambiguous reset policy exists.
+- Keep non-price calculation confidence warnings, special fallback warnings, active PriceSet/source rows, custom setup rows, protection prayer, inherited Trip high-alch rows, manual Trip controls and supply settings review-only until a separate unambiguous reset policy exists. Price-data notes belong to the Economy disclosure rather than Active assumptions.
 - Do not add fields to `SimulationRequest`, persisted setup schema versions, live provider paths or legacy migration policy.
 
 Current implementation note: `createSimulationViewModel()` returns
 `activeAssumptions`, built from the validated current form/context and existing
-view-model warning data. It covers price and special-attack confidence warnings,
+view-model warning data. It covers special-attack confidence warnings,
 active custom setup, manual combat overrides, enabled per-monster cannon settings,
 per-monster loot settings, loot action overrides, active non-bundled PriceSet,
 scarce spot, explicit safespot override, protection prayer, manual food/bank/prayer controls,
@@ -684,6 +684,11 @@ Required content:
 
 Current implementation note: the root rewrite UI exposes the full current-target loot workflow, meaningful action controls, per-monster settings, composition/nested/action-impact detail and price-history context from the same merged shared/local analysis used by Economy. The ordinary drop table keeps source order by default and exposes accessible ascending/descending sorting for drop, action, hourly delta, EV/kill, chance, quantity and price; Impacts and Details remain disclosure columns rather than sort keys. Expanded random-table contents keep their source order by default and can be sorted by child, weight, chance, quantity, price or EV share, with unavailable numeric values retained at the end. Both sorts are session-local presentation state and do not change loot preferences, simulation requests or persisted setup data. Composition, action-impact and conditional tables keep their semantic contribution, action-policy and source-completeness order. Generated high alch controls alch profitability. D-089 moves the D-072 conditional quest/clue rows out of the ordinary action table into one collapsed native disclosure; their source chance, sanitized eligibility and locked Skip remain visible on demand, and they still contribute no value or trip effect while exact player state is unavailable. D-090 lets Economy overlay and reset one validated browser-local item price while preserving the selected/scheduled/bundled base and generated high alch. Economy owns the read-only shared plus local comparison workflow; D-049 still keeps full legacy history migration out of V1, while root-variable and scheduled-run evidence remain operations work after the successful live dry-run.
 
+D-101 removes the duplicated aggregate Loot price-warning block. Bounded notes
+now stay beside the supplying row or nested contributor; Bury, Skip and unused
+Alch sale values may retain alternative-price context without entering the
+current-result aggregate.
+
 #### Loot/Economy nested workflow parity slice
 
 This slice finishes the visible nested loot/economy workflow that remains open
@@ -950,18 +955,24 @@ scheduled then bundled prices, while generated high alch wins in every source.
 Missing values and zero baselines remain finite. Backend/account history and
 live scheduled-run evidence remain separate boundaries.
 
+Economy also owns the complete current-result `Price data notes (N)` native
+disclosure. It starts collapsed during ordinary navigation, contains every
+deduplicated active issue and confidence note, and opens with focus transfer
+from the Result area's compact `Review price data` action. No passive
+`N more` truncation or duplicate Result/Loot aggregate remains.
+
 ### Loot/Economy Release Classification
 
 Status date: 2026-07-08. This classification applies to the visible
 Loot/Economy V1 replacement workflow in the root Vite rewrite, not to
 production market automation or full legacy storage migration.
 
-| Classification     | Items                                                                                                                                                                                                                                                                                                                                                      | Release impact                                                                   |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| `release-required` | Current-monster loot actions/settings; reset/optimize with Undo; loot composition/nested detail; structured price warnings; active market-price context; generated high alch; local PriceSet override/reset; shared read-only plus local comparison history; `Save local comparison`; confirmed `Clear local history`; movers, sparklines and item trends. | Complete for this slice.                                                         |
-| `later`            | Further Economy analysis beyond the local movers/trend workflow, visual scenarios beyond the implemented repository-local matrix and remote merge-gate promotion.                                                                                                                                                                                          | Not required unless a later release makes one of these evidence areas a blocker. |
-| `legacy-only`      | Archived `market.js` current-monster nested sync behavior, legacy script-order globals, legacy `/api/prices` or `/api/scrape` production copy and legacy runtime internals.                                                                                                                                                                                | Not ported by design for the rewrite V1 path.                                    |
-| `decision-needed`  | Full legacy history migration and backend/account history.                                                                                                                                                                                                                                                                                                 | Keep as explicit future work, not blockers for the accepted visible slice.       |
+| Classification     | Items                                                                                                                                                                                                                                                                                                                                                                                                                             | Release impact                                                                   |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `release-required` | Current-monster loot actions/settings; reset/optimize with Undo; row-local used-price notes; compact Result issue only for active missing/fallback values; complete Economy price-data disclosure; active market-price context; generated high alch; local PriceSet override/reset; shared read-only plus local comparison history; `Save local comparison`; confirmed `Clear local history`; movers, sparklines and item trends. | Complete for this slice.                                                         |
+| `later`            | Further Economy analysis beyond the local movers/trend workflow, visual scenarios beyond the implemented repository-local matrix and remote merge-gate promotion.                                                                                                                                                                                                                                                                 | Not required unless a later release makes one of these evidence areas a blocker. |
+| `legacy-only`      | Archived `market.js` current-monster nested sync behavior, legacy script-order globals, legacy `/api/prices` or `/api/scrape` production copy and legacy runtime internals.                                                                                                                                                                                                                                                       | Not ported by design for the rewrite V1 path.                                    |
+| `decision-needed`  | Full legacy history migration and backend/account history.                                                                                                                                                                                                                                                                                                                                                                        | Keep as explicit future work, not blockers for the accepted visible slice.       |
 
 ### Settings
 
