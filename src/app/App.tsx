@@ -72,7 +72,6 @@ import { usePriceSetTransfer } from "./controllers/use-price-set-transfer";
 import { formatRiskRange } from "./view-models/risk";
 import type {
   AcceptedPriceSetOutcome,
-  PriceImportSurface,
   ResetPriceSetOutcome
 } from "./controllers/price-set-transfer";
 import {
@@ -1184,10 +1183,9 @@ export function App() {
     );
   };
 
-  const importPriceFile = async (file: File, surface: PriceImportSurface): Promise<void> => {
+  const importPriceFile = async (file: File): Promise<void> => {
     if (!context) return;
     const outcome = await priceSetTransfer.importFile(file, {
-      surface,
       gameData: context.gameData,
       manualPriceOverrides
     });
@@ -2198,11 +2196,9 @@ export function App() {
           onPreviewOpenChange: hiscores.setPreviewOpen,
           onApply: applyHiscoresPreview
         }}
-        priceImportNotice={priceSetTransfer.importNotice}
         setupImportNotice={setupFileTransfer.notice}
         shareCreateNotice={shareCreateNotice}
         shareButtonRef={shareSetupButtonRef}
-        onImportPrices={(file) => importPriceFile(file, "topbar")}
         onImportSetup={importSetupFile}
         onExportSetup={exportCurrentSetup}
         onShareSetup={openShareSetupDialog}

@@ -25,7 +25,7 @@ function inOrder(markup: string, fragments: readonly string[]): void {
 }
 
 describe("app shell components", () => {
-  it("keeps skip link, header, Hiscores, file actions and notices in order", () => {
+  it("keeps skip link, header, Hiscores, setup actions and notices in order", () => {
     const markup = renderToStaticMarkup(
       <AppHeader
         hiscores={{
@@ -43,15 +43,9 @@ describe("app shell components", () => {
           onPreviewOpenChange: noOp,
           onApply: noOp
         }}
-        priceImportNotice={{
-          tone: "error",
-          message: "Price fixture",
-          surface: "topbar"
-        }}
         setupImportNotice={{ tone: "success", message: "Setup fixture" }}
         shareCreateNotice="Share fixture"
         shareButtonRef={null}
-        onImportPrices={asyncNoOp}
         onImportSetup={asyncNoOp}
         onExportSetup={noOp}
         onShareSetup={noOp}
@@ -62,16 +56,15 @@ describe("app shell components", () => {
       'class="skip-link"',
       'class="topbar"',
       'aria-label="Hiscores"',
-      "Import prices",
       "Import setup",
       "Export setup",
       "Share setup",
-      "Price fixture",
       "Setup fixture",
       "Share fixture"
     ]);
     expect(markup).toContain('href="#workbench-active-panel"');
-    expect(markup.match(/accept="application\/json,.json"/g)).toHaveLength(2);
+    expect(markup.match(/accept="application\/json,.json"/g)).toHaveLength(1);
+    expect(markup).not.toContain("Import prices");
   });
 
   it("keeps shared ready and invalid review branches exact", () => {

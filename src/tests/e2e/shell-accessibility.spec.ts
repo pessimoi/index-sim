@@ -243,9 +243,16 @@ test("renders scheduled price status and keeps local PriceSet overrides separate
     itemPrices: { big_bones: 910, lobster: 90 },
     alchValues: { big_bones: 0, lobster: 0 }
   };
-  await market
+  const advancedPriceSetTools = market.locator("details.advanced-price-set-tools");
+  await expect(advancedPriceSetTools).not.toHaveAttribute("open", "");
+  await advancedPriceSetTools.locator(":scope > summary").click();
+  await expect(advancedPriceSetTools).toContainText(
+    "Importing replaces the complete local base PriceSet"
+  );
+  await expect(advancedPriceSetTools).toContainText("Missing items are not merged");
+  await advancedPriceSetTools
     .locator("label.file-button")
-    .filter({ hasText: "Import PriceSet" })
+    .filter({ hasText: "Import full PriceSet" })
     .locator('input[type="file"]')
     .setInputFiles({
       name: "disabled-market-prices.json",
@@ -303,7 +310,12 @@ test("renders scheduled price status and keeps local PriceSet overrides separate
   await expect(reloadedActivePriceSetSummary).toContainText("Source manual");
   await expect(page.getByLabel("Price history summary")).toContainText("Snapshots 1");
 
-  await reloadedMarket.getByRole("button", { name: "Reset local price override" }).click();
+  const reloadedAdvancedPriceSetTools = reloadedMarket.locator("details.advanced-price-set-tools");
+  await expect(reloadedAdvancedPriceSetTools).not.toHaveAttribute("open", "");
+  await reloadedAdvancedPriceSetTools.locator(":scope > summary").click();
+  await reloadedAdvancedPriceSetTools
+    .getByRole("button", { name: "Reset imported PriceSet" })
+    .click();
   await expect(reloadedMarket).toContainText("Confirm reset to scheduled prices");
   await reloadedMarket.getByRole("button", { name: "Confirm reset to scheduled prices" }).click();
   await expect(reloadedActivePriceSetSummary).toContainText("Active source Scheduled snapshot");

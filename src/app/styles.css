@@ -4369,6 +4369,98 @@ th {
   margin: 0.7rem 0 0;
 }
 
+.advanced-price-set-tools {
+  border: 1px solid #394150;
+  border-radius: 8px;
+  margin-top: 0.75rem;
+  min-width: 0;
+}
+
+.advanced-price-set-tools > summary {
+  color: #d7dee8;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.65rem 0.75rem;
+}
+
+.advanced-price-set-tools > summary:focus-visible,
+.price-set-format-help > summary:focus-visible {
+  outline: 2px solid #76d7ff;
+  outline-offset: 2px;
+}
+
+.advanced-price-set-tools-content {
+  border-top: 1px solid #26303d;
+  display: grid;
+  gap: 0.6rem;
+  min-width: 0;
+  padding: 0.75rem;
+}
+
+.advanced-price-set-tools-content > p,
+.price-set-format-help p,
+.price-set-format-help li {
+  color: #aeb9c8;
+  font-size: 0.74rem;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.advanced-price-set-tools-content strong,
+.price-set-format-help code {
+  color: #e8edf5;
+}
+
+.price-set-format-help {
+  border: 1px solid #2b3544;
+  border-radius: 6px;
+  min-width: 0;
+}
+
+.price-set-format-help > summary {
+  color: #b9c6d8;
+  cursor: pointer;
+  font-size: 0.74rem;
+  font-weight: 700;
+  padding: 0.5rem 0.6rem;
+}
+
+.price-set-format-help > p,
+.price-set-format-help > ul,
+.price-set-format-help > pre {
+  margin-left: 0.6rem;
+  margin-right: 0.6rem;
+}
+
+.price-set-format-help > p {
+  border-top: 1px solid #26303d;
+  padding-top: 0.55rem;
+}
+
+.price-set-format-help > pre {
+  background: #10151c;
+  border: 1px solid #26303d;
+  border-radius: 5px;
+  color: #d8e2f0;
+  font-size: 0.7rem;
+  line-height: 1.45;
+  max-width: calc(100% - 1.2rem);
+  overflow-x: auto;
+  padding: 0.6rem;
+  white-space: pre;
+}
+
+.price-set-format-help > ul {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0 0 0.7rem 1rem;
+}
+
+.advanced-price-set-tools-content > .market-sync-bar {
+  margin-top: 0;
+}
+
 .gear-tier-grid {
   display: grid;
   gap: 0.5rem;

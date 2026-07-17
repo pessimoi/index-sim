@@ -210,9 +210,11 @@ test("keeps manual item drafts and unavailable overrides scoped across base chan
 
   await priceInput.fill("222222");
   const market = page.getByLabel("Market price data");
-  await market
+  const advancedPriceSetTools = market.locator("details.advanced-price-set-tools");
+  await advancedPriceSetTools.locator(":scope > summary").click();
+  await advancedPriceSetTools
     .locator("label.file-button")
-    .filter({ hasText: "Import PriceSet" })
+    .filter({ hasText: "Import full PriceSet" })
     .locator('input[type="file"]')
     .setInputFiles({
       name: "big-bones-only.json",
@@ -239,7 +241,7 @@ test("keeps manual item drafts and unavailable overrides scoped across base chan
     )
   ).toBe(123456);
 
-  await market.getByRole("button", { name: "Reset local price override" }).click();
+  await advancedPriceSetTools.getByRole("button", { name: "Reset imported PriceSet" }).click();
   await market.getByRole("button", { name: "Confirm reset to scheduled prices" }).click();
   await chooseSearchableOption(panel, "Manual price item", "Lobster", true);
   await expect(summary).toContainText("Active 123,456");

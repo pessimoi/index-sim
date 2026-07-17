@@ -6,6 +6,7 @@ import {
   type EconomySettingsPaneMode,
   type EconomySettingsPaneModel
 } from "../app/components/panes/economy-settings-pane";
+import { importPriceSetFromInput } from "../app/components/panes/price-set-import-input";
 import { DEFAULT_MANUAL_PRICE_OVERRIDES_STATE } from "../app/state/manual-price-overrides";
 import { DEFAULT_PRICE_HISTORY_STATE } from "../app/state/price-history";
 import {
@@ -211,6 +212,38 @@ describe("Economy and Settings pane", () => {
     expect(markup).not.toContain('aria-label="Price history analysis"');
   });
 
+  it.each(["economy", "settings"] as const)(
+    "renders one collapsed, fully explained PriceSet workflow in %s mode",
+    (mode) => {
+      const markup = renderToStaticMarkup(
+        createElement(EconomySettingsPane, { model: model(mode), actions: defaultActions })
+      );
+
+      expect(markup.match(/class="advanced-price-set-tools"/g)).toHaveLength(1);
+      expect(markup.match(/type="file"/g)).toHaveLength(1);
+      expect(markup).toContain(
+        '<details class="advanced-price-set-tools" aria-label="Advanced PriceSet tools"><summary>Advanced PriceSet tools</summary>'
+      );
+      expect(markup).toContain("Importing replaces the complete local base PriceSet");
+      expect(markup).toContain("Missing items are not merged from the committed snapshot");
+      expect(markup).toContain("Use <strong>Manual item price</strong>");
+      expect(markup).toContain("a PriceSet JSON exported by this app, up to 1 MB");
+      expect(markup).toContain("High alch values always come from current game data");
+      expect(markup).toContain("File format");
+      expect(markup).toContain("complete replacement map, not a patch");
+      expect(markup).toContain('accept="application/json,.json"');
+      expect(markup).toMatch(/aria-describedby="[^"]+ [^"]+"/);
+      inOrder(markup, [
+        "Export active PriceSet",
+        "Import full PriceSet",
+        "Reset imported PriceSet"
+      ]);
+      expect(markup).not.toContain("Import prices");
+      expect(markup).not.toContain("Import PriceSet");
+      expect(markup).not.toContain("Reset local price override");
+    }
+  );
+
   it("keeps the hidden shared service strip mounted with the Market boundary", () => {
     const markup = renderToStaticMarkup(
       createElement(EconomySettingsPane, { model: model("hidden"), actions: defaultActions })
@@ -282,13 +315,12 @@ describe("Economy and Settings pane", () => {
     expect(calls).toEqual([false]);
   });
 
-  it("keeps confirmation branches, recovery and scoped notices in their current sections", () => {
+  it("keeps confirmations and the one PriceSet notice in the shared Market section", () => {
     const settingsModel: EconomySettingsPaneModel = {
       ...model("settings"),
       priceSetResetPending: true,
       marketNotice: { tone: "warning", message: "Market fixture warning" },
       importNotice: {
-        surface: "settings",
         tone: "error",
         message: "Settings import fixture failed"
       },
@@ -305,10 +337,11 @@ describe("Economy and Settings pane", () => {
       'aria-label="Local state recovery"',
       "Recovery fixture notice",
       'aria-label="Price data settings"',
-      "Confirm reset to bundled prices",
-      "Settings import fixture failed",
       'aria-label="Hidden gear tiers"',
-      'aria-label="Market price data"'
+      'aria-label="Market price data"',
+      "Advanced PriceSet tools",
+      "Confirm reset to bundled prices",
+      "Settings import fixture failed"
     ]);
     expect(settingsMarkup).toContain("Market fixture warning");
 
@@ -319,7 +352,6 @@ describe("Economy and Settings pane", () => {
       manualPriceClearPending: true,
       marketNotice: { tone: "success", message: "Market fixture ready" },
       importNotice: {
-        surface: "market",
         tone: "success",
         message: "Market import fixture succeeded"
       }
@@ -328,11 +360,11 @@ describe("Economy and Settings pane", () => {
       createElement(EconomySettingsPane, { model: economyModel, actions: defaultActions })
     );
     inOrder(economyMarkup, [
-      "Confirm reset to bundled prices",
-      "Confirm clear local history",
       "Confirm clear all manual prices",
-      "Market fixture ready",
+      "Confirm reset to bundled prices",
       "Market import fixture succeeded",
+      "Market fixture ready",
+      "Confirm clear local history",
       'aria-label="Price history analysis"'
     ]);
   });
@@ -343,8 +375,8 @@ describe("Economy and Settings pane", () => {
       ...defaultActions,
       prices: {
         ...defaultActions.prices,
-        importPriceSet: async (file, surface) => {
-          calls.push(`import:${surface}:${file.name}`);
+        importPriceSet: async (file) => {
+          calls.push(`import:${file.name}`);
         }
       },
       history: {
@@ -433,16 +465,14 @@ describe("Economy and Settings pane", () => {
         (element.props as { report?: unknown }).report !== undefined
     );
     (recoveryPanel!.props as { onBeginClear(id: "invalid-all"): void }).onBeginClear("invalid-all");
-    const fileInput = settingsElements.find(
-      (element) => element.type === "input" && (element.props as { type?: string }).type === "file"
-    );
     const target = {
       files: [new File(["{}"], "prices.json", { type: "application/json" })],
       value: "prices.json"
     };
-    (fileInput!.props as { onChange(event: { target: typeof target }): void }).onChange({ target });
-    await Promise.resolve();
-    await Promise.resolve();
+    await importPriceSetFromInput(
+      { currentTarget: target } as unknown as Parameters<typeof importPriceSetFromInput>[0],
+      actions.prices.importPriceSet
+    );
 
     expect(calls).toEqual([
       "sort:gpDelta",
@@ -455,7 +485,7 @@ describe("Economy and Settings pane", () => {
       "history:clear",
       "tier:bronze:false",
       "recovery:invalid-all",
-      "import:settings:prices.json"
+      "import:prices.json"
     ]);
     expect(target.value).toBe("");
   });

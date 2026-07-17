@@ -47,7 +47,6 @@ function priceSetText(overrides: Partial<PriceSet> = {}): string {
 
 function importInput(data: GameDataSnapshot = gameData()): ImportPriceSetFileInput {
   return {
-    surface: "market",
     gameData: data,
     manualPriceOverrides: DEFAULT_MANUAL_PRICE_OVERRIDES_STATE
   };
@@ -180,8 +179,7 @@ describe("PriceSet transfer controller", () => {
       importNotice: {
         tone: "success",
         message:
-          "Imported market prices: Imported fixture prices. High alch values use current generated game data.",
-        surface: "market"
+          "Imported market prices: Imported fixture prices. High alch values use current generated game data."
       },
       resetPending: false
     });
@@ -264,14 +262,13 @@ describe("PriceSet transfer controller", () => {
   ])("rejects $label without acceptance side effects", async ({ text, readFileText, code }) => {
     const test = harness(readFileText ? { readFileText } : {});
 
-    await expect(
-      test.core.importFile({ id: "invalid", text }, { ...importInput(), surface: "settings" })
-    ).resolves.toEqual({ status: "rejected" });
+    await expect(test.core.importFile({ id: "invalid", text }, importInput())).resolves.toEqual({
+      status: "rejected"
+    });
 
     expect(test.core.getSnapshot().importNotice).toMatchObject({
       tone: "error",
-      code,
-      surface: "settings"
+      code
     });
     expect(JSON.stringify(test.core.getSnapshot())).not.toContain(process.cwd());
     expect(test.saveSelectedPriceSet).not.toHaveBeenCalled();
@@ -308,25 +305,18 @@ describe("PriceSet transfer controller", () => {
       )
     });
 
-    const firstImport = test.core.importFile(
-      { id: "first", text: "" },
-      { ...importInput(), surface: "topbar" }
-    );
-    const secondImport = test.core.importFile(
-      { id: "second", text: "" },
-      { ...importInput(), surface: "settings" }
-    );
+    const firstImport = test.core.importFile({ id: "first", text: "" }, importInput());
+    const secondImport = test.core.importFile({ id: "second", text: "" }, importInput());
     second.resolve(priceSetText({ id: "second-prices", label: "Second prices" }));
     await expect(secondImport).resolves.toMatchObject({ status: "ready" });
-    expect(test.core.getSnapshot().importNotice).toMatchObject({ surface: "settings" });
+    expect(test.core.getSnapshot().importNotice).toMatchObject({ tone: "success" });
     first.resolve("{bad");
     await expect(firstImport).resolves.toEqual({ status: "rejected" });
 
     expect(test.saveSelectedPriceSet).toHaveBeenCalledOnce();
     expect(test.core.getSnapshot().importNotice).toMatchObject({
       tone: "error",
-      code: "invalid_json",
-      surface: "topbar"
+      code: "invalid_json"
     });
   });
 
@@ -357,7 +347,7 @@ describe("PriceSet transfer controller", () => {
     expect(test.core.requestReset("bundled prices")).toEqual({
       tone: "neutral",
       message:
-        "Confirm reset local price override to bundled prices. Local price history will be kept."
+        "Confirm reset imported PriceSet to bundled prices. Manual item prices and local price history will be kept."
     });
     test.core.requestReset("bundled prices");
     test.core.cancelReset();

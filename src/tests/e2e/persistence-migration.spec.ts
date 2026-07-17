@@ -658,14 +658,14 @@ test("does not overwrite an existing rewrite setup before import action", async 
   });
 });
 
-test("exports current rewrite setup and completes successful setup import", async ({ page }) => {
+test("keeps global actions focused and completes setup export and import", async ({ page }) => {
   await page.goto("/");
   const topbarActions = page.locator(".topbar > .actions");
   await expect(topbarActions.getByRole("button", { name: "Export setup" })).toBeVisible();
   const transferControls = topbarActions.locator("label.file-button, button");
   expect(
     (await transferControls.allTextContents()).map((text) => text.trim().replace(/\s+/g, " "))
-  ).toEqual(["Import prices", "Import setup", "Export setup", "Share setup"]);
+  ).toEqual(["Import setup", "Export setup", "Share setup"]);
 
   const downloadPromise = page.waitForEvent("download");
   await topbarActions.getByRole("button", { name: "Export setup" }).click();
@@ -737,7 +737,7 @@ test("exports current rewrite setup and completes successful setup import", asyn
     await setupNotice.evaluate((element) =>
       Array.from(element.parentElement?.children ?? []).indexOf(element)
     )
-  ).toBe(4);
+  ).toBe(3);
   await expect(setupInput).toHaveValue("");
   await expect(page.locator('span.visually-hidden[role="status"]')).toHaveText(
     "Imported rewrite setup"
@@ -780,6 +780,68 @@ test("exports current rewrite setup and completes successful setup import", asyn
     .click();
   await expect(page.getByLabel("Setup context")).toContainText("Default setup");
   await expectSearchableSelection(loadout, "Weapon", "rune_scimitar");
+});
+
+test("round-trips a full PriceSet through the one advanced Market workflow", async ({ page }) => {
+  await page.goto("/");
+
+  const topbarActions = page.locator(".topbar > .actions");
+  await expect(topbarActions).not.toContainText("Import prices");
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Settings" }).click();
+
+  const settings = page.getByLabel("Price data settings");
+  const market = page.getByLabel("Market price data");
+  const advancedPriceSetTools = market.locator("details.advanced-price-set-tools");
+  await expect(settings.locator('input[type="file"]')).toHaveCount(0);
+  await expect(market.locator('input[type="file"]')).toHaveCount(1);
+  await expect(advancedPriceSetTools).not.toHaveAttribute("open", "");
+
+  await advancedPriceSetTools.locator(":scope > summary").click();
+  await expect(advancedPriceSetTools).toContainText(
+    "Importing replaces the complete local base PriceSet"
+  );
+  await expect(advancedPriceSetTools).toContainText(
+    "Missing items are not merged from the committed snapshot"
+  );
+  await expect(advancedPriceSetTools).toContainText("Use Manual item price");
+  await expect(advancedPriceSetTools).toContainText("up to 1 MB");
+  await expect(advancedPriceSetTools).toContainText(
+    "High alch values always come from current game data"
+  );
+  await advancedPriceSetTools.getByText("File format", { exact: true }).click();
+  await expect(advancedPriceSetTools).toContainText('"itemPrices"');
+  await expect(advancedPriceSetTools).toContainText("complete replacement map, not a patch");
+
+  const downloadPromise = page.waitForEvent("download");
+  await advancedPriceSetTools.getByRole("button", { name: "Export active PriceSet" }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/^index-sim-price-set-.+\.json$/);
+  const exportedText = await readDownloadText(download);
+  const exported = JSON.parse(exportedText);
+  expect(exported).toMatchObject({
+    id: expect.any(String),
+    label: expect.any(String),
+    source: expect.any(String),
+    createdAt: expect.any(String),
+    itemPrices: expect.any(Object),
+    alchValues: expect.any(Object)
+  });
+
+  const priceSetInput = advancedPriceSetTools
+    .locator("label.file-button")
+    .filter({ hasText: "Import full PriceSet" })
+    .locator('input[type="file"]');
+  await priceSetInput.setInputFiles({
+    name: "exported-price-set.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(exportedText)
+  });
+
+  await expect(advancedPriceSetTools).toHaveAttribute("open", "");
+  await expect(advancedPriceSetTools.getByLabel("Price import notice")).toContainText(
+    `Imported market prices: ${exported.label}`
+  );
+  await expect(priceSetInput).toHaveValue("");
 });
 
 test("keeps setup import failures non-fatal and retryable", async ({ page }) => {
@@ -854,13 +916,16 @@ test("keeps PriceSet import failures non-fatal and recoverable", async ({ page }
   const storedHistoryBefore = await page.evaluate(() =>
     window.localStorage.getItem("index-sim:price-history")
   );
-  const topbarPriceInput = page
-    .locator(".topbar")
+  const market = page.getByLabel("Market price data");
+  const advancedPriceSetTools = market.locator("details.advanced-price-set-tools");
+  await expect(advancedPriceSetTools).not.toHaveAttribute("open", "");
+  await advancedPriceSetTools.locator(":scope > summary").click();
+  const priceSetInput = advancedPriceSetTools
     .locator("label.file-button")
-    .filter({ hasText: "Import prices" })
+    .filter({ hasText: "Import full PriceSet" })
     .locator('input[type="file"]');
 
-  await topbarPriceInput.setInputFiles({
+  await priceSetInput.setInputFiles({
     name: "bad-price-set.json",
     mimeType: "application/json",
     buffer: Buffer.from(
@@ -876,25 +941,26 @@ test("keeps PriceSet import failures non-fatal and recoverable", async ({ page }
   });
 
   await expect(page.getByLabel("Workbench shell")).toBeVisible();
-  await expect(page.locator(".topbar").getByLabel("Price import notice")).toContainText(
+  await expect(advancedPriceSetTools).toHaveAttribute("open", "");
+  await expect(advancedPriceSetTools.getByLabel("Price import notice")).toContainText(
     "Code validation_failed"
   );
-  await expect(page.locator(".topbar").getByLabel("Price import notice")).toContainText(
+  await expect(advancedPriceSetTools.getByLabel("Price import notice")).toContainText(
     "itemPrices.lobster"
   );
-  await expect(page.locator(".topbar").getByLabel("Price import notice")).toContainText(
+  await expect(advancedPriceSetTools.getByLabel("Price import notice")).toContainText(
     "Import was not applied"
   );
-  await expect(page.locator(".topbar").getByLabel("Price import notice")).not.toContainText(
+  await expect(advancedPriceSetTools.getByLabel("Price import notice")).not.toContainText(
     "SyntaxError"
   );
-  await expect(page.locator(".topbar").getByLabel("Price import notice")).not.toContainText(
+  await expect(advancedPriceSetTools.getByLabel("Price import notice")).not.toContainText(
     "expensive"
   );
-  await expect(page.locator(".topbar").getByLabel("Price import notice")).not.toContainText(
+  await expect(advancedPriceSetTools.getByLabel("Price import notice")).not.toContainText(
     process.cwd()
   );
-  await expect(topbarPriceInput).toHaveValue("");
+  await expect(priceSetInput).toHaveValue("");
   expect(await summaryText(priceSetSummary)).toBe(priceSetBefore);
   expect(await summaryText(historySummary)).toBe(historyBefore);
   expect(await page.evaluate(() => window.localStorage.getItem("index-sim:price-history"))).toBe(
@@ -909,17 +975,15 @@ test("keeps PriceSet import failures non-fatal and recoverable", async ({ page }
     itemPrices: { big_bones: 900, lobster: 80 },
     alchValues: { big_bones: 0, lobster: 0 }
   };
-  await settings
-    .locator("label.file-button")
-    .filter({ hasText: "Import PriceSet" })
-    .locator('input[type="file"]')
-    .setInputFiles({
-      name: "manual-after-error-prices.json",
-      mimeType: "application/json",
-      buffer: Buffer.from(JSON.stringify(importedPriceSet))
-    });
+  await priceSetInput.setInputFiles({
+    name: "manual-after-error-prices.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(importedPriceSet))
+  });
 
-  await expect(settings.getByLabel("Price import notice")).toContainText("Imported market prices");
+  await expect(advancedPriceSetTools.getByLabel("Price import notice")).toContainText(
+    "Imported market prices"
+  );
   await expect(priceSetSummary).toContainText("Label Imported after error prices");
   await expect(historySummary).toContainText("Snapshots 1");
 });

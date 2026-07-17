@@ -807,9 +807,12 @@ test("matches browser-rendered numeric snapshots for imported price sets", async
     alchValues: { big_bones: 0, lobster: 0 }
   };
 
-  await settings
+  const market = page.getByLabel("Market price data");
+  const advancedPriceSetTools = market.locator("details.advanced-price-set-tools");
+  await advancedPriceSetTools.locator(":scope > summary").click();
+  await advancedPriceSetTools
     .locator("label.file-button")
-    .filter({ hasText: "Import PriceSet" })
+    .filter({ hasText: "Import full PriceSet" })
     .locator('input[type="file"]')
     .setInputFiles({
       name: "manual-browser-snapshot-prices.json",
@@ -822,7 +825,7 @@ test("matches browser-rendered numeric snapshots for imported price sets", async
   await expect(priceSetSummary).toContainText("Item prices 2");
   await expect(priceSetSummary).toContainText(/Alch values [1-9][0-9,]*/);
   await expect(priceSetSummary).not.toContainText("Status Imported price set");
-  await expect(settings).toContainText("Imported price set: Imported fixture prices");
+  await expect(market).toContainText("Imported price set: Imported fixture prices");
   await expect(page.locator(".topbar")).not.toContainText("Imported fixture prices");
 
   await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Monsters" }).click();

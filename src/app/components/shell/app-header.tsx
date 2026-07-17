@@ -1,16 +1,13 @@
 import type { ChangeEvent, Ref } from "react";
-import type { ScopedPriceImportNotice } from "../../controllers/price-set-transfer";
 import type { InlineNoticeViewModel } from "../../view-models/contracts";
 import { InlineImportNotice } from "../app-presenters";
 import { HiscoresPanel, type HiscoresPanelProps } from "../topbar/hiscores-panel";
 
 export interface AppHeaderProps {
   hiscores: HiscoresPanelProps;
-  priceImportNotice: ScopedPriceImportNotice | null;
   setupImportNotice: InlineNoticeViewModel | null;
   shareCreateNotice: string | null;
   shareButtonRef: Ref<HTMLButtonElement>;
-  onImportPrices(file: File): Promise<void>;
   onImportSetup(file: File): Promise<void>;
   onExportSetup(): void;
   onShareSetup(): void;
@@ -32,11 +29,9 @@ async function importSelectedFile(
 
 export function AppHeader({
   hiscores,
-  priceImportNotice,
   setupImportNotice,
   shareCreateNotice,
   shareButtonRef,
-  onImportPrices,
   onImportSetup,
   onExportSetup,
   onShareSetup
@@ -60,14 +55,6 @@ export function AppHeader({
         <HiscoresPanel {...hiscores} />
         <div className="actions">
           <label className="file-button">
-            Import prices
-            <input
-              type="file"
-              accept="application/json,.json"
-              onChange={(event) => void importSelectedFile(event, onImportPrices)}
-            />
-          </label>
-          <label className="file-button">
             Import setup
             <input
               type="file"
@@ -81,13 +68,6 @@ export function AppHeader({
           <button ref={shareButtonRef} type="button" onClick={onShareSetup}>
             Share setup
           </button>
-          {priceImportNotice?.surface === "topbar" && (
-            <InlineImportNotice
-              notice={priceImportNotice}
-              ariaLabel="Price import notice"
-              className="topbar-import-notice price-import-notice"
-            />
-          )}
           {setupImportNotice && (
             <InlineImportNotice
               notice={setupImportNotice}

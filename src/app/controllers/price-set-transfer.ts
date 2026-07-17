@@ -17,16 +17,13 @@ import {
   type PriceImportNotice
 } from "../state/price-import";
 
-export type PriceImportSurface = "topbar" | "settings" | "market";
-export type ScopedPriceImportNotice = PriceImportNotice & { surface: PriceImportSurface };
-
 export interface MarketNotice {
   tone: "neutral" | "success" | "warning" | "error";
   message: string;
 }
 
 export interface PriceSetTransferSnapshot {
-  importNotice: ScopedPriceImportNotice | null;
+  importNotice: PriceImportNotice | null;
   resetPending: boolean;
 }
 
@@ -51,12 +48,10 @@ export interface AcceptedPriceSetOutcome {
 
 export type PriceSetFileImportOutcome = AcceptedPriceSetOutcome | { status: "rejected" };
 
-export interface ImportPriceSetFileInput extends Omit<
+export type ImportPriceSetFileInput = Omit<
   AcceptPriceSetInput,
   "priceSet" | "acceptedAt" | "nextStatus"
-> {
-  surface: PriceImportSurface;
-}
+>;
 
 export interface ResetPriceSetInput {
   fallbackPriceSet: PriceSet;
@@ -183,12 +178,10 @@ export class PriceSetTransferControllerCore<TFile> {
         acceptedAt: this.dependencies.now(),
         nextStatus: "Imported price set"
       });
-      this.update({
-        importNotice: { ...createPriceImportSuccessNotice(priceSet.label), surface: input.surface }
-      });
+      this.update({ importNotice: createPriceImportSuccessNotice(priceSet.label) });
       return outcome;
     } catch (error) {
-      this.update({ importNotice: { ...describePriceImportError(error), surface: input.surface } });
+      this.update({ importNotice: describePriceImportError(error) });
       return { status: "rejected" };
     }
   };
@@ -209,7 +202,7 @@ export class PriceSetTransferControllerCore<TFile> {
     this.update({ resetPending: true });
     return {
       tone: "neutral",
-      message: `Confirm reset local price override to ${fallbackLabel}. Local price history will be kept.`
+      message: `Confirm reset imported PriceSet to ${fallbackLabel}. Manual item prices and local price history will be kept.`
     };
   };
 
@@ -248,8 +241,8 @@ export class PriceSetTransferControllerCore<TFile> {
       marketNotice: {
         tone: persistedReset ? "success" : "neutral",
         message: persistedReset
-          ? `Reset to ${input.fallbackLabel}. Local price history was kept.`
-          : `Reset to ${input.fallbackLabel} for this session. Local storage is unavailable, so reload may restore the previous PriceSet.`
+          ? `Reset to ${input.fallbackLabel}. Manual item prices and local price history were kept.`
+          : `Reset to ${input.fallbackLabel} for this session. Manual item prices and local price history were kept. Local storage is unavailable, so reload may restore the previous PriceSet.`
       }
     };
   };

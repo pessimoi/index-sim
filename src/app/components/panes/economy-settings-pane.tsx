@@ -1,14 +1,11 @@
-import type { ChangeEvent, Ref } from "react";
+import { useId, type Ref } from "react";
 import type {
   LocalStateHealthItemId,
   LocalStateHealthReport
 } from "../../state/local-state-health";
 import type { LocalStateClearPendingId } from "../../controllers/local-state-recovery";
-import type {
-  MarketNotice,
-  PriceImportSurface,
-  ScopedPriceImportNotice
-} from "../../controllers/price-set-transfer";
+import type { MarketNotice } from "../../controllers/price-set-transfer";
+import type { PriceImportNotice } from "../../state/price-import";
 import type { GearTierId } from "../../state/hidden-gear-tiers";
 import type { PriceHistoryBaselineMode, PriceHistoryMoverSortKey } from "../../state/price-history";
 import {
@@ -30,6 +27,7 @@ import {
 } from "../presentation-formatters";
 import { PriceTrendChart, PriceTrendSparkline } from "../price-history-charts";
 import { LocalStateRecoveryPanel } from "../settings/local-state-recovery-panel";
+import { importPriceSetFromInput } from "./price-set-import-input";
 
 export type EconomySettingsPaneMode = "economy" | "settings" | "hidden";
 
@@ -40,7 +38,7 @@ export interface EconomySettingsPaneModel {
   priceNotices: CurrentPriceNoticePresentation;
   priceNotesOpen: boolean;
   marketNotice: MarketNotice | null;
-  importNotice: ScopedPriceImportNotice | null;
+  importNotice: PriceImportNotice | null;
   priceSetResetPending: boolean;
   priceHistoryClearPending: boolean;
   manualPriceClearPending: boolean;
@@ -55,7 +53,7 @@ export interface EconomySettingsPaneModel {
 export interface EconomySettingsPaneActions {
   setPriceNotesOpen(open: boolean): void;
   prices: {
-    importPriceSet(file: File, surface: PriceImportSurface): Promise<void>;
+    importPriceSet(file: File): Promise<void>;
     exportActivePriceSet(): void;
     requestReset(): void;
     confirmReset(): void;
@@ -101,20 +99,6 @@ export interface EconomySettingsPaneProps {
   priceNotesSummaryRef?: Ref<HTMLElement>;
 }
 
-async function importPriceSetFromInput(
-  event: ChangeEvent<HTMLInputElement>,
-  surface: PriceImportSurface,
-  importPriceSet: EconomySettingsPaneActions["prices"]["importPriceSet"]
-): Promise<void> {
-  const file = event.target.files?.[0];
-  if (!file) return;
-  try {
-    await importPriceSet(file, surface);
-  } finally {
-    event.target.value = "";
-  }
-}
-
 function ScheduledSnapshotSummary({ prices }: { prices: PriceDataViewModel }) {
   const scheduled = prices.scheduled;
   return (
@@ -145,41 +129,107 @@ function ScheduledSnapshotSummary({ prices }: { prices: PriceDataViewModel }) {
   );
 }
 
-function PriceSetControls({
+function AdvancedPriceSetTools({
   model,
   actions
 }: {
   model: EconomySettingsPaneModel;
   actions: EconomySettingsPaneActions;
 }) {
+  const replacementHelpId = useId();
+  const formatHelpId = useId();
+
   return (
-    <>
-      <button
-        type="button"
-        disabled={!model.prices.active.available}
-        onClick={actions.prices.exportActivePriceSet}
-      >
-        Export active PriceSet
-      </button>
-      {model.priceSetResetPending ? (
-        <>
-          <button type="button" onClick={actions.prices.confirmReset}>
-            Confirm reset to {model.prices.reset.fallbackLabel}
+    <details className="advanced-price-set-tools" aria-label="Advanced PriceSet tools">
+      <summary>Advanced PriceSet tools</summary>
+      <div className="advanced-price-set-tools-content">
+        <p id={replacementHelpId}>
+          Importing replaces the complete local base PriceSet in this browser. Missing items are not
+          merged from the committed snapshot. Use <strong>Manual item price</strong> for individual
+          corrections.
+        </p>
+        <p id={formatHelpId}>
+          Accepted file: a PriceSet JSON exported by this app, up to 1 MB. High alch values always
+          come from current game data.
+        </p>
+        <details className="price-set-format-help">
+          <summary>File format</summary>
+          <p>
+            Export the active PriceSet for the preferred backup and import template. A minimal file
+            contains these required fields:
+          </p>
+          <pre>
+            <code>{`{
+  "id": "custom-prices",
+  "label": "Custom prices",
+  "source": "manual",
+  "createdAt": "2026-07-17T08:00:00.000Z",
+  "itemPrices": {
+    "big_bones": 1000,
+    "lobster": 50
+  },
+  "alchValues": {}
+}`}</code>
+          </pre>
+          <ul>
+            <li>Item ids use the app&apos;s canonical item keys.</li>
+            <li>Prices must be finite non-negative numbers.</li>
+            <li>
+              <code>itemPrices</code> is a complete replacement map, not a patch.
+            </li>
+            <li>
+              <code>alchValues</code> is required, but imported values are replaced by current
+              generated game data.
+            </li>
+          </ul>
+        </details>
+        <div className="market-sync-bar">
+          <button
+            type="button"
+            disabled={!model.prices.active.available}
+            onClick={actions.prices.exportActivePriceSet}
+          >
+            Export active PriceSet
           </button>
-          <button type="button" onClick={actions.prices.cancelReset}>
-            Cancel
-          </button>
-        </>
-      ) : (
-        <button
-          type="button"
-          disabled={!model.prices.reset.canReset}
-          onClick={actions.prices.requestReset}
-        >
-          Reset local price override
-        </button>
-      )}
-    </>
+          <label className="file-button">
+            Import full PriceSet
+            <input
+              type="file"
+              accept="application/json,.json"
+              aria-describedby={`${replacementHelpId} ${formatHelpId}`}
+              onChange={(event) =>
+                void importPriceSetFromInput(event, actions.prices.importPriceSet)
+              }
+            />
+          </label>
+          {model.priceSetResetPending ? (
+            <>
+              <button type="button" onClick={actions.prices.confirmReset}>
+                Confirm reset to {model.prices.reset.fallbackLabel}
+              </button>
+              <button type="button" onClick={actions.prices.cancelReset}>
+                Cancel
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              disabled={!model.prices.reset.canReset}
+              onClick={actions.prices.requestReset}
+            >
+              Reset imported PriceSet
+            </button>
+          )}
+        </div>
+        {model.importNotice && (
+          <InlineImportNotice
+            notice={model.importNotice}
+            ariaLabel="Price import notice"
+            className="price-import-panel-notice"
+          />
+        )}
+      </div>
+    </details>
   );
 }
 
@@ -229,34 +279,6 @@ export function EconomySettingsPane({
             <span>Item prices {formatNumber(prices.active.itemCount)}</span>
             <span>Alch values {formatNumber(prices.active.alchCount)}</span>
           </div>
-          <div className="market-sync-bar">
-            <label className="file-button">
-              Import PriceSet
-              <input
-                type="file"
-                accept="application/json,.json"
-                onChange={(event) =>
-                  void importPriceSetFromInput(event, "settings", actions.prices.importPriceSet)
-                }
-              />
-            </label>
-            <PriceSetControls model={model} actions={actions} />
-          </div>
-          {model.marketNotice && (
-            <p
-              className={`inline-status ${model.marketNotice.tone}`}
-              role={model.marketNotice.tone === "error" ? "alert" : "status"}
-            >
-              {model.marketNotice.message}
-            </p>
-          )}
-          {model.importNotice?.surface === "settings" && (
-            <InlineImportNotice
-              notice={model.importNotice}
-              ariaLabel="Price import notice"
-              className="price-import-panel-notice"
-            />
-          )}
         </section>
       )}
       {settingsVisible && (
@@ -308,48 +330,10 @@ export function EconomySettingsPane({
         </div>
         <ScheduledSnapshotSummary prices={prices} />
         <p className="inline-status neutral">
-          Automatic market upstream refresh is currently disabled. Import a PriceSet file to
-          override committed market prices locally. High alch always uses current generated game
-          data.
+          Automatic market upstream refresh is currently disabled. The committed snapshot remains
+          the base unless a local PriceSet has been selected. High alch always uses current
+          generated game data.
         </p>
-        <div className="market-sync-bar">
-          <label className="file-button">
-            Import PriceSet
-            <input
-              type="file"
-              accept="application/json,.json"
-              onChange={(event) =>
-                void importPriceSetFromInput(event, "market", actions.prices.importPriceSet)
-              }
-            />
-          </label>
-          {economyVisible && <PriceSetControls model={model} actions={actions} />}
-          <button
-            type="button"
-            disabled={!prices.active.available}
-            onClick={actions.history.saveLocalComparison}
-          >
-            Save local comparison
-          </button>
-          {model.priceHistoryClearPending ? (
-            <>
-              <button type="button" onClick={actions.history.confirmClear}>
-                Confirm clear local history
-              </button>
-              <button type="button" onClick={actions.history.cancelClear}>
-                Cancel
-              </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              disabled={history.localSnapshotCount === 0}
-              onClick={actions.history.requestClear}
-            >
-              Clear local history
-            </button>
-          )}
-        </div>
         <div className="price-history-summary" aria-label="Market active PriceSet summary">
           <span>Active source {prices.active.sourceLabel}</span>
           <span>Label {prices.active.label}</span>
@@ -373,7 +357,8 @@ export function EconomySettingsPane({
               <div>
                 <h3>Manual item price</h3>
                 <small>
-                  Local correction over the active base PriceSet; high alch is unchanged.
+                  Correct one item over the active base PriceSet; high alch is unchanged. Advanced
+                  PriceSet tools replace the complete base for transfer or reproduction.
                 </small>
               </div>
               <span>
@@ -458,6 +443,42 @@ export function EconomySettingsPane({
             </div>
           </section>
         )}
+        <AdvancedPriceSetTools model={model} actions={actions} />
+        {model.marketNotice && (
+          <p
+            className={`inline-status ${model.marketNotice.tone}`}
+            role={model.marketNotice.tone === "error" ? "alert" : "status"}
+          >
+            {model.marketNotice.message}
+          </p>
+        )}
+        <div className="market-sync-bar">
+          <button
+            type="button"
+            disabled={!prices.active.available}
+            onClick={actions.history.saveLocalComparison}
+          >
+            Save local comparison
+          </button>
+          {model.priceHistoryClearPending ? (
+            <>
+              <button type="button" onClick={actions.history.confirmClear}>
+                Confirm clear local history
+              </button>
+              <button type="button" onClick={actions.history.cancelClear}>
+                Cancel
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              disabled={history.localSnapshotCount === 0}
+              onClick={actions.history.requestClear}
+            >
+              Clear local history
+            </button>
+          )}
+        </div>
         <div className="price-history-summary" aria-label="Price history summary">
           <span>Snapshots {formatNumber(history.summary.snapshotCount)}</span>
           <span>Shared {formatNumber(history.sharedSnapshotCount)}</span>
@@ -511,21 +532,6 @@ export function EconomySettingsPane({
             </ul>
           </details>
         ) : null}
-        {model.marketNotice && (
-          <p
-            className={`inline-status ${model.marketNotice.tone}`}
-            role={model.marketNotice.tone === "error" ? "alert" : "status"}
-          >
-            {model.marketNotice.message}
-          </p>
-        )}
-        {model.importNotice?.surface === "market" && (
-          <InlineImportNotice
-            notice={model.importNotice}
-            ariaLabel="Price import notice"
-            className="price-import-panel-notice"
-          />
-        )}
       </section>
       {economyVisible && (
         <section
