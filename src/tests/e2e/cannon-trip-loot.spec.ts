@@ -26,6 +26,7 @@ test("enables cannon for the selected monster and shows cannon rates", async ({ 
 
   const output = page.locator('[aria-label="Cannon output"]');
   await expect(output).toContainText("Balls/hr");
+  await expect(output).toContainText("Cannon only DPS");
   await expect(output).toContainText("Cannon Ranged XP/hr");
   await expect(output).toContainText("Effective XP/hr");
   await expect(output).toContainText("Effective net GP/hr");
@@ -37,7 +38,7 @@ test("enables cannon for the selected monster and shows cannon rates", async ({ 
   await expect(output).toContainText("Linked");
   await expect(output).toContainText("Inventory reserve");
   await expect(cannon.getByLabel("Cannon sparse status")).toContainText(/Trip sparse|Respawn/);
-  await expect(cannon.getByText("active")).toBeVisible();
+  await expect(cannon.getByText("respawn-bound", { exact: true })).toBeVisible();
   await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Monsters" }).click();
   await expect(page.getByLabel("Simulation results")).toContainText("SUPPLY/KILL");
   await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Stats" }).click();
@@ -473,6 +474,41 @@ test("updates per-monster loot settings and keeps them after reload", async ({ p
   await expect(reloadedLoot.getByLabel("Talisman spot")).toHaveValue("overground");
 });
 
+test("sorts current monster drops from accessible column headings", async ({ page }) => {
+  await page.goto("/");
+  await page.getByLabel("TARGET", { exact: true }).selectOption("firegiant");
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Loot" }).click();
+
+  const table = page.getByRole("table", { name: "Current monster drops" });
+  const rows = table.locator(":scope > tbody > tr");
+  const evHeader = table.getByRole("columnheader", { name: "EV/kill" });
+  await expect(evHeader).toHaveAttribute("aria-sort", "none");
+
+  await evHeader.getByRole("button").click();
+  await expect(evHeader).toHaveAttribute("aria-sort", "descending");
+  const descendingEv = (await rows.locator(":scope > td:nth-child(5)").allTextContents()).map(
+    (value) => Number(value.replaceAll(",", ""))
+  );
+  expect(descendingEv).toEqual([...descendingEv].sort((left, right) => right - left));
+
+  await evHeader.getByRole("button").click();
+  await expect(evHeader).toHaveAttribute("aria-sort", "ascending");
+  const ascendingEv = (await rows.locator(":scope > td:nth-child(5)").allTextContents()).map(
+    (value) => Number(value.replaceAll(",", ""))
+  );
+  expect(ascendingEv).toEqual([...ascendingEv].sort((left, right) => left - right));
+
+  const dropHeader = table.getByRole("columnheader", { name: "Drop" });
+  await dropHeader.getByRole("button").click();
+  await expect(dropHeader).toHaveAttribute("aria-sort", "ascending");
+  const dropNames = await rows.locator(":scope > td:first-child > span").allTextContents();
+  expect(dropNames).toEqual(
+    [...dropNames].sort((left, right) =>
+      left.localeCompare(right, undefined, { numeric: true, sensitivity: "base" })
+    )
+  );
+});
+
 test("shows source-backed conditional clue loot without allowing a value action", async ({
   page
 }) => {
@@ -622,12 +658,16 @@ test("shows loot value composition, nested detail and action impact detail", asy
   const nestedRow = table.getByRole("row", { name: /Random herb/ }).first();
   await nestedRow.scrollIntoViewIfNeeded();
   await nestedRow.locator("details").last().locator("summary").click();
-  await expect(page.getByRole("table", { name: /Nested rows for Random herb/ })).toContainText(
-    "Ranarr"
+  const nested = page.getByRole("table", { name: /Nested rows for Random herb/ });
+  await expect(nested).toContainText("Ranarr");
+  await expect(nested).toContainText("Weight");
+  const priceHeader = nested.getByRole("columnheader", { name: "Price", exact: true });
+  await priceHeader.getByRole("button", { name: "Price", exact: true }).click();
+  await expect(priceHeader).toHaveAttribute("aria-sort", "descending");
+  const prices = (await nested.locator("tbody tr td:nth-child(6)").allTextContents()).map((value) =>
+    Number(value.replaceAll(",", ""))
   );
-  await expect(page.getByRole("table", { name: /Nested rows for Random herb/ })).toContainText(
-    "Weight"
-  );
+  expect(prices).toEqual([...prices].sort((left, right) => right - left));
 });
 
 test("shows source-backed opened-casket value composition", async ({ page }) => {
@@ -786,12 +826,10 @@ test("matches browser-rendered numeric snapshots for imported price sets", async
   await expect(page.locator(".topbar")).not.toContainText("Imported fixture prices");
 
   await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Monsters" }).click();
-  await expect(page.locator('[aria-label="Result price warnings"]')).toContainText(
-    "Price warnings"
-  );
-  await expect(page.locator('[aria-label="Result price warnings"]')).toContainText(
-    "Missing price for loot item"
-  );
+  const priceDataIssue = page.getByLabel("Price data issue");
+  await expect(priceDataIssue).toContainText("Price data incomplete");
+  await expect(priceDataIssue.getByRole("button", { name: "Review price data" })).toBeVisible();
+  await expect(page.locator('[aria-label="Result price warnings"]')).toHaveCount(0);
   const importedPrices = await resultMetricSnapshot(page);
 
   expect({
@@ -821,10 +859,23 @@ test("matches browser-rendered numeric snapshots for imported price sets", async
   expect(reloadedImportedPrices).toEqual(importedPrices);
 
   await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Loot" }).click();
-  await expect(page.locator('[aria-label="Loot price warnings"]')).toContainText("Price warnings");
+  await expect(page.locator('[aria-label="Loot price warnings"]')).toHaveCount(0);
+  await expect(
+    page.locator(".loot-price-cell").filter({ hasText: "Missing price" }).first()
+  ).toBeVisible();
 
-  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Economy" }).click();
-  await expect(page.locator('[aria-label="Economy price warnings"]')).toContainText(
-    "Price warnings"
-  );
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Monsters" }).click();
+  await page
+    .getByLabel("Price data issue")
+    .getByRole("button", { name: "Review price data" })
+    .click();
+  const economyTab = page.getByLabel("Workbench tabs").getByRole("tab", { name: "Economy" });
+  const priceDataNotes = page.getByLabel("Economy price data notes");
+  await expect(economyTab).toHaveAttribute("aria-selected", "true");
+  await expect(priceDataNotes).toHaveAttribute("open", "");
+  await expect(priceDataNotes.locator("summary")).toBeFocused();
+  await expect(priceDataNotes.locator("summary")).toContainText(/Price data notes \([1-9][0-9]*\)/);
+  expect(await priceDataNotes.locator("li").count()).toBeGreaterThan(4);
+  await expect(priceDataNotes).not.toContainText(/\d+ more/);
+  await expect(page.locator('[aria-label="Economy price warnings"]')).toHaveCount(0);
 });

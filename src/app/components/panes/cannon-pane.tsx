@@ -132,6 +132,11 @@ export function CannonPane({
                     value: formatNumber(output.cannonDps, 2),
                     tone: "teal"
                   },
+                  {
+                    label: "Cannon only DPS",
+                    value: formatNumber(output.cannonOnlyDps, 2),
+                    tone: "teal"
+                  },
                   { label: "Balls/hr", value: formatNumber(output.ballsPerHour) },
                   { label: "Balls/kill", value: formatNumber(output.ballsPerKill, 2) },
                   {
@@ -206,6 +211,7 @@ export function CannonPane({
                 items={[
                   { label: "Effective targets", value: "0.0" },
                   { label: "Cannon DPS", value: "0.00" },
+                  { label: "Cannon only DPS", value: "0.00" },
                   { label: "Balls/hr", value: "0" },
                   { label: "Cannon Ranged XP/hr", value: "0" },
                   { label: "Effective XP/hr", value: formatNumber(effectiveXpPerHour) },

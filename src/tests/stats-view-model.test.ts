@@ -563,7 +563,7 @@ describe("rewrite UI view models", () => {
       label: "Normal attack",
       status: "modeled",
       statusLabel: "modeled",
-      warnings: result.moneyWarnings
+      warnings: []
     });
     expect(normalDetail?.histogram).toBe(result.hitDistribution);
     expect(normalMetrics.get("dps")).toMatchObject({
@@ -774,7 +774,7 @@ describe("rewrite UI view models", () => {
     );
   }, 15_000);
 
-  it("builds cannon source details for idle cannon spots without inventing a histogram", async () => {
+  it("keeps cannon source details modeled for an extremely sparse spot", async () => {
     const { context } = await loadBundledLegacyContext();
     const idleResult = createSimulationViewModel(rangedRockCrabForm(), context, {
       rock_crab: { enabled: true, targets: 1, respawnSec: 3600 }
@@ -783,21 +783,20 @@ describe("rewrite UI view models", () => {
     const metrics = statsSourceMetrics(detail);
 
     expect(idleResult.trip.cannon).toMatchObject({
-      idle: true,
-      respawnBound: false,
-      cannonDps: 0
+      idle: false,
+      respawnBound: true
     });
+    expect(idleResult.trip.cannon?.cannonDps).toBeGreaterThan(0);
     expect(detail).toMatchObject({
-      status: "inactive",
-      statusLabel: "inactive",
-      histogram: null
+      status: "modeled",
+      statusLabel: "modeled",
+      histogramScopeLabel: "Per fired cannonball"
     });
-    expect(detail?.notes.join("\n")).toContain(
-      "Idle: this spot is too sparse for the cannon to fire."
-    );
-    expect(metrics.get("dps")).toMatchObject({ value: "0.00", numericValue: 0 });
-    expect(metrics.get("sparse-state")?.value).toBe("Idle");
-    expect(metrics.get("idle")?.value).toBe("Yes");
-    expect(metrics.get("respawn-bound")?.value).toBe("No");
+    expect(detail?.histogram).not.toBeNull();
+    expect(detail?.notes.join("\n")).toContain("Respawn-bound cannon overlay.");
+    expect(metrics.get("dps")?.numericValue).toBeGreaterThan(0);
+    expect(metrics.get("sparse-state")?.value).toBe("Respawn-bound");
+    expect(metrics.get("idle")?.value).toBe("No");
+    expect(metrics.get("respawn-bound")?.value).toBe("Yes");
   }, 15_000);
 });

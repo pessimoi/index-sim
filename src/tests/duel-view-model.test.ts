@@ -9,6 +9,14 @@ import {
   normalizeFormState,
   switchCombatStyleLoadout
 } from "./ui-view-model-fixture";
+import {
+  DEFAULT_DUEL_COMPARISON_SORT_STATE,
+  DEFAULT_DUEL_MATRIX_SORT_STATE,
+  nextDuelComparisonSortState,
+  nextDuelMatrixSortState,
+  sortDuelComparisonRows,
+  sortDuelMatrixRows
+} from "../app/view-models/duel";
 
 describe("rewrite UI view models", () => {
   it("builds duel comparison rows for live and snapshots on the current monster", async () => {
@@ -208,5 +216,106 @@ describe("rewrite UI view models", () => {
     expect(currentTargetRow?.cells.some((cell) => cell.best.effectiveXpPerHour)).toBe(true);
     expect(snapshot.form.monsterId).toBe("firegiant");
     expect(JSON.stringify(matrix)).not.toContain("sourceRef");
+  }, 30_000);
+
+  it("sorts current-target setup rows by labels and outcomes without mutating source order", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const snapshot = createDuelSnapshot(
+      "snap-ranged",
+      "Alpha ranged",
+      normalizeFormState({
+        ...switchCombatStyleLoadout(DEFAULT_FORM_STATE, "ranged"),
+        weaponId: "magic_shortbow",
+        ammoId: "mith_arrow"
+      })
+    );
+    const comparison = createDuelComparisonViewModel(
+      DEFAULT_FORM_STATE,
+      { snapshots: [snapshot] },
+      context
+    );
+    const rows = [
+      ...comparison.rows,
+      {
+        ...comparison.snapshotRows[0]!,
+        id: "duel-snapshot:missing-gp-xp",
+        name: "Zulu setup",
+        gpPerXp: null
+      }
+    ];
+    const sourceIds = rows.map((row) => row.id);
+
+    expect(
+      sortDuelComparisonRows(rows, DEFAULT_DUEL_COMPARISON_SORT_STATE).map((row) => row.id)
+    ).toEqual(sourceIds);
+
+    const setupSort = nextDuelComparisonSortState(DEFAULT_DUEL_COMPARISON_SORT_STATE, "setup");
+    expect(setupSort).toEqual({ key: "setup", direction: "asc" });
+    expect(sortDuelComparisonRows(rows, setupSort).map((row) => row.name)).toEqual([
+      "Alpha ranged",
+      "Live loadout",
+      "Zulu setup"
+    ]);
+
+    const dpsRows = sortDuelComparisonRows(rows, { key: "dps", direction: "desc" });
+    expect(dpsRows.map((row) => row.dps)).toEqual(
+      [...dpsRows.map((row) => row.dps)].sort((left, right) => right - left)
+    );
+    const gpPerXpRows = sortDuelComparisonRows(rows, { key: "gpPerXp", direction: "desc" });
+    expect(gpPerXpRows.at(-1)?.gpPerXp).toBeNull();
+    expect(rows.map((row) => row.id)).toEqual(sourceIds);
+  }, 15_000);
+
+  it("sorts the Duel matrix by monster or the selected metric for a setup", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const snapshot = createDuelSnapshot(
+      "snap-ranged",
+      "Ranged saved",
+      normalizeFormState({
+        ...switchCombatStyleLoadout(DEFAULT_FORM_STATE, "ranged"),
+        weaponId: "magic_shortbow",
+        ammoId: "mith_arrow"
+      })
+    );
+    const matrix = createDuelMatrixViewModel(
+      DEFAULT_FORM_STATE,
+      { snapshots: [snapshot] },
+      context
+    );
+    const sourceIds = matrix.rows.map((row) => row.monsterId);
+
+    expect(
+      sortDuelMatrixRows(matrix.rows, DEFAULT_DUEL_MATRIX_SORT_STATE, "dps").map(
+        (row) => row.monsterId
+      )
+    ).toEqual(sourceIds);
+
+    const monsterSort = nextDuelMatrixSortState(DEFAULT_DUEL_MATRIX_SORT_STATE, {
+      kind: "monster"
+    });
+    const monsterNames = sortDuelMatrixRows(matrix.rows, monsterSort, "dps").map(
+      (row) => row.monsterName
+    );
+    expect(monsterNames).toEqual(
+      [...monsterNames].sort((left, right) =>
+        left.localeCompare(right, undefined, { numeric: true, sensitivity: "base" })
+      )
+    );
+
+    const setupId = matrix.setups[0]!.id;
+    const setupSort = nextDuelMatrixSortState(DEFAULT_DUEL_MATRIX_SORT_STATE, {
+      kind: "setup",
+      setupId
+    });
+    const setupRows = sortDuelMatrixRows(matrix.rows, setupSort, "effectiveXpPerHour");
+    const availableValues = setupRows
+      .map((row) => row.cells.find((cell) => cell.setupId === setupId)?.values.effectiveXpPerHour)
+      .filter((value): value is number => value != null);
+    expect(availableValues).toEqual([...availableValues].sort((left, right) => right - left));
+    expect(nextDuelMatrixSortState(setupSort, { kind: "setup", setupId })).toEqual({
+      target: { kind: "setup", setupId },
+      direction: "asc"
+    });
+    expect(matrix.rows.map((row) => row.monsterId)).toEqual(sourceIds);
   }, 30_000);
 });

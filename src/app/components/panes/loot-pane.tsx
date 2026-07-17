@@ -1,14 +1,18 @@
 import type { JewelSpot, LootAction } from "@/domain/trip";
 import type { MonsterLootSettings } from "../../state/loot-settings";
-import type { CalculationWarningViewModel } from "../../view-models/contracts";
 import {
   lootActionLabel,
+  sortLootNestedTableRows,
+  sortLootTableRows,
   type LootDropRowViewModel,
-  type LootPresentationViewModel
+  type LootNestedTableSortKey,
+  type LootNestedTableSortState,
+  type LootPresentationViewModel,
+  type LootTableSortKey,
+  type LootTableSortState
 } from "../../view-models/loot";
 import { formatNumber } from "../../view-models/formatting";
 import { MetricList } from "../app-presenters";
-import { CalculationWarningSummary } from "../combat-result-presenters";
 import { DecimalField, SelectField } from "../form-fields";
 import {
   formatDelta,
@@ -32,13 +36,45 @@ const TALISMAN_SPOT_OPTIONS: Array<{ id: JewelSpot; label: string }> = [
   { id: "overground", label: "Overground" }
 ];
 
+const LOOT_TABLE_COLUMNS: ReadonlyArray<{
+  label: string;
+  sortKey: LootTableSortKey | null;
+  numeric?: boolean;
+}> = [
+  { label: "Drop", sortKey: "drop" },
+  { label: "Action", sortKey: "action" },
+  { label: "Delta/hr", sortKey: "deltaPerHour", numeric: true },
+  { label: "Impacts", sortKey: null },
+  { label: "EV/kill", sortKey: "evPerKill", numeric: true },
+  { label: "Chance", sortKey: "chance", numeric: true },
+  { label: "Qty", sortKey: "quantity", numeric: true },
+  { label: "Price", sortKey: "price", numeric: true },
+  { label: "Details", sortKey: null }
+];
+
+const LOOT_NESTED_TABLE_COLUMNS: ReadonlyArray<{
+  label: string;
+  sortKey: LootNestedTableSortKey | null;
+  numeric?: boolean;
+}> = [
+  { label: "Child", sortKey: "child" },
+  { label: "Key/tag", sortKey: null },
+  { label: "Weight", sortKey: "weight", numeric: true },
+  { label: "Chance", sortKey: "chance", numeric: true },
+  { label: "Qty", sortKey: "quantity", numeric: true },
+  { label: "Price", sortKey: "price", numeric: true },
+  { label: "EV share", sortKey: "evShare", numeric: true },
+  { label: "Notes", sortKey: null }
+];
+
 export interface LootPaneModel {
   presentation: LootPresentationViewModel;
   settings: MonsterLootSettings;
   notice: string | null;
   gpPerKill: number;
   effectiveNetGpPerHour: number;
-  moneyWarnings: readonly CalculationWarningViewModel[];
+  sort: LootTableSortState;
+  nestedSort: LootNestedTableSortState;
 }
 
 export interface LootPaneActions {
@@ -50,6 +86,8 @@ export interface LootPaneActions {
   resetSettings(): void;
   resetOverrides(): void;
   optimize(): void;
+  sortBy(key: LootTableSortKey): void;
+  sortNestedBy(key: LootNestedTableSortKey): void;
 }
 
 export interface LootPaneProps {
@@ -62,9 +100,26 @@ function optionLabel(options: ReadonlyArray<{ id: string; label: string }>, valu
   return options.find((option) => option.id === value)?.label ?? value;
 }
 
+function lootAriaSort(
+  sort: LootTableSortState,
+  key: LootTableSortKey
+): "ascending" | "descending" | "none" {
+  if (sort.key !== key) return "none";
+  return sort.direction === "asc" ? "ascending" : "descending";
+}
+
+function lootNestedAriaSort(
+  sort: LootNestedTableSortState,
+  key: LootNestedTableSortKey
+): "ascending" | "descending" | "none" {
+  if (sort.key !== key) return "none";
+  return sort.direction === "asc" ? "ascending" : "descending";
+}
+
 export function LootPane({ hidden, model, actions }: LootPaneProps) {
   const { presentation } = model;
   const { actionableRows, conditionalRows, summary } = presentation;
+  const sortedActionableRows = sortLootTableRows(actionableRows, model.sort);
 
   return (
     <section className="loot-strip" aria-label="Current monster loot" hidden={hidden}>
@@ -153,7 +208,6 @@ export function LootPane({ hidden, model, actions }: LootPaneProps) {
           ]}
         />
       </div>
-      <CalculationWarningSummary warnings={model.moneyWarnings} label="Loot price warnings" />
       <section className="loot-composition" aria-label="Loot value composition">
         <div className="loot-section-heading">
           <h3>Loot value composition</h3>
@@ -204,15 +258,34 @@ export function LootPane({ hidden, model, actions }: LootPaneProps) {
         <table className="loot-table" aria-label="Current monster drops">
           <thead>
             <tr>
-              <th>Drop</th>
-              <th>Action</th>
-              <th className="numeric">Delta/hr</th>
-              <th>Impacts</th>
-              <th className="numeric">EV/kill</th>
-              <th className="numeric">Chance</th>
-              <th className="numeric">Qty</th>
-              <th className="numeric">Price</th>
-              <th>Details</th>
+              {LOOT_TABLE_COLUMNS.map((column) => (
+                <th
+                  key={column.label}
+                  className={column.numeric ? "numeric" : undefined}
+                  aria-sort={
+                    column.sortKey === null ? undefined : lootAriaSort(model.sort, column.sortKey)
+                  }
+                >
+                  {column.sortKey === null ? (
+                    column.label
+                  ) : (
+                    <button
+                      type="button"
+                      className="sort-button"
+                      onClick={() => actions.sortBy(column.sortKey!)}
+                    >
+                      <span>{column.label}</span>
+                      <span aria-hidden="true">
+                        {model.sort.key === column.sortKey
+                          ? model.sort.direction === "asc"
+                            ? "^"
+                            : "v"
+                          : ""}
+                      </span>
+                    </button>
+                  )}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
@@ -221,7 +294,7 @@ export function LootPane({ hidden, model, actions }: LootPaneProps) {
                 <td colSpan={9}>No drops</td>
               </tr>
             ) : (
-              actionableRows.map((row) => (
+              sortedActionableRows.map((row) => (
                 <tr
                   key={row.rowId}
                   className={[
@@ -308,7 +381,23 @@ export function LootPane({ hidden, model, actions }: LootPaneProps) {
                   <td className="numeric">{formatNumber(row.effectiveEvGp, 1)}</td>
                   <td className="numeric">{formatNumber(row.chance * 100, 2)}%</td>
                   <td className="numeric">{formatNumber(row.qtyAvg, 1)}</td>
-                  <td className="numeric">{formatNumber(row.price)}</td>
+                  <td className="numeric loot-price-cell">
+                    <span>{formatNumber(row.price)}</span>
+                    {row.priceNotices.length > 0 ? (
+                      <small
+                        className={
+                          row.priceNotices.some((notice) => notice.level === "issue")
+                            ? "warning"
+                            : undefined
+                        }
+                      >
+                        {row.priceNotices[0]?.summary}
+                        {row.priceNotices.length > 1
+                          ? ` +${formatNumber(row.priceNotices.length - 1)}`
+                          : ""}
+                      </small>
+                    ) : null}
+                  </td>
                   <td>
                     <details className="loot-row-disclosure">
                       <summary>
@@ -317,6 +406,27 @@ export function LootPane({ hidden, model, actions }: LootPaneProps) {
                           : "Value details"}
                       </summary>
                       <div className="loot-row-detail-panel">
+                        {row.priceNotices.length > 0 ? (
+                          <section
+                            className="loot-price-notices"
+                            aria-label={`Price data notes for ${row.name}`}
+                          >
+                            <strong>Price data</strong>
+                            <ul>
+                              {row.priceNotices.map((notice) => (
+                                <li key={`${notice.code}:${notice.itemId ?? notice.itemLabel}`}>
+                                  <span>{notice.summary}</span>
+                                  <small>
+                                    {notice.detail}
+                                    {!notice.affectsCurrentResult
+                                      ? " This displayed alternative is not used in current GP totals."
+                                      : ""}
+                                  </small>
+                                </li>
+                              ))}
+                            </ul>
+                          </section>
+                        ) : null}
                         <dl className="loot-value-facts">
                           {row.valueDetails.map((detail) => (
                             <div className={detail.tone} key={`${row.rowId}-${detail.label}`}>
@@ -368,39 +478,69 @@ export function LootPane({ hidden, model, actions }: LootPaneProps) {
                           >
                             <thead>
                               <tr>
-                                <th>Child</th>
-                                <th>Key/tag</th>
-                                <th className="numeric">Weight</th>
-                                <th className="numeric">Chance</th>
-                                <th className="numeric">Qty</th>
-                                <th className="numeric">Price</th>
-                                <th className="numeric">EV share</th>
-                                <th>Notes</th>
+                                {LOOT_NESTED_TABLE_COLUMNS.map((column) => (
+                                  <th
+                                    scope="col"
+                                    className={column.numeric ? "numeric" : undefined}
+                                    aria-sort={
+                                      column.sortKey === null
+                                        ? undefined
+                                        : lootNestedAriaSort(model.nestedSort, column.sortKey)
+                                    }
+                                    key={column.label}
+                                  >
+                                    {column.sortKey === null ? (
+                                      column.label
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        className="sort-button"
+                                        onClick={() => actions.sortNestedBy(column.sortKey!)}
+                                      >
+                                        <span>{column.label}</span>
+                                        <span aria-hidden="true">
+                                          {model.nestedSort.key === column.sortKey
+                                            ? model.nestedSort.direction === "asc"
+                                              ? "^"
+                                              : "v"
+                                            : ""}
+                                        </span>
+                                      </button>
+                                    )}
+                                  </th>
+                                ))}
                               </tr>
                             </thead>
                             <tbody>
-                              {row.expandedRows.map((detail) => (
-                                <tr key={`${row.rowId}-${detail.label}`}>
-                                  <td>{detail.label}</td>
-                                  <td>{detail.key ?? detail.tag ?? "-"}</td>
-                                  <td className="numeric">{detail.weightLabel ?? "-"}</td>
-                                  <td className="numeric">
-                                    {detail.chance === null
-                                      ? "-"
-                                      : `${formatNumber(detail.chance * 100, 2)}%`}
-                                  </td>
-                                  <td className="numeric">{detail.qtyLabel ?? "-"}</td>
-                                  <td className="numeric">
-                                    {detail.price === null ? "-" : formatNumber(detail.price)}
-                                  </td>
-                                  <td className="numeric">
-                                    {detail.evGp === null
-                                      ? "-"
-                                      : `${formatNumber(detail.evGp, 1)} gp`}
-                                  </td>
-                                  <td>{detail.notes.join("; ") || "-"}</td>
-                                </tr>
-                              ))}
+                              {sortLootNestedTableRows(row.expandedRows, model.nestedSort).map(
+                                (detail) => (
+                                  <tr key={`${row.rowId}-${detail.label}`}>
+                                    <td>{detail.label}</td>
+                                    <td>{detail.key ?? detail.tag ?? "-"}</td>
+                                    <td className="numeric">{detail.weightLabel ?? "-"}</td>
+                                    <td className="numeric">
+                                      {detail.chance === null
+                                        ? "-"
+                                        : `${formatNumber(detail.chance * 100, 2)}%`}
+                                    </td>
+                                    <td className="numeric">{detail.qtyLabel ?? "-"}</td>
+                                    <td className="numeric">
+                                      {detail.price === null ? "-" : formatNumber(detail.price)}
+                                    </td>
+                                    <td className="numeric">
+                                      {detail.evGp === null
+                                        ? "-"
+                                        : `${formatNumber(detail.evGp, 1)} gp`}
+                                    </td>
+                                    <td>
+                                      {[
+                                        ...detail.notes,
+                                        ...detail.priceNotices.map((notice) => notice.summary)
+                                      ].join("; ") || "-"}
+                                    </td>
+                                  </tr>
+                                )
+                              )}
                             </tbody>
                           </table>
                         )}

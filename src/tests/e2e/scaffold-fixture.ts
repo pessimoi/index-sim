@@ -91,6 +91,7 @@ export async function readDownloadText(download: Download): Promise<string> {
 export const CANNON_NUMERIC_LABELS = [
   "Effective targets",
   "Cannon DPS",
+  "Cannon only DPS",
   "Balls/hr",
   "Balls/kill",
   "Cannon Ranged XP/hr",

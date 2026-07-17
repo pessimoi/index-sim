@@ -34,7 +34,7 @@ import legacyGolden from "../src/tests/fixtures/legacy-golden.json";
 import { createRewriteFixtureCase } from "../src/tests/helpers/rewrite-fixture";
 
 const REPORT_PATH = resolve("docs/project/numeric-user-path-audit.md");
-const AUDIT_DATE = "2026-07-12";
+const AUDIT_DATE = "2026-07-17";
 const CROSS_PATH_ABS_TOLERANCE = 1e-9;
 const CROSS_PATH_REL_TOLERANCE = 1e-9;
 const COMBAT_STYLES = ["melee", "ranged", "magic"] as const satisfies readonly CombatStyle[];
@@ -333,10 +333,16 @@ function legacyClassification(
   fixtureId: string,
   metric: string
 ): Pick<LegacyFinding, "classification" | "note"> {
-  if (fixtureId === "ranged_magic_shortbow_dagannoth_cannon" && metric === "effectiveXpPerHour") {
+  if (fixtureId === "ranged_magic_shortbow_dagannoth_cannon") {
+    if (["gpPerKill", "gpPerHour", "effectiveNetGpPerHour", "supplyCostPerKill"].includes(metric)) {
+      return {
+        classification: "price-source",
+        note: "Legacy uses embedded prices; rewrite uses scheduled/generated prices plus D-100 finite cannon occupancy."
+      };
+    }
     return {
       classification: "accepted-delta",
-      note: "Rewrite XP/HR composes player and cannon effective XP; legacy keeps cannon XP in a separate row."
+      note: "D-100 replaces the legacy sparse hard-idle formula with finite player-plus-cannon occupancy; rewrite XP also composes the combined cannon row."
     };
   }
   if (fixtureId === "magic_water_bolt_tribesman_poison_safespot") {
@@ -453,6 +459,7 @@ function renderReport(summary: AuditSummary): string {
     "- `FullSimulationResult.rates.ttkSec` now uses the Trip path's cannon/poison/recoil-adjusted kill time. The prior combat-only value disagreed with the same result's kills/hr, XP/hr and economy rates when auxiliary damage was active.",
     "- Stats combat-roll detail continues to expose the normal player-combat TTK separately.",
     "- Ordinary caskets use the exact Revision 274 opened-content table; the generated parent object cost cannot override the component EV.",
+    "- D-100 replaces the false minimum-mob cannon idle threshold with finite independent-spawn occupancy and keeps theoretical cannon-only DPS out of effective rates and supply cost.",
     "",
     "## Source-backed casket correction",
     "",

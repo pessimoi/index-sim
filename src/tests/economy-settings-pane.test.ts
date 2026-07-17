@@ -23,6 +23,7 @@ import type { PriceSet } from "../domain/shared";
 const noOp = () => undefined;
 
 const defaultActions: EconomySettingsPaneActions = {
+  setPriceNotesOpen: noOp,
   prices: {
     importPriceSet: async () => undefined,
     exportActivePriceSet: noOp,
@@ -131,7 +132,8 @@ function model(mode: EconomySettingsPaneMode): EconomySettingsPaneModel {
     mode,
     prices: priceData(),
     settings: createSettingsPaneViewModel({ bronze: true }),
-    moneyWarnings: [],
+    priceNotices: { issues: [], notes: [], all: [], byLootRowId: {} },
+    priceNotesOpen: false,
     marketNotice: null,
     importNotice: null,
     priceSetResetPending: false,
@@ -220,6 +222,64 @@ describe("Economy and Settings pane", () => {
     expect(markup).toContain('aria-label="Market price data"');
     expect(markup).not.toContain('aria-label="Price data settings"');
     expect(markup).not.toContain('aria-label="Price history analysis"');
+  });
+
+  it("renders every current price note in one controlled native disclosure", () => {
+    const priceNotices = [
+      {
+        code: "missing-price",
+        itemId: "lobster",
+        itemLabel: "Lobster",
+        level: "issue" as const,
+        consumer: "supply" as const,
+        affectsCurrentResult: true,
+        summary: "Missing price",
+        detail: "Lobster has no usable price."
+      },
+      {
+        code: "price-generated-fallback",
+        itemId: "bones",
+        itemLabel: "Bones",
+        level: "note" as const,
+        consumer: "loot" as const,
+        affectsCurrentResult: true,
+        lootRowId: "bones-row",
+        summary: "Estimated price",
+        detail: "Bones use a game-data estimate."
+      }
+    ];
+    const calls: boolean[] = [];
+    const paneModel: EconomySettingsPaneModel = {
+      ...model("economy"),
+      priceNotices: {
+        issues: [priceNotices[0]!],
+        notes: [priceNotices[1]!],
+        all: priceNotices,
+        byLootRowId: { "bones-row": [priceNotices[1]!] }
+      },
+      priceNotesOpen: true
+    };
+    const paneActions: EconomySettingsPaneActions = {
+      ...defaultActions,
+      setPriceNotesOpen: (open) => calls.push(open)
+    };
+    const tree = EconomySettingsPane({ model: paneModel, actions: paneActions });
+    const details = elements(tree).find(
+      (element) =>
+        element.type === "details" &&
+        (element.props as { "aria-label"?: string })["aria-label"] === "Economy price data notes"
+    );
+    const markup = renderToStaticMarkup(tree);
+
+    expect(markup).toContain("Price data notes (2)");
+    expect(markup).toContain("Lobster");
+    expect(markup).toContain("Bones");
+    expect(markup).not.toContain("2 more");
+    expect(details?.props).toMatchObject({ open: true });
+    (details!.props as { onToggle(event: { currentTarget: { open: boolean } }): void }).onToggle({
+      currentTarget: { open: false }
+    });
+    expect(calls).toEqual([false]);
   });
 
   it("keeps confirmation branches, recovery and scoped notices in their current sections", () => {

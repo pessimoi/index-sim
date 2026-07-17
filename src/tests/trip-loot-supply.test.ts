@@ -589,6 +589,64 @@ describe("trip/loot/supply unit rules", () => {
     );
   });
 
+  it("scopes inactive loot prices and suppresses exact coin face-value noise", () => {
+    const { context } = createGeneratedRuntimeContext();
+    const bones = { name: "Bones", key: "bones", chance: 1, qtyAvg: 1 };
+    const coins = { name: "Coins", key: "coins", chance: 1, qtyAvg: 5 };
+    const cookedMeat = {
+      name: "Cooked meat",
+      key: "cooked_meat",
+      chance: 1,
+      qtyAvg: 1
+    };
+    const monster: MonsterDefinition = {
+      ...context.gameData.monsters.chicken,
+      id: "price_warning_scope_fixture",
+      name: "Price warning scope fixture",
+      loot: [bones, coins, cookedMeat]
+    };
+    const skipped = evaluateLoot(monster, context, {
+      lootPrefs: {
+        [lootPreferenceKey(bones, 0)]: "bury",
+        [lootPreferenceKey(coins, 1)]: "loot",
+        [lootPreferenceKey(cookedMeat, 2)]: "skip"
+      }
+    });
+
+    expect(
+      skipped.warnings.find(
+        (warning) => warning.itemId === "bones" && warning.code === "price-generated-fallback"
+      )?.priceContext
+    ).toMatchObject({
+      consumer: "loot",
+      affectsCurrentResult: false,
+      lootRowId: lootPreferenceKey(bones, 0)
+    });
+    expect(
+      skipped.warnings.find(
+        (warning) => warning.itemId === "cooked_meat" && warning.code === "price-generated-fallback"
+      )?.priceContext
+    ).toMatchObject({
+      consumer: "loot",
+      affectsCurrentResult: false,
+      lootRowId: lootPreferenceKey(cookedMeat, 2)
+    });
+    expect(skipped.warnings.some((warning) => warning.itemId === "coins")).toBe(false);
+
+    const looted = evaluateLoot(monster, context, {
+      lootPrefs: { [lootPreferenceKey(cookedMeat, 2)]: "loot" }
+    });
+    expect(
+      looted.warnings.find(
+        (warning) => warning.itemId === "cooked_meat" && warning.code === "price-generated-fallback"
+      )?.priceContext
+    ).toMatchObject({
+      consumer: "loot",
+      affectsCurrentResult: true,
+      lootRowId: lootPreferenceKey(cookedMeat, 2)
+    });
+  });
+
   it("surfaces structured warnings when jewel table prices use aliases or fallbacks", () => {
     const runtime = createLegacyRuntime();
     const context = domainContextFromLegacy(runtime);
@@ -707,6 +765,94 @@ describe("trip/loot/supply unit rules", () => {
     expect(result.cannon?.respawnSec).toBe(1);
   });
 
+  it("keeps sparse cannon fire finite and exposes a player-free theoretical DPS", () => {
+    const runtime = createLegacyRuntime();
+    const context = domainContextFromLegacy(runtime);
+    const definition = definitionsById.get("ranged_magic_shortbow_dagannoth_cannon");
+    expect(definition).toBeDefined();
+    if (!definition) throw new Error("Missing cannon fixture definition");
+
+    const input = buildTripInput(runtime, definition, context);
+    const result = simulateTripLootSupply(
+      {
+        ...input,
+        cannon: { enabled: true, targets: 1, respawnSec: 3600 }
+      },
+      context
+    );
+    const cannon = result.cannon;
+    expect(cannon).not.toBeNull();
+    if (!cannon) throw new Error("Missing sparse cannon result");
+
+    expect(cannon.idle).toBe(false);
+    expect(cannon.respawnBound).toBe(true);
+    expect(cannon.effTargets).toBeGreaterThan(0);
+    expect(cannon.ballsPerHour).toBeGreaterThan(0);
+    expect(cannon.cannonDps).toBeGreaterThan(0);
+    expect(cannon.activeFrac).toBeGreaterThan(0);
+    expect(cannon.activeFrac).toBeLessThan(1);
+    expect(cannon.kphWithCannon).toBeGreaterThan(cannon.kphNoCannon);
+    expect(cannon.cannonOnlyDps).toBeGreaterThan(cannon.cannonDps);
+    expectCloseLoose(cannon.ballCostPerHour, cannon.ballsPerHour * cannon.ballPrice);
+    expectCloseLoose(cannon.ballCostPerKill, cannon.ballsPerKill * cannon.ballPrice);
+    expectCloseLoose(result.supply.ballCostPerKill, cannon.ballCostPerKill);
+    expectCloseLoose(
+      cannon.ballCostPerTrip ?? NaN,
+      (cannon.ballsPerTrip ?? NaN) * cannon.ballPrice
+    );
+
+    const monster = context.gameData.monsters[input.request.monsterId];
+    if (!monster) throw new Error("Missing cannon fixture monster");
+    const hpEffective = monster.hp + input.combat.maxHit / 4;
+    const cannonDpsPerTarget = (input.combat.hitChance * (cannon.maxBall / 2)) / 4.8;
+    const cannonOnlyTargets = 1 / (1 + (3600 * cannonDpsPerTarget) / hpEffective);
+    expectCloseLoose(cannon.cannonOnlyDps, cannonDpsPerTarget * cannonOnlyTargets);
+  });
+
+  it("reports cannonball price provenance only when cannonballs affect the result", () => {
+    const runtime = createLegacyRuntime();
+    const baseContext = domainContextFromLegacy(runtime);
+    const context: SimulationContext = {
+      ...baseContext,
+      priceSet: {
+        ...baseContext.priceSet,
+        itemPriceMetadata: {
+          ...baseContext.priceSet.itemPriceMetadata,
+          mcannonball: {
+            valueOrigin: "generated-object-cost",
+            refreshStatus: "not-applicable",
+            quality: "fallback",
+            reasonCode: "generated-price-fallback"
+          }
+        }
+      }
+    };
+    const definition = definitionsById.get("ranged_magic_shortbow_dagannoth_cannon");
+    expect(definition).toBeDefined();
+    if (!definition) throw new Error("Missing cannon fixture definition");
+
+    const input = buildTripInput(runtime, definition, context);
+    const active = simulateTripLootSupply(
+      { ...input, cannon: { enabled: true, targets: 1, respawnSec: 12 } },
+      context
+    );
+    const disabled = simulateTripLootSupply(
+      { ...input, cannon: { enabled: false, targets: 1, respawnSec: 12 } },
+      context
+    );
+
+    expect(
+      active.warnings.find(
+        (warning) => warning.itemId === "mcannonball" && warning.code === "price-generated-fallback"
+      )?.priceContext
+    ).toEqual({ consumer: "cannon", affectsCurrentResult: true });
+    expect(
+      disabled.warnings.some(
+        (warning) => warning.itemId === "mcannonball" && warning.priceContext?.consumer === "cannon"
+      )
+    ).toBe(false);
+  });
+
   it("applies safespot override and protect prayer to incoming damage", () => {
     const runtime = createLegacyRuntime();
     const context = domainContextFromLegacy(runtime);
@@ -739,6 +885,56 @@ describe("trip/loot/supply unit rules", () => {
     expect(protectedResult.trip.incoming.hpPerKill).toBeLessThan(
       forcedOffResult.trip.incoming.hpPerKill
     );
+  });
+
+  it("reports food price provenance only when food is consumed", () => {
+    const runtime = createLegacyRuntime();
+    const baseContext = domainContextFromLegacy(runtime);
+    const context: SimulationContext = {
+      ...baseContext,
+      priceSet: {
+        ...baseContext.priceSet,
+        itemPrices: { ...baseContext.priceSet.itemPrices, lobster: 205 },
+        itemPriceMetadata: {
+          ...baseContext.priceSet.itemPriceMetadata,
+          lobster: {
+            valueOrigin: "generated-object-cost",
+            refreshStatus: "not-applicable",
+            quality: "fallback",
+            reasonCode: "generated-price-fallback"
+          }
+        }
+      }
+    };
+    const definition = definitionsById.get("melee_ring_recoil_fire_giant_food_trip");
+    expect(definition).toBeDefined();
+    if (!definition) throw new Error("Missing food fixture definition");
+
+    const input = buildTripInput(runtime, definition, context);
+    const safespotted = simulateTripLootSupply(
+      { ...input, trip: { ...input.trip, foodKey: "lobster", safespot: true } },
+      context
+    );
+    const takingDamage = simulateTripLootSupply(
+      { ...input, trip: { ...input.trip, foodKey: "lobster", safespot: false } },
+      context
+    );
+
+    expect(safespotted.trip.foodPerKill).toBe(0);
+    expect(
+      safespotted.warnings.some(
+        (warning) => warning.itemId === "lobster" && warning.priceContext?.consumer === "supply"
+      )
+    ).toBe(false);
+    expect(takingDamage.trip.foodPerKill).toBeGreaterThan(0);
+    expect(
+      takingDamage.warnings.find(
+        (warning) =>
+          warning.itemId === "lobster" &&
+          warning.code === "price-generated-fallback" &&
+          warning.priceContext?.consumer === "supply"
+      )?.priceContext
+    ).toEqual({ consumer: "supply", affectsCurrentResult: true });
   });
 
   it("normalizes exact typed melee, ranged and magic profiles through one descriptor", () => {
@@ -1245,7 +1441,6 @@ describe("trip/loot/supply parity with legacy golden fixtures", () => {
     "melee_dragon_halberd_rock_crab_small_target_spec",
     "melee_ring_recoil_fire_giant_food_trip",
     "ranged_magic_shortbow_rock_crab_safespot",
-    "ranged_magic_shortbow_dagannoth_cannon",
     "ranged_steel_knives_chaos_druid_inventory",
     "ranged_yew_longbow_black_demon_no_recovery",
     "ranged_magic_shortbow_greater_demon_spec",

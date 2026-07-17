@@ -38,7 +38,10 @@ const definitionsById = new Map(
   LEGACY_GOLDEN_CASES.map((definition) => [definition.id, definition])
 );
 const numericRoundingGuard = 0.000000001;
-const acceptedXpIntentionalDeltas = new Set(["melee_ring_recoil_fire_giant_food_trip"]);
+const acceptedXpIntentionalDeltas = new Set([
+  "melee_ring_recoil_fire_giant_food_trip",
+  "ranged_magic_shortbow_dagannoth_cannon"
+]);
 
 function stableNumber(value: number): number {
   return Number(value.toFixed(6));
@@ -208,7 +211,8 @@ describe("XP parity with legacy golden fixtures", () => {
 
   it("keeps accepted XP intentional deltas explicit", () => {
     expect([...acceptedXpIntentionalDeltas].sort()).toEqual([
-      "melee_ring_recoil_fire_giant_food_trip"
+      "melee_ring_recoil_fire_giant_food_trip",
+      "ranged_magic_shortbow_dagannoth_cannon"
     ]);
   });
 
@@ -246,8 +250,8 @@ describe("XP parity with legacy golden fixtures", () => {
   }
 });
 
-describe("cannon XP parity", () => {
-  it("models cannon ranged XP as a separate effective XP row", () => {
+describe("cannon XP ownership", () => {
+  it("models combined cannon damage, rather than theoretical cannon-only DPS, as XP", () => {
     const caseId = "ranged_magic_shortbow_dagannoth_cannon";
     const runtime = createLegacyRuntime();
     const context = domainContextFromLegacy(runtime);
@@ -262,14 +266,7 @@ describe("cannon XP parity", () => {
     const xp = computeCombatXpBreakdown(tripInput.request, context, tripInput.combat, {
       directDamageFraction: trip.combatXpDamageFraction
     });
-    const expectedRows = new Map(
-      (
-        fixture.expected.skillXpBreakdown as Array<{
-          key: string;
-          xpPerHour: number;
-        }>
-      ).map((row) => [row.key, row.xpPerHour])
-    );
+    const actualRows = modeledXpRows(xp, trip);
     const playerRowsTotal = Object.values(xp.skillXpPerKill).reduce(
       (sum, value) => sum + (value ?? 0) * trip.effectiveKph,
       0
@@ -278,10 +275,13 @@ describe("cannon XP parity", () => {
     const prayerXpPerHour = trip.prayerXpPerKill * trip.effectiveKph;
 
     expect(trip.cannon).not.toBeNull();
-    expectClose(cannonXpPerHour, expectedRows.get("rngcannon"));
-    expectClose(
+    expect(actualRows.get("rngcannon")).toBeCloseTo(cannonXpPerHour, 10);
+    expect(cannonXpPerHour).toBeLessThan(
+      (trip.cannon?.cannonOnlyDps ?? 0) * 2 * 3600 * trip.trip.efficiency
+    );
+    expect(Array.from(actualRows.values()).reduce((sum, value) => sum + value, 0)).toBeCloseTo(
       playerRowsTotal + cannonXpPerHour + prayerXpPerHour,
-      fixture.expected.totalXpPerHour
+      10
     );
   });
 });

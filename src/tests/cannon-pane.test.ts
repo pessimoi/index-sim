@@ -16,6 +16,7 @@ const output: CannonOverlayResult = {
   ballCostPerKill: 2222.1,
   ballCostPerHour: 486_000,
   cannonDps: 4.567,
+  cannonOnlyDps: 6.789,
   cannonDmgPerHour: 16_441.2,
   rangedXpPerHour: 32_882.4,
   playerDps: 3.2,
@@ -83,6 +84,7 @@ describe("Cannon pane", () => {
     labelsInOrder(markup, [
       "Effective targets",
       "Cannon DPS",
+      "Cannon only DPS",
       "Balls/hr",
       "Cannon Ranged XP/hr",
       "Effective XP/hr",
@@ -129,6 +131,7 @@ describe("Cannon pane", () => {
     labelsInOrder(markup, [
       "Effective targets",
       "Cannon DPS",
+      "Cannon only DPS",
       "Balls/hr",
       "Balls/kill",
       "Cannon Ranged XP/hr",
@@ -150,6 +153,7 @@ describe("Cannon pane", () => {
     for (const value of [
       "3.3",
       "4.57",
+      "6.79",
       "2,700",
       "12.35",
       "32,882",

@@ -11,10 +11,21 @@ import type { LootPrefsState } from "../state/loot-prefs";
 import type { LootSettingsByMonsterState } from "../state/loot-settings";
 import type { CannonByMonsterState, CombatSetupFormState } from "../state/ui-state";
 import {
+  DEFAULT_DUEL_COMPARISON_SORT_STATE,
+  DEFAULT_DUEL_MATRIX_SORT_STATE,
   createDuelComparisonViewModel,
+  nextDuelComparisonSortState,
+  nextDuelMatrixSortState,
+  sortDuelComparisonRows,
+  sortDuelMatrixRows,
+  type DuelComparisonRowViewModel,
+  type DuelComparisonSortKey,
+  type DuelComparisonSortState,
   type DuelComparisonViewModel,
   type DuelMatrixMetricId,
   type DuelMatrixRowViewModel,
+  type DuelMatrixSortState,
+  type DuelMatrixSortTarget,
   type DuelMatrixViewModel,
   type DuelViewMode
 } from "../view-models/duel";
@@ -46,18 +57,23 @@ export interface UseDuelPaneInput {
 
 export interface DuelPaneController {
   comparison: DuelComparisonViewModel | null;
+  comparisonRows: DuelComparisonRowViewModel[];
+  comparisonSort: DuelComparisonSortState;
   viewMode: DuelViewMode;
   expandedDiffId: string | null;
   matrixMetric: DuelMatrixMetricId;
   matrixFilter: string;
   matrix: DuelMatrixViewModel | null;
   filteredMatrixRows: DuelMatrixRowViewModel[];
+  matrixSort: DuelMatrixSortState;
   matrixBusy: boolean;
   showCurrentTarget(): void;
   showMonsterMatrix(): void;
   toggleDiff(snapshotId: string): void;
   setMatrixMetric(metric: DuelMatrixMetricId): void;
   setMatrixFilter(value: string): void;
+  sortComparisonBy(key: DuelComparisonSortKey): void;
+  sortMatrixBy(target: DuelMatrixSortTarget): void;
   buildMatrix(): void;
 }
 
@@ -113,8 +129,12 @@ export function useDuelPane(
   } = input;
   const [viewMode, setViewMode] = useState<DuelViewMode>("current-target");
   const [expandedDiffId, setExpandedDiffId] = useState<string | null>(null);
+  const [comparisonSort, setComparisonSort] = useState<DuelComparisonSortState>(
+    DEFAULT_DUEL_COMPARISON_SORT_STATE
+  );
   const [matrixMetric, setMatrixMetric] = useState<DuelMatrixMetricId>("effectiveXpPerHour");
   const [matrixFilter, setMatrixFilter] = useState("");
+  const [matrixSort, setMatrixSort] = useState<DuelMatrixSortState>(DEFAULT_DUEL_MATRIX_SORT_STATE);
   const [matrixBuild, setMatrixBuild] = useState<DuelMatrixBuild | null>(null);
   const [matrixBusy, setMatrixBusy] = useState(false);
   const taskRef = useRef<RunningCalculationTask<DuelMatrixCalculationRequest> | null>(null);
@@ -142,6 +162,10 @@ export function useDuelPane(
         : null,
     [active, cannonByMonster, context, form, lootPrefsByMonster, lootSettingsByMonster, snapshots]
   );
+  const comparisonRows = useMemo(
+    () => sortDuelComparisonRows(comparison?.rows ?? [], comparisonSort),
+    [comparison, comparisonSort]
+  );
   const source = useMemo<DuelMatrixSource | null>(
     () =>
       context
@@ -158,8 +182,8 @@ export function useDuelPane(
   );
   const matrix = isDuelMatrixBuildFresh(matrixBuild, source) ? matrixBuild!.model : null;
   const filteredMatrixRows = useMemo(
-    () => filterDuelMatrixRows(matrix, matrixFilter),
-    [matrix, matrixFilter]
+    () => sortDuelMatrixRows(filterDuelMatrixRows(matrix, matrixFilter), matrixSort, matrixMetric),
+    [matrix, matrixFilter, matrixMetric, matrixSort]
   );
 
   const buildMatrix = useCallback(() => {
@@ -198,12 +222,15 @@ export function useDuelPane(
 
   return {
     comparison,
+    comparisonRows,
+    comparisonSort,
     viewMode,
     expandedDiffId,
     matrixMetric,
     matrixFilter,
     matrix,
     filteredMatrixRows,
+    matrixSort,
     matrixBusy,
     showCurrentTarget: () => setViewMode("current-target"),
     showMonsterMatrix,
@@ -211,6 +238,9 @@ export function useDuelPane(
       setExpandedDiffId((current) => (current === snapshotId ? null : snapshotId)),
     setMatrixMetric,
     setMatrixFilter,
+    sortComparisonBy: (key) =>
+      setComparisonSort((current) => nextDuelComparisonSortState(current, key)),
+    sortMatrixBy: (target) => setMatrixSort((current) => nextDuelMatrixSortState(current, target)),
     buildMatrix
   };
 }

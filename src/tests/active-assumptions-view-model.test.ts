@@ -8,7 +8,7 @@ import {
 import type { CombatSetupFormState } from "./ui-view-model-fixture";
 
 describe("rewrite UI view models", () => {
-  it("surfaces used legacy price freshness in the default active assumptions", async () => {
+  it("keeps advisory price freshness out of active assumptions", async () => {
     const { context } = await loadBundledLegacyContext();
     const result = createSimulationViewModel(DEFAULT_FORM_STATE, {
       ...context,
@@ -25,18 +25,13 @@ describe("rewrite UI view models", () => {
     });
 
     expect(result.activeAssumptions).toMatchObject({
-      statusLabel: "1 active modifier",
-      totalCount: 1,
-      hasActiveRows: true,
+      statusLabel: "Default assumptions active",
+      totalCount: 0,
+      hasActiveRows: false,
       hiddenCount: 0
     });
-    expect(result.activeAssumptions.visibleRows).toEqual([
-      expect.objectContaining({
-        id: "price-warnings",
-        label: "Price confidence",
-        reviewTab: "economy"
-      })
-    ]);
+    expect(result.priceNotices.notes.length).toBeGreaterThan(0);
+    expect(result.activeAssumptions.visibleRows).toEqual([]);
     expect(result.activeAssumptions.hiddenRows).toEqual([]);
   });
 
@@ -105,12 +100,10 @@ describe("rewrite UI view models", () => {
       ])
     );
     expect(result.warnings.join("\n")).toContain("Using alias price");
-    expect(activeAssumptionRow(result, "price-warnings")).toMatchObject({
-      label: "Price confidence",
-      reviewTab: "economy",
-      value: `${result.moneyWarnings.length} warnings`,
-      detail: result.moneyWarnings[0]?.message
-    });
+    expect(result.priceNotices.notes).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: "price-alias-used" })])
+    );
+    expect(activeAssumptionRow(result, "price-warnings")).toBeUndefined();
   });
 
   it("summarizes imported and synced PriceSet modifiers", async () => {
@@ -143,11 +136,7 @@ describe("rewrite UI view models", () => {
       reviewTab: "economy"
     });
     expect(activeAssumptionRow(imported, "active-price-set")?.resetAction).toBeUndefined();
-    expect(activeAssumptionRow(imported, "price-warnings")).toMatchObject({
-      label: "Price confidence",
-      reviewTab: "economy"
-    });
-    expect(activeAssumptionRow(imported, "price-warnings")?.resetAction).toBeUndefined();
+    expect(activeAssumptionRow(imported, "price-warnings")).toBeUndefined();
     expect(activeAssumptionRow(synced, "active-price-set")).toMatchObject({
       value: "Synced",
       detail: "Synced test snapshot"
@@ -216,14 +205,13 @@ describe("rewrite UI view models", () => {
     expect(result.activeAssumptions.visibleRows).toHaveLength(5);
     expect(result.activeAssumptions.hiddenCount).toBeGreaterThan(0);
     expect(result.activeAssumptions.visibleRows.map((row) => row.id)).toEqual([
-      "price-warnings",
       "custom-setup",
       "cannon-enabled",
       "manual-combat-overrides",
-      "active-price-set"
+      "active-price-set",
+      "loot-settings"
     ]);
     expect(activeAssumptionRows(result).map((row) => row.id)).toEqual([
-      "price-warnings",
       "custom-setup",
       "cannon-enabled",
       "manual-combat-overrides",

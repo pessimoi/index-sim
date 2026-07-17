@@ -210,9 +210,15 @@ import { plannerAllowedPool } from "./view-models/planner";
 import { monsterOptions } from "./view-models/monster-card";
 import { createSimulationViewModel } from "./view-models/simulation";
 import {
+  DEFAULT_LOOT_NESTED_TABLE_SORT_STATE,
+  DEFAULT_LOOT_TABLE_SORT_STATE,
   lootActionLabel,
+  nextLootNestedTableSortState,
+  nextLootTableSortState,
   optimizeLootPrefsForMonster,
-  type LootDropRowViewModel
+  type LootDropRowViewModel,
+  type LootNestedTableSortState,
+  type LootTableSortState
 } from "./view-models/loot";
 import {
   createEconomyHistoryPresentation,
@@ -493,11 +499,23 @@ export function App() {
     direction: "desc"
   });
   const [priceHistoryClearPending, setPriceHistoryClearPending] = useState(false);
-  const [lootNotice, setLootNotice] = useState<string | null>(null);
+  const [lootUiState, setLootUiState] = useState<{
+    notice: string | null;
+    sort: LootTableSortState;
+    nestedSort: LootNestedTableSortState;
+  }>({
+    notice: null,
+    sort: DEFAULT_LOOT_TABLE_SORT_STATE,
+    nestedSort: DEFAULT_LOOT_NESTED_TABLE_SORT_STATE
+  });
+  const setLootNotice = (notice: string | null) =>
+    setLootUiState((current) => ({ ...current, notice }));
   const [pendingUndo, setPendingUndo] = useState<PendingUndo | null>(null);
   const [respectLoadoutRequirements, setRespectLoadoutRequirements] = useState(true);
   const [activeTab, setActiveTab] = useState<WorkbenchTabId>("compare");
+  const [priceNotesOpen, setPriceNotesOpen] = useState(false);
   const shareSetupButtonRef = useRef<HTMLButtonElement>(null);
+  const priceNotesSummaryRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     const timerId = window.setInterval(() => setPriceAgeNowMs(Date.now()), 60_000);
@@ -850,18 +868,23 @@ export function App() {
   } = compareCalculation;
   const {
     comparison: duelComparison,
+    comparisonRows: duelComparisonRows,
+    comparisonSort: duelComparisonSort,
     viewMode: duelViewMode,
     expandedDiffId: expandedDuelDiffId,
     matrixMetric: duelMatrixMetric,
     matrixFilter: duelMatrixFilter,
     matrix: duelMatrix,
     filteredMatrixRows: filteredDuelMatrixRows,
+    matrixSort: duelMatrixSort,
     matrixBusy: duelMatrixBusy,
     showCurrentTarget: showCurrentDuelTarget,
     showMonsterMatrix: showDuelMonsterMatrix,
     toggleDiff: toggleDuelDiff,
+    sortComparisonBy: sortDuelComparisonBy,
     setMatrixMetric: setDuelMatrixMetric,
     setMatrixFilter: setDuelMatrixFilter,
+    sortMatrixBy: sortDuelMatrixBy,
     buildMatrix: buildDuelMatrix
   } = duelPane;
   const {
@@ -1452,6 +1475,11 @@ export function App() {
     setCombatStyle(combatStyle);
   };
   const activateWorkbenchTab = (tabId: WorkbenchTabId) => setActiveTab(tabId);
+  const reviewPriceData = () => {
+    setPriceNotesOpen(true);
+    setActiveTab("economy");
+    window.requestAnimationFrame(() => priceNotesSummaryRef.current?.focus());
+  };
 
   const reviewActiveAssumption = (tab: ActiveAssumptionReviewTarget) => {
     if (tab === "melee" || tab === "ranged" || tab === "magic") {
@@ -2225,7 +2253,7 @@ export function App() {
         styleOptions={styles}
         spellOptions={spellSelectOptions}
         foodPerKill={viewModel.trip.trip.foodPerKill}
-        moneyWarnings={viewModel.moneyWarnings}
+        priceNotices={viewModel.priceNotices}
         activeAssumptions={viewModel.activeAssumptions}
         actions={{
           activateTab: activateWorkbenchTab,
@@ -2251,6 +2279,7 @@ export function App() {
               })
             ),
           setManualOverride,
+          reviewPriceData,
           reviewActiveAssumption,
           resetActiveAssumption
         }}
@@ -2339,10 +2368,11 @@ export function App() {
           model={{
             presentation: viewModel.loot,
             settings: currentLootSettings,
-            notice: lootNotice,
+            notice: lootUiState.notice,
             gpPerKill: viewModel.trip.gpPerKill,
             effectiveNetGpPerHour: viewModel.trip.effectiveNetGpPerHour,
-            moneyWarnings: viewModel.moneyWarnings
+            sort: lootUiState.sort,
+            nestedSort: lootUiState.nestedSort
           }}
           actions={{
             setHighAlch: (highAlch) => setLootSettingsForCurrentMonster({ highAlch }),
@@ -2355,7 +2385,17 @@ export function App() {
             setAction: setLootActionForCurrentMonster,
             resetSettings: resetCurrentLootSettings,
             resetOverrides: resetCurrentLootOverrides,
-            optimize: optimizeCurrentLoot
+            optimize: optimizeCurrentLoot,
+            sortBy: (key) =>
+              setLootUiState((current) => ({
+                ...current,
+                sort: nextLootTableSortState(current.sort, key)
+              })),
+            sortNestedBy: (key) =>
+              setLootUiState((current) => ({
+                ...current,
+                nestedSort: nextLootNestedTableSortState(current.nestedSort, key)
+              }))
           }}
         />
 
@@ -2420,12 +2460,15 @@ export function App() {
             targetLabel: currentMonster?.name ?? form.monsterId,
             snapshotCount: duelSnapshots.snapshots.length,
             duelComparison,
+            duelComparisonRows,
+            duelComparisonSort,
             duelViewMode,
             expandedDuelDiffId,
             duelMatrixMetric,
             duelMatrixFilter,
             duelMatrix,
             filteredDuelMatrixRows,
+            duelMatrixSort,
             duelMatrixBusy,
             duelImportNotice
           }}
@@ -2439,8 +2482,10 @@ export function App() {
             showCurrentDuelTarget,
             showDuelMonsterMatrix,
             toggleDuelDiff,
+            sortDuelComparisonBy,
             setDuelMatrixFilter,
             setDuelMatrixMetric,
+            sortDuelMatrixBy,
             buildDuelMatrix
           }}
         />
@@ -2472,6 +2517,7 @@ export function App() {
           }}
         />
         <EconomySettingsPane
+          priceNotesSummaryRef={priceNotesSummaryRef}
           model={{
             mode:
               activeTab === "economy"
@@ -2481,7 +2527,8 @@ export function App() {
                   : "hidden",
             prices: priceDataViewModel,
             settings: settingsPaneViewModel,
-            moneyWarnings: viewModel.moneyWarnings,
+            priceNotices: viewModel.priceNotices,
+            priceNotesOpen,
             marketNotice,
             importNotice: priceSetTransfer.importNotice,
             priceSetResetPending: priceSetTransfer.resetPending,
@@ -2495,6 +2542,7 @@ export function App() {
             }
           }}
           actions={{
+            setPriceNotesOpen,
             prices: {
               importPriceSet: importPriceFile,
               exportActivePriceSet,

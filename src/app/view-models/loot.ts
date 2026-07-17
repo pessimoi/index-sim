@@ -15,7 +15,7 @@ import {
   type CombatSetupFormState
 } from "../state/ui-state";
 import { formatNumber } from "./formatting";
-import type { ItemPriceHistoryContext } from "./price-data";
+import type { ItemPriceHistoryContext, PriceDataNotice } from "./price-data";
 import { createFullSimulationInput } from "./simulation-input";
 
 export interface LootActionImpactViewModel {
@@ -63,6 +63,7 @@ export interface LootExpandedRowViewModel {
   evGp: number | null;
   shareOfParentPct: number | null;
   notes: string[];
+  priceNotices: readonly PriceDataNotice[];
 }
 
 export interface LootDropValueDetailViewModel {
@@ -111,6 +112,7 @@ export interface LootDropRowViewModel {
   expandedRows: LootExpandedRowViewModel[];
   valueDetails: LootDropValueDetailViewModel[];
   historyContext: LootPriceHistoryContextViewModel;
+  priceNotices: readonly PriceDataNotice[];
 }
 
 export interface LootSummaryViewModel {
@@ -132,6 +134,32 @@ export interface LootPresentationViewModel {
   policySummary: string;
 }
 
+export type LootTableSortKey =
+  "drop" | "action" | "deltaPerHour" | "evPerKill" | "chance" | "quantity" | "price";
+
+export interface LootTableSortState {
+  key: LootTableSortKey | null;
+  direction: "asc" | "desc";
+}
+
+export const DEFAULT_LOOT_TABLE_SORT_STATE: LootTableSortState = {
+  key: null,
+  direction: "asc"
+};
+
+export type LootNestedTableSortKey =
+  "child" | "weight" | "chance" | "quantity" | "price" | "evShare";
+
+export interface LootNestedTableSortState {
+  key: LootNestedTableSortKey | null;
+  direction: "asc" | "desc";
+}
+
+export const DEFAULT_LOOT_NESTED_TABLE_SORT_STATE: LootNestedTableSortState = {
+  key: null,
+  direction: "asc"
+};
+
 export interface LootOptimizeResult {
   prefs: Record<string, LootAction>;
   effectiveNetGpPerHour: number;
@@ -140,6 +168,118 @@ export interface LootOptimizeResult {
   iterations: number;
   changedRows: number;
   capped: boolean;
+}
+
+export function nextLootTableSortState(
+  current: LootTableSortState,
+  key: LootTableSortKey
+): LootTableSortState {
+  if (current.key === key) {
+    return { key, direction: current.direction === "asc" ? "desc" : "asc" };
+  }
+
+  return {
+    key,
+    direction: key === "drop" || key === "action" ? "asc" : "desc"
+  };
+}
+
+function compareLootTableRows(
+  left: LootDropRowViewModel,
+  right: LootDropRowViewModel,
+  key: LootTableSortKey
+): number {
+  if (key === "drop" || key === "action") {
+    const leftValue = key === "drop" ? left.name : left.prefLabel;
+    const rightValue = key === "drop" ? right.name : right.prefLabel;
+    return leftValue.localeCompare(rightValue, undefined, {
+      numeric: true,
+      sensitivity: "base"
+    });
+  }
+
+  const numericValues: Record<
+    Exclude<LootTableSortKey, "drop" | "action">,
+    (row: LootDropRowViewModel) => number
+  > = {
+    deltaPerHour: (row) => row.selectedDeltaNetGpPerHour,
+    evPerKill: (row) => row.effectiveEvGp,
+    chance: (row) => row.chance,
+    quantity: (row) => row.qtyAvg,
+    price: (row) => row.price
+  };
+  return numericValues[key](left) - numericValues[key](right);
+}
+
+export function sortLootTableRows(
+  rows: readonly LootDropRowViewModel[],
+  sort: LootTableSortState
+): LootDropRowViewModel[] {
+  const key = sort.key;
+  if (key === null) return [...rows];
+
+  const direction = sort.direction === "asc" ? 1 : -1;
+  return rows
+    .map((row, index) => ({ row, index }))
+    .sort((left, right) => {
+      const compared = compareLootTableRows(left.row, right.row, key);
+      return compared === 0 ? left.index - right.index : compared * direction;
+    })
+    .map(({ row }) => row);
+}
+
+export function nextLootNestedTableSortState(
+  current: LootNestedTableSortState,
+  key: LootNestedTableSortKey
+): LootNestedTableSortState {
+  if (current.key === key) {
+    return { key, direction: current.direction === "asc" ? "desc" : "asc" };
+  }
+  return { key, direction: key === "child" ? "asc" : "desc" };
+}
+
+export function sortLootNestedTableRows(
+  rows: readonly LootExpandedRowViewModel[],
+  sort: LootNestedTableSortState
+): LootExpandedRowViewModel[] {
+  if (sort.key === null) return [...rows];
+  const key = sort.key;
+  const direction = sort.direction === "asc" ? 1 : -1;
+  const numericValues: Record<
+    Exclude<LootNestedTableSortKey, "child">,
+    (row: LootExpandedRowViewModel) => number | null
+  > = {
+    weight: (row) => row.weight,
+    chance: (row) => row.chance,
+    quantity: (row) => row.qty,
+    price: (row) => row.price,
+    evShare: (row) => row.evGp
+  };
+
+  return rows
+    .map((row, index) => ({ row, index }))
+    .sort((left, right) => {
+      let compared: number;
+      if (key === "child") {
+        compared =
+          left.row.label.localeCompare(right.row.label, undefined, {
+            numeric: true,
+            sensitivity: "base"
+          }) * direction;
+      } else {
+        const leftValue = numericValues[key](left.row);
+        const rightValue = numericValues[key](right.row);
+        const leftMissing = leftValue === null || !Number.isFinite(leftValue);
+        const rightMissing = rightValue === null || !Number.isFinite(rightValue);
+        if (leftMissing || rightMissing) {
+          compared = leftMissing === rightMissing ? 0 : leftMissing ? 1 : -1;
+        } else {
+          compared = (leftValue - rightValue) * direction;
+        }
+      }
+      return compared === 0 ? left.index - right.index : compared;
+    })
+    .map(({ row }) => row);
 }
 
 const NATURE_RUNE_FALLBACK = 265;
@@ -197,7 +337,10 @@ function stringField(record: Record<string, unknown>, key: string): string | nul
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
-function expandedRows(drop: LootBreakdownEntry): LootExpandedRowViewModel[] {
+function expandedRows(
+  drop: LootBreakdownEntry,
+  priceNotices: readonly PriceDataNotice[] = []
+): LootExpandedRowViewModel[] {
   if (!Array.isArray(drop._expand)) return [];
   const normalized = drop._expand.map((row, index) => {
     const record = row as Record<string, unknown>;
@@ -228,7 +371,10 @@ function expandedRows(drop: LootBreakdownEntry): LootExpandedRowViewModel[] {
         record.mega === true ? "Nested mega-rare table" : null,
         record.proxy === true ? "Uses generic unidentified-herb price proxy" : null,
         note
-      ].filter((item): item is string => item !== null)
+      ].filter((item): item is string => item !== null),
+      priceNotices: priceNotices.filter(
+        (notice) => notice.itemId !== undefined && notice.itemId === stringField(record, "key")
+      )
     };
   });
 
@@ -467,7 +613,8 @@ function createLootRows(
   context: SimulationContext,
   currentTrip: TripLootSupplyResult,
   lootPrefs: Record<string, LootAction | string | undefined>,
-  lootPriceHistoryByItem: Readonly<Record<string, ItemPriceHistoryContext | undefined>> = {}
+  lootPriceHistoryByItem: Readonly<Record<string, ItemPriceHistoryContext | undefined>> = {},
+  priceNoticesByLootRowId: Readonly<Record<string, readonly PriceDataNotice[]>> = {}
 ): Omit<LootSummaryViewModel, "valueComposition"> & { rows: LootDropRowViewModel[] } {
   const defaultTrip = simulateWithLootPrefs(input, context, undefined);
   const defaultRows = new Map(defaultTrip.lootBreakdown.map((drop) => [drop.rowId, drop]));
@@ -499,6 +646,13 @@ function createLootRows(
       };
     });
     const selectedImpact = actionImpacts.find((impact) => impact.action === drop.pref);
+    const rowPriceNotices = priceNoticesByLootRowId[drop.rowId] ?? [];
+    const expandedPriceRows = expandedRows(drop, rowPriceNotices);
+    const nestedPriceItemIds = new Set(
+      expandedPriceRows.flatMap((detail) =>
+        detail.priceNotices.flatMap((notice) => notice.itemId ?? [])
+      )
+    );
 
     return {
       rowId: drop.rowId,
@@ -531,9 +685,12 @@ function createLootRows(
       prayerXp: drop.prayerXp,
       alchValue: drop.alchValue,
       slotFrac: drop.slotFrac,
-      expandedRows: expandedRows(drop),
+      expandedRows: expandedPriceRows,
       valueDetails: lootValueDetails(drop),
-      historyContext: lootPriceHistoryContext(drop, lootPriceHistoryByItem)
+      historyContext: lootPriceHistoryContext(drop, lootPriceHistoryByItem),
+      priceNotices: rowPriceNotices.filter(
+        (notice) => notice.itemId === undefined || !nestedPriceItemIds.has(notice.itemId)
+      )
     };
   });
 
@@ -553,6 +710,7 @@ export function createLootPresentationViewModel(input: {
   lootPrefs: Record<string, LootAction | string | undefined>;
   lootSettingsByMonster?: LootSettingsByMonsterState;
   lootPriceHistoryByItem?: Readonly<Record<string, ItemPriceHistoryContext | undefined>>;
+  priceNoticesByLootRowId?: Readonly<Record<string, readonly PriceDataNotice[]>>;
   includeRows?: boolean;
 }): LootPresentationViewModel {
   const settings = lootSettingsForMonster(input.lootSettingsByMonster ?? {}, input.form.monsterId);
@@ -574,7 +732,8 @@ export function createLootPresentationViewModel(input: {
           input.context,
           input.trip,
           input.lootPrefs,
-          input.lootPriceHistoryByItem
+          input.lootPriceHistoryByItem,
+          input.priceNoticesByLootRowId
         );
   const actionableRows = rowResult.rows.filter((row) => row.eligibilityDescription === null);
   const conditionalRows = rowResult.rows.filter((row) => row.eligibilityDescription !== null);

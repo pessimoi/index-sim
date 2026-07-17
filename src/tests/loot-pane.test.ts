@@ -4,6 +4,10 @@ import { loadBundledLegacyContext } from "../adapters/legacy-runtime";
 import { LootPane, type LootPaneActions } from "../app/components/panes/loot-pane";
 import { DEFAULT_FORM_STATE } from "../app/state/ui-state";
 import { lootSettingsForMonster } from "../app/state/loot-settings";
+import {
+  DEFAULT_LOOT_NESTED_TABLE_SORT_STATE,
+  DEFAULT_LOOT_TABLE_SORT_STATE
+} from "../app/view-models/loot";
 import { createSimulationViewModel } from "../app/view-models/simulation";
 import type { LootAction } from "../domain/trip";
 
@@ -17,7 +21,9 @@ const actions: LootPaneActions = {
   setAction: noOp,
   resetSettings: noOp,
   resetOverrides: noOp,
-  optimize: noOp
+  optimize: noOp,
+  sortBy: noOp,
+  sortNestedBy: noOp
 };
 
 function inOrder(markup: string, fragments: readonly string[]): void {
@@ -49,7 +55,8 @@ describe("Loot pane", () => {
           notice: null,
           gpPerKill: simulation.trip.gpPerKill,
           effectiveNetGpPerHour: simulation.trip.effectiveNetGpPerHour,
-          moneyWarnings: simulation.moneyWarnings
+          sort: DEFAULT_LOOT_TABLE_SORT_STATE,
+          nestedSort: DEFAULT_LOOT_NESTED_TABLE_SORT_STATE
         },
         actions
       })
@@ -73,7 +80,13 @@ describe("Loot pane", () => {
     ]);
     expect(markup).toContain("Monster actions");
     expect(markup).toContain("Local history");
+    expect(markup).toContain("loot-price-cell");
+    expect(markup).toContain("Price data");
+    expect(markup).not.toContain('aria-label="Loot price warnings"');
     expect(markup).toContain("Default net GP/hr");
+    expect(markup).toContain('<th aria-sort="none"><button type="button" class="sort-button"');
+    expect(markup).toContain(">Drop</span>");
+    expect(markup).toContain(">EV/kill</span>");
   });
 
   it("validates a selected action against the row before invoking the caller", async () => {
@@ -92,7 +105,8 @@ describe("Loot pane", () => {
         notice: null,
         gpPerKill: simulation.trip.gpPerKill,
         effectiveNetGpPerHour: simulation.trip.effectiveNetGpPerHour,
-        moneyWarnings: simulation.moneyWarnings
+        sort: DEFAULT_LOOT_TABLE_SORT_STATE,
+        nestedSort: DEFAULT_LOOT_NESTED_TABLE_SORT_STATE
       },
       actions: {
         ...actions,
@@ -115,5 +129,56 @@ describe("Loot pane", () => {
     });
 
     expect(calls).toEqual([{ rowId: row!.rowId, action }]);
+  });
+
+  it("routes sortable column headings through the controlled pane action", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const simulation = createSimulationViewModel(DEFAULT_FORM_STATE, context);
+    const calls: string[] = [];
+    const nestedCalls: string[] = [];
+    const tree = LootPane({
+      hidden: false,
+      model: {
+        presentation: simulation.loot,
+        settings: lootSettingsForMonster({}, DEFAULT_FORM_STATE.monsterId),
+        notice: null,
+        gpPerKill: simulation.trip.gpPerKill,
+        effectiveNetGpPerHour: simulation.trip.effectiveNetGpPerHour,
+        sort: { key: "evPerKill", direction: "desc" },
+        nestedSort: DEFAULT_LOOT_NESTED_TABLE_SORT_STATE
+      },
+      actions: {
+        ...actions,
+        sortBy: (key) => calls.push(key),
+        sortNestedBy: (key) => nestedCalls.push(key)
+      }
+    });
+    const evButton = elements(tree).find(
+      (element) =>
+        element.type === "button" &&
+        elements(element).some(
+          (child) =>
+            child.type === "span" &&
+            (child.props as { children?: ReactNode }).children === "EV/kill"
+        )
+    );
+
+    (evButton!.props as { onClick(): void }).onClick();
+
+    const weightButton = elements(tree).find(
+      (element) =>
+        element.type === "button" &&
+        elements(element).some(
+          (child) =>
+            child.type === "span" && (child.props as { children?: ReactNode }).children === "Weight"
+        )
+    );
+    expect(weightButton).toBeDefined();
+    (weightButton!.props as { onClick(): void }).onClick();
+
+    expect(calls).toEqual(["evPerKill"]);
+    expect(nestedCalls).toEqual(["weight"]);
+    const markup = renderToStaticMarkup(tree);
+    expect(markup).toContain('class="numeric" aria-sort="descending"');
   });
 });

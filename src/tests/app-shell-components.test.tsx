@@ -212,7 +212,23 @@ describe("app shell components", () => {
         styleOptions={[{ id: DEFAULT_FORM_STATE.styleId, label: "Accurate" }]}
         spellOptions={[{ id: DEFAULT_FORM_STATE.spellId, label: "None" }]}
         foodPerKill={1.5}
-        moneyWarnings={[]}
+        priceNotices={{
+          issues: [
+            {
+              code: "missing-price",
+              itemId: "lobster",
+              itemLabel: "Lobster",
+              level: "issue",
+              consumer: "supply",
+              affectsCurrentResult: true,
+              summary: "Missing price",
+              detail: "Lobster has no usable price."
+            }
+          ],
+          notes: [],
+          all: [],
+          byLootRowId: {}
+        }}
         activeAssumptions={{
           statusLabel: "No active assumptions",
           totalCount: 0,
@@ -235,6 +251,7 @@ describe("app shell components", () => {
           setPrimaryPrayer: noOp,
           setPrimaryBoost: noOp,
           setManualOverride: noOp,
+          reviewPriceData: noOp,
           reviewActiveAssumption: noOp,
           resetActiveAssumption: noOp
         }}
@@ -266,9 +283,14 @@ describe("app shell components", () => {
     expect(markup).toContain("Active setup");
     expect(markup).toContain("Rune scimitar");
     expect(markup).toContain("Requirements met");
-    expect(markup).toContain("Open loadout");
+    expect(markup).toContain('aria-label="Melee setup">Melee setup</button>');
+    expect(markup).not.toContain("Open loadout");
     expect(markup).toContain("View stats");
     expect(markup).toContain("Effective XP/hr");
+    expect(markup).toContain('aria-label="Price data issue"');
+    expect(markup).toContain("Price data incomplete");
+    expect(markup).toContain("Review price data");
+    expect(markup).not.toContain("Price warnings");
     expect(markup).not.toContain('aria-label="Effective trip rates"');
     expect(markup).toContain('hidden=""');
   });

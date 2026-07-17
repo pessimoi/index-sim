@@ -1,4 +1,4 @@
-import type { ChangeEvent } from "react";
+import type { ChangeEvent, Ref } from "react";
 import type {
   LocalStateHealthItemId,
   LocalStateHealthReport
@@ -11,17 +11,16 @@ import type {
 } from "../../controllers/price-set-transfer";
 import type { GearTierId } from "../../state/hidden-gear-tiers";
 import type { PriceHistoryBaselineMode, PriceHistoryMoverSortKey } from "../../state/price-history";
-import type { CalculationWarningViewModel } from "../../view-models/contracts";
 import {
   economyAriaSort,
   economyMoverTone,
   PRICE_HISTORY_BASELINE_OPTIONS,
+  type CurrentPriceNoticePresentation,
   type PriceDataViewModel
 } from "../../view-models/price-data";
 import type { SettingsPaneViewModel } from "../../view-models/settings";
 import { formatNumber } from "../../view-models/formatting";
 import { InlineImportNotice } from "../app-presenters";
-import { CalculationWarningSummary } from "../combat-result-presenters";
 import { DecimalField, SearchableSelectField, SelectField } from "../form-fields";
 import {
   itemPriceMetadataLabel,
@@ -38,7 +37,8 @@ export interface EconomySettingsPaneModel {
   mode: EconomySettingsPaneMode;
   prices: PriceDataViewModel;
   settings: SettingsPaneViewModel;
-  moneyWarnings: readonly CalculationWarningViewModel[];
+  priceNotices: CurrentPriceNoticePresentation;
+  priceNotesOpen: boolean;
   marketNotice: MarketNotice | null;
   importNotice: ScopedPriceImportNotice | null;
   priceSetResetPending: boolean;
@@ -53,6 +53,7 @@ export interface EconomySettingsPaneModel {
 }
 
 export interface EconomySettingsPaneActions {
+  setPriceNotesOpen(open: boolean): void;
   prices: {
     importPriceSet(file: File, surface: PriceImportSurface): Promise<void>;
     exportActivePriceSet(): void;
@@ -97,6 +98,7 @@ export interface EconomySettingsPaneActions {
 export interface EconomySettingsPaneProps {
   model: EconomySettingsPaneModel;
   actions: EconomySettingsPaneActions;
+  priceNotesSummaryRef?: Ref<HTMLElement>;
 }
 
 async function importPriceSetFromInput(
@@ -181,7 +183,11 @@ function PriceSetControls({
   );
 }
 
-export function EconomySettingsPane({ model, actions }: EconomySettingsPaneProps) {
+export function EconomySettingsPane({
+  model,
+  actions,
+  priceNotesSummaryRef
+}: EconomySettingsPaneProps) {
   const economyVisible = model.mode === "economy";
   const settingsVisible = model.mode === "settings";
   const hidden = model.mode === "hidden";
@@ -466,7 +472,45 @@ export function EconomySettingsPane({ model, actions }: EconomySettingsPaneProps
           </span>
           <span>Baseline {history.movers.baselineLabel}</span>
         </div>
-        <CalculationWarningSummary warnings={model.moneyWarnings} label="Economy price warnings" />
+        {model.priceNotices.all.length > 0 ? (
+          <details
+            className="price-data-notes"
+            aria-label="Economy price data notes"
+            open={model.priceNotesOpen}
+            onToggle={(event) => {
+              if (event.currentTarget.open !== model.priceNotesOpen) {
+                actions.setPriceNotesOpen(event.currentTarget.open);
+              }
+            }}
+          >
+            <summary ref={priceNotesSummaryRef}>
+              Price data notes ({formatNumber(model.priceNotices.all.length)})
+            </summary>
+            <p>These values affect the current monetary result. Calculations remain available.</p>
+            <ul>
+              {model.priceNotices.all.map((notice) => (
+                <li
+                  className={notice.level}
+                  key={`${notice.code}:${notice.itemId ?? notice.itemLabel}:${notice.consumer}:${notice.lootRowId ?? ""}`}
+                >
+                  <div>
+                    <strong>{notice.itemLabel}</strong>
+                    <span>{notice.summary}</span>
+                  </div>
+                  <p>{notice.detail}</p>
+                  <small>
+                    {notice.consumer === "loot"
+                      ? "Loot"
+                      : notice.consumer === "cannon"
+                        ? "Cannon"
+                        : "Supply"}
+                    {notice.itemId ? ` · ${notice.itemId}` : ""}
+                  </small>
+                </li>
+              ))}
+            </ul>
+          </details>
+        ) : null}
         {model.marketNotice && (
           <p
             className={`inline-status ${model.marketNotice.tone}`}

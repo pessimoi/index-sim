@@ -2,6 +2,7 @@ import type { ScheduledStaticPriceSnapshotStatus } from "@/adapters/market";
 import { MARKET_SOURCE_MAPPINGS } from "@/data/market-source-mapping";
 import { deriveItemPriceFreshness, type ItemPriceFreshnessDisplay } from "@/domain/economy";
 import type { GameDataSnapshot, ItemPriceMetadata, PriceSet } from "@/domain/shared";
+import type { LootBreakdownEntry } from "@/domain/trip";
 import {
   activeManualPriceOverridesForPriceSet,
   canSetManualPriceOverride,
@@ -33,6 +34,56 @@ import {
   type PriceHistoryTrendAnalysis
 } from "../state/price-history";
 import { formatNumber } from "./formatting";
+import type { CalculationWarningViewModel } from "./contracts";
+
+const MONEY_WARNING_CODES = new Set([
+  "missing-price",
+  "missing-alch-value",
+  "price-alias-used",
+  "price-fallback-used",
+  "price-generated-fallback",
+  "price-market-retained",
+  "price-freshness-unknown",
+  "approximate-data-source",
+  "unidentified-herb-price-approximation"
+]);
+
+const PRICE_ISSUE_CODES = new Set(["missing-price", "missing-alch-value", "price-fallback-used"]);
+
+const PRICE_NOTICE_PRIORITY: Readonly<Record<string, number>> = {
+  "missing-price": 0,
+  "missing-alch-value": 1,
+  "price-fallback-used": 2,
+  "price-generated-fallback": 3,
+  "price-market-retained": 4,
+  "price-freshness-unknown": 5,
+  "price-alias-used": 6,
+  "approximate-data-source": 7,
+  "unidentified-herb-price-approximation": 8
+};
+
+export function isMoneyWarningCode(code: string): boolean {
+  return MONEY_WARNING_CODES.has(code);
+}
+
+export interface PriceDataNotice {
+  code: string;
+  itemId?: string;
+  itemLabel: string;
+  level: "issue" | "note";
+  consumer: "loot" | "supply" | "cannon";
+  affectsCurrentResult: boolean;
+  lootRowId?: string;
+  summary: string;
+  detail: string;
+}
+
+export interface CurrentPriceNoticePresentation {
+  issues: readonly PriceDataNotice[];
+  notes: readonly PriceDataNotice[];
+  all: readonly PriceDataNotice[];
+  byLootRowId: Readonly<Record<string, readonly PriceDataNotice[]>>;
+}
 
 export interface PriceDataSelectOption {
   id: string;
@@ -204,6 +255,135 @@ export function createPriceItemLabels(
   return Object.fromEntries(
     Object.entries(gameData.items).map(([itemId, item]) => [itemId, item.name])
   );
+}
+
+function humanizePriceItemId(itemId: string): string {
+  const words = itemId.replace(/_/g, " ").trim();
+  return words ? words.charAt(0).toUpperCase() + words.slice(1) : "Price data";
+}
+
+function priceNoticeCopy(
+  code: string,
+  itemLabel: string
+): Pick<PriceDataNotice, "summary" | "detail"> {
+  if (code === "missing-price") {
+    return {
+      summary: "Missing price",
+      detail: `${itemLabel} has no usable price, so its active value is incomplete.`
+    };
+  }
+  if (code === "missing-alch-value") {
+    return {
+      summary: "Missing alch value",
+      detail: `${itemLabel} has no usable alch value for the selected action.`
+    };
+  }
+  if (code === "price-fallback-used") {
+    return {
+      summary: "Fallback used",
+      detail: `${itemLabel} uses a fallback value in the current calculation.`
+    };
+  }
+  if (code === "price-generated-fallback") {
+    return {
+      summary: "Estimated price",
+      detail: `${itemLabel} uses a game-data estimate instead of an observed market price.`
+    };
+  }
+  if (code === "price-market-retained") {
+    return {
+      summary: "Previous price retained",
+      detail: `${itemLabel} keeps its previous accepted price because the latest evaluation could not replace it.`
+    };
+  }
+  if (code === "price-freshness-unknown") {
+    return {
+      summary: "Price date unknown",
+      detail: `${itemLabel} has a usable price but no verified market observation time.`
+    };
+  }
+  if (code === "price-alias-used") {
+    return {
+      summary: "Related item price",
+      detail: `${itemLabel} uses a compatible related-item price because its canonical price is missing.`
+    };
+  }
+  if (code === "unidentified-herb-price-approximation") {
+    return {
+      summary: "Estimated herb price",
+      detail: "Unidentified herbs use a shared proxy where species-specific prices are unavailable."
+    };
+  }
+  return {
+    summary: "Approximate source",
+    detail: `${itemLabel} uses approximate source data in the current valuation.`
+  };
+}
+
+function comparePriceNotices(left: PriceDataNotice, right: PriceDataNotice): number {
+  const priority =
+    (PRICE_NOTICE_PRIORITY[left.code] ?? Number.MAX_SAFE_INTEGER) -
+    (PRICE_NOTICE_PRIORITY[right.code] ?? Number.MAX_SAFE_INTEGER);
+  if (priority !== 0) return priority;
+  return left.itemLabel.localeCompare(right.itemLabel, undefined, {
+    numeric: true,
+    sensitivity: "base"
+  });
+}
+
+export function createCurrentPriceNoticePresentation(input: {
+  warnings: readonly CalculationWarningViewModel[];
+  gameData: Pick<GameDataSnapshot, "items">;
+  lootBreakdown: readonly Pick<LootBreakdownEntry, "rowId" | "name">[];
+}): CurrentPriceNoticePresentation {
+  const lootLabelByRowId = new Map(input.lootBreakdown.map((row) => [row.rowId, row.name]));
+  const notices: PriceDataNotice[] = [];
+  const seen = new Set<string>();
+
+  for (const warning of input.warnings) {
+    if (!isMoneyWarningCode(warning.code)) continue;
+    const context = warning.priceContext;
+    const itemLabel =
+      warning.code === "unidentified-herb-price-approximation"
+        ? "Unidentified herbs"
+        : warning.itemId
+          ? (input.gameData.items[warning.itemId]?.name ?? humanizePriceItemId(warning.itemId))
+          : context?.lootRowId
+            ? (lootLabelByRowId.get(context.lootRowId) ?? "Price data")
+            : "Price data";
+    const consumer = context?.consumer ?? "loot";
+    const affectsCurrentResult = context?.affectsCurrentResult ?? true;
+    const level = PRICE_ISSUE_CODES.has(warning.code) ? "issue" : "note";
+    const copy = priceNoticeCopy(warning.code, itemLabel);
+    const key = `${warning.code}:${warning.itemId ?? itemLabel}:${consumer}:${context?.lootRowId ?? ""}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    notices.push({
+      code: warning.code,
+      ...(warning.itemId ? { itemId: warning.itemId } : {}),
+      itemLabel,
+      level,
+      consumer,
+      affectsCurrentResult,
+      ...(context?.lootRowId ? { lootRowId: context.lootRowId } : {}),
+      ...copy
+    });
+  }
+
+  notices.sort(comparePriceNotices);
+  const active = notices.filter((notice) => notice.affectsCurrentResult);
+  const byLootRowId: Record<string, PriceDataNotice[]> = {};
+  for (const notice of notices) {
+    if (!notice.lootRowId) continue;
+    (byLootRowId[notice.lootRowId] ??= []).push(notice);
+  }
+
+  return {
+    issues: active.filter((notice) => notice.level === "issue"),
+    notes: active.filter((notice) => notice.level === "note"),
+    all: active,
+    byLootRowId
+  };
 }
 
 export function summarizeItemPriceMetadata(priceSet: PriceSet | null): ItemPriceMetadataSummary {

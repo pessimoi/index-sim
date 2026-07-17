@@ -5,9 +5,13 @@ import { formatDelta, signedPercent } from "../presentation-formatters";
 import { formatNumber, signedDecimal } from "../../view-models/formatting";
 import type {
   DuelComparisonRowViewModel,
+  DuelComparisonSortKey,
+  DuelComparisonSortState,
   DuelComparisonViewModel,
   DuelMatrixMetricId,
   DuelMatrixRowViewModel,
+  DuelMatrixSortState,
+  DuelMatrixSortTarget,
   DuelMatrixViewModel,
   DuelViewMode
 } from "../../view-models/duel";
@@ -17,6 +21,21 @@ const DUEL_MATRIX_METRICS: ReadonlyArray<{ id: DuelMatrixMetricId; label: string
   { id: "effectiveXpPerHour", label: "XP/hr" },
   { id: "effectiveNetGpPerHour", label: "Net GP/hr" },
   { id: "gpPerXp", label: "GP/XP" }
+];
+
+const DUEL_COMPARISON_COLUMNS: ReadonlyArray<{
+  label: string;
+  sortKey: DuelComparisonSortKey;
+  numeric?: boolean;
+}> = [
+  { label: "Setup", sortKey: "setup" },
+  { label: "Loadout", sortKey: "loadout" },
+  { label: "Max", sortKey: "maxHit", numeric: true },
+  { label: "DPS", sortKey: "dps", numeric: true },
+  { label: "XP/hr", sortKey: "effectiveXpPerHour", numeric: true },
+  { label: "Net GP/hr", sortKey: "effectiveNetGpPerHour", numeric: true },
+  { label: "GP/XP", sortKey: "gpPerXp", numeric: true },
+  { label: "K/hr", sortKey: "killsPerHour", numeric: true }
 ];
 
 function gpPerXpDisplay(value: number | null): string {
@@ -41,16 +60,48 @@ function duelRowClass(row: DuelComparisonRowViewModel): string | undefined {
   return row.source === "live" ? "duel-live-row" : undefined;
 }
 
+function duelComparisonAriaSort(
+  sort: DuelComparisonSortState,
+  key: DuelComparisonSortKey
+): "ascending" | "descending" | "none" {
+  if (sort.key !== key) return "none";
+  return sort.direction === "asc" ? "ascending" : "descending";
+}
+
+function sameDuelMatrixSortTarget(
+  current: DuelMatrixSortTarget | null,
+  target: DuelMatrixSortTarget
+): boolean {
+  if (current === null || current.kind !== target.kind) return false;
+  if (current.kind === "monster") return true;
+  return target.kind === "setup" && current.setupId === target.setupId;
+}
+
+function duelMatrixAriaSort(
+  sort: DuelMatrixSortState,
+  target: DuelMatrixSortTarget
+): "ascending" | "descending" | "none" {
+  if (!sameDuelMatrixSortTarget(sort.target, target)) return "none";
+  return sort.direction === "asc" ? "ascending" : "descending";
+}
+
+function sortIndicator(active: boolean, direction: "asc" | "desc"): string {
+  return active ? (direction === "asc" ? "^" : "v") : "";
+}
+
 export interface DuelPaneModel {
   targetLabel: string;
   snapshotCount: number;
   duelComparison: DuelComparisonViewModel | null;
+  duelComparisonRows: DuelComparisonRowViewModel[];
+  duelComparisonSort: DuelComparisonSortState;
   duelViewMode: DuelViewMode;
   expandedDuelDiffId: string | null;
   duelMatrixMetric: DuelMatrixMetricId;
   duelMatrixFilter: string;
   duelMatrix: DuelMatrixViewModel | null;
   filteredDuelMatrixRows: DuelMatrixRowViewModel[];
+  duelMatrixSort: DuelMatrixSortState;
   duelMatrixBusy: boolean;
   duelImportNotice: InlineNoticeViewModel | null;
 }
@@ -65,8 +116,10 @@ export interface DuelPaneActions {
   showCurrentDuelTarget(): void;
   showDuelMonsterMatrix(): void;
   toggleDuelDiff(snapshotId: string): void;
+  sortDuelComparisonBy(key: DuelComparisonSortKey): void;
   setDuelMatrixFilter(value: string): void;
   setDuelMatrixMetric(metric: DuelMatrixMetricId): void;
+  sortDuelMatrixBy(target: DuelMatrixSortTarget): void;
   buildDuelMatrix(): void;
 }
 
@@ -81,12 +134,15 @@ export function DuelPane({ hidden, model, actions }: DuelPaneProps) {
     targetLabel,
     snapshotCount,
     duelComparison,
+    duelComparisonRows,
+    duelComparisonSort,
     duelViewMode,
     expandedDuelDiffId,
     duelMatrixMetric,
     duelMatrixFilter,
     duelMatrix,
     filteredDuelMatrixRows,
+    duelMatrixSort,
     duelMatrixBusy,
     duelImportNotice
   } = model;
@@ -100,8 +156,10 @@ export function DuelPane({ hidden, model, actions }: DuelPaneProps) {
     showCurrentDuelTarget,
     showDuelMonsterMatrix,
     toggleDuelDiff,
+    sortDuelComparisonBy,
     setDuelMatrixFilter,
     setDuelMatrixMetric,
+    sortDuelMatrixBy,
     buildDuelMatrix
   } = actions;
 
@@ -189,19 +247,33 @@ export function DuelPane({ hidden, model, actions }: DuelPaneProps) {
           <table className="duel-table" aria-label="Setup comparison table">
             <thead>
               <tr>
-                <th>Setup</th>
-                <th>Loadout</th>
-                <th className="numeric">Max</th>
-                <th className="numeric">DPS</th>
-                <th className="numeric">XP/hr</th>
-                <th className="numeric">Net GP/hr</th>
-                <th className="numeric">GP/XP</th>
-                <th className="numeric">K/hr</th>
-                <th>Actions</th>
+                {DUEL_COMPARISON_COLUMNS.map((column) => (
+                  <th
+                    scope="col"
+                    className={column.numeric ? "numeric" : undefined}
+                    aria-sort={duelComparisonAriaSort(duelComparisonSort, column.sortKey)}
+                    key={column.sortKey}
+                  >
+                    <button
+                      type="button"
+                      className="sort-button"
+                      onClick={() => sortDuelComparisonBy(column.sortKey)}
+                    >
+                      <span>{column.label}</span>
+                      <span aria-hidden="true">
+                        {sortIndicator(
+                          duelComparisonSort.key === column.sortKey,
+                          duelComparisonSort.direction
+                        )}
+                      </span>
+                    </button>
+                  </th>
+                ))}
+                <th scope="col">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {duelComparison?.rows.map((row) => {
+              {duelComparisonRows.map((row) => {
                 const diffId = `duel-diff-${row.snapshotId ?? "live"}`;
                 const diffExpanded = row.snapshotId === expandedDuelDiffId;
                 return (
@@ -434,13 +506,51 @@ export function DuelPane({ hidden, model, actions }: DuelPaneProps) {
               <table className="duel-matrix-table" aria-label="All-monster setup comparison">
                 <thead>
                   <tr>
-                    <th scope="col">Monster</th>
-                    {duelMatrix.setups.map((setup) => (
-                      <th scope="col" title={setup.loadoutLabel} key={setup.id}>
-                        <strong>{setup.name}</strong>
-                        <span>{setup.combatStyle}</span>
-                      </th>
-                    ))}
+                    <th
+                      scope="col"
+                      aria-sort={duelMatrixAriaSort(duelMatrixSort, { kind: "monster" })}
+                    >
+                      <button
+                        type="button"
+                        className="sort-button duel-matrix-sort-button"
+                        onClick={() => sortDuelMatrixBy({ kind: "monster" })}
+                      >
+                        <strong>Monster</strong>
+                        <i aria-hidden="true">
+                          {sortIndicator(
+                            duelMatrixSort.target?.kind === "monster",
+                            duelMatrixSort.direction
+                          )}
+                        </i>
+                      </button>
+                    </th>
+                    {duelMatrix.setups.map((setup) => {
+                      const target: DuelMatrixSortTarget = {
+                        kind: "setup",
+                        setupId: setup.id
+                      };
+                      const active = sameDuelMatrixSortTarget(duelMatrixSort.target, target);
+                      return (
+                        <th
+                          scope="col"
+                          title={setup.loadoutLabel}
+                          aria-sort={duelMatrixAriaSort(duelMatrixSort, target)}
+                          key={setup.id}
+                        >
+                          <button
+                            type="button"
+                            className="sort-button duel-matrix-sort-button"
+                            onClick={() => sortDuelMatrixBy(target)}
+                          >
+                            <strong>{setup.name}</strong>
+                            <span>{setup.combatStyle}</span>
+                            <i aria-hidden="true">
+                              {sortIndicator(active, duelMatrixSort.direction)}
+                            </i>
+                          </button>
+                        </th>
+                      );
+                    })}
                   </tr>
                 </thead>
                 <tbody>

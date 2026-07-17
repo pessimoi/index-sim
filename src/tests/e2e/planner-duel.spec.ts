@@ -92,6 +92,17 @@ test("uses saved setup comparison to import export rename load delete and persis
       !raw.includes("effectiveXpPerHour")
     );
   });
+  const setupHeader = table.getByRole("columnheader", { name: "Setup", exact: true });
+  await setupHeader.getByRole("button", { name: "Setup", exact: true }).click();
+  await expect(setupHeader).toHaveAttribute("aria-sort", "ascending");
+  await setupHeader.getByRole("button", { name: "Setup", exact: true }).click();
+  await expect(setupHeader).toHaveAttribute("aria-sort", "descending");
+  await expect(
+    table.locator("tbody > tr").first().getByLabel("Rename saved setup Melee saved")
+  ).toBeVisible();
+  const xpHeader = table.getByRole("columnheader", { name: "XP/hr", exact: true });
+  await xpHeader.getByRole("button", { name: "XP/hr", exact: true }).click();
+  await expect(xpHeader).toHaveAttribute("aria-sort", "descending");
   const exportedSnapshotJson = await page.evaluate(() => {
     const saved = JSON.parse(window.localStorage.getItem("index-sim:duel-snapshots") ?? "null");
     return JSON.stringify({
@@ -134,7 +145,7 @@ test("uses saved setup comparison to import export rename load delete and persis
   await expect(setupDiff).toContainText("current target, cannon, loot policy and active prices");
   await hideDiff.click();
   await expect(setupDiff).toHaveCount(0);
-  await reloadedTable.getByRole("button", { name: "Load" }).click();
+  await reloadedTable.getByRole("button", { name: "Load", exact: true }).click();
   await expect(combatType.getByRole("button", { name: "melee" })).toHaveAttribute(
     "aria-pressed",
     "true"
@@ -217,6 +228,18 @@ test("builds and filters the all-monster saved setup matrix on demand", async ({
 
   await duel.getByLabel("Setup comparison metric").getByRole("button", { name: "DPS" }).click();
   await expect(matrix.locator('td[aria-label*="DPS"]')).not.toHaveCount(0);
+  const liveSetupHeader = matrix.getByRole("columnheader", { name: /Live setup/ }).first();
+  await liveSetupHeader.getByRole("button", { name: /Live setup/ }).click();
+  await expect(liveSetupHeader).toHaveAttribute("aria-sort", "descending");
+  const monsterHeader = matrix.getByRole("columnheader", { name: "Monster", exact: true });
+  await monsterHeader.getByRole("button", { name: "Monster", exact: true }).click();
+  await expect(monsterHeader).toHaveAttribute("aria-sort", "ascending");
+  const monsterNames = await matrix.locator("tbody th strong").allTextContents();
+  expect(monsterNames).toEqual(
+    [...monsterNames].sort((left, right) =>
+      left.localeCompare(right, undefined, { numeric: true, sensitivity: "base" })
+    )
+  );
   await duel.getByLabel("Find monster in setup comparison").fill("tribesman");
   await expect(matrix.locator("tbody tr")).toHaveCount(1);
   await expect(matrix.getByRole("row", { name: /Tribesman/ })).toBeVisible();

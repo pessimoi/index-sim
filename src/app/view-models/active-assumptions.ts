@@ -75,22 +75,7 @@ interface ActiveAssumptionSetupRequirementSummary {
   warnings: readonly { message: string }[];
 }
 
-const MONEY_WARNING_CODES = new Set([
-  "missing-price",
-  "missing-alch-value",
-  "price-alias-used",
-  "price-fallback-used",
-  "price-generated-fallback",
-  "price-market-retained",
-  "price-freshness-unknown",
-  "approximate-data-source",
-  "unidentified-herb-price-approximation"
-]);
 const SPECIAL_WARNING_CODES = new Set(["dragon-halberd-npc-size-fallback"]);
-
-export function isMoneyWarningCode(code: string): boolean {
-  return MONEY_WARNING_CODES.has(code);
-}
 
 export function isSpecialWarningCode(code: string): boolean {
   return SPECIAL_WARNING_CODES.has(code);
@@ -109,7 +94,9 @@ function warningViewModel(warning: SimulationWarning): CalculationWarningViewMod
   return {
     code: warning.code,
     severity: warning.severity,
-    message: warning.message.replace(/\s+/g, " ").slice(0, 240)
+    message: warning.message.replace(/\s+/g, " ").slice(0, 240),
+    ...(warning.itemId ? { itemId: warning.itemId } : {}),
+    ...(warning.priceContext ? { priceContext: warning.priceContext } : {})
   };
 }
 
@@ -244,26 +231,12 @@ export function createActiveAssumptionsSummaryViewModel(input: {
   lootOverrideCount: number;
   setupRequirements: ActiveAssumptionSetupRequirementSummary;
   specialWarnings: readonly CalculationWarningViewModel[];
-  moneyWarnings: readonly CalculationWarningViewModel[];
   options?: ActiveAssumptionsViewModelOptions;
 }): ActiveAssumptionsSummaryViewModel {
   const rows: ActiveAssumptionRowViewModel[] = [];
   const monsterName =
     input.context.gameData.monsters[input.request.monsterId]?.name ?? input.request.monsterId;
   const combatReviewTab = input.request.combatStyle;
-
-  if (input.moneyWarnings.length > 0) {
-    rows.push({
-      id: "price-warnings",
-      category: "warning",
-      label: "Price confidence",
-      value: activeAssumptionCountLabel(input.moneyWarnings.length, "warning"),
-      detail: input.moneyWarnings[0]?.message ?? "Price warnings affect this result.",
-      reviewTab: "economy",
-      tone: "warning",
-      priority: 10
-    });
-  }
 
   if (input.specialWarnings.length > 0) {
     rows.push({

@@ -153,6 +153,26 @@ export interface DuelComparisonViewModel {
   rows: DuelComparisonRowViewModel[];
 }
 
+export type DuelComparisonSortKey =
+  | "setup"
+  | "loadout"
+  | "maxHit"
+  | "dps"
+  | "effectiveXpPerHour"
+  | "effectiveNetGpPerHour"
+  | "gpPerXp"
+  | "killsPerHour";
+
+export interface DuelComparisonSortState {
+  key: DuelComparisonSortKey | null;
+  direction: "asc" | "desc";
+}
+
+export const DEFAULT_DUEL_COMPARISON_SORT_STATE: DuelComparisonSortState = {
+  key: null,
+  direction: "asc"
+};
+
 export type DuelMatrixMetricId = "dps" | "effectiveXpPerHour" | "effectiveNetGpPerHour" | "gpPerXp";
 
 export interface DuelMatrixMetricValuesViewModel {
@@ -192,6 +212,142 @@ export interface DuelMatrixViewModel {
   cellCount: number;
   setups: DuelMatrixSetupViewModel[];
   rows: DuelMatrixRowViewModel[];
+}
+
+export type DuelMatrixSortTarget = { kind: "monster" } | { kind: "setup"; setupId: string };
+
+export interface DuelMatrixSortState {
+  target: DuelMatrixSortTarget | null;
+  direction: "asc" | "desc";
+}
+
+export const DEFAULT_DUEL_MATRIX_SORT_STATE: DuelMatrixSortState = {
+  target: null,
+  direction: "asc"
+};
+
+export function nextDuelComparisonSortState(
+  current: DuelComparisonSortState,
+  key: DuelComparisonSortKey
+): DuelComparisonSortState {
+  if (current.key === key) {
+    return { key, direction: current.direction === "asc" ? "desc" : "asc" };
+  }
+  return {
+    key,
+    direction: key === "setup" || key === "loadout" ? "asc" : "desc"
+  };
+}
+
+function compareNullableNumbers(
+  left: number | null,
+  right: number | null,
+  direction: "asc" | "desc"
+): number {
+  const leftMissing = left === null || !Number.isFinite(left);
+  const rightMissing = right === null || !Number.isFinite(right);
+  if (leftMissing || rightMissing) {
+    if (leftMissing && rightMissing) return 0;
+    return leftMissing ? 1 : -1;
+  }
+  return (left - right) * (direction === "asc" ? 1 : -1);
+}
+
+function compareDuelText(left: string, right: string): number {
+  return left.localeCompare(right, undefined, { numeric: true, sensitivity: "base" });
+}
+
+export function sortDuelComparisonRows(
+  rows: readonly DuelComparisonRowViewModel[],
+  sort: DuelComparisonSortState
+): DuelComparisonRowViewModel[] {
+  if (sort.key === null) return [...rows];
+  const key = sort.key;
+  const direction = sort.direction === "asc" ? 1 : -1;
+  return rows
+    .map((row, index) => ({ row, index }))
+    .sort((left, right) => {
+      let compared: number;
+      if (key === "setup" || key === "loadout") {
+        const leftValue =
+          key === "setup"
+            ? left.row.source === "live"
+              ? "Live setup"
+              : left.row.name
+            : left.row.loadoutLabel;
+        const rightValue =
+          key === "setup"
+            ? right.row.source === "live"
+              ? "Live setup"
+              : right.row.name
+            : right.row.loadoutLabel;
+        compared = compareDuelText(leftValue, rightValue) * direction;
+      } else {
+        const numericValues: Record<
+          Exclude<DuelComparisonSortKey, "setup" | "loadout">,
+          (row: DuelComparisonRowViewModel) => number | null
+        > = {
+          maxHit: (row) => row.maxHit,
+          dps: (row) => row.dps,
+          effectiveXpPerHour: (row) => row.effectiveXpPerHour,
+          effectiveNetGpPerHour: (row) => row.effectiveNetGpPerHour,
+          gpPerXp: (row) => row.gpPerXp,
+          killsPerHour: (row) => row.killsPerHour
+        };
+        compared = compareNullableNumbers(
+          numericValues[key](left.row),
+          numericValues[key](right.row),
+          sort.direction
+        );
+      }
+      return compared === 0 ? left.index - right.index : compared;
+    })
+    .map(({ row }) => row);
+}
+
+function sameDuelMatrixTarget(
+  left: DuelMatrixSortTarget | null,
+  right: DuelMatrixSortTarget
+): boolean {
+  if (left === null || left.kind !== right.kind) return false;
+  if (left.kind === "monster") return true;
+  return right.kind === "setup" && left.setupId === right.setupId;
+}
+
+export function nextDuelMatrixSortState(
+  current: DuelMatrixSortState,
+  target: DuelMatrixSortTarget
+): DuelMatrixSortState {
+  if (sameDuelMatrixTarget(current.target, target)) {
+    return { target, direction: current.direction === "asc" ? "desc" : "asc" };
+  }
+  return { target, direction: target.kind === "monster" ? "asc" : "desc" };
+}
+
+export function sortDuelMatrixRows(
+  rows: readonly DuelMatrixRowViewModel[],
+  sort: DuelMatrixSortState,
+  metric: DuelMatrixMetricId
+): DuelMatrixRowViewModel[] {
+  if (sort.target === null) return [...rows];
+  const target = sort.target;
+  const direction = sort.direction === "asc" ? 1 : -1;
+  return rows
+    .map((row, index) => ({ row, index }))
+    .sort((left, right) => {
+      const compared =
+        target.kind === "monster"
+          ? compareDuelText(left.row.monsterName, right.row.monsterName) * direction
+          : compareNullableNumbers(
+              left.row.cells.find((cell) => cell.setupId === target.setupId)?.values[metric] ??
+                null,
+              right.row.cells.find((cell) => cell.setupId === target.setupId)?.values[metric] ??
+                null,
+              sort.direction
+            );
+      return compared === 0 ? left.index - right.index : compared;
+    })
+    .map(({ row }) => row);
 }
 
 type DuelComparisonBaseRowViewModel = Omit<

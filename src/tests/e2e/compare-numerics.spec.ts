@@ -265,7 +265,7 @@ test("matches browser-rendered dense numeric snapshots", async ({ page }) => {
       .getByRole("row", { name: /Dagannoth \(lvl 74\)/ })
       .locator("td")
       .nth(5)
-  ).toHaveText("326");
+  ).toHaveText("325");
   const cannonRanged = await denseNumericSnapshot(table, /Dagannoth \(lvl 74\)/);
   const cannonRangedResults = await resultMetricSnapshot(page);
 
@@ -324,37 +324,38 @@ test("matches browser-rendered dense numeric snapshots", async ({ page }) => {
       hit: "80.7%",
       max: "10.0",
       dps: "2.24",
-      ttk: "8.5s",
-      killsPerHour: "326",
-      xpPerHour: "37,421",
+      ttk: "8.6s",
+      killsPerHour: "325",
+      xpPerHour: "37,083",
       gpPerKill: "95",
-      gpPerHour: "30,902",
-      netGpPerHour: "-474,446"
+      gpPerHour: "30,780",
+      netGpPerHour: "-475,073"
     },
     cannonRangedResults: {
       DPS: "2.24",
       "MAX HIT": "10.0",
       "HIT %": "80.7%",
-      "XP/HR": "37,421",
-      "GP/HR NET": "-474,446",
-      "KILLS/HR": "326",
+      "XP/HR": "37,083",
+      "GP/HR NET": "-475,073",
+      "KILLS/HR": "325",
       "GP/KILL": "95",
-      "SUPPLY/KILL": "2,815"
+      "SUPPLY/KILL": "2,829"
     },
     cannonOutput: {
       "Effective targets": "2.5",
-      "Cannon DPS": "6.26",
-      "Balls/hr": "1,861",
-      "Balls/kill": "4.41",
-      "Cannon Ranged XP/hr": "45,075",
-      "Effective XP/hr": "37,421",
-      "Effective net GP/hr": "-474,446",
-      "Ball cost/hr": "744,459",
-      "Ball cost/kill": "1,763",
+      "Cannon DPS": "6.31",
+      "Cannon only DPS": "7.41",
+      "Balls/hr": "1,875",
+      "Balls/kill": "4.46",
+      "Cannon Ranged XP/hr": "45,401",
+      "Effective XP/hr": "37,083",
+      "Effective net GP/hr": "-475,073",
+      "Ball cost/hr": "749,830",
+      "Ball cost/kill": "1,785",
       "Ball price": "400",
       "Cannonballs/trip": "69",
-      "Ball gp/trip": "27,512",
-      "K/hr uplift": "215.9%"
+      "Ball gp/trip": "27,743",
+      "K/hr uplift": "214.6%"
     }
   });
 });
@@ -398,7 +399,7 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
       .getByRole("row", { name: /Dagannoth \(lvl 74\)/ })
       .locator("td")
       .nth(5)
-  ).toHaveText("326");
+  ).toHaveText("325");
   const rangedCannon = await denseNumericSnapshot(table, /Dagannoth \(lvl 74\)/);
   const rangedCannonResults = await resultMetricSnapshot(page);
   await expectActiveDenseRow(table, /Dagannoth \(lvl 74\)/);
@@ -536,22 +537,22 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
       hit: "80.7%",
       max: "10.0",
       dps: "2.24",
-      ttk: "8.5s",
-      killsPerHour: "326",
-      xpPerHour: "37,421",
+      ttk: "8.6s",
+      killsPerHour: "325",
+      xpPerHour: "37,083",
       gpPerKill: "95",
-      gpPerHour: "30,902",
-      netGpPerHour: "-474,446"
+      gpPerHour: "30,780",
+      netGpPerHour: "-475,073"
     },
     rangedCannonResults: {
       DPS: "2.24",
       "MAX HIT": "10.0",
       "HIT %": "80.7%",
-      "XP/HR": "37,421",
-      "GP/HR NET": "-474,446",
-      "KILLS/HR": "326",
+      "XP/HR": "37,083",
+      "GP/HR NET": "-475,073",
+      "KILLS/HR": "325",
       "GP/KILL": "95",
-      "SUPPLY/KILL": "2,815"
+      "SUPPLY/KILL": "2,829"
     },
     magicSafespot: {
       hit: "35.7%",

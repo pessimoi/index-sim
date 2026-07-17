@@ -10,6 +10,8 @@ export interface CalculationWarningViewModel {
   code: string;
   severity: SimulationWarning["severity"];
   message: string;
+  itemId?: EntityId;
+  priceContext?: SimulationWarning["priceContext"];
 }
 
 export interface InlineNoticeViewModel {

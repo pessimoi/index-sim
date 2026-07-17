@@ -2587,6 +2587,61 @@ th {
   min-width: 32rem;
 }
 
+.loot-price-cell > span,
+.loot-price-cell > small {
+  display: block;
+}
+
+.loot-price-cell > small {
+  color: #9fb0c5;
+  font-size: 0.64rem;
+  margin-top: 0.12rem;
+  white-space: nowrap;
+}
+
+.loot-price-cell > small.warning {
+  color: #e8c26a;
+}
+
+.loot-price-notices {
+  border: 1px solid #344050;
+  border-radius: 6px;
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.45rem 0.55rem;
+}
+
+.loot-price-notices > strong {
+  color: #d7dee8;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.loot-price-notices ul {
+  display: grid;
+  gap: 0.35rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.loot-price-notices li {
+  display: grid;
+  gap: 0.08rem;
+}
+
+.loot-price-notices li span {
+  color: #d7bd77;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.loot-price-notices li small {
+  color: #aeb9c8;
+  font-size: 0.68rem;
+  line-height: 1.35;
+}
+
 .loot-value-facts {
   display: grid;
   gap: 0.25rem;
@@ -2816,9 +2871,18 @@ th {
   min-width: 0;
 }
 
+.cannon-body > .toggle,
+.cannon-actions {
+  align-self: end;
+}
+
+.cannon-body > .toggle,
+.cannon-actions button {
+  min-height: 2.15rem;
+}
+
 .cannon-actions button {
   inline-size: 100%;
-  min-height: 2.05rem;
 }
 
 .cannon-notice {
@@ -2975,6 +3039,10 @@ th {
 .duel-table th.numeric,
 .duel-table td.numeric {
   text-align: right;
+}
+
+.duel-table th.numeric .sort-button {
+  justify-content: flex-end;
 }
 
 .duel-table td {
@@ -3251,6 +3319,23 @@ th {
   color: #7f8b9a;
   font-size: 0.66rem;
   margin-top: 0.14rem;
+}
+
+.duel-matrix-sort-button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  text-align: left;
+}
+
+.duel-matrix-sort-button span {
+  grid-column: 1;
+}
+
+.duel-matrix-sort-button i {
+  align-self: center;
+  font-style: normal;
+  grid-column: 2;
+  grid-row: 1 / span 2;
 }
 
 .duel-matrix-table td.numeric {
@@ -3700,6 +3785,43 @@ th {
   color: #ffb4b4;
 }
 
+.price-data-issue {
+  align-items: center;
+  background: #171d26;
+  border: 1px solid #49586b;
+  border-radius: 6px;
+  display: flex;
+  gap: 0.65rem;
+  justify-content: space-between;
+  min-width: 0;
+  padding: 0.45rem 0.55rem;
+}
+
+.price-data-issue > div {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.price-data-issue strong {
+  color: #e8c26a;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.price-data-issue span {
+  color: #aeb9c8;
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.price-data-issue button {
+  flex: 0 0 auto;
+  min-height: 1.85rem;
+  padding: 0.25rem 0.45rem;
+  white-space: nowrap;
+}
+
 .active-assumptions-summary {
   background: #151b24;
   border: 1px solid #26303d;
@@ -3978,6 +4100,11 @@ th {
 .sort-button:hover {
   border-color: transparent;
   color: #eef2f7;
+}
+
+.loot-table th.numeric .sort-button,
+.loot-nested-table th.numeric .sort-button {
+  justify-content: flex-end;
 }
 
 .monster-cell {
@@ -4286,6 +4413,79 @@ th {
   font-size: 0.78rem;
   gap: 0.45rem 0.8rem;
   margin: 0.55rem 0 0;
+}
+
+.price-data-notes {
+  border: 1px solid #394150;
+  border-radius: 8px;
+  margin-top: 0.65rem;
+}
+
+.price-data-notes > summary {
+  color: #d7dee8;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.55rem 0.65rem;
+}
+
+.price-data-notes > p {
+  border-top: 1px solid #26303d;
+  color: #aeb9c8;
+  font-size: 0.72rem;
+  line-height: 1.4;
+  margin: 0;
+  padding: 0.55rem 0.65rem 0;
+}
+
+.price-data-notes > ul {
+  display: grid;
+  gap: 0;
+  list-style: none;
+  margin: 0;
+  padding: 0.35rem 0.65rem 0.65rem;
+}
+
+.price-data-notes li {
+  border-top: 1px solid #26303d;
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.5rem 0;
+}
+
+.price-data-notes li > div {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.6rem;
+  justify-content: space-between;
+}
+
+.price-data-notes li strong {
+  color: #eef2f7;
+  font-size: 0.76rem;
+}
+
+.price-data-notes li span {
+  color: #9fb0c5;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.price-data-notes li.issue span {
+  color: #e8c26a;
+}
+
+.price-data-notes li p,
+.price-data-notes li small {
+  color: #aeb9c8;
+  font-size: 0.7rem;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.price-data-notes li small {
+  color: #6f7f92;
 }
 
 .economy-history-panel {

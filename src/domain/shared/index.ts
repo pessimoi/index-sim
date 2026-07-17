@@ -465,6 +465,11 @@ export interface SimulationWarning {
   message: string;
   severity: "info" | "warning" | "error";
   itemId?: EntityId;
+  priceContext?: {
+    consumer: "loot" | "supply" | "cannon";
+    affectsCurrentResult: boolean;
+    lootRowId?: string;
+  };
 }
 
 export interface SpecialAttackResult {

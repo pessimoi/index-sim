@@ -417,7 +417,6 @@ export function createStatsSourceBreakdownViewModel(input: {
   form: CombatSetupFormState;
   result: FullSimulationResult;
   specialWarnings: readonly CalculationWarningViewModel[];
-  moneyWarnings: readonly CalculationWarningViewModel[];
   hitDistribution: HitDistributionViewModel;
   includeHistograms?: boolean;
 }): StatsSourceBreakdownViewModel {
@@ -620,7 +619,7 @@ export function createStatsSourceBreakdownViewModel(input: {
     details: [
       statsSourceDetail({
         row: normalRow,
-        warnings: input.moneyWarnings,
+        warnings: [],
         histogram: input.includeHistograms === false ? null : input.hitDistribution,
         histogramScopeLabel: input.includeHistograms === false ? null : "Per normal attack"
       }),
@@ -634,7 +633,7 @@ export function createStatsSourceBreakdownViewModel(input: {
       statsSourceDetail({
         row: cannonRow,
         metrics: cannonMetrics,
-        warnings: cannon ? input.moneyWarnings : [],
+        warnings: [],
         histogram: cannonHistogram,
         histogramScopeLabel: cannonHistogram ? "Per fired cannonball" : null
       })

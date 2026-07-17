@@ -109,6 +109,7 @@ export interface CannonOverlayResult {
   ballCostPerKill: number;
   ballCostPerHour: number;
   cannonDps: number;
+  cannonOnlyDps: number;
   cannonDmgPerHour: number;
   rangedXpPerHour: number;
   playerDps: number;
@@ -298,6 +299,7 @@ export interface TripResult {
     prayerSlots: number;
   };
   bankSeconds: number;
+  warnings?: SimulationWarning[];
 }
 
 export interface SupplyResult {
@@ -352,6 +354,7 @@ const PROTECT_DRAIN = 12;
 const CHARGE_DURATION_SEC = 420;
 const DEFAULT_SCARCE_TARGETS = 1;
 const DEFAULT_RESPAWN_SEC = 60;
+const CANNON_ROTATION_SECONDS = 8 * TICK_SECONDS;
 
 export const FOOD: Record<EntityId, FoodDefinition> = {
   none: { name: "No food", heal: 0, priceKey: null },
@@ -1022,6 +1025,7 @@ function priceFromKeys(
         addWarningOnce(warnings, {
           code: "price-alias-used",
           severity: "info",
+          itemId: key,
           message: `Using alias price '${key}' for ${label ?? canonicalKey}; canonical price '${canonicalKey}' is missing.`
         });
       }
@@ -1032,6 +1036,7 @@ function priceFromKeys(
     addWarningOnce(warnings, {
       code: "price-fallback-used",
       severity: "warning",
+      itemId: canonicalKey,
       message: `Missing price '${canonicalKey}' for ${label ?? canonicalKey}; using fallback ${fallback}.`
     });
   }
@@ -1054,6 +1059,7 @@ function addPriceAliasWarning(
   addWarningOnce(warnings, {
     code: "price-alias-used",
     severity: "info",
+    itemId: lookup.aliasItemId,
     message: `Using alias price '${lookup.aliasItemId}' for ${label}; canonical price '${lookup.canonicalItemId}' is missing.`
   });
 }
@@ -1069,16 +1075,37 @@ function itemPrice(
 }
 
 function addWarningOnce(warnings: SimulationWarning[], warning: SimulationWarning): void {
-  if (
-    warnings.some(
-      (existing) =>
-        existing.code === warning.code &&
-        (warning.itemId ? existing.itemId === warning.itemId : existing.message === warning.message)
-    )
-  ) {
+  const existingIndex = warnings.findIndex((existing) => {
+    const sameIdentity =
+      existing.code === warning.code &&
+      (warning.itemId ? existing.itemId === warning.itemId : existing.message === warning.message);
+    if (!sameIdentity) return false;
+    if (!existing.priceContext && !warning.priceContext) return true;
+    return (
+      existing.priceContext?.consumer === warning.priceContext?.consumer &&
+      existing.priceContext?.lootRowId === warning.priceContext?.lootRowId
+    );
+  });
+  if (existingIndex >= 0) {
+    if (
+      warning.priceContext?.affectsCurrentResult &&
+      !warnings[existingIndex]?.priceContext?.affectsCurrentResult
+    ) {
+      warnings[existingIndex] = warning;
+    }
     return;
   }
   warnings.push(warning);
+}
+
+function appendPriceWarnings(
+  warnings: SimulationWarning[],
+  source: readonly SimulationWarning[],
+  priceContext: NonNullable<SimulationWarning["priceContext"]>
+): void {
+  for (const warning of source) {
+    addWarningOnce(warnings, { ...warning, priceContext });
+  }
 }
 
 function addPriceLookupMetadataWarnings(
@@ -1086,6 +1113,7 @@ function addPriceLookupMetadataWarnings(
   lookup: Pick<ReturnType<typeof lookupItemPrice>, "itemId" | "value" | "metadata">
 ): void {
   if (lookup.value === null || !lookup.metadata) return;
+  if (lookup.itemId === "coins" && lookup.value === 1) return;
   const metadata = lookup.metadata;
   if (metadata.valueOrigin === "generated-object-cost") {
     addWarningOnce(warnings, {
@@ -1133,6 +1161,7 @@ function priceOrFallback(
   addWarningOnce(warnings, {
     code: "price-fallback-used",
     severity: "warning",
+    itemId: lookup.canonicalItemId ?? itemId,
     message: `Missing price '${lookup.canonicalItemId ?? itemId}' for ${label}; using fallback ${fallback}.`
   });
   return fallback;
@@ -1187,6 +1216,7 @@ function itemApproximationWarning(
     addWarningOnce(warnings, {
       code: "approximate-data-source",
       severity: "info",
+      itemId,
       message: `Item '${itemId}' uses ${source} provenance.`
     });
   }
@@ -1329,6 +1359,7 @@ function unidentifiedHerbStats(priceSet: PriceSet, warnings?: SimulationWarning[
     addWarningOnce(warnings, {
       code: "unidentified-herb-price-approximation",
       severity: "info",
+      itemId: UNIDENTIFIED_HERB_PROXY_ID,
       message: `Species-specific unidentified herb prices are unavailable for ${proxyRows.length} of ${rows.length} table rows; using '${UNIDENTIFIED_HERB_PROXY_ID}' as their shared price proxy.`
     });
   }
@@ -1573,6 +1604,14 @@ interface CannonComputationResult {
   combatXpDamageFraction: number;
 }
 
+interface CannonOccupancyResult {
+  effectiveTargets: number;
+  playerActiveFraction: number;
+  ballsPerSec: number;
+  cannonDps: number;
+  killRate: number;
+}
+
 function boundedNumber(value: unknown, fallback: number, min: number, max: number): number {
   const numeric = asNumeric(value);
   if (numeric === undefined) return fallback;
@@ -1581,6 +1620,60 @@ function boundedNumber(value: unknown, fallback: number, min: number, max: numbe
 
 function monsterNumber(monster: MonsterDefinition, key: string): number | undefined {
   return asNumeric((monster as unknown as Record<string, unknown>)[key]);
+}
+
+function playerActiveFraction(effectiveTargets: number, totalSpawns: number): number {
+  if (totalSpawns <= 0 || effectiveTargets <= 0) return 0;
+  const aliveFraction = Math.max(0, Math.min(1, effectiveTargets / totalSpawns));
+
+  // Spawn timers are not positioned or phased in the UI, so treat their alive
+  // states as independent. The player can attack whenever at least one spawn is
+  // alive; this avoids turning finite target lifetimes into a false hard-idle
+  // threshold when the player's unrestricted DPS exceeds the respawn supply.
+  return 1 - Math.pow(1 - aliveFraction, totalSpawns);
+}
+
+function computeCannonOccupancy({
+  totalSpawns,
+  respawnSec,
+  playerDps,
+  cannonDpsPerTarget,
+  hpEffective
+}: {
+  totalSpawns: number;
+  respawnSec: number;
+  playerDps: number;
+  cannonDpsPerTarget: number;
+  hpEffective: number;
+}): CannonOccupancyResult {
+  let low = 0;
+  let high = totalSpawns;
+
+  // Solve E + K(E)R = N. E is the average number of live targets, K is
+  // combined kills/sec and K*R is the average number waiting to respawn.
+  // Bisection is deterministic and the balance is monotonic on [0, N].
+  for (let iteration = 0; iteration < 64; iteration += 1) {
+    const effectiveTargets = (low + high) / 2;
+    const activeFraction = playerActiveFraction(effectiveTargets, totalSpawns);
+    const cannonDps = cannonDpsPerTarget * effectiveTargets;
+    const killRate = (playerDps * activeFraction + cannonDps) / hpEffective;
+    const balance = effectiveTargets + killRate * respawnSec - totalSpawns;
+    if (balance > 0) high = effectiveTargets;
+    else low = effectiveTargets;
+  }
+
+  const effectiveTargets = (low + high) / 2;
+  const activeFraction = playerActiveFraction(effectiveTargets, totalSpawns);
+  const cannonDps = cannonDpsPerTarget * effectiveTargets;
+  const killRate = (playerDps * activeFraction + cannonDps) / hpEffective;
+
+  return {
+    effectiveTargets,
+    playerActiveFraction: activeFraction,
+    ballsPerSec: effectiveTargets / CANNON_ROTATION_SECONDS,
+    cannonDps,
+    killRate
+  };
 }
 
 function computeScarceSpot(
@@ -1635,62 +1728,58 @@ export function computeCannonOverlay(input: CannonComputationInput): CannonCompu
   const totalSpawns = targets;
   const ballMax = Math.min(30, monsterNumber(input.monster, "cannonMax") ?? 30);
   const averageBallDamage = ballMax / 2;
-  const octantCap = Math.min(8, targets);
   const cannonDamagePerSecondPerTarget =
-    octantCap > 0 ? (input.combat.hitChance * averageBallDamage) / (8 * TICK_SECONDS) : 0;
+    (input.combat.hitChance * averageBallDamage) / CANNON_ROTATION_SECONDS;
+  const ballPriceWarnings: SimulationWarning[] = [];
   const ballPrice = priceOrFallback(
     input.priceSet,
     CANNONBALL_PRICE_KEY,
     CANNONBALL_FALLBACK_PRICE,
-    input.warnings,
+    ballPriceWarnings,
     "cannonballs"
   );
 
-  let effectiveTargets =
-    cannonDamagePerSecondPerTarget > 0
-      ? (totalSpawns - (respawnSec * input.playerDps) / input.hpEffective) /
-        (1 + (respawnSec * cannonDamagePerSecondPerTarget) / input.hpEffective)
-      : totalSpawns - (respawnSec * input.playerDps) / input.hpEffective;
-  let ballsPerSec = 0;
-  let cannonDps = 0;
-  let killRate: number;
-  let activeFrac: number;
-
-  if (effectiveTargets < 0) {
-    effectiveTargets = 0;
-    killRate = input.playerDps / input.hpEffective;
-    activeFrac = 1;
-  } else if (effectiveTargets <= octantCap) {
-    ballsPerSec = effectiveTargets / (8 * TICK_SECONDS);
-    cannonDps = ballsPerSec * input.combat.hitChance * averageBallDamage;
-    killRate = (input.playerDps + cannonDps) / input.hpEffective;
-    activeFrac = 1;
-  } else {
-    ballsPerSec = octantCap / (8 * TICK_SECONDS);
-    cannonDps = ballsPerSec * input.combat.hitChance * averageBallDamage;
-    killRate = (input.playerDps + cannonDps) / input.hpEffective;
-    effectiveTargets = totalSpawns - killRate * respawnSec;
-    if (effectiveTargets < 0) {
-      killRate = totalSpawns / respawnSec;
-      const totalDps = killRate * input.hpEffective;
-      const playerContribution = Math.min(input.playerDps, totalDps);
-      cannonDps = Math.max(0, totalDps - playerContribution);
-      ballsPerSec =
-        input.combat.hitChance * averageBallDamage > 0
-          ? cannonDps / (input.combat.hitChance * averageBallDamage)
-          : 0;
-      activeFrac = input.playerDps > 0 ? playerContribution / input.playerDps : 0;
-      effectiveTargets = 0;
-    } else {
-      activeFrac = 1;
-    }
-  }
+  const combinedOccupancy = computeCannonOccupancy({
+    totalSpawns,
+    respawnSec,
+    playerDps: input.playerDps,
+    cannonDpsPerTarget: cannonDamagePerSecondPerTarget,
+    hpEffective: input.hpEffective
+  });
+  const playerOnlyOccupancy = computeCannonOccupancy({
+    totalSpawns,
+    respawnSec,
+    playerDps: input.playerDps,
+    cannonDpsPerTarget: 0,
+    hpEffective: input.hpEffective
+  });
+  const cannonOnlyOccupancy = computeCannonOccupancy({
+    totalSpawns,
+    respawnSec,
+    playerDps: 0,
+    cannonDpsPerTarget: cannonDamagePerSecondPerTarget,
+    hpEffective: input.hpEffective
+  });
+  const effectiveTargets = combinedOccupancy.effectiveTargets;
+  const ballsPerSec = combinedOccupancy.ballsPerSec;
+  const cannonDps = combinedOccupancy.cannonDps;
+  const killRate = combinedOccupancy.killRate;
+  const activeFrac = combinedOccupancy.playerActiveFraction;
 
   const ttkSec = killRate > 0 ? 1 / killRate : input.baseTtkSec;
   const cycleSec = ttkSec + input.overheadSec;
   const killsPerHour = 3600 / cycleSec;
+  const playerOnlyTtkSec =
+    playerOnlyOccupancy.killRate > 0 ? 1 / playerOnlyOccupancy.killRate : input.baseTtkSec;
+  const kphNoCannon = 3600 / (playerOnlyTtkSec + input.overheadSec);
   const ballsPerHour = ballsPerSec * 3600;
   const ballsPerKill = killRate > 0 ? ballsPerSec / killRate : 0;
+  if (ballsPerHour > 0) {
+    appendPriceWarnings(input.warnings, ballPriceWarnings, {
+      consumer: "cannon",
+      affectsCurrentResult: true
+    });
+  }
   const playerXpDamagePerKill = (input.combat.effectiveDps * activeFrac) / Math.max(1e-9, killRate);
   const combatXpDamageFraction =
     input.monster.hp > 0
@@ -1710,11 +1799,12 @@ export function computeCannonOverlay(input: CannonComputationInput): CannonCompu
     ballCostPerKill: ballsPerKill * ballPrice,
     ballCostPerHour: ballsPerHour * ballPrice,
     cannonDps,
+    cannonOnlyDps: cannonOnlyOccupancy.cannonDps,
     cannonDmgPerHour: cannonDps * 3600,
     rangedXpPerHour: 2 * cannonDps * 3600,
     playerDps: input.playerDps,
     activeFrac,
-    kphNoCannon: input.baseKillsPerHour,
+    kphNoCannon,
     kphWithCannon: killsPerHour,
     respawnBound: ballsPerSec > 0 && activeFrac < 0.999,
     idle: ballsPerSec === 0
@@ -1740,31 +1830,30 @@ export function evaluateLoot(
   const lootPrefs = options.lootPrefs ?? {};
   const alchAllowed = !!options.alching;
   let cachedNatureRuneCost: number | undefined;
-  const getNatureRuneCost = () => {
-    cachedNatureRuneCost ??=
-      itemPrice(priceSet, "naturerune", alchAllowed ? warnings : undefined) ?? NATURE_RUNE_FALLBACK;
+  const getNatureRuneCost = (activeWarnings?: SimulationWarning[]) => {
+    if (activeWarnings) {
+      return priceOrFallback(
+        priceSet,
+        "naturerune",
+        NATURE_RUNE_FALLBACK,
+        activeWarnings,
+        "high alch nature rune"
+      );
+    }
+    cachedNatureRuneCost ??= lookupItemPrice(priceSet, "naturerune").value ?? NATURE_RUNE_FALLBACK;
     return cachedNatureRuneCost;
   };
-  let cachedHerbs: ReturnType<typeof herbStats> | undefined;
-  let cachedUnidentifiedHerbs: ReturnType<typeof unidentifiedHerbStats> | undefined;
-  let cachedJewels: ReturnType<typeof jewelStats> | undefined;
-  const getHerbs = () => {
-    cachedHerbs ??= herbStats(priceSet, warnings);
-    return cachedHerbs;
-  };
-  const getUnidentifiedHerbs = () => {
-    cachedUnidentifiedHerbs ??= unidentifiedHerbStats(priceSet, warnings);
-    return cachedUnidentifiedHerbs;
-  };
-  const getJewels = () => {
-    cachedJewels ??= jewelStats(
+  const getHerbs = (targetWarnings: SimulationWarning[] = []) =>
+    herbStats(priceSet, targetWarnings);
+  const getUnidentifiedHerbs = (targetWarnings: SimulationWarning[] = []) =>
+    unidentifiedHerbStats(priceSet, targetWarnings);
+  const getJewels = (targetWarnings: SimulationWarning[] = []) =>
+    jewelStats(
       priceSet,
       options.jewelSpot ?? "underground",
       options.legendsComplete !== false,
-      warnings
+      targetWarnings
     );
-    return cachedJewels;
-  };
   let gpPerKill = 0;
   let prayerXpPerKill = 0;
   let alchCastsPerKill = 0;
@@ -1790,10 +1879,12 @@ export function evaluateLoot(
       });
       continue;
     }
-    const drop = adjustDropPrices(rawDrop, priceSet, options, context.gameData, warnings);
+    const displayWarnings: SimulationWarning[] = [];
+    const activeWarnings: SimulationWarning[] = [];
+    const drop = adjustDropPrices(rawDrop, priceSet, options, context.gameData, displayWarnings);
     const isBone = bonePrayerXp(drop.name) > 0;
     const isHerb = drop.tag === "herb";
-    itemApproximationWarning(context.gameData, drop.key, warnings);
+    itemApproximationWarning(context.gameData, drop.key, displayWarnings);
     const usesCompositePrice = drop._compositePrice === "opened-casket";
     const livePriceLookup =
       !usesCompositePrice && drop.key ? lookupItemPrice(priceSet, drop.key) : null;
@@ -1801,13 +1892,14 @@ export function evaluateLoot(
       ? (drop.price ?? 0)
       : (livePriceLookup?.value ?? drop.price ?? 0);
     if (livePriceLookup && livePriceLookup.value !== null) {
-      addPriceAliasWarning(warnings, livePriceLookup, drop.name);
-      addPriceLookupMetadataWarnings(warnings, livePriceLookup);
+      addPriceAliasWarning(displayWarnings, livePriceLookup, drop.name);
+      addPriceLookupMetadataWarnings(displayWarnings, livePriceLookup);
     } else if (drop.key && drop.price == null) {
       const missingItemId = livePriceLookup?.warning?.itemId ?? drop.key;
-      addWarningOnce(warnings, {
+      addWarningOnce(displayWarnings, {
         code: "missing-price",
         severity: "warning",
+        itemId: missingItemId,
         message:
           missingItemId === drop.key
             ? `Missing price for loot item '${drop.key}'.`
@@ -1848,27 +1940,50 @@ export function evaluateLoot(
     if (pref === "alch" && dropAlch - natCost <= 0) pref = "loot";
 
     let unitGp: number;
+    let selectedHerbs: ReturnType<typeof herbStats> | null = null;
+    let selectedUnidentifiedHerbs: ReturnType<typeof unidentifiedHerbStats> | null = null;
+    let selectedJewels: ReturnType<typeof jewelStats> | null = null;
     if (pref === "skip" || pref === "bury") unitGp = 0;
-    else if (pref === "unid") unitGp = isHerb ? getUnidentifiedHerbs().ev : saleValue;
-    else if (pref === "value") {
-      unitGp = isHerb
-        ? getHerbs().highEv
-        : drop.tag === "gem"
-          ? options.ringOfWealth
-            ? getJewels().rowHighEv
-            : getJewels().baseHighEv
-          : saleValue;
-    } else if (pref === "alch") unitGp = Math.max(0, dropAlch - natCost);
-    else unitGp = bulkDead ? Math.max(0, dropAlch - natCost) : saleValue;
+    else if (pref === "unid") {
+      if (isHerb) {
+        selectedUnidentifiedHerbs = getUnidentifiedHerbs(activeWarnings);
+        unitGp = selectedUnidentifiedHerbs.ev;
+      } else {
+        unitGp = saleValue;
+      }
+    } else if (pref === "value") {
+      if (isHerb) {
+        selectedHerbs = getHerbs(activeWarnings);
+        unitGp = selectedHerbs.highEv;
+      } else if (drop.tag === "gem") {
+        selectedJewels = getJewels(activeWarnings);
+        unitGp = options.ringOfWealth ? selectedJewels.rowHighEv : selectedJewels.baseHighEv;
+      } else {
+        unitGp = saleValue;
+      }
+    } else if (pref === "alch") {
+      unitGp = Math.max(0, dropAlch - getNatureRuneCost(activeWarnings));
+    } else if (bulkDead) {
+      unitGp = Math.max(0, dropAlch - getNatureRuneCost(activeWarnings));
+    } else {
+      unitGp = saleValue;
+    }
+
+    const displayedPriceAffectsResult =
+      !bulkDead && (pref === "loot" || pref === "value" || (pref === "unid" && !isHerb));
+    if (displayedPriceAffectsResult) {
+      for (const warning of displayWarnings) addWarningOnce(activeWarnings, warning);
+    }
 
     const evGp = drop.chance * drop.qtyAvg * unitGp;
     gpPerKill += evGp;
 
     let slotFrac = 1;
     if (pref === "value") {
-      if (isHerb) slotFrac = getHerbs().keepFrac;
+      if (isHerb) slotFrac = (selectedHerbs ?? getHerbs(activeWarnings)).keepFrac;
       else if (drop.tag === "gem") {
-        slotFrac = options.ringOfWealth ? getJewels().rowKeepFrac : getJewels().baseKeepFrac;
+        selectedJewels ??= getJewels(activeWarnings);
+        slotFrac = options.ringOfWealth ? selectedJewels.rowKeepFrac : selectedJewels.baseKeepFrac;
       }
     }
     if (pref === "alch") alchCastsPerKill += drop.chance * drop.qtyAvg;
@@ -1879,7 +1994,7 @@ export function evaluateLoot(
     const evaluatedPrice = pref === "unid" && isHerb ? unitGp : livePrice;
     const evaluatedExpansion =
       pref === "unid" && isHerb
-        ? getUnidentifiedHerbs().rows.map((row) => ({
+        ? (selectedUnidentifiedHerbs ?? getUnidentifiedHerbs(activeWarnings)).rows.map((row) => ({
             name: row.name,
             key: row.key,
             weight: row.weight,
@@ -1887,6 +2002,17 @@ export function evaluateLoot(
             proxy: row.proxy
           }))
         : drop._expand;
+
+    appendPriceWarnings(warnings, activeWarnings, {
+      consumer: "loot",
+      affectsCurrentResult: true,
+      lootRowId: rowId
+    });
+    appendPriceWarnings(warnings, displayWarnings, {
+      consumer: "loot",
+      affectsCurrentResult: false,
+      lootRowId: rowId
+    });
 
     lootBreakdown.push({
       ...drop,
@@ -2360,23 +2486,38 @@ export function computeTrip(
   const killsPerAltar = altarOn ? prayerPool / prayerPerKill : Infinity;
   const altarSecPerKill = altarOn && killsPerAltar > 0 ? altarSeconds / killsPerAltar : 0;
   const warnings: SimulationWarning[] = [];
-  const perDose = (key: EntityId) => {
+  const perDose = (key: EntityId, affectsCurrentResult: boolean) => {
     const potion = POTION_SUPPLIES[key];
+    const priceWarnings: SimulationWarning[] = [];
     const price = priceOrFallback(
       context.priceSet,
       potion?.priceKey,
       potion?.fallback ?? 0,
-      warnings,
+      priceWarnings,
       `${key} dose`
     );
+    if (affectsCurrentResult) {
+      appendPriceWarnings(warnings, priceWarnings, {
+        consumer: "supply",
+        affectsCurrentResult: true
+      });
+    }
     return price / 4;
   };
 
   let potionCostPerTrip = 0;
-  for (const cat of potionCats) potionCostPerTrip += dosesPerType * perDose(CAT_POTION[cat]);
-  if (dbaRestore) potionCostPerTrip += restoreDoses * perDose("restore");
-  if (antifireOn) potionCostPerTrip += antifireDoses * perDose("antifire");
-  if (antipoisonOn) potionCostPerTrip += antipoisonDoses * perDose("antipoison");
+  for (const cat of potionCats) {
+    potionCostPerTrip += dosesPerType * perDose(CAT_POTION[cat], dosesPerType > 0);
+  }
+  if (dbaRestore) {
+    potionCostPerTrip += restoreDoses * perDose("restore", restoreDoses > 0);
+  }
+  if (antifireOn) {
+    potionCostPerTrip += antifireDoses * perDose("antifire", antifireDoses > 0);
+  }
+  if (antipoisonOn) {
+    potionCostPerTrip += antipoisonDoses * perDose("antipoison", antipoisonDoses > 0);
+  }
 
   let reserve = 0;
   const reserveParts: string[] = [];
@@ -2425,13 +2566,20 @@ export function computeTrip(
     recoilRings = Math.max(1, Math.floor(trip.recoilRings ?? 1));
     recoilSpares = recoilRings - 1;
     recoilRingsPerKill = recoilDmgPerKill / 40;
+    const recoilPriceWarnings: SimulationWarning[] = [];
     const ringPrice = priceOrFallback(
       context.priceSet,
       "ring_of_recoil",
       1500,
-      warnings,
+      recoilPriceWarnings,
       "ring of recoil"
     );
+    if (recoilRingsPerKill > 0) {
+      appendPriceWarnings(warnings, recoilPriceWarnings, {
+        consumer: "supply",
+        affectsCurrentResult: true
+      });
+    }
     recoilCostPerKill = recoilRingsPerKill * ringPrice;
     maxKillsRecoil = recoilDmgPerKill > 0 ? (recoilRings * 40) / recoilDmgPerKill : Infinity;
   }
@@ -2466,7 +2614,7 @@ export function computeTrip(
       .map((candidate) => [candidate.priceKey, candidate.heal])
   ) as Record<string, number>;
   const broughtFoodPrice = food.priceKey
-    ? priceOrFallback(context.priceSet, food.priceKey, 0, warnings, `${food.name} food`)
+    ? priceOrFallback(context.priceSet, food.priceKey, 0, [], `${food.name} food`)
     : 0;
   const eatenFood: Record<string, number> = {};
   let nonStackPerKill = 0;
@@ -2643,9 +2791,16 @@ export function computeTrip(
     capTrip(maxKillsRecoil, "recoil");
   }
 
+  const foodPriceWarnings: SimulationWarning[] = [];
   const foodPrice = food.priceKey
-    ? priceOrFallback(context.priceSet, food.priceKey, 0, warnings, `${food.name} food`)
+    ? priceOrFallback(context.priceSet, food.priceKey, 0, foodPriceWarnings, `${food.name} food`)
     : 0;
+  if (foodPerKill > 0) {
+    appendPriceWarnings(warnings, foodPriceWarnings, {
+      consumer: "supply",
+      affectsCurrentResult: true
+    });
+  }
   const foodCostPerKill = foodPerKill * foodPrice;
   let prayerCostPerKill = 0;
   if (prayerActive && prayerPointsPerDose > 0) {
@@ -2654,9 +2809,10 @@ export function computeTrip(
         0,
         (prayerPerKill * result.killsPerTrip - prayerPool) / prayerPointsPerDose
       );
-      prayerCostPerKill = (dosesUsed * perDose("prayer")) / result.killsPerTrip;
+      prayerCostPerKill = (dosesUsed * perDose("prayer", dosesUsed > 0)) / result.killsPerTrip;
     } else {
-      prayerCostPerKill = (prayerPerKill / prayerPointsPerDose) * perDose("prayer");
+      prayerCostPerKill =
+        (prayerPerKill / prayerPointsPerDose) * perDose("prayer", prayerPerKill > 0);
     }
   }
   const potionCostPerKill =
@@ -2724,7 +2880,8 @@ export function computeTrip(
       autoFoodCount,
       prayerSlots
     },
-    bankSeconds
+    bankSeconds,
+    warnings
   };
 }
 
@@ -2835,7 +2992,7 @@ export function computeSupplyCosts(
   cannon: CannonOverlayResult | null
 ): SupplyResult {
   const request = input.request;
-  const warnings: SimulationWarning[] = [];
+  const warnings: SimulationWarning[] = [...(tripResult.warnings ?? [])];
   let ammoCostPerKill = 0;
   let ammoPerKill = 0;
   let ammoKeyUsed: EntityId | null = null;
@@ -2853,8 +3010,15 @@ export function computeSupplyCosts(
           : 0;
       const recover = input.trip?.recoverAmmo !== false;
       const destroyFraction = recover ? 1 / 5 : 1;
-      ammoUnitPrice = ammoPrice(ammoKeyUsed, context, warnings);
+      const ammoPriceWarnings: SimulationWarning[] = [];
+      ammoUnitPrice = ammoPrice(ammoKeyUsed, context, ammoPriceWarnings);
       ammoPerKill = shotsPerKill * destroyFraction;
+      if (ammoPerKill > 0) {
+        appendPriceWarnings(warnings, ammoPriceWarnings, {
+          consumer: "supply",
+          affectsCurrentResult: true
+        });
+      }
       ammoCostPerKill = ammoPerKill * ammoUnitPrice;
     }
   }
@@ -2864,15 +3028,27 @@ export function computeSupplyCosts(
   let runeCostPerCast = 0;
   let chargePerCast = 0;
   if (request.combatStyle === "magic" && request.spellId) {
-    runeCostPerCast = spellRuneCost(request.spellId, request.loadout.weaponId, context, warnings);
+    const runePriceWarnings: SimulationWarning[] = [];
+    runeCostPerCast = spellRuneCost(
+      request.spellId,
+      request.loadout.weaponId,
+      context,
+      runePriceWarnings
+    );
     const spell = context.gameData.spells[request.spellId];
     if (spell?.god && request.charge !== false) {
-      chargePerCast = chargeCostPerCast(input.combat.attackSpeedSec, context, warnings);
+      chargePerCast = chargeCostPerCast(input.combat.attackSpeedSec, context, runePriceWarnings);
     }
     castsPerKill =
       input.combat.attackSpeedSec > 0
         ? playerAttackTimeSecPerKill / input.combat.attackSpeedSec
         : 0;
+    if (castsPerKill > 0) {
+      appendPriceWarnings(warnings, runePriceWarnings, {
+        consumer: "supply",
+        affectsCurrentResult: true
+      });
+    }
     runeCostPerKill = castsPerKill * (runeCostPerCast + chargePerCast);
   }
 

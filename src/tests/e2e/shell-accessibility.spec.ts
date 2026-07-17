@@ -339,8 +339,14 @@ test("shows Stats XP routing and trip summary plus setup damage distribution", a
   await expect(activePlayerSetup).toContainText("Attack speed");
   await expect(activePlayerSetup).toContainText("Effective levels");
   await expect(activePlayerSetup).toContainText("Requirements met");
-  await expect(activePlayerSetup.getByRole("button", { name: "Open loadout" })).toBeVisible();
+  await expect(activePlayerSetup.getByRole("button", { name: "Melee setup" })).toBeVisible();
   await expect(activePlayerSetup.getByRole("button", { name: "View stats" })).toBeVisible();
+  await playerSidebar.getByRole("button", { name: "ranged", exact: true }).click();
+  await expect(activePlayerSetup.getByRole("button", { name: "Ranged setup" })).toBeVisible();
+  await playerSidebar.getByRole("button", { name: "magic", exact: true }).click();
+  await expect(activePlayerSetup.getByRole("button", { name: "Magic setup" })).toBeVisible();
+  await playerSidebar.getByRole("button", { name: "melee", exact: true }).click();
+  await expect(activePlayerSetup.getByRole("button", { name: "Melee setup" })).toBeVisible();
   await expect(setupContext).toContainText("DPS");
   await expect(setupContext).toContainText("Effective XP/hr");
   await expect(setupContext).toContainText("Net GP/hr");

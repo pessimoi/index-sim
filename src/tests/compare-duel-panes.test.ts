@@ -15,7 +15,12 @@ import { DEFAULT_DENSE_COMPARE_STATE } from "../app/state/dense-compare";
 import { createDuelSnapshot } from "../app/state/duel-snapshots";
 import { DEFAULT_FORM_STATE } from "../app/state/ui-state";
 import { createDenseCompareRows, createDenseCompareScaleModel } from "../app/view-models/compare";
-import { createDuelComparisonViewModel, type DuelMatrixViewModel } from "../app/view-models/duel";
+import {
+  DEFAULT_DUEL_COMPARISON_SORT_STATE,
+  DEFAULT_DUEL_MATRIX_SORT_STATE,
+  createDuelComparisonViewModel,
+  type DuelMatrixViewModel
+} from "../app/view-models/duel";
 
 const noOp = () => undefined;
 
@@ -39,8 +44,10 @@ const duelActions: DuelPaneActions = {
   showCurrentDuelTarget: noOp,
   showDuelMonsterMatrix: noOp,
   toggleDuelDiff: noOp,
+  sortDuelComparisonBy: noOp,
   setDuelMatrixFilter: noOp,
   setDuelMatrixMetric: noOp,
+  sortDuelMatrixBy: noOp,
   buildDuelMatrix: noOp
 };
 
@@ -114,12 +121,15 @@ describe("Compare and Duel panes", () => {
       targetLabel: comparison.monsterName,
       snapshotCount: 1,
       duelComparison: comparison,
+      duelComparisonRows: comparison.rows,
+      duelComparisonSort: DEFAULT_DUEL_COMPARISON_SORT_STATE,
       duelViewMode: "current-target",
       expandedDuelDiffId: snapshot.id,
       duelMatrixMetric: "effectiveXpPerHour",
       duelMatrixFilter: "",
       duelMatrix: null,
       filteredDuelMatrixRows: [],
+      duelMatrixSort: DEFAULT_DUEL_MATRIX_SORT_STATE,
       duelMatrixBusy: false,
       duelImportNotice: { tone: "success", message: "Imported saved setups." }
     };
@@ -144,6 +154,7 @@ describe("Compare and Duel panes", () => {
       'aria-label="Calculated impact"'
     ]);
     expect(markup).toContain('aria-expanded="true"');
+    expect(markup).toContain('aria-sort="none"');
     expect(markup).toContain("Hide diff");
     expect(markup).toContain("Saved setup compared with live");
     expect(markup).toContain(comparison.snapshotRows[0]!.setupDiff!.sharedContextNote);
@@ -195,12 +206,15 @@ describe("Compare and Duel panes", () => {
       targetLabel: "Rock Crab",
       snapshotCount: 1,
       duelComparison: null,
+      duelComparisonRows: [],
+      duelComparisonSort: DEFAULT_DUEL_COMPARISON_SORT_STATE,
       duelViewMode: "monster-matrix",
       expandedDuelDiffId: null,
       duelMatrixMetric: "effectiveXpPerHour",
       duelMatrixFilter: "rock",
       duelMatrix: matrix,
       filteredDuelMatrixRows: matrix.rows,
+      duelMatrixSort: DEFAULT_DUEL_MATRIX_SORT_STATE,
       duelMatrixBusy: false,
       duelImportNotice: null
     };
@@ -217,6 +231,7 @@ describe("Compare and Duel panes", () => {
     ]);
     expect(markup).toContain('aria-pressed="true"');
     expect(markup).toContain('aria-current="true"');
+    expect(markup).toContain('aria-sort="none"');
     expect(markup).toContain("1 monsters - 1 setups");
     expect(markup).toContain("42,000");
 

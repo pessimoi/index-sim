@@ -304,6 +304,20 @@ describe("Compare and Duel controllers", () => {
     expect(controller!.matrix?.monsterCount).toBe(2);
     expect(controller!.matrixBusy).toBe(false);
 
+    await act(async () => controller!.sortComparisonBy("setup"));
+    expect(controller!.comparisonSort).toEqual({ key: "setup", direction: "asc" });
+    await act(async () => controller!.sortComparisonBy("setup"));
+    expect(controller!.comparisonSort).toEqual({ key: "setup", direction: "desc" });
+    await act(async () => controller!.sortMatrixBy({ kind: "monster" }));
+    expect(controller!.matrixSort).toEqual({
+      target: { kind: "monster" },
+      direction: "asc"
+    });
+    expect(controller!.filteredMatrixRows.map((row) => row.monsterName)).toEqual([
+      "Hill Giant",
+      "Rock Crab"
+    ]);
+
     await act(async () => controller!.showCurrentTarget());
     await act(async () => controller!.showMonsterMatrix());
     expect(controller!.viewMode).toBe("monster-matrix");

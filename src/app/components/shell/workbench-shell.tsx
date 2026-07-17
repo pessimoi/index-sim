@@ -16,11 +16,11 @@ import {
   type WorkbenchResultViewModel,
   type WorkbenchTabId
 } from "../../view-models/app-shell";
-import type { CalculationWarningViewModel } from "../../view-models/contracts";
+import type { CurrentPriceNoticePresentation } from "../../view-models/price-data";
 import type { ManualCombatOverrideField } from "../../view-models/loadout";
 import { formatNumber } from "../../view-models/formatting";
 import type { CombatSetupFormState } from "../../state/ui-state";
-import { ActiveAssumptionsSummary, CalculationWarningSummary } from "../combat-result-presenters";
+import { ActiveAssumptionsSummary } from "../combat-result-presenters";
 import {
   CompactSelectionSelectField,
   NumberField,
@@ -46,6 +46,7 @@ export interface WorkbenchShellActions {
   setPrimaryPrayer(prayerId: EntityId): void;
   setPrimaryBoost(boostId: EntityId): void;
   setManualOverride(field: ManualCombatOverrideField, value: number | null): void;
+  reviewPriceData(): void;
   reviewActiveAssumption(target: ActiveAssumptionReviewTarget): void;
   resetActiveAssumption(target: ActiveAssumptionResetTarget, statusLabel: string): void;
 }
@@ -62,7 +63,7 @@ export interface WorkbenchShellProps {
   styleOptions: SelectOption[];
   spellOptions: SelectOption[];
   foodPerKill: number;
-  moneyWarnings: readonly CalculationWarningViewModel[];
+  priceNotices: CurrentPriceNoticePresentation;
   activeAssumptions: ActiveAssumptionsSummaryViewModel;
   actions: WorkbenchShellActions;
   children: ReactNode;
@@ -110,12 +111,13 @@ export function WorkbenchShell({
   styleOptions,
   spellOptions,
   foodPerKill,
-  moneyWarnings,
+  priceNotices,
   activeAssumptions,
   actions,
   children,
   rail
 }: WorkbenchShellProps) {
+  const setupTabLabel = workbenchTabLabel("loadout", form.combatStyle);
   const handleTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     const nextTabId = nextWorkbenchTabId(activeTab, event.key);
     if (!nextTabId) return;
@@ -230,10 +232,10 @@ export function WorkbenchShell({
             <div className="player-profile-actions">
               <button
                 type="button"
-                aria-label="Open loadout"
+                aria-label={setupTabLabel}
                 onClick={() => actions.activateTab("loadout")}
               >
-                Loadout
+                {setupTabLabel}
               </button>
               <button
                 type="button"
@@ -453,7 +455,21 @@ export function WorkbenchShell({
                     </div>
                   </section>
                 ) : null}
-                <CalculationWarningSummary warnings={moneyWarnings} label="Result price warnings" />
+                {priceNotices.issues.length > 0 ? (
+                  <section className="price-data-issue" aria-label="Price data issue">
+                    <div>
+                      <strong>Price data incomplete</strong>
+                      <span>
+                        {formatNumber(priceNotices.issues.length)} active{" "}
+                        {priceNotices.issues.length === 1 ? "value uses" : "values use"} missing or
+                        fallback prices.
+                      </span>
+                    </div>
+                    <button type="button" onClick={actions.reviewPriceData}>
+                      Review price data
+                    </button>
+                  </section>
+                ) : null}
                 <ActiveAssumptionsSummary
                   summary={activeAssumptions}
                   onReview={actions.reviewActiveAssumption}

@@ -14,12 +14,16 @@ import {
   type LootPresentationViewModel,
   type LootSummaryViewModel
 } from "./loot";
-import type { ItemPriceHistoryContext } from "./price-data";
+import {
+  createCurrentPriceNoticePresentation,
+  isMoneyWarningCode,
+  type CurrentPriceNoticePresentation,
+  type ItemPriceHistoryContext
+} from "./price-data";
 import type { CalculationWarningViewModel } from "./contracts";
 import {
   calculationWarningViewModels,
   createActiveAssumptionsSummaryViewModel,
-  isMoneyWarningCode,
   isSpecialWarningCode,
   type ActiveAssumptionsSummaryViewModel,
   type ActiveAssumptionsViewModelOptions
@@ -73,6 +77,7 @@ export interface SimulationViewModel {
   calculationWarnings: CalculationWarningViewModel[];
   specialWarnings: CalculationWarningViewModel[];
   moneyWarnings: CalculationWarningViewModel[];
+  priceNotices: CurrentPriceNoticePresentation;
   topLoot: Array<{
     name: string;
     pref: string;
@@ -116,6 +121,19 @@ export function createSimulationViewModel(
   const effectiveXpPerHour = fullResult.xp.effectiveXpPerHour;
   const totalXpPerHour = fullResult.xp.totalXpPerHour;
 
+  const calculationWarnings = calculationWarningViewModels(fullResult.warnings);
+  const specialWarnings = calculationWarnings.filter((warning) =>
+    isSpecialWarningCode(warning.code)
+  );
+  const moneyWarnings = calculationWarnings.filter(
+    (warning) =>
+      isMoneyWarningCode(warning.code) && warning.priceContext?.affectsCurrentResult !== false
+  );
+  const priceNotices = createCurrentPriceNoticePresentation({
+    warnings: calculationWarnings,
+    gameData: context.gameData,
+    lootBreakdown: trip.lootBreakdown
+  });
   const loot = createLootPresentationViewModel({
     form,
     context,
@@ -124,13 +142,9 @@ export function createSimulationViewModel(
     lootPrefs,
     lootSettingsByMonster,
     lootPriceHistoryByItem: options.lootPriceHistoryByItem,
+    priceNoticesByLootRowId: priceNotices.byLootRowId,
     includeRows: options.includeLootRows
   });
-  const calculationWarnings = calculationWarningViewModels(fullResult.warnings);
-  const specialWarnings = calculationWarnings.filter((warning) =>
-    isSpecialWarningCode(warning.code)
-  );
-  const moneyWarnings = calculationWarnings.filter((warning) => isMoneyWarningCode(warning.code));
   const includeHitDistributionAnalysis = options.includeHitDistributionAnalysis !== false;
   const hitDistribution = includeHitDistributionAnalysis
     ? createHitDistributionViewModel(combat)
@@ -151,7 +165,6 @@ export function createSimulationViewModel(
     lootOverrideCount: loot.summary.overrideCount,
     setupRequirements,
     specialWarnings,
-    moneyWarnings,
     options: options.activeAssumptions
   });
 
@@ -174,7 +187,6 @@ export function createSimulationViewModel(
       form,
       result: fullResult,
       specialWarnings,
-      moneyWarnings,
       hitDistribution,
       includeHistograms: includeHitDistributionAnalysis
     }),
@@ -196,6 +208,7 @@ export function createSimulationViewModel(
     calculationWarnings,
     specialWarnings,
     moneyWarnings,
+    priceNotices,
     topLoot: trip.lootBreakdown
       .filter((drop) => drop.evGp > 0 || drop.prayerXp > 0)
       .sort((left, right) => right.evGp - left.evGp)

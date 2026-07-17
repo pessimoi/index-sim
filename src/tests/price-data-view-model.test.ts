@@ -13,6 +13,7 @@ import {
   type PriceHistoryMoverSortKey
 } from "../app/state/price-history";
 import {
+  createCurrentPriceNoticePresentation,
   createEconomyHistoryPresentation,
   createManualPriceEditorPresentation,
   createPriceHistorySources,
@@ -119,6 +120,79 @@ function localHistory(
 }
 
 describe("price-data view model", () => {
+  it("classifies active issues separately from advisory and row-local price notes", () => {
+    const presentation = createCurrentPriceNoticePresentation({
+      warnings: [
+        {
+          code: "price-generated-fallback",
+          severity: "warning",
+          message: "technical generated message",
+          itemId: "bronze_longsword",
+          priceContext: {
+            consumer: "loot",
+            affectsCurrentResult: true,
+            lootRowId: "bronze-row"
+          }
+        },
+        {
+          code: "missing-price",
+          severity: "warning",
+          message: "technical missing message",
+          itemId: "vial_water",
+          priceContext: { consumer: "supply", affectsCurrentResult: true }
+        },
+        {
+          code: "price-generated-fallback",
+          severity: "warning",
+          message: "technical inactive message",
+          itemId: "bones",
+          priceContext: {
+            consumer: "loot",
+            affectsCurrentResult: false,
+            lootRowId: "bones-row"
+          }
+        }
+      ],
+      gameData: {
+        items: {
+          bronze_longsword: { id: "bronze_longsword", name: "Bronze longsword" },
+          vial_water: { id: "vial_water", name: "Vial of water" },
+          bones: { id: "bones", name: "Bones" }
+        }
+      },
+      lootBreakdown: [
+        { rowId: "bronze-row", name: "Bronze longsword" },
+        { rowId: "bones-row", name: "Bones" }
+      ]
+    });
+
+    expect(presentation.issues).toEqual([
+      expect.objectContaining({
+        code: "missing-price",
+        itemLabel: "Vial of water",
+        summary: "Missing price",
+        consumer: "supply"
+      })
+    ]);
+    expect(presentation.notes).toEqual([
+      expect.objectContaining({
+        code: "price-generated-fallback",
+        itemLabel: "Bronze longsword",
+        summary: "Estimated price"
+      })
+    ]);
+    expect(presentation.all.map((notice) => notice.itemLabel)).toEqual([
+      "Vial of water",
+      "Bronze longsword"
+    ]);
+    expect(presentation.byLootRowId["bones-row"]).toEqual([
+      expect.objectContaining({ itemLabel: "Bones", affectsCurrentResult: false })
+    ]);
+    expect(presentation.all.map((notice) => notice.detail).join(" ")).not.toContain(
+      "bronze_longsword"
+    );
+  });
+
   it("presents active, scheduled and reset price-set ownership without UI dependencies", () => {
     const bundled = priceSet({ id: "bundled-prices", source: "bundled" });
     const selected = priceSet();
