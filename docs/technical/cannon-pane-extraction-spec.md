@@ -154,3 +154,11 @@ remain explicit actions rather than shared hidden state.
 - Full `npm run verify` passes 694 unit tests, 19 explicit goldens and all
   non-network release gates. No CSS, persisted schema, domain formula,
   generated data or golden fixture changed in this extraction.
+
+## Subsequent behavior change
+
+D-100 later replaces the preserved legacy sparse hard-idle formula with finite
+independent-spawn occupancy, adds comparison-only `Cannon only DPS` and aligns
+the mixed checkbox/number/button control row. This extraction document remains
+the historical component-ownership record; current Cannon calculation and UI
+truth belong in `src/domain/trip`, `ui-parity-spec.md` and D-100.

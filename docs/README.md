@@ -17,6 +17,7 @@ This directory is the project memory layer for humans and AI agents. It keeps cu
 - Source-backed incoming damage specification: [technical/source-backed-incoming-damage-spec.md](technical/source-backed-incoming-damage-spec.md)
 - Source-backed casket valuation specification: [technical/source-backed-casket-valuation-spec.md](technical/source-backed-casket-valuation-spec.md)
 - Per-item price provenance and freshness specification: [technical/per-item-price-provenance-freshness-spec.md](technical/per-item-price-provenance-freshness-spec.md)
+- Current-result price warning relevance and presentation specification: [technical/price-warning-relevance-presentation-spec.md](technical/price-warning-relevance-presentation-spec.md)
 - Dynamic loot market dependency coverage specification: [technical/dynamic-loot-market-dependency-coverage-spec.md](technical/dynamic-loot-market-dependency-coverage-spec.md)
 - Conditional loot presentation specification: [technical/conditional-loot-presentation-spec.md](technical/conditional-loot-presentation-spec.md)
 - Manual item price overrides specification: [technical/manual-item-price-overrides-spec.md](technical/manual-item-price-overrides-spec.md)
@@ -94,6 +95,7 @@ These files are useful evidence, but they are not the living source of truth. Pr
 - Source-backed NPC attack profiles and shared Trip/Risk incoming-damage requirements belong in [technical/source-backed-incoming-damage-spec.md](technical/source-backed-incoming-damage-spec.md).
 - Ordinary fishing-casket opened-content valuation and its focused source-drift guard belong in [technical/source-backed-casket-valuation-spec.md](technical/source-backed-casket-valuation-spec.md).
 - Item-level price origin, observation/evaluation time, scheduled sidecar, history-v2 and PriceSet migration requirements belong in [technical/per-item-price-provenance-freshness-spec.md](technical/per-item-price-provenance-freshness-spec.md).
+- Current-result used-price relevance, Result/Loot/Economy notice placement and complete disclosure behavior belong in [technical/price-warning-relevance-presentation-spec.md](technical/price-warning-relevance-presentation-spec.md); item provenance, freshness and storage contracts remain in the per-item price specification.
 - Trip-derived market dependency inventory belongs in [technical/dynamic-loot-market-dependency-coverage-spec.md](technical/dynamic-loot-market-dependency-coverage-spec.md); source-reviewed admission of identified high-impact rows belongs in [technical/high-impact-dynamic-loot-market-allowlist-spec.md](technical/high-impact-dynamic-loot-market-allowlist-spec.md).
 - Inactive quest/clue row grouping belongs in [technical/conditional-loot-presentation-spec.md](technical/conditional-loot-presentation-spec.md); source eligibility and zero-calculation policy remain in [technical/conditional-quest-clue-loot-spec.md](technical/conditional-quest-clue-loot-spec.md).
 - Browser-local per-item price overlay and reset behavior belongs in [technical/manual-item-price-overrides-spec.md](technical/manual-item-price-overrides-spec.md).

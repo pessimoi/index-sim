@@ -11,7 +11,12 @@
 - Open one selector and filter monsters, loadout items, spells, food, risk drops and
   Economy history choices from the search field inside its popup.
 - Compare effective XP/hr, GP/hr, DPS, supply use and trip behavior.
-- Inspect loot value and alch/bury/keep/drop choices.
+- Compare player-plus-cannon spot rates with theoretical cannon-only DPS while
+  keeping actual cannonball cost in the combined supply and net-GP result.
+- Inspect and sort current-monster drops by name, action, hourly impact, expected
+  value, chance, quantity or price before choosing alch/bury/keep/drop behavior;
+  expanded random-table contents can also be sorted by their useful child and
+  numeric columns.
 - Value a random-herb `Loot` action from identified herb prices and an `Unid`
   action from the source-weighted unidentified item identities; when the active
   PriceSet lacks species-specific unid prices, show that the generic unid price
@@ -20,6 +25,8 @@
   Revision 274 reward table, show all eight weighted content bands and keep the
   parent casket market/object price out of that opened value.
 - Compare monsters under the current setup.
+- Compare saved setups for the current monster and across all monsters, then
+  sort the comparison by setup, monster or the visible outcome metric.
 - Inspect modeled kill-time, food, trip and timed-profit ranges plus drop/GP target probabilities beside deterministic averages.
 - Use the planner to estimate training order and gear unlock impact.
 - Import or sync market prices when the relevant path is available.
@@ -104,7 +111,7 @@ visible when a component price is missing. Whether to add a separate
 - Trip, loot and supply rules now have a pure rewrite-domain owner in `src/domain/trip`.
 - Training planner rules now have a pure rewrite-domain owner in `src/domain/planner`.
 - The root Vite rewrite UI now covers a selected parity slice: combat setup, result summary, loot/economy, trip, monster compare and planner.
-- On desktop, the root workbench uses the accepted legacy-console shape: one viewport-bound three-zone shell with compact Player controls, the active workbench pane and MonsterCard scrolling independently. The narrower Player sidebar owns player inputs plus a read-only active weapon, stance/ammo/spell, effective-level, prayer, boost and requirement-status summary with navigation to Loadout and Stats. The selected-monster context bar owns the persistent DPS, effective XP/hr and net GP/hr summary, while Stats owns the detailed player/cannon XP routing. Tablet and mobile retain normal document flow.
+- On desktop, the root workbench uses the accepted legacy-console shape: one viewport-bound three-zone shell with compact Player controls, the active workbench pane and MonsterCard scrolling independently. The narrower Player sidebar owns player inputs plus a read-only active weapon, stance/ammo/spell, effective-level, prayer, boost and requirement-status summary with navigation to the dynamically named Melee/Ranged/Magic setup tab and Stats. The selected-monster context bar owns the persistent DPS, effective XP/hr and net GP/hr summary, while Stats owns the detailed player/cannon XP routing. Tablet and mobile retain normal document flow.
 - Three compact quick-navigation summaries distinguish active prayers/combat boosts from Trip-owned potion carry and prayer restore, show current values and jump directly to the owning setup, Trip or Loot pane. The redundant `Where to edit` intro copy is omitted. Negative net GP results explain the supply-vs-loot gap and link to the relevant controls.
 - The legacy UI is archived at `legacy/index.html` and still has source files in `views.jsx`, `planner.jsx` and `planner-core.js` for reference/parity work.
 - Current feature coverage and missing legacy workflows are tracked in [feature-inventory.md](feature-inventory.md).

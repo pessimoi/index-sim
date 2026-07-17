@@ -413,8 +413,10 @@ legacy-order TabBar and active pane routing, and a right-side MonsterCard rail.
 The narrower PlayerSidebar keeps level and style inputs at the top and adds one
 read-only Active setup profile for the current weapon, stance/ammo/spell,
 attack speed, effective accuracy/damage levels, prayers, boosts and requirement
-or manual-override status. Its actions only navigate to Loadout and Stats; it
-does not duplicate target-, Trip-, loot- or price-dependent output metrics.
+or manual-override status. Its setup action uses the same dynamic `Melee setup`,
+`Ranged setup` or `Magic setup` label as the destination tab; the other action
+navigates to Stats. It does not duplicate target-, Trip-, loot- or
+price-dependent output metrics.
 The left rail, center pane and MonsterCard rail have independent scroll
 containers on desktop. On mobile the zones stack in workflow order, with
 MonsterCard after the active pane. The final default-pane decision remains open.
@@ -680,7 +682,7 @@ Required content:
 - Prayer XP from burying.
 - Loot value composition section.
 
-Current implementation note: the root rewrite UI exposes the full current-target loot workflow, meaningful action controls, per-monster settings, composition/nested/action-impact detail and price-history context from the same merged shared/local analysis used by Economy. Generated high alch controls alch profitability. D-089 moves the D-072 conditional quest/clue rows out of the ordinary action table into one collapsed native disclosure; their source chance, sanitized eligibility and locked Skip remain visible on demand, and they still contribute no value or trip effect while exact player state is unavailable. D-090 lets Economy overlay and reset one validated browser-local item price while preserving the selected/scheduled/bundled base and generated high alch. Economy owns the read-only shared plus local comparison workflow; D-049 still keeps full legacy history migration out of V1, while root-variable and scheduled-run evidence remain operations work after the successful live dry-run.
+Current implementation note: the root rewrite UI exposes the full current-target loot workflow, meaningful action controls, per-monster settings, composition/nested/action-impact detail and price-history context from the same merged shared/local analysis used by Economy. The ordinary drop table keeps source order by default and exposes accessible ascending/descending sorting for drop, action, hourly delta, EV/kill, chance, quantity and price; Impacts and Details remain disclosure columns rather than sort keys. Expanded random-table contents keep their source order by default and can be sorted by child, weight, chance, quantity, price or EV share, with unavailable numeric values retained at the end. Both sorts are session-local presentation state and do not change loot preferences, simulation requests or persisted setup data. Composition, action-impact and conditional tables keep their semantic contribution, action-policy and source-completeness order. Generated high alch controls alch profitability. D-089 moves the D-072 conditional quest/clue rows out of the ordinary action table into one collapsed native disclosure; their source chance, sanitized eligibility and locked Skip remain visible on demand, and they still contribute no value or trip effect while exact player state is unavailable. D-090 lets Economy overlay and reset one validated browser-local item price while preserving the selected/scheduled/bundled base and generated high alch. Economy owns the read-only shared plus local comparison workflow; D-049 still keeps full legacy history migration out of V1, while root-variable and scheduled-run evidence remain operations work after the successful live dry-run.
 
 #### Loot/Economy nested workflow parity slice
 
@@ -834,13 +836,13 @@ Required content:
 - Per-monster enable toggle.
 - Target count and respawn controls.
 - Explanation of cannon accuracy and XP rules.
-- Idle state when the spot is too sparse.
-- Effective targets, cannon DPS, balls/hr, balls/kill, cannon ranged XP/hr, ball cost/hr, ball cost/kill and ball price.
+- Finite respawn-bound output for sparse spots without a minimum-mob idle threshold.
+- Effective targets, combined cannon DPS, theoretical cannon-only DPS, balls/hr, balls/kill, cannon ranged XP/hr, ball cost/hr, ball cost/kill and ball price.
 - Kills/hr uplift vs solo.
 - Respawn-bound warning.
 - Cannonballs to bring per trip and per-trip ball cost.
 
-Current implementation note: the root rewrite now exposes Cannon as its own workbench tab in the legacy tab order. It owns per-monster enable, target count and respawn settings in versioned rewrite setup state, provides current-monster reset, can link its spot assumptions to Trip sparse state, and displays idle/respawn-bound status plus compact accuracy, XP, supply, sparse-link and inventory-reserve notes. The output metrics cover effective targets, cannon DPS, balls/hr, balls/kill, cannon ranged XP/hr, effective XP/hr with cannon, effective net GP/hr with cannon, ball cost/hr, ball cost/kill, ball price, cannonballs/trip, ball cost/trip and kills/hr uplift. Browser tests snapshot the expanded Cannon output for the ranged Dagannoth cannon path. Legacy cannon-map migration remains a legacy storage decision, not part of the visible Cannon tab parity.
+Current implementation note: the root rewrite now exposes Cannon as its own workbench tab in the legacy tab order. It owns per-monster enable, target count and respawn settings in versioned rewrite setup state, provides current-monster reset, can link its spot assumptions to Trip sparse state, and displays respawn-bound status plus compact accuracy, XP, supply, sparse-link and inventory-reserve notes. D-100 replaces the false sparse hard-idle threshold with a finite independent-spawn occupancy solve. Player damage competes for target uptime in the combined cannon result; the separate `Cannon only DPS` metric uses player damage zero and is not routed into effective XP, GP, supply or K/hr. The remaining output metrics cover effective targets, combined cannon DPS, balls/hr, balls/kill, cannon ranged XP/hr, effective XP/hr with cannon, effective net GP/hr with cannon, ball cost/hr, ball cost/kill, ball price, cannonballs/trip, ball cost/trip and kills/hr uplift against player-only occupancy at the same spot. Browser tests snapshot the expanded Cannon output for the ranged Dagannoth cannon path. Legacy cannon-map migration remains a legacy storage decision, not part of the visible Cannon tab parity.
 
 ### Setup comparison
 
@@ -851,9 +853,10 @@ Required content:
 - Rename, load and delete controls for saved setups.
 - Versioned saved-setup export/import with bounded validation and non-destructive merge behavior.
 - Table comparing live and saved setups on the current monster.
+- Sortable current-monster setup and outcome columns.
 - Best markers for effective XP/hr, effective net GP/hr and GP/XP.
 - A visible DPS delta and an expandable live-versus-snapshot review for active setup fields and calculated impact.
-- On-demand cross-monster matrix for live and saved setups with metric selection, filtering and per-monster best markers.
+- On-demand cross-monster matrix for live and saved setups with metric selection, filtering, sortable monster/setup columns and per-monster best markers.
 
 Current implementation note: the rewrite Setups tab now exposes the visible
 saved-setup workflow over the Goal 1 foundation. `src/app/state/duel-snapshots.ts`
@@ -871,6 +874,9 @@ new snapshots only while the current 12-entry cap has room. The comparison table
 uses `createDuelComparisonViewModel()` to build live plus snapshot rows by
 re-simulating each snapshot setup against the current active monster, including
 XP/hr, effective net GP/hr, GP/XP and best-marker fields where live can also win.
+The table keeps live-plus-snapshot order by default and can sort by setup,
+loadout or any visible numeric outcome. This session-local presentation state is
+not included in saved snapshots or setup persistence.
 Each saved row also exposes one keyboard-operable `Review diff` panel at a time.
 The panel groups normalized active setup field differences and shows snapshot-minus-live
 calculated deltas for combat, trip, XP and economy metrics. The target, cannon,
@@ -882,7 +888,9 @@ The optional all-monster comparison is built only after an explicit user action 
 `createDuelMatrixViewModel()`. It evaluates the live setup and at most 12 saved
 setups across the current generated monster catalog, exposes DPS, XP/hr, net
 GP/hr and GP/XP views, supports a local monster filter and marks the best setup
-within each monster row. The matrix is not persisted and is treated as stale
+within each monster row. Its headers sort monsters alphabetically or rows by the
+selected metric for one setup; changing the visible metric reapplies that setup
+sort to the newly visible values. The matrix and its sort are not persisted and it is treated as stale
 when setup, snapshot, price, cannon or loot inputs change, so normal setup edits
 do not trigger a full cross-monster recalculation.
 Compatible legacy `sim_input_v3.duelSetups` rows migrate through the same bounded
@@ -891,6 +899,19 @@ saved setups win conflicts, the shared 12-entry cap applies and invalid or compu
 rows produce sanitized skip reasons. The planned active setup permalink is
 specified separately and does not share this collection. Account-backed saves,
 shared saved-setup collections and server-backed sharing remain out of scope.
+
+#### Table-order audit
+
+Sortable presentation tables are limited to datasets where users reasonably
+compare or search rows in more than one order: Monsters, Economy price movers,
+the ordinary and expanded Loot tables, the current-monster setup comparison and
+the all-monster setup matrix. Hiscores skills, exact damage outcomes, migration
+and local-state checks, Stats summaries, Planner phases/unlocks, Loot value
+composition, per-action impacts and conditional-source rows keep fixed order
+because their sequence conveys skill, probability, recovery priority,
+chronology, contribution rank, policy or source structure. Table-like setup,
+equipment and summary grids are curated label/value layouts rather than row
+datasets and do not expose sort controls.
 
 ### Planner
 
