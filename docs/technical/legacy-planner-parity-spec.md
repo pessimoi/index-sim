@@ -35,6 +35,13 @@ implementation card.
 - D-071 refreshed 13 current-product digests after generated requirement rows
   removed only the D-051 manual-fallback warning; reviewed training, numeric,
   configuration and transition deltas stayed unchanged.
+- D-081's source-backed incoming-damage migration later added the expected
+  `incoming-attack-compatibility-fallback` warning to all 16 legacy-derived
+  reference-context rows and `incoming-attack-partial-model` to two
+  current-product magic rows. The 2026-07-17 review confirmed that training
+  order and the existing bounded numeric, configuration and transition
+  differences were unchanged, then refreshed the classified digests and
+  generated report.
 - `docs/project/planner-parity/current.md` is the generated current report.
 - `npm run planner:parity` runs the focused Planner tests and checks/writes the
   classified report without updating the reviewed baseline.

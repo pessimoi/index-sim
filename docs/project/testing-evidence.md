@@ -66,6 +66,18 @@ PriceSet-import edits in `src/app/components/panes/economy-settings-pane.tsx`;
 the D-101 source and documentation set passed Prettier before that external
 edit arrived.
 
+Follow-up on 2026-07-17 resolved that Planner baseline failure. Review confirmed
+that D-081 had intentionally added only the visible incoming-attack coverage
+warnings: `incoming-attack-compatibility-fallback` in all 16 reference-context
+rows and `incoming-attack-partial-model` in two current-product magic rows.
+Training order and the previously classified bounded numeric, configuration and
+transition differences were unchanged. The reviewed baseline and generated
+report now retain 29 `accepted-rewrite-delta` and three `source-data-delta`
+rows, with zero `needs-review` or `rewrite-gap` rows. `npm run planner:parity`
+passes 19/19 tests and all 32 comparisons; the full `npm run verify` gate passes
+80/80 unit files, 799/799 unit tests, 19/19 goldens, architecture, typecheck,
+build/artifact, lint, Prettier and diff checks.
+
 ## 2026-07-13–15 structural validation snapshots
 
 D-099 GitHub Actions disablement validation note, 2026-07-15: the only
