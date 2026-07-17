@@ -3,14 +3,16 @@
 ## Current state
 
 The latest complete production-preview Chromium gate passed 78/78 on
-2026-07-15 after the local startup reliability implementation. Full
-`npm run verify` passes 80 test files / 788 unit tests, 19 explicit goldens,
-typecheck, the
-124-source-module/109-client-reachable-module/eight-external-entrypoint
-zero-cycle architecture check, build/artifact budgets, lint, formatting and
-diff checks. The 10-file artifact entry is 721,543 raw / 209,175 gzip bytes and
-remains inside the D-098-rebased D-094 budgets; total bytes are 1,976,291 and SHA-256 is
-`fea2d14a96a429d221c695e8aed699a8231ac6c6f8c0dc188dcf48cadc120f39`.
+2026-07-15 after the local startup reliability implementation. The current
+2026-07-17 `npm run verify` reaches 79 passing test files and 798 passing tests
+out of 80/799; only the independently stale legacy Planner parity baseline
+fails, with no D-100–D-102 Cannon, price-warning or PriceSet-import failure.
+Typecheck, the 125-source-module/110-client-reachable-module/eight-external-
+entrypoint zero-cycle architecture check, 19 explicit goldens, build/artifact
+budgets, lint, formatting and diff checks pass when run separately. The current
+10-file artifact entry is 736,565 raw / 213,862 gzip bytes and remains inside
+the D-098-rebased D-094 budgets; total bytes are 2,095,263 and SHA-256 is
+`1b6f6b11a9eb06ee663bf5bc0e3a894fb991648fbf79045fa22b88ab495722f2`.
 Earlier functional counts are superseded snapshots recorded in the linked
 evidence log. The latest read-only Darwin visual comparison passed 20/20 after
 the repository-wide dead-selector cleanup against the same 31 reviewed
@@ -189,6 +191,7 @@ node -e "for (const f of ['prices.json','price-provenance.json','alch.json','pri
 - UI/view-model changes: `npm run test -- src/tests/*-view-model.test.ts`, `npm run test`, `npm run build` and `npm run test:e2e` when browser behavior changes.
 - Performance-sensitive UI/view-model changes: include `src/tests/ui-performance.test.ts` and browser smoke where possible; compare the level-input path and representative compare/planner workloads against the accepted performance budget.
 - Market/import logic: unit tests with mocked price sources and malformed data; include `src/tests/ui-adapters.test.ts` for rewrite price imports and `src/tests/market-ui-state.test.ts` for selected active `PriceSet` persistence, restore and failure behavior.
+- Full PriceSet transfer presentation: include the focused transfer-controller, Economy/Settings pane and app-header component tests plus Playwright coverage for the one collapsed Market disclosure, global/Settings duplicate removal, export-to-import round trip, non-merge guidance, recoverable invalid files and compact/mobile containment.
 - Manual item-price overlay: include `src/tests/market-ui-state.test.ts`, `src/tests/local-state-health.test.ts` and the focused Economy Playwright draft/base-change/reload/reset/capacity workflow. Confirm the base PriceSet and high-alch values are unchanged, item metadata becomes manual, unavailable stored ids stay inactive without deletion, a draft cannot move with the separate Trend item selector, the 512-row guard is non-throwing, the local key clears after the final reset and calculated consumers receive a new composed PriceSet identity.
 - Conditional loot presentation: include `src/tests/*-view-model.test.ts` plus the focused Loot Playwright disclosure workflow. Confirm conditional rows remain locked/zero in the view model, are absent from the ordinary action table, and expose source chance plus sanitized eligibility only after the collapsed disclosure is opened.
 - Live integrations: `npm run test -- src/tests/live-integrations.test.ts src/tests/hiscores-server.test.ts src/tests/hiscores-adapter.test.ts src/tests/hiscores-ui-state.test.ts src/tests/hiscores-lookup-controller.test.ts src/tests/market-sync-items.test.ts src/tests/market-server.test.ts src/tests/market-adapter.test.ts src/tests/market-ui-state.test.ts` plus `npm run test` when shared schemas or API adapters are touched. Use mocked hiscores and market service tests only; do not call live upstream services in automated tests. Cover request validation, allowlisted market item mapping, upstream-invalid responses, request races, partial market failures and UI apply/failure behavior.

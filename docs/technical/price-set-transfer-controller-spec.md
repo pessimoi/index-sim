@@ -7,13 +7,14 @@ Status: implemented as composition-root Goal 9, 2026-07-13.
 Before this extraction, `src/app/App.tsx` coordinated one PriceSet transaction
 across browser file reading, validation, generated high-alch authority, manual
 item-price overlays, selected-snapshot persistence, local history, recovery
-state and three import surfaces. Those operations form one browser-state
-responsibility; the live `SimulationContext` and React state setters do not.
+state and, at that time, three import surfaces. Those operations form one
+browser-state responsibility; the live `SimulationContext` and React state
+setters do not.
 
 This goal moves the transaction behind a DOM-free controller core and a thin
 React hook. `App` keeps the active runtime context and applies only typed
-accepted/reset outcomes. The existing Economy, Settings and topbar markup stays
-in place.
+accepted/reset outcomes. D-102 subsequently consolidates presentation into one
+Market-owned workflow without changing this transaction boundary.
 
 ## Verified pre-refactor ownership
 
@@ -33,13 +34,13 @@ in place.
 The controller composes these existing owners. It must not duplicate their
 schemas, price formulas, metadata rules or storage envelopes.
 
-## Current behavior to preserve
+## Current transaction behavior
 
 ### Import surface and bounded validation
 
-- The topbar, Settings and Market inputs remain `type="file"` with
-  `accept="application/json,.json"`; each passes its surface id to one import
-  operation.
+- One Market-owned input remains `type="file"` with
+  `accept="application/json,.json"` inside the collapsed
+  `Advanced PriceSet tools` disclosure. It calls one unscoped import operation.
 - The first selected file is used. No file or unavailable runtime context is a
   no-op.
 - `readBrowserFileText(file, PRICE_SET_IMPORT_MAX_BYTES)` runs before
@@ -48,8 +49,8 @@ schemas, price formulas, metadata rules or storage envelopes.
   schema failures retain the exact messages produced by
   `describePriceImportError()`.
 - A rejected import does not change runtime prices, base prices, active origin,
-  history, selected persistence or the previous Market notice. Its scoped
-  import notice explains that the current PriceSet and history were retained.
+  history, selected persistence or the previous Market notice. Its import
+  notice explains that the current PriceSet and history were retained.
 - Starting an attempt clears the previous import notice. The input value is
   reset after success or failure so the same file can be selected again. The
   controller does not retain or mutate an input element.
@@ -86,8 +87,8 @@ An unavailable storage bridge marks persistence unavailable; a thrown write
 records `save_failed`. Both remain successful in-memory acceptance and use the
 existing neutral “Local restore was not saved” copy.
 
-A file import additionally publishes the existing success notice scoped to the
-originating surface. Compatible legacy import uses the same acceptance
+A file import additionally publishes the existing success notice beside the
+canonical Market workflow. Compatible legacy import uses the same acceptance
 transaction but does not create a file-import notice.
 
 ### Export and reset
@@ -127,10 +128,8 @@ Exact names may vary, but the implementation must expose an equivalent typed
 boundary:
 
 ```ts
-type PriceImportSurface = "topbar" | "settings" | "market";
-
 interface PriceSetTransferSnapshot {
-  importNotice: (PriceImportNotice & { surface: PriceImportSurface }) | null;
+  importNotice: PriceImportNotice | null;
   resetPending: boolean;
 }
 
@@ -174,7 +173,7 @@ Focused controller tests must cover:
 - valid import sequencing and exact canonical/active/history output;
 - session-only save and thrown save recovery paths;
 - every existing parser error category with no mutation authority;
-- scoped notices and concurrent settlement behavior;
+- the unscoped canonical notice and concurrent settlement behavior;
 - compatible direct acceptance without a file notice;
 - deterministic export filename/value;
 - reset request/cancel, persisted reset, unavailable reset and failed clear;
@@ -193,14 +192,14 @@ git diff --check
 
 ## Open questions
 
-None for this ownership move. A future Economy pane extraction may move the
-three control surfaces, but must consume this controller contract instead of
-reintroducing file/storage orchestration.
+None. D-102 has consolidated presentation into one Economy/Market workflow,
+which consumes this controller contract without reintroducing file/storage
+orchestration.
 
 ## Implementation evidence
 
-- `price-set-transfer.ts` and its thin hook now own bounded import, scoped
-  notices, generated-alch/manual-overlay composition, selected persistence,
+- `price-set-transfer.ts` and its thin hook now own bounded import, one
+  canonical notice, generated-alch/manual-overlay composition, selected persistence,
   recovery integration, pure latest-state history updates, export and reset
   confirmation. `App` applies typed accepted/reset outcomes and retains only
   runtime state mutation plus file-input reset.

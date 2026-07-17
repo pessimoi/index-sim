@@ -330,7 +330,7 @@ export interface EconomySettingsPaneProps {
     settings: SettingsPaneViewModel;
     moneyWarnings: readonly CalculationWarning[];
     marketNotice: MarketNotice | null;
-    importNotice: ScopedPriceImportNotice | null;
+    importNotice: PriceImportNotice | null;
     recovery: LocalStateRecoveryPaneModel;
     localHistoryClearPending: boolean;
     manualClearPending: boolean;
@@ -349,10 +349,10 @@ export interface EconomySettingsPaneProps {
 The exact supporting interface names may change. Callbacks must express user
 intent, not expose raw React setters or storage/controller objects.
 
-The component may own the mechanical file-input extraction and `finally`
-reset, following the existing Duel pane pattern. It calls a typed
-`importPriceSet(file, surface)` action. It must not parse, persist or accept the
-file itself.
+The component owns the mechanical first-file extraction and `finally` reset
+through `price-set-import-input.ts`. Under D-102 it calls one typed
+`importPriceSet(file)` action from the Market-owned advanced disclosure. It must
+not parse, persist or accept the file itself.
 
 ### Exact wrapper contract
 

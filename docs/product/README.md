@@ -29,7 +29,9 @@
   sort the comparison by setup, monster or the visible outcome metric.
 - Inspect modeled kill-time, food, trip and timed-profit ranges plus drop/GP target probabilities beside deterministic averages.
 - Use the planner to estimate training order and gear unlock impact.
-- Import or sync market prices when the relevant path is available.
+- Correct individual prices through `Manual item price`, or use Economy's
+  advanced full-PriceSet export/import/reset workflow when an exact complete
+  browser-local price context must be transferred or reproduced.
 - Look up player hiscores from the global header and apply previewed combat levels.
 
 Visible legacy-vs-rewrite coverage is tracked in [feature-inventory.md](feature-inventory.md).

@@ -847,7 +847,7 @@ Required content:
 - Respawn-bound warning.
 - Cannonballs to bring per trip and per-trip ball cost.
 
-Current implementation note: the root rewrite now exposes Cannon as its own workbench tab in the legacy tab order. It owns per-monster enable, target count and respawn settings in versioned rewrite setup state, provides current-monster reset, can link its spot assumptions to Trip sparse state, and displays respawn-bound status plus compact accuracy, XP, supply, sparse-link and inventory-reserve notes. D-100 replaces the false sparse hard-idle threshold with a finite independent-spawn occupancy solve. Player damage competes for target uptime in the combined cannon result; the separate `Cannon only DPS` metric uses player damage zero and is not routed into effective XP, GP, supply or K/hr. The remaining output metrics cover effective targets, combined cannon DPS, balls/hr, balls/kill, cannon ranged XP/hr, effective XP/hr with cannon, effective net GP/hr with cannon, ball cost/hr, ball cost/kill, ball price, cannonballs/trip, ball cost/trip and kills/hr uplift against player-only occupancy at the same spot. Browser tests snapshot the expanded Cannon output for the ranged Dagannoth cannon path. Legacy cannon-map migration remains a legacy storage decision, not part of the visible Cannon tab parity.
+Current implementation note: the root rewrite now exposes Cannon as its own workbench tab in the legacy tab order. It owns per-monster enable, target count and respawn settings in versioned rewrite setup state, provides current-monster reset, can link its spot assumptions to Trip sparse state, and displays respawn-bound status plus compact accuracy, XP, supply, sparse-link and inventory-reserve notes. D-100 replaces the false sparse hard-idle threshold with a finite independent-spawn occupancy solve. Player damage competes for target uptime in the combined cannon result; the separate `Cannon only DPS` metric uses player damage zero and is not routed into effective XP, GP, supply or K/hr. The remaining output metrics cover effective targets, combined cannon DPS, balls/hr, balls/kill, cannon ranged XP/hr, effective XP/hr with cannon, effective net GP/hr with cannon, ball cost/hr, ball cost/kill, ball price, cannonballs/trip, ball cost/trip and kills/hr uplift against player-only occupancy at the same spot. The complete formula, cost, status, alignment and acceptance contract belongs in [the Cannon finite occupancy specification](cannon-finite-occupancy-spec.md). Browser tests snapshot the expanded Cannon output for the ranged Dagannoth cannon path. Legacy cannon-map migration remains a legacy storage decision, not part of the visible Cannon tab parity.
 
 ### Setup comparison
 
@@ -978,13 +978,14 @@ production market automation or full legacy storage migration.
 
 Required content:
 
-- Price and alch import inside Settings.
+- Price and alch diagnostics inside Settings; full-PriceSet transfer belongs to
+  the shared Market section rather than a duplicate Settings action row.
 - Gear-tier hiding controls.
-- Price/alch counts and import status.
+- Price/alch counts and active-source status.
 - Scheduled static price snapshot status following [live-integrations-spec.md](live-integrations-spec.md).
 - Service-aware scheduled/unavailable/fallback state for market prices. Production copy must not point users to `run_sim.py` or imply user-triggered upstream refresh.
 
-Current implementation note: Settings Price data shows scheduled status and active PriceSet metadata. Imports use the validated parser, keep imported market prices, replace imported alch with generated Revision 274 values, persist the selected override and add a local comparison. Reset clears only the selected key, preserves shared/local history and returns to scheduled or bundled prices. Economy owns merged read-only shared plus local comparison analysis. Settings Gear controls remain separately backed by `index-sim:hidden-gear-tiers` and preserve current/None selections.
+Current implementation note: Settings Price data shows scheduled status and active PriceSet metadata without a duplicate transfer row. D-102 keeps one collapsed `Advanced PriceSet tools` workflow in the shared Market section, explains complete replacement/non-merge semantics and uses the validated parser, generated Revision 274 alch authority, selected persistence and local-comparison transaction. Reset clears only the selected key, preserves manual item prices plus shared/local history and returns to scheduled or bundled prices. Economy owns merged read-only shared plus local comparison analysis. Settings Gear controls remain separately backed by `index-sim:hidden-gear-tiers` and preserve current/None selections.
 
 ## Implementation Phases
 

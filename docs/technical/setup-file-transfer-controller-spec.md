@@ -9,11 +9,10 @@ browser JSON helpers already existed. The implementation moves their file
 transfer orchestration from `src/app/App.tsx` into a directly tested controller
 and hook while leaving the live setup mutation in `App`.
 
-The completed goal extracts that cohesive orchestration into a DOM-free controller plus
-a thin React hook. `App` continues to own the live setup values and applies only
-a typed successful import outcome. The current topbar DOM remains in place so
-the structural refactor cannot reorder the adjacent PriceSet, Share or notice
-elements.
+The completed goal extracts that cohesive orchestration into a DOM-free
+controller plus a thin React hook. `App` continues to own the live setup values
+and applies only a typed successful import outcome. D-102 later removes the
+unrelated PriceSet action without changing setup transfer ordering or notices.
 
 ## Verified pre-refactor ownership
 
@@ -37,8 +36,8 @@ compatibility checks, storage envelopes or browser download code.
 
 ### Topbar and file selection
 
-- `Import setup` remains a `label.file-button` in the topbar actions, after
-  `Import prices` and before `Export setup`.
+- `Import setup` remains the first `label.file-button` in the topbar actions,
+  before `Export setup` and `Share setup`.
 - Its input remains `type="file"` with
   `accept="application/json,.json"`. The browser MIME value and filename are
   not separately trusted or rejected; content validation remains authoritative.

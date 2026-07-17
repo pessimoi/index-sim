@@ -5,6 +5,32 @@ It does not own current commands, required gates or test strategy; those remain 
 [the testing guide](../technical/testing.md). Counts and artifact hashes below
 apply only to the source state described by each entry.
 
+## 2026-07-17 PriceSet import discoverability
+
+D-102 implementation validation confirms that full-PriceSet transfer now has
+one advanced Market owner rather than global-header and Settings duplicates.
+The focused controller/component command passes 3 files / 27 tests, covering
+the one-disclosure DOM and copy contract, unscoped notice, unchanged generated
+high-alch/manual-overlay/persistence/history transaction, reset semantics and
+header action removal. The named production-preview Chromium run passes 5/5:
+global setup actions, full PriceSet round trip, recoverable invalid import,
+compact landscape and narrow mobile containment. Port 5173 was already in use,
+so the run used an otherwise identical temporary port-5175 config that was
+removed afterward.
+
+Typecheck, lint, formatting, `git diff --check` and the cycle-free 125-source /
+110-client-reachable / eight-entrypoint architecture gate pass. Production
+build transforms 222 modules. Artifact validation reports 10 files, two assets,
+2,095,263 total bytes, 736,565 raw / 213,862 gzip entry JavaScript, three
+JavaScript chunks and SHA-256
+`1b6f6b11a9eb06ee663bf5bc0e3a894fb991648fbf79045fa22b88ab495722f2`.
+
+Full `npm run verify` reaches 79 passing files and 798 passing tests out of
+80/799. Its only failure is the independently stale legacy Planner parity
+baseline already classified below; all D-100–D-102 focused and full-suite tests
+pass. The Planner baseline was not regenerated as part of the PriceSet
+presentation change.
+
 ## 2026-07-17 price-warning relevance and presentation
 
 D-101 implementation validation confirms that price notices retain structured
