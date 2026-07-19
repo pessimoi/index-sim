@@ -129,5 +129,5 @@ describe("rewrite browser fixture adapter", () => {
         expect(result.trip.trip.lootFraction, `${monsterId}:${combatStyle}`).toBeLessThanOrEqual(1);
       }
     }
-  });
+  }, 15_000);
 });

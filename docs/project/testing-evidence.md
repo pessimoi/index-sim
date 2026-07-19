@@ -5,6 +5,33 @@ It does not own current commands, required gates or test strategy; those remain 
 [the testing guide](../technical/testing.md). Counts and artifact hashes below
 apply only to the source state described by each entry.
 
+## 2026-07-19 safe active setup reset
+
+The required candidate/review/persistence/Planner command passes 4 files / 70
+tests. The extended focused run, including the session-only recovery-controller
+regression, passes 5 files / 81 tests. It covers fresh canonical all-style
+candidates, Default and current-target Custom ownership, grouped friendly
+review labels, no-op/stale/duplicate safety, complete six-family persistence
+and Undo, Planner non-interference and protected surrounding state.
+
+Typecheck, the cycle-free 137-source / 122-client-reachable / eight-entrypoint
+architecture graph and the 233-module production build pass. The named
+production-preview Reset workflow passes 3/3 for Review/Cancel/Confirm/no-op,
+durable complete Undo/reload and truthful session-only Apply/Undo. The complete
+functional Chromium suite passes 91/91 with one worker in 4.9 minutes after a
+compact four-action containment correction and one explicit app-ready wait in
+the MonsterCard test.
+
+The read-only visual run first reached the managed sandbox's expected
+`listen EPERM 127.0.0.1:5174` boundary. Its approved localhost rerun verified
+the root shell desktop and compact-landscape snapshots. The root mobile image
+was reviewed and only that baseline was regenerated for the intentional 44 px
+Reset action row. A bounded rerun shows Economy desktop passing; three
+pre-existing Reset-external 1 px / 0.01-ratio mobile differences remain in
+Loot, Planner and Duel and their baselines were not changed by this goal. This
+is `LOCAL_RUNTIME` / `SYNTHETIC_TEST` evidence, not deployed or provider
+evidence.
+
 ## 2026-07-19 application error boundary and safe-session recovery
 
 The focused application recovery command passes 3 files / 23 tests. It proves
