@@ -1,4 +1,4 @@
-import { createElement } from "react";
+import { createElement, createRef } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { AppHeader } from "../app/components/shell/app-header";
 import { LegacyMigrationPanel } from "../app/components/shell/legacy-migration-panel";
@@ -243,6 +243,7 @@ describe("app shell components", () => {
         currentMonsterLabel="Fixture monster"
         hasCurrentCustomSetup={false}
         activeSetupIsCustom={false}
+        resetSetupButtonRef={createRef<HTMLButtonElement>()}
         monsterOptions={[{ id: DEFAULT_FORM_STATE.monsterId, label: "Fixture monster" }]}
         styleOptions={[{ id: DEFAULT_FORM_STATE.styleId, label: "Accurate" }]}
         spellOptions={[{ id: DEFAULT_FORM_STATE.spellId, label: "None" }]}
@@ -272,6 +273,7 @@ describe("app shell components", () => {
           hiddenRows: [],
           hiddenCount: 0
         }}
+        setupReview={null}
         actions={{
           activateTab: noOp,
           selectCombatStyle: noOp,
@@ -282,6 +284,7 @@ describe("app shell components", () => {
           editDefaultSetup: noOp,
           editCustomSetup: noOp,
           removeCurrentCustomSetup: noOp,
+          resetActiveSetup: noOp,
           setSpell: noOp,
           setPrimaryPrayer: noOp,
           setPrimaryBoost: noOp,
@@ -321,6 +324,7 @@ describe("app shell components", () => {
     expect(markup).toContain('aria-label="Melee setup">Melee setup</button>');
     expect(markup).not.toContain("Open loadout");
     expect(markup).toContain("View stats");
+    expect(markup).toContain('aria-label="Reset active setup" title="Reset active setup"');
     expect(markup).toContain("Effective XP/hr");
     expect(markup).toContain('aria-label="Price data issue"');
     expect(markup).toContain("Price data incomplete");

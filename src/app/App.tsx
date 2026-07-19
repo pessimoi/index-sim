@@ -8,6 +8,11 @@ import {
 import type { SelectOption } from "./components/form-fields";
 import { formatDelta } from "./components/presentation-formatters";
 import { AppHeader } from "./components/shell/app-header";
+import { ActiveSetupResetReview } from "./components/shell/active-setup-reset-review";
+import {
+  ApplicationFailureScreen,
+  SafeSessionNotice
+} from "./components/shell/application-error-boundary";
 import { LocalStateAttentionBanner } from "./components/shell/local-state-attention-banner";
 import { SetupImportReview } from "./components/shell/setup-import-review";
 import { SharedSetupReview } from "./components/shell/shared-setup-review";
@@ -33,12 +38,8 @@ import {
   writeShareableSetupToClipboard
 } from "@/adapters/browser";
 import type { ScheduledStaticPriceSnapshotStatus } from "@/adapters/market";
-import {
-  createMemoryStorage,
-  loadPersisted,
-  tryClearPersisted,
-  type KeyValueStorage
-} from "@/adapters/storage";
+import { loadPersisted, tryClearPersisted } from "@/adapters/storage";
+import { SAFE_SESSION_NOTICE, createBrowserStorageAccess } from "./application-recovery";
 import {
   clearKnownLegacyStorageKeys,
   inspectLegacySetupMigration,
@@ -168,7 +169,10 @@ import {
   reviewShareableSetup
 } from "./state/shareable-setup";
 import { useRuntimeBootstrap } from "./controllers/use-runtime-bootstrap";
-import type { RuntimeBootstrapResult } from "./controllers/runtime-bootstrap";
+import {
+  RUNTIME_BOOTSTRAP_ERROR_MESSAGE,
+  type RuntimeBootstrapResult
+} from "./controllers/runtime-bootstrap";
 import {
   PLANNER_UI_STORAGE_KEY,
   PLANNER_UI_VERSION,
@@ -209,6 +213,14 @@ import {
   type SavedSetupState,
   type SetupMode
 } from "./state/ui-state";
+import {
+  ACTIVE_SETUP_RESET_STALE_NOTICE,
+  INITIAL_ACTIVE_SETUP_RESET_STATE,
+  cancelActiveSetupReset,
+  consumeActiveSetupReset,
+  invalidateStaleActiveSetupReset,
+  openActiveSetupReset
+} from "./state/active-setup-reset";
 import {
   cleanDenseCompareStateForMonsterIds,
   nextDenseCompareSortState,
@@ -276,20 +288,13 @@ import { createLegacyMigrationViewModel } from "./view-models/legacy-migration";
 import { defaultDuelSnapshotName, describeDuelSnapshotsImportError } from "./view-models/duel";
 import type { InlineNoticeViewModel } from "./view-models/contracts";
 
-function createBrowserStorageAccess(): { storage: KeyValueStorage; unavailable: boolean } {
-  if (typeof window === "undefined") {
-    return { storage: createMemoryStorage(), unavailable: false };
-  }
-  try {
-    return { storage: window.localStorage, unavailable: false };
-  } catch {
-    return { storage: createMemoryStorage(), unavailable: true };
-  }
-}
-
-const browserStorageAccess = createBrowserStorageAccess();
+const browserStorageAccess = createBrowserStorageAccess(
+  typeof window === "undefined" ? undefined : window
+);
 const storage = browserStorageAccess.storage;
-const localStorageAccessUnavailable = browserStorageAccess.unavailable;
+const localStorageAccessUnavailable = browserStorageAccess.storageUnavailable;
+const savedDataIgnoredForSession = browserStorageAccess.savedDataIgnoredForSession;
+const localPersistenceUnavailable = localStorageAccessUnavailable || savedDataIgnoredForSession;
 
 const setupStorageOptions = {
   key: REWRITE_SETUP_STORAGE_KEY,
@@ -460,6 +465,8 @@ export function App() {
   const localStateRecovery = useLocalStateRecovery({
     storage,
     storageUnavailable: localStorageAccessUnavailable,
+    persistenceUnavailable: localPersistenceUnavailable,
+    persistenceNotice: savedDataIgnoredForSession ? SAFE_SESSION_NOTICE : undefined,
     onStatus: setStatus,
     onDownload: downloadJsonFile
   });
@@ -469,7 +476,7 @@ export function App() {
   const setupFileTransfer = useSetupFileTransfer();
   const priceSetTransfer = usePriceSetTransfer({
     storage,
-    storageUnavailable: localStorageAccessUnavailable,
+    storageUnavailable: localPersistenceUnavailable,
     clearStorageFailures: localStateRecovery.clearStorageFailures,
     recordStorageFailure: localStateRecovery.recordStorageFailure,
     markPersistenceUnavailable: localStateRecovery.markPersistenceUnavailable,
@@ -531,12 +538,14 @@ export function App() {
   const setLootNotice = (notice: string | null) =>
     setLootUiState((current) => ({ ...current, notice }));
   const [pendingUndo, setPendingUndo] = useState<PendingUndo | null>(null);
+  const [activeSetupReset, setActiveSetupReset] = useState(INITIAL_ACTIVE_SETUP_RESET_STATE);
   const [respectLoadoutRequirements, setRespectLoadoutRequirements] = useState(true);
   const [activeTab, setActiveTab] = useState<WorkbenchTabId>("compare");
   const [localStateReviewRequest, setLocalStateReviewRequest] = useState(0);
   const [priceNotesOpen, setPriceNotesOpen] = useState(false);
   const shareSetupButtonRef = useRef<HTMLButtonElement>(null);
   const setupImportInputRef = useRef<HTMLInputElement>(null);
+  const resetSetupButtonRef = useRef<HTMLButtonElement>(null);
   const duelImportAttemptRef = useRef(0);
   const priceNotesSummaryRef = useRef<HTMLElement>(null);
   const handledLocalStateReviewRequestRef = useRef(0);
@@ -915,10 +924,8 @@ export function App() {
     rows: denseCompareRows,
     scale: denseCompareScale,
     totalRows: denseCompareTotalRows,
-    pending: denseComparePending,
-    freshnessLabel: denseCompareFreshnessLabel,
-    freshnessSummary: denseCompareFreshnessSummary,
-    freshnessAria: denseCompareFreshnessAria
+    presentation: denseComparePresentation,
+    retry: retryDenseCompare
   } = compareCalculation;
   const {
     comparison: duelComparison,
@@ -943,12 +950,11 @@ export function App() {
   const {
     panel: plannerPanel,
     gearPoolEditor: plannerGearPoolEditor,
-    error: plannerError,
-    pending: plannerPending,
     draftDirty: plannerDraftDirty,
-    status: plannerStatus,
+    presentation: plannerPresentation,
     computedMetric: plannerComputedMetric,
-    recompute: recomputePlanner
+    recompute: recomputePlanner,
+    retry: retryPlanner
   } = plannerCalculation;
   const hiscoresPreviewRows = useMemo(
     () =>
@@ -1527,7 +1533,7 @@ export function App() {
 
   const confirmClearPriceHistory = () => {
     const cleared = tryClearPersisted(priceHistoryStorageOptions);
-    const persistedClear = cleared.status === "cleared" && !localStorageAccessUnavailable;
+    const persistedClear = cleared.status === "cleared" && !localPersistenceUnavailable;
     if (cleared.status === "failed") {
       localStateRecovery.recordStorageFailure("price-history", cleared.reason);
     } else if (persistedClear) {
@@ -1555,15 +1561,7 @@ export function App() {
   };
 
   if (fatalError) {
-    return (
-      <main className="app-shell" data-app-startup-state="error">
-        <section className="fatal" role="alert">
-          <h1>2004scape Combat Simulator</h1>
-          <p>The simulator could not start. Reload the page and try again.</p>
-          <p>{fatalError}</p>
-        </section>
-      </main>
-    );
+    return <ApplicationFailureScreen message={RUNTIME_BOOTSTRAP_ERROR_MESSAGE} />;
   }
 
   if (!context || !viewModel || !derivedViewModel) {
@@ -1845,6 +1843,50 @@ export function App() {
         setForm(previousForm);
       }
     );
+  };
+  const openActiveSetupResetReview = () => {
+    if (!context) return;
+    const next = openActiveSetupReset(
+      activeSetupReset,
+      captureCurrentRewriteSetup(),
+      context.gameData
+    );
+    setActiveSetupReset(next);
+    setStatus(next.notice ?? "Active setup reset ready for review.");
+  };
+  const cancelActiveSetupResetReview = (candidateId: number) => {
+    const next = cancelActiveSetupReset(activeSetupReset, candidateId);
+    if (next === activeSetupReset) return;
+    setActiveSetupReset(next);
+    setStatus("Cancelled active setup reset.");
+    window.queueMicrotask(() => resetSetupButtonRef.current?.focus());
+  };
+  const confirmActiveSetupReset = (candidateId: number) => {
+    const consumed = consumeActiveSetupReset(
+      activeSetupReset,
+      candidateId,
+      captureCurrentRewriteSetup()
+    );
+    setActiveSetupReset(consumed.state);
+    if (consumed.outcome.status === "ignored") return;
+    if (consumed.outcome.status === "stale") {
+      setStatus(ACTIVE_SETUP_RESET_STALE_NOTICE);
+      window.queueMicrotask(() => resetSetupButtonRef.current?.focus());
+      return;
+    }
+
+    const previousSetup = consumed.outcome.candidate.source;
+    const persisted = persistAndApplyRewriteSetup(consumed.outcome.candidate.setup);
+    const appliedLabel = persisted
+      ? "Reset active setup to defaults."
+      : "Reset active setup for this session. Changes may not persist after reload.";
+    const restoreLabel = "Restored setup from before reset.";
+    setUndoableStatus(appliedLabel, restoreLabel, () => {
+      const restored = persistAndApplyRewriteSetup(previousSetup);
+      return restored
+        ? restoreLabel
+        : "Restored setup from before reset for this session. Changes may not persist after reload.";
+    });
   };
   const currentCannon = cannonByMonster[form.monsterId] ?? DEFAULT_CANNON_SETTINGS;
   const closeShareSetupDialog = () => {
@@ -2212,7 +2254,7 @@ export function App() {
     let persisted = true;
     try {
       saveManualPriceOverrides(storage, next);
-      if (localStorageAccessUnavailable) {
+      if (localPersistenceUnavailable) {
         persisted = false;
         localStateRecovery.markPersistenceUnavailable();
       } else {
@@ -2348,6 +2390,9 @@ export function App() {
   const setupImportReviewViewModel = setupFileTransfer.review
     ? buildSetupImportReviewViewModel(setupFileTransfer.review, captureCurrentRewriteSetup())
     : null;
+  const activeSetupResetViewState = activeSetupReset.candidate
+    ? invalidateStaleActiveSetupReset(activeSetupReset, captureCurrentRewriteSetup())
+    : activeSetupReset;
   const duelImportReviewViewModel = duelImportReview
     ? (() => {
         const preview = mergeDuelSnapshots(duelSnapshots, duelImportReview.data);
@@ -2391,6 +2436,7 @@ export function App() {
         onExportSetup={exportCurrentSetup}
         onShareSetup={openShareSetupDialog}
       />
+      {savedDataIgnoredForSession && <SafeSessionNotice />}
       {setupImportReviewViewModel && (
         <SetupImportReview
           viewModel={setupImportReviewViewModel}
@@ -2444,12 +2490,20 @@ export function App() {
         currentMonsterLabel={currentMonster?.name ?? form.monsterId}
         hasCurrentCustomSetup={hasCurrentCustomSetup}
         activeSetupIsCustom={activeSetupIsCustom}
+        resetSetupButtonRef={resetSetupButtonRef}
         monsterOptions={monsters}
         styleOptions={styles}
         spellOptions={spellSelectOptions}
         foodPerKill={viewModel.trip.trip.foodPerKill}
         priceNotices={viewModel.priceNotices}
         activeAssumptions={viewModel.activeAssumptions}
+        setupReview={
+          <ActiveSetupResetReview
+            state={activeSetupResetViewState}
+            onConfirm={confirmActiveSetupReset}
+            onCancel={cancelActiveSetupResetReview}
+          />
+        }
         actions={{
           activateTab: activateWorkbenchTab,
           selectCombatStyle,
@@ -2460,6 +2514,7 @@ export function App() {
           editDefaultSetup,
           editCustomSetup,
           removeCurrentCustomSetup,
+          resetActiveSetup: openActiveSetupResetReview,
           setSpell: setSpellSelection,
           setPrimaryPrayer: (prayer) =>
             setFormSafe((current) =>
@@ -2612,8 +2667,7 @@ export function App() {
           hidden={activeTab !== "risk"}
           model={{
             controls: riskAnalysis.controls,
-            runStatus: riskAnalysis.runStatus,
-            statusLabel: riskAnalysis.statusLabel,
+            presentation: riskAnalysis.presentation,
             targetDropOptions: riskAnalysis.targetDropOptions,
             display: riskAnalysis.display,
             expectedTtkSec: viewModel.result.rates.ttkSec,
@@ -2693,10 +2747,8 @@ export function App() {
             draftState: plannerState,
             panel: plannerPanel,
             gearPoolEditor: plannerGearPoolEditor,
-            error: plannerError,
-            pending: plannerPending,
             draftDirty: plannerDraftDirty,
-            status: plannerStatus,
+            presentation: plannerPresentation,
             computedMetric: plannerComputedMetric,
             combatStyleLabel: form.combatStyle,
             targetLabel: currentMonster?.name ?? form.monsterId,
@@ -2712,7 +2764,8 @@ export function App() {
             setAverageOverSession: updatePlannerAverageOverSession,
             setGearPoolItem: updatePlannerGearPoolItem,
             resetGearPool: resetPlannerGearPool,
-            recompute: recomputePlannerPlan
+            recompute: recomputePlannerPlan,
+            retry: retryPlanner
           }}
         />
         <EconomySettingsPane
@@ -2800,10 +2853,7 @@ export function App() {
             denseCompareRows,
             denseCompareScale,
             denseCompareTotalRows,
-            denseComparePending,
-            denseCompareFreshnessLabel,
-            denseCompareFreshnessSummary,
-            denseCompareFreshnessAria,
+            denseComparePresentation,
             selectedMonsterId: form.monsterId
           }}
           actions={{
@@ -2817,7 +2867,8 @@ export function App() {
                 sort: nextDenseCompareSortState(current.sort, key)
               })),
             selectTarget,
-            toggleDenseIrrelevant
+            toggleDenseIrrelevant,
+            retryDenseCompare
           }}
         />
       </WorkbenchShell>

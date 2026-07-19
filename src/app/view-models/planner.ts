@@ -41,8 +41,6 @@ import {
 } from "../state/ui-state";
 import { formatNumber } from "./formatting";
 
-export type PlannerStatus = "error" | "pending" | "running" | "empty" | "ready" | "idle";
-
 export interface PlannerDomainAdapterViewModel {
   input: PlannerInput;
   options: PlannerOptions;

@@ -6,7 +6,8 @@ import { loadBundledLegacyContext } from "../adapters/legacy-runtime";
 import type { RunningCalculationTask } from "../app/calculation-worker-client";
 import type { PlannerCalculationRequest } from "../app/calculation-task";
 import {
-  plannerStatusFor,
+  derivePlannerCalculationPresentation,
+  isPlannerSourceCurrent,
   usePlannerCalculation,
   type PlannerCalculationController,
   type UsePlannerCalculationInput
@@ -132,7 +133,7 @@ describe("Planner calculation controller", () => {
     expect(requests).toHaveLength(1);
     expect(requests[0]!.kind).toBe("planner");
     expect(controller!.pending).toBe(true);
-    expect(controller!.status).toBe("running");
+    expect(controller!.status).toBe("building");
 
     await act(async () => {
       root.render(
@@ -202,17 +203,18 @@ describe("Planner calculation controller", () => {
     await render({ ...initial, draftState: changedDraft });
     expect(requests).toHaveLength(1);
     expect(controller!.draftDirty).toBe(true);
-    expect(controller!.status).toBe("pending");
+    expect(controller!.status).toBe("stale");
     expect(controller!.panel).not.toBeNull();
 
     await act(async () => controller!.recompute());
     expect(requests).toHaveLength(2);
     expect(requests[1]!.plannerState.metric).toBe("dps");
-    expect(controller!.computedMetric).toBe("dps");
-    expect(controller!.panel).toBeNull();
-    expect(controller!.status).toBe("running");
+    expect(controller!.computedMetric).toBe("xph");
+    expect(controller!.panel).not.toBeNull();
+    expect(controller!.status).toBe("building");
     await act(async () => resolvers[1]!(panelFixture(true)));
-    expect(controller!.status).toBe("empty");
+    expect(controller!.status).toBe("ready");
+    expect(controller!.computedMetric).toBe("dps");
 
     const changedForm = {
       ...initial.form,
@@ -293,15 +295,139 @@ describe("Planner calculation controller", () => {
     expect(controller!.panel).not.toBeNull();
   });
 
-  it("keeps status precedence and the fixed Planner error contract", async () => {
-    expect(
-      plannerStatusFor({ error: "failed", draftDirty: true, pending: true, panel: panelFixture() })
-    ).toBe("error");
-    expect(
-      plannerStatusFor({ error: null, draftDirty: true, pending: true, panel: panelFixture() })
-    ).toBe("pending");
-
+  it("retries first and refresh failures while retaining the previous plan", async () => {
     const { context } = await loadBundledLegacyContext();
+    const requests: PlannerCalculationRequest[] = [];
+    const resolvers: Array<(panel: PlannerPanelViewModel) => void> = [];
+    const rejectors: Array<(reason: unknown) => void> = [];
+    const cancels: Array<ReturnType<typeof vi.fn>> = [];
+    const startTask = (request: PlannerCalculationRequest) => {
+      requests.push(request);
+      const cancel = vi.fn();
+      cancels.push(cancel);
+      return {
+        promise: new Promise<PlannerPanelViewModel>((resolve, reject) => {
+          resolvers.push(resolve);
+          rejectors.push(reject);
+        }),
+        cancel
+      } satisfies RunningCalculationTask<PlannerCalculationRequest>;
+    };
+    let controller: PlannerCalculationController | null = null;
+    const initial = plannerInput(context);
+    const render = async (input: UsePlannerCalculationInput) => {
+      await act(async () => {
+        root.render(
+          createElement(PlannerHarness, {
+            input,
+            startTask,
+            capture: (value) => {
+              controller = value;
+            }
+          })
+        );
+      });
+    };
+
+    await render(initial);
+    await act(async () => rejectors[0]!(new Error("private planner worker path")));
+    expect(controller!.presentation).toMatchObject({
+      status: "failed",
+      message: "Planner could not compute the current plan. Your inputs are unchanged.",
+      canRetry: true
+    });
+    expect(controller!.panel).toBeNull();
+    expect(JSON.stringify(controller!.presentation)).not.toContain("private planner worker path");
+
+    await act(async () => controller!.retry());
+    expect(requests).toHaveLength(2);
+    await act(async () => resolvers[1]!(panelFixture()));
+    expect(controller!.presentation.status).toBe("ready");
+    expect(controller!.panel).not.toBeNull();
+
+    const changedForm = { ...initial.form };
+    await render({ ...initial, form: changedForm });
+    expect(requests).toHaveLength(3);
+    expect(controller!.presentation).toMatchObject({
+      status: "building",
+      message: "Calculating the current plan. Showing the previous result."
+    });
+    await act(async () => rejectors[2]!(new Error("raw planner refresh failure")));
+    expect(controller!.presentation).toMatchObject({
+      status: "failed",
+      message: "Planner could not compute the current plan. Showing the previous result."
+    });
+    expect(controller!.panel).not.toBeNull();
+
+    await act(async () => controller!.retry());
+    expect(requests).toHaveLength(4);
+    await act(async () => resolvers[3]!(panelFixture(true)));
+    expect(controller!.presentation).toMatchObject({ status: "ready", displayIsCurrent: true });
+
+    const lateForm = { ...changedForm };
+    await render({ ...initial, form: lateForm });
+    expect(requests).toHaveLength(5);
+    const latestForm = { ...lateForm };
+    await render({ ...initial, form: latestForm });
+    expect(cancels[4]).toHaveBeenCalledOnce();
+    expect(requests).toHaveLength(6);
+    await act(async () => resolvers[4]!(panelFixture()));
+    expect(controller!.presentation.status).toBe("building");
+    await act(async () => resolvers[5]!(panelFixture()));
+    expect(controller!.presentation.status).toBe("ready");
+
+    const lateFailureForm = { ...latestForm };
+    await render({ ...initial, form: lateFailureForm });
+    expect(requests).toHaveLength(7);
+    const finalForm = { ...lateFailureForm };
+    await render({ ...initial, form: finalForm });
+    expect(cancels[6]).toHaveBeenCalledOnce();
+    expect(requests).toHaveLength(8);
+    await act(async () => rejectors[6]!(new Error("late obsolete planner failure")));
+    expect(controller!.presentation.status).toBe("building");
+    await act(async () => resolvers[7]!(panelFixture()));
+    expect(controller!.presentation.status).toBe("ready");
+  });
+
+  it("keeps status precedence and the fixed Planner error contract", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const plannerState = createDefaultPlannerUiState(DEFAULT_FORM_STATE);
+    const source = {
+      form: DEFAULT_FORM_STATE,
+      context,
+      lootSettingsByMonster: {},
+      plannerState
+    };
+    const failure = {
+      source,
+      message: "Planner could not compute the current plan. Your inputs are unchanged." as const
+    };
+    expect(isPlannerSourceCurrent(source, source)).toBe(true);
+    expect(isPlannerSourceCurrent(source, { ...source, form: { ...source.form } })).toBe(false);
+    expect(
+      derivePlannerCalculationPresentation({
+        active: true,
+        source,
+        lastSuccessfulBuild: { panel: panelFixture(), source },
+        failure,
+        pendingSource: source,
+        draftDirty: true
+      }).status
+    ).toBe("building");
+    expect(
+      derivePlannerCalculationPresentation({
+        active: true,
+        source,
+        lastSuccessfulBuild: { panel: panelFixture(), source },
+        failure,
+        pendingSource: null,
+        draftDirty: true
+      })
+    ).toMatchObject({
+      status: "failed",
+      message: "Planner could not compute the current plan. Showing the previous result."
+    });
+
     const startTask = () =>
       ({
         promise: Promise.reject(new Error("worker detail must not leak")),
@@ -320,7 +446,10 @@ describe("Planner calculation controller", () => {
         })
       );
     });
-    expect(controller!.status).toBe("error");
-    expect(controller!.error).toBe("Planner could not compute the current plan");
+    expect(controller!.status).toBe("failed");
+    expect(controller!.error).toBe(
+      "Planner could not compute the current plan. Your inputs are unchanged."
+    );
+    expect(controller!.presentation.canRetry).toBe(true);
   });
 });

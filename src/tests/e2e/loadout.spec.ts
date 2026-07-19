@@ -1,4 +1,5 @@
 import {
+  GENERATED_BROWSER_FIXTURE_CONTEXT,
   chooseSearchableOption,
   expect,
   expectAppStatus,
@@ -8,6 +9,211 @@ import {
   selectCombatType,
   test
 } from "./scaffold-fixture";
+import type { Page } from "@playwright/test";
+import {
+  HISCORES_LAST_PLAYER_STORAGE_KEY,
+  HISCORES_LAST_PLAYER_STORAGE_VERSION
+} from "../../adapters/hiscores";
+import { DEFAULT_DENSE_COMPARE_STATE } from "../../app/state/dense-compare";
+import { DUEL_SNAPSHOTS_STORAGE_KEY, DUEL_SNAPSHOTS_VERSION } from "../../app/state/duel-snapshots";
+import {
+  HIDDEN_GEAR_TIERS_STORAGE_KEY,
+  HIDDEN_GEAR_TIERS_VERSION
+} from "../../app/state/hidden-gear-tiers";
+import { LOOT_PREFS_STORAGE_KEY, LOOT_PREFS_VERSION } from "../../app/state/loot-prefs";
+import { LOOT_SETTINGS_STORAGE_KEY, LOOT_SETTINGS_VERSION } from "../../app/state/loot-settings";
+import {
+  MANUAL_PRICE_OVERRIDES_STORAGE_KEY,
+  MANUAL_PRICE_OVERRIDES_VERSION
+} from "../../app/state/manual-price-overrides";
+import { PRICE_HISTORY_STORAGE_KEY, PRICE_HISTORY_VERSION } from "../../app/state/price-history";
+import {
+  SELECTED_PRICE_SET_STORAGE_KEY,
+  SELECTED_PRICE_SET_VERSION
+} from "../../app/state/selected-price-set";
+import {
+  DEFAULT_FORM_STATE,
+  REWRITE_SETUP_STORAGE_KEY,
+  REWRITE_SETUP_VERSION,
+  normalizeFormState,
+  savedSetupFromForm,
+  setCustomSetupForMonster,
+  switchCombatStyleLoadout
+} from "../../app/state/ui-state";
+
+const RESET_PROTECTED_STORAGE_KEYS = [
+  DUEL_SNAPSHOTS_STORAGE_KEY,
+  LOOT_PREFS_STORAGE_KEY,
+  LOOT_SETTINGS_STORAGE_KEY,
+  HIDDEN_GEAR_TIERS_STORAGE_KEY,
+  SELECTED_PRICE_SET_STORAGE_KEY,
+  MANUAL_PRICE_OVERRIDES_STORAGE_KEY,
+  PRICE_HISTORY_STORAGE_KEY,
+  HISCORES_LAST_PLAYER_STORAGE_KEY
+] as const;
+
+const resetFixtureRanged = switchCombatStyleLoadout(DEFAULT_FORM_STATE, "ranged");
+const resetFixtureForm = normalizeFormState({
+  ...resetFixtureRanged,
+  monsterId: "rock_crab",
+  weaponId: "yew_longbow",
+  ammoId: "addy_arrow",
+  styleId: "longrange",
+  levels: {
+    attack: 74,
+    strength: 75,
+    defence: 76,
+    hitpoints: 77,
+    ranged: 78,
+    magic: 79,
+    prayer: 80
+  },
+  perStyleLoadouts: {
+    ...resetFixtureRanged.perStyleLoadouts,
+    melee: {
+      ...resetFixtureRanged.perStyleLoadouts.melee,
+      weaponId: "dragon_halberd",
+      gear: {
+        ...resetFixtureRanged.perStyleLoadouts.melee.gear,
+        shield: "none"
+      },
+      prayers: ["clarity"],
+      boosts: ["super_def"]
+    },
+    ranged: {
+      ...resetFixtureRanged.perStyleLoadouts.ranged,
+      weaponId: "yew_longbow",
+      ammoId: "addy_arrow",
+      styleId: "longrange"
+    },
+    magic: {
+      ...resetFixtureRanged.perStyleLoadouts.magic,
+      spellId: "fire_wave",
+      boosts: ["magic"]
+    }
+  },
+  ringOfWealth: true,
+  trip: {
+    ...resetFixtureRanged.trip,
+    foodKey: "swordfish",
+    teleport: false,
+    bankSeconds: 45
+  },
+  plannerTargets: { attack: 90, strength: 91, defence: 92, ranged: 93, magic: 94 }
+});
+const resetFixtureUnrelatedCustom = normalizeFormState({
+  ...DEFAULT_FORM_STATE,
+  monsterId: "giant",
+  levels: { ...DEFAULT_FORM_STATE.levels, attack: 67 }
+});
+const RESET_FIXTURE_SETUP = savedSetupFromForm(
+  resetFixtureForm,
+  {
+    ...DEFAULT_DENSE_COMPARE_STATE,
+    monsterFilter: "dragon",
+    dropFilter: "bones"
+  },
+  { rock_crab: { enabled: true, targets: 3, respawnSec: 18 } },
+  setCustomSetupForMonster({}, resetFixtureUnrelatedCustom),
+  resetFixtureForm,
+  "default"
+);
+const RESET_PROTECTED_STORAGE_VALUES = {
+  [DUEL_SNAPSHOTS_STORAGE_KEY]: {
+    version: DUEL_SNAPSHOTS_VERSION,
+    savedAt: "2026-07-19T12:00:00.000Z",
+    data: {
+      snapshots: [
+        {
+          id: "reset-protected-duel",
+          name: "Protected reset fixture",
+          form: resetFixtureUnrelatedCustom
+        }
+      ]
+    }
+  },
+  [LOOT_PREFS_STORAGE_KEY]: {
+    version: LOOT_PREFS_VERSION,
+    savedAt: "2026-07-19T12:00:00.000Z",
+    data: { green_dragon: { key_dragon_bones_0: "skip" } }
+  },
+  [LOOT_SETTINGS_STORAGE_KEY]: {
+    version: LOOT_SETTINGS_VERSION,
+    savedAt: "2026-07-19T12:00:00.000Z",
+    data: {
+      rock_crab: { highAlch: true, overheadSec: 12, talismanSpot: "overground" }
+    }
+  },
+  [HIDDEN_GEAR_TIERS_STORAGE_KEY]: {
+    version: HIDDEN_GEAR_TIERS_VERSION,
+    savedAt: "2026-07-19T12:00:00.000Z",
+    data: { bronze: true }
+  },
+  [SELECTED_PRICE_SET_STORAGE_KEY]: {
+    version: SELECTED_PRICE_SET_VERSION,
+    savedAt: "2026-07-19T12:00:00.000Z",
+    data: {
+      priceSet: GENERATED_BROWSER_FIXTURE_CONTEXT.priceSet,
+      selectedAt: "2026-07-19T12:00:00.000Z"
+    }
+  },
+  [MANUAL_PRICE_OVERRIDES_STORAGE_KEY]: {
+    version: MANUAL_PRICE_OVERRIDES_VERSION,
+    savedAt: "2026-07-19T12:00:00.000Z",
+    data: { items: { bones: { price: 123, updatedAt: "2026-07-19T12:00:00.000Z" } } }
+  },
+  [PRICE_HISTORY_STORAGE_KEY]: {
+    version: PRICE_HISTORY_VERSION,
+    savedAt: "2026-07-19T12:00:00.000Z",
+    data: { snapshots: [] }
+  },
+  [HISCORES_LAST_PLAYER_STORAGE_KEY]: {
+    version: HISCORES_LAST_PLAYER_STORAGE_VERSION,
+    savedAt: "2026-07-19T12:00:00.000Z",
+    data: { player: "Reset Tester" }
+  }
+};
+
+async function openResetFixture(page: Page): Promise<void> {
+  await page.goto("/prices.json");
+  await page.evaluate(
+    ({ key, version, setup, protectedValues }) => {
+      window.localStorage.setItem(
+        key,
+        JSON.stringify({ version, savedAt: "2026-07-19T12:00:00.000Z", data: setup })
+      );
+      for (const [protectedKey, value] of Object.entries(protectedValues)) {
+        window.localStorage.setItem(protectedKey, JSON.stringify(value));
+      }
+    },
+    {
+      key: REWRITE_SETUP_STORAGE_KEY,
+      version: REWRITE_SETUP_VERSION,
+      setup: RESET_FIXTURE_SETUP,
+      protectedValues: RESET_PROTECTED_STORAGE_VALUES
+    }
+  );
+  await page.goto("/");
+  await expect(page.locator('[data-app-startup-state="ready"]')).toBeVisible();
+  await expect(page.getByLabel("TARGET", { exact: true })).toHaveValue("rock_crab");
+  await expect(page.getByLabel("TYPE", { exact: true })).toHaveText("ranged");
+  await page.waitForFunction(() => window.localStorage.getItem("index-sim:planner-ui") !== null);
+}
+
+async function protectedStorageSnapshot(page: Page): Promise<Record<string, string | null>> {
+  return page.evaluate(
+    (keys) =>
+      Object.fromEntries(
+        keys.map((key) => {
+          const raw = window.localStorage.getItem(key);
+          if (!raw) return [key, null];
+          const parsed = JSON.parse(raw);
+          return [key, JSON.stringify(parsed.data)];
+        })
+      ),
+    RESET_PROTECTED_STORAGE_KEYS
+  );
+}
 
 test("updates results when the combat style changes", async ({ page }) => {
   await page.goto("/");
@@ -70,6 +276,170 @@ test("restores per-combat-style loadout edits when switching styles", async ({ p
       saved.data?.form?.perStyleLoadouts?.ranged?.boosts?.[0] === "ranging"
     );
   });
+});
+
+test("Reset active setup reviews, cancels and durably restores canonical defaults", async ({
+  page
+}) => {
+  test.setTimeout(90_000);
+  await openResetFixture(page);
+  const setupActions = page.getByLabel("Setup actions");
+  const resetButton = setupActions.getByRole("button", { name: "Reset active setup" });
+  const setupBefore = await page.evaluate(() =>
+    window.localStorage.getItem("index-sim:rewrite-setup")
+  );
+  const plannerBefore = await page.evaluate(() => {
+    const raw = window.localStorage.getItem("index-sim:planner-ui");
+    return raw ? JSON.stringify(JSON.parse(raw).data) : null;
+  });
+  const protectedBefore = await protectedStorageSnapshot(page);
+
+  await resetButton.click();
+  const review = page.getByLabel("Reset active setup review");
+  await expect(review).toBeVisible();
+  await expect(review).toContainText("Rock Crab");
+  await expect(review).toContainText("Ranged remains selected");
+  await expect(review).toContainText("Default");
+  await expect(review).toContainText("Melee, Ranged and Magic");
+  await expect(review).toContainText("Player levels");
+  await expect(review).toContainText("Loadouts and equipment");
+  await expect(review).toContainText("Trip and supplies");
+  await expect(review).toContainText("Planner targets");
+  expect(await page.evaluate(() => window.localStorage.getItem("index-sim:rewrite-setup"))).toBe(
+    setupBefore
+  );
+
+  await review.getByRole("button", { name: "Cancel" }).click();
+  await expect(review).toHaveCount(0);
+  await expect(resetButton).toBeFocused();
+  expect(await page.evaluate(() => window.localStorage.getItem("index-sim:rewrite-setup"))).toBe(
+    setupBefore
+  );
+
+  await resetButton.click();
+  await page
+    .getByLabel("Reset active setup review")
+    .getByRole("button", { name: "Reset active setup" })
+    .click();
+  const undo = page.getByLabel("Local state undo");
+  await expect(undo).toContainText("Reset active setup to defaults.");
+  await expect(page.getByLabel("TARGET", { exact: true })).toHaveValue("rock_crab");
+  await expect(page.getByLabel("TYPE", { exact: true })).toHaveText("ranged");
+  await page.waitForFunction(() => {
+    const raw = window.localStorage.getItem("index-sim:rewrite-setup");
+    if (!raw) return false;
+    const setup = JSON.parse(raw).data;
+    return (
+      setup.form?.monsterId === "rock_crab" &&
+      setup.form?.combatStyle === "ranged" &&
+      setup.form?.levels?.ranged === 50 &&
+      setup.form?.perStyleLoadouts?.melee?.weaponId === "rune_scimitar" &&
+      setup.form?.perStyleLoadouts?.ranged?.weaponId === "magic_shortbow" &&
+      setup.form?.perStyleLoadouts?.magic?.spellId === "fire_bolt" &&
+      setup.form?.plannerTargets?.ranged === 50 &&
+      setup.customSetupsByMonster?.giant?.levels?.attack === 67 &&
+      setup.denseCompare?.monsterFilter === "dragon" &&
+      setup.cannonByMonster?.rock_crab?.targets === 3
+    );
+  });
+  expect(
+    await page.evaluate(() => {
+      const raw = window.localStorage.getItem("index-sim:planner-ui");
+      return raw ? JSON.stringify(JSON.parse(raw).data) : null;
+    })
+  ).toBe(plannerBefore);
+  expect(await protectedStorageSnapshot(page)).toEqual(protectedBefore);
+
+  await page.reload();
+  await expect(page.locator('[data-app-startup-state="ready"]')).toBeVisible();
+  await expect(page.getByLabel("TARGET", { exact: true })).toHaveValue("rock_crab");
+  await expect(page.getByLabel("TYPE", { exact: true })).toHaveText("ranged");
+  expect(await protectedStorageSnapshot(page)).toEqual(protectedBefore);
+
+  await page
+    .getByLabel("Setup actions")
+    .getByRole("button", { name: "Reset active setup" })
+    .click();
+  const noOp = page.getByLabel("Reset active setup review");
+  await expect(noOp).toContainText("Active setup already matches the defaults.");
+  await expect(noOp.getByRole("button", { name: "Reset active setup" })).toHaveCount(0);
+});
+
+test("Reset active setup Undo restores the complete prior setup and durable reload", async ({
+  page
+}) => {
+  test.setTimeout(90_000);
+  await openResetFixture(page);
+  const protectedBefore = await protectedStorageSnapshot(page);
+  const setupActions = page.getByLabel("Setup actions");
+
+  await setupActions.getByRole("button", { name: "Reset active setup" }).click();
+  await page
+    .getByLabel("Reset active setup review")
+    .getByRole("button", { name: "Reset active setup" })
+    .click();
+  const undo = page.getByLabel("Local state undo");
+  await undo.getByRole("button", { name: "Undo" }).click();
+  await expectAppStatus(page, "Restored setup from before reset.");
+  await page.waitForFunction((expected) => {
+    const raw = window.localStorage.getItem("index-sim:rewrite-setup");
+    return raw ? JSON.stringify(JSON.parse(raw).data) === JSON.stringify(expected) : false;
+  }, RESET_FIXTURE_SETUP);
+  await expect(page.getByLabel("TARGET", { exact: true })).toHaveValue("rock_crab");
+  await expect(page.getByLabel("TYPE", { exact: true })).toHaveText("ranged");
+  expect(await protectedStorageSnapshot(page)).toEqual(protectedBefore);
+
+  await page.reload();
+  await expect(page.getByLabel("TARGET", { exact: true })).toHaveValue("rock_crab");
+  await expect(page.getByLabel("TYPE", { exact: true })).toHaveText("ranged");
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Ranged setup" }).click();
+  await expectSearchableSelection(page.getByLabel("Equipment loadout"), "Weapon", "yew_longbow");
+  expect(await protectedStorageSnapshot(page)).toEqual(protectedBefore);
+});
+
+test("Reset active setup applies and undoes truthfully in a session-only safe tab", async ({
+  page
+}) => {
+  test.setTimeout(90_000);
+  await openResetFixture(page);
+  const durableSetup = await page.evaluate(() =>
+    window.localStorage.getItem("index-sim:rewrite-setup")
+  );
+  await page.evaluate(() => window.sessionStorage.setItem("index-sim:saved-data-ignored", "1"));
+  await page.reload();
+  await expect(page.getByRole("status", { name: "Session-only safe mode" })).toBeVisible();
+
+  const playerSetup = page.getByLabel("Player setup");
+  await playerSetup.getByLabel("ATT", { exact: true }).fill("88");
+  await playerSetup.getByLabel("ATT", { exact: true }).press("Enter");
+  await expect(playerSetup.getByLabel("ATT", { exact: true })).toHaveValue("88");
+  await page
+    .getByLabel("Setup actions")
+    .getByRole("button", { name: "Reset active setup" })
+    .click();
+  await page
+    .getByLabel("Reset active setup review")
+    .getByRole("button", { name: "Reset active setup" })
+    .click();
+
+  const undo = page.getByLabel("Local state undo");
+  await expect(undo).toContainText(
+    "Reset active setup for this session. Changes may not persist after reload."
+  );
+  await expect(playerSetup.getByLabel("ATT", { exact: true })).toHaveValue("60");
+  expect(await page.evaluate(() => window.localStorage.getItem("index-sim:rewrite-setup"))).toBe(
+    durableSetup
+  );
+
+  await undo.getByRole("button", { name: "Undo" }).click();
+  await expectAppStatus(
+    page,
+    "Restored setup from before reset for this session. Changes may not persist after reload."
+  );
+  await expect(playerSetup.getByLabel("ATT", { exact: true })).toHaveValue("88");
+  expect(await page.evaluate(() => window.localStorage.getItem("index-sim:rewrite-setup"))).toBe(
+    durableSetup
+  );
 });
 
 test("supports multi-prayer and multi-boost workbench controls with compact primary edits", async ({

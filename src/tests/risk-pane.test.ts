@@ -56,8 +56,13 @@ function model(overrides: Partial<RiskPaneModel> = {}): RiskPaneModel {
   };
   return {
     controls,
-    runStatus: "ready",
-    statusLabel: "Ready",
+    presentation: {
+      status: "ready",
+      displayIsCurrent: true,
+      message: "",
+      canRun: true,
+      runActionLabel: "Run analysis"
+    },
     targetDropOptions: [
       { id: "", label: "No target drop" },
       { id: "fixture-drop", label: "Fixture drop" }
@@ -123,13 +128,24 @@ describe("Risk pane", () => {
     const markup = renderToStaticMarkup(
       createElement(RiskPane, {
         hidden: false,
-        model: model({ runStatus: "running", statusLabel: "Running", display: null }),
+        model: model({
+          presentation: {
+            status: "building",
+            displayIsCurrent: false,
+            message: "Running the analysis for current inputs.",
+            canRun: false,
+            runActionLabel: "Running…"
+          },
+          display: null
+        }),
         actions
       })
     );
 
-    expect(markup).toContain('<span class="status-pill pending" aria-live="polite">Running</span>');
-    expect(markup).toContain('<button type="button" disabled="">Run analysis</button>');
+    expect(markup).toContain(
+      '<span class="status-pill pending" aria-live="polite">Building</span>'
+    );
+    expect(markup).toContain('<button type="button" disabled="">Running…</button>');
     expect(markup).toContain('<button type="button">Cancel</button>');
     expect(markup).toContain(
       "Run the analysis to model kill time, food sufficiency, trip length, timed net GP and target probabilities."
@@ -148,7 +164,14 @@ describe("Risk pane", () => {
         hidden: false,
         model: model({
           controls: { ...capturedControls, targetKills: 75, horizonMinutes: 90 },
-          statusLabel: "Stale",
+          presentation: {
+            status: "stale",
+            displayIsCurrent: false,
+            message:
+              "Inputs changed. These results do not include the current setup, prices, loot policy or analysis controls.",
+            canRun: true,
+            runActionLabel: "Run analysis"
+          },
           display: { result: resultFixture(), controls: capturedControls, fresh: false }
         }),
         actions
@@ -156,11 +179,36 @@ describe("Risk pane", () => {
     );
 
     expect(markup).toContain(
-      "Results are stale because the setup, prices, loot policy or analysis controls changed. Run again to refresh them."
+      "Inputs changed. These results do not include the current setup, prices, loot policy or analysis controls."
     );
     expect(markup).toContain("Before 50 kills; not death chance");
     expect(markup).toContain("60m net GP");
     expect(markup).not.toContain("90m net GP");
+  });
+
+  it("shows a fixed failed state, Retry and a labelled previous result", () => {
+    const controls = model().controls;
+    const markup = renderToStaticMarkup(
+      createElement(RiskPane, {
+        hidden: false,
+        model: model({
+          presentation: {
+            status: "failed",
+            displayIsCurrent: false,
+            message: "Risk analysis could not be completed. Showing the previous result.",
+            canRun: true,
+            runActionLabel: "Retry analysis"
+          },
+          display: { result: resultFixture(), controls, fresh: false }
+        }),
+        actions
+      })
+    );
+
+    expect(markup).toContain('role="alert"');
+    expect(markup).toContain("Risk analysis could not be completed. Showing the previous result.");
+    expect(markup).toContain("Retry analysis");
+    expect(markup).toContain('aria-label="Modeled risk results"');
   });
 
   it("keeps unbounded and unavailable result formatting", () => {

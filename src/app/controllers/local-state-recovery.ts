@@ -45,6 +45,8 @@ export interface LocalStateRecoverySnapshot {
 export interface LocalStateRecoveryDependencies {
   storage: KeyValueStorage;
   storageUnavailable: boolean;
+  persistenceUnavailable?: boolean;
+  persistenceNotice?: string;
   onStatus: (message: string) => void;
   onDownload: (fileName: string, value: LocalStateHealthExport) => void;
   now?: () => Date;
@@ -171,7 +173,7 @@ export class LocalStateRecoveryControllerCore {
       storageUnavailable: dependencies.storageUnavailable
     });
     this.transition = initialLocalStateRecoveryTransition(report);
-    const notice = dependencies.storageUnavailable ? LOCAL_STATE_PERSISTENCE_NOTICE : null;
+    const notice = this.persistenceIsUnavailable() ? this.persistenceNotice() : null;
     this.snapshot = {
       report,
       notice,
@@ -179,6 +181,16 @@ export class LocalStateRecoveryControllerCore {
       blockedIds: this.transition.blockedIds,
       visible: report.hasAttention || notice != null
     };
+  }
+
+  private persistenceIsUnavailable(): boolean {
+    return (
+      this.dependencies.storageUnavailable || this.dependencies.persistenceUnavailable === true
+    );
+  }
+
+  private persistenceNotice(): string {
+    return this.dependencies.persistenceNotice ?? LOCAL_STATE_PERSISTENCE_NOTICE;
   }
 
   subscribe = (listener: () => void): (() => void) => {
@@ -225,7 +237,7 @@ export class LocalStateRecoveryControllerCore {
   ): boolean => {
     const result = trySavePersisted(options, value);
     if (result.status === "saved") {
-      if (this.dependencies.storageUnavailable) {
+      if (this.persistenceIsUnavailable()) {
         this.markPersistenceUnavailable();
         return false;
       }
@@ -247,8 +259,8 @@ export class LocalStateRecoveryControllerCore {
         reason
       })
     };
-    this.snapshot = { ...this.snapshot, notice: LOCAL_STATE_PERSISTENCE_NOTICE };
-    this.dependencies.onStatus(LOCAL_STATE_PERSISTENCE_NOTICE);
+    this.snapshot = { ...this.snapshot, notice: this.persistenceNotice() };
+    this.dependencies.onStatus(this.persistenceNotice());
     this.refresh();
   };
 
@@ -261,8 +273,10 @@ export class LocalStateRecoveryControllerCore {
   };
 
   markPersistenceUnavailable = (): void => {
-    this.snapshot = { ...this.snapshot, notice: LOCAL_STATE_PERSISTENCE_NOTICE };
-    this.dependencies.onStatus(LOCAL_STATE_PERSISTENCE_NOTICE);
+    const notice = this.persistenceNotice();
+    const shouldAnnounce = this.snapshot.notice !== notice;
+    this.snapshot = { ...this.snapshot, notice };
+    if (shouldAnnounce) this.dependencies.onStatus(notice);
     this.refresh();
   };
 

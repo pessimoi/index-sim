@@ -1,6 +1,7 @@
 import { parsePriceSetFileText } from "../adapters/market";
 import { createGeneratedRuntimeContext } from "../adapters/generated";
 import { createMemoryStorage, loadPersisted, savePersisted } from "../adapters/storage";
+import { createActiveSetupResetCandidate } from "../app/state/active-setup-reset";
 import {
   DEFAULT_DENSE_COMPARE_STATE,
   DEFAULT_DENSE_COMPARE_SORT_STATE,
@@ -188,6 +189,59 @@ describe("versioned rewrite persistence", () => {
     });
     expect(loaded.status).toBe("loaded");
     expect(loaded.value).toEqual(setup);
+  });
+
+  it("persists one complete active-reset candidate and one complete Undo without other writes", () => {
+    const storage = createMemoryStorage({
+      "protected:duel": "duel-bytes",
+      "protected:prices": "price-bytes"
+    });
+    const { context } = createGeneratedRuntimeContext();
+    const edited = normalizeFormState({
+      ...switchCombatStyleLoadout(DEFAULT_FORM_STATE, "magic"),
+      monsterId: "rock_crab",
+      levels: { ...DEFAULT_FORM_STATE.levels, magic: 88 },
+      spellId: "fire_wave",
+      perStyleLoadouts: {
+        ...DEFAULT_FORM_STATE.perStyleLoadouts,
+        magic: {
+          ...DEFAULT_FORM_STATE.perStyleLoadouts.magic,
+          spellId: "fire_wave"
+        }
+      }
+    });
+    const custom = setCustomSetupForMonster(
+      setCustomSetupForMonster({}, { ...DEFAULT_FORM_STATE, monsterId: "giant" }),
+      edited
+    );
+    const source = savedSetupFromForm(
+      edited,
+      { ...DEFAULT_DENSE_COMPARE_STATE, monsterFilter: "dragon" },
+      { rock_crab: { enabled: true, targets: 2, respawnSec: null } },
+      custom,
+      DEFAULT_FORM_STATE,
+      "custom"
+    );
+    const candidate = createActiveSetupResetCandidate(1, source, context.gameData);
+    const options = {
+      key: REWRITE_SETUP_STORAGE_KEY,
+      version: REWRITE_SETUP_VERSION,
+      schema: SavedSetupSchema,
+      storage,
+      now: () => new Date("2026-07-19T12:00:00.000Z")
+    };
+
+    savePersisted(options, candidate.setup);
+    const reset = loadPersisted(options);
+    expect(reset).toMatchObject({ status: "loaded", value: candidate.setup });
+    expect(storage.getItem("protected:duel")).toBe("duel-bytes");
+    expect(storage.getItem("protected:prices")).toBe("price-bytes");
+
+    savePersisted(options, candidate.source);
+    const undone = loadPersisted(options);
+    expect(undone).toMatchObject({ status: "loaded", value: candidate.source });
+    expect(storage.getItem("protected:duel")).toBe("duel-bytes");
+    expect(storage.getItem("protected:prices")).toBe("price-bytes");
   });
 
   it("saves and loads versioned duel snapshots separately from rewrite setup state", () => {

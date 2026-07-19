@@ -76,6 +76,27 @@ function reportItem(
 }
 
 describe("local state recovery controller", () => {
+  it("keeps session-only persistence separate from storage read health", () => {
+    const storage = createMemoryStorage();
+    const sessionNotice = "Saved data is ignored for this session.";
+    const { controller: recovery, statuses } = controller(storage, {
+      persistenceUnavailable: true,
+      persistenceNotice: sessionNotice
+    });
+    const options = {
+      key: PLANNER_UI_STORAGE_KEY,
+      version: PLANNER_UI_VERSION,
+      schema: PlannerUiStateSchema,
+      storage
+    };
+
+    expect(recovery.getSnapshot().report.attentionCount).toBe(0);
+    expect(recovery.getSnapshot().notice).toBe(sessionNotice);
+    expect(recovery.persist("planner-ui", options, PlannerUiStateSchema.parse({}))).toBe(false);
+    expect(storage.getItem(PLANNER_UI_STORAGE_KEY)).not.toBeNull();
+    expect(statuses).toEqual([]);
+  });
+
   it("blocks initial invalid and version-mismatched state", () => {
     const storage = createMemoryStorage({
       [HIDDEN_GEAR_TIERS_STORAGE_KEY]: "{",

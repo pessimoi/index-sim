@@ -542,6 +542,7 @@ test("switches the target through MonsterCard and keeps shell state in sync", as
 
 test("updates MonsterCard active defence for melee stance, ranged and magic", async ({ page }) => {
   await page.goto("/");
+  await expect(page.locator('[data-app-startup-state="ready"]')).toBeVisible();
   const card = page.getByLabel("Monster card");
 
   await expect(activeMonsterDefence(card)).toContainText("Slash defence");

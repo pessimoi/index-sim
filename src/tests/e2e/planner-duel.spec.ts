@@ -22,7 +22,7 @@ test("recomputes the Planner tab workflow from visible planner controls", async 
   await expect(planner.getByRole("table", { name: "Planner training order" })).toBeVisible();
 
   await planner.getByLabel("Avg over session").uncheck();
-  await expect(planner.getByText("pending")).toBeVisible();
+  await expect(planner.getByText("stale", { exact: true })).toBeVisible();
   await planner.getByLabel("Avg over session").check();
   await planner.getByLabel("Only current gear").check();
   await planner.getByLabel("Only current gear").uncheck();
@@ -31,7 +31,7 @@ test("recomputes the Planner tab workflow from visible planner controls", async 
   await planner.getByLabel("Strength current XP").fill("274000");
   await planner.getByLabel("Strength target").fill("63");
   await planner.getByLabel("Lock Attack").check();
-  await expect(planner.getByText("pending")).toBeVisible();
+  await expect(planner.getByText("stale", { exact: true })).toBeVisible();
 
   await planner.getByRole("button", { name: "Recompute plan" }).click();
   await expect(planner.getByText("ready")).toBeVisible();
@@ -78,7 +78,9 @@ test("keeps Planner Auto XP and effective targets aligned with live levels", asy
   const attackFloor = Number((await attackXp.getAttribute("placeholder"))?.replace("Auto: ", ""));
   await attackXp.fill(String(attackFloor + 10));
   await attackTarget.fill("65");
-  await expect(planner).toContainText("Current output uses the last recomputed inputs.");
+  await expect(planner).toContainText(
+    "Planner inputs changed. This plan uses the last recomputed inputs."
+  );
 
   await player.getByLabel("ATT", { exact: true }).fill("66");
   await expect(attackXp).toHaveValue("");
@@ -111,7 +113,9 @@ test("keeps Planner Auto XP and effective targets aligned with live levels", asy
   await expect(attackXp).toHaveValue("");
   await planner.getByRole("button", { name: "Recompute plan" }).click();
   await expect(planner.getByText("ready")).toBeVisible({ timeout: 30_000 });
-  await expect(planner).not.toContainText("Current output uses the last recomputed inputs.");
+  await expect(planner).not.toContainText(
+    "Planner inputs changed. This plan uses the last recomputed inputs."
+  );
 
   await tabs.getByRole("tab", { name: "Setups" }).click();
   await setups.getByRole("button", { name: "Load", exact: true }).click();

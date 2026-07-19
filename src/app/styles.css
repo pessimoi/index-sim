@@ -445,6 +445,186 @@ th {
   border-color: #42b993;
 }
 
+.setup-review-slot {
+  min-height: 0;
+  min-width: 0;
+}
+
+.active-setup-reset-review {
+  background: #171f24;
+  border: 1px solid #3b7868;
+  border-radius: 6px;
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 0.65rem;
+  max-height: min(38vh, 24rem);
+  min-width: 0;
+  overflow: auto;
+  padding: 0.75rem;
+  scrollbar-gutter: stable;
+}
+
+.active-setup-reset-review.notice {
+  max-height: none;
+}
+
+.active-setup-reset-review.notice h2,
+.active-setup-reset-review.notice p,
+.active-setup-reset-heading h2,
+.active-setup-reset-protected,
+.active-setup-reset-planner-note {
+  margin: 0;
+}
+
+.active-setup-reset-review.notice h2,
+.active-setup-reset-heading h2 {
+  color: #eef2f7;
+  font-size: 0.9rem;
+}
+
+.active-setup-reset-review.notice p,
+.active-setup-reset-protected,
+.active-setup-reset-planner-note {
+  color: #c5d0dd;
+  font-size: 0.76rem;
+  overflow-wrap: anywhere;
+}
+
+.active-setup-reset-heading {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  justify-content: space-between;
+}
+
+.active-setup-reset-context {
+  display: grid;
+  gap: 0.4rem;
+  grid-template-columns: repeat(4, minmax(9rem, 1fr));
+  margin: 0;
+}
+
+.active-setup-reset-context div {
+  background: #141a20;
+  border: 1px solid #2a3544;
+  border-radius: 4px;
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+  padding: 0.45rem 0.55rem;
+}
+
+.active-setup-reset-context dt {
+  color: #8f9cac;
+  font-size: 0.66rem;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.active-setup-reset-context dd {
+  color: #eef2f7;
+  font-size: 0.78rem;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.active-setup-reset-groups {
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-width: 0;
+}
+
+.active-setup-reset-group {
+  background: #11171d;
+  border: 1px solid #2a3544;
+  border-radius: 5px;
+  display: grid;
+  gap: 0.4rem;
+  min-width: 0;
+  padding: 0.55rem;
+}
+
+.active-setup-reset-group h3 {
+  align-items: baseline;
+  color: #eef2f7;
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+  gap: 0.35rem;
+  justify-content: space-between;
+  margin: 0;
+}
+
+.active-setup-reset-group h3 span:last-child {
+  color: #93e8c8;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+}
+
+.active-setup-reset-subgroup {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.active-setup-reset-subgroup h4 {
+  color: #aeb9c8;
+  font-size: 0.68rem;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.active-setup-reset-group ul {
+  display: grid;
+  gap: 0.25rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.active-setup-reset-group li {
+  align-items: baseline;
+  display: grid;
+  font-size: 0.7rem;
+  gap: 0.35rem;
+  grid-template-columns: minmax(7rem, 0.8fr) minmax(0, 1.2fr);
+  min-width: 0;
+}
+
+.active-setup-reset-group li > span:first-child {
+  color: #aeb9c8;
+  overflow-wrap: anywhere;
+}
+
+.active-setup-reset-value-change {
+  color: #eef2f7;
+  display: grid;
+  gap: 0.3rem;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  min-width: 0;
+}
+
+.active-setup-reset-value-change span {
+  overflow-wrap: anywhere;
+}
+
+.active-setup-reset-value-change span:nth-child(2) {
+  color: #93e8c8;
+}
+
+.active-setup-reset-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.active-setup-reset-actions .primary-action {
+  background: #184f40;
+  border-color: #42b993;
+}
+
 .share-setup-dialog {
   background: #171b21;
   border: 1px solid #40526a;
@@ -920,7 +1100,7 @@ th {
 
 .workbench-center {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto minmax(0, 1fr);
   min-height: 0;
   min-width: 0;
   overflow: hidden;
@@ -961,7 +1141,7 @@ th {
 .setup-context-actions {
   display: grid;
   gap: 0.4rem;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   min-width: 0;
 }
 
@@ -4612,6 +4792,28 @@ th {
   color: #ffb4a9;
 }
 
+.calculation-lifecycle-message {
+  align-items: center;
+  background: #111821;
+  border: 1px solid #314052;
+  border-radius: 0.35rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 0.75rem;
+  justify-content: space-between;
+  overflow-wrap: anywhere;
+  padding: 0.55rem 0.65rem;
+}
+
+.calculation-lifecycle-message.error {
+  background: #241517;
+  border-color: #754047;
+}
+
+.calculation-lifecycle-message button {
+  flex: 0 0 auto;
+}
+
 .hiscores-preview {
   display: grid;
   gap: 0.55rem;
@@ -5192,7 +5394,39 @@ th {
 }
 
 .fatal {
+  align-content: center;
   color: #ffb4b4;
+  gap: 0.85rem;
+  justify-items: center;
+  text-align: center;
+}
+
+.fatal h1,
+.fatal p {
+  margin: 0;
+  max-width: 48rem;
+}
+
+.fatal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  justify-content: center;
+}
+
+.safe-session-notice {
+  align-items: center;
+  background: #2e2818;
+  border: 1px solid #826f37;
+  color: #f2d98c;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.8rem;
+  padding: 0.55rem 0.7rem;
+}
+
+.safe-session-notice strong {
+  color: #ffe8a3;
 }
 
 /*
@@ -5366,7 +5600,7 @@ th {
   .setup-context-actions button {
     font-size: 0.68rem;
     min-height: 1.9rem;
-    padding: 0.25rem 0.35rem;
+    padding: 0.25rem 0.12rem;
   }
 
   .setup-context-metrics {
@@ -5512,6 +5746,11 @@ th {
     overflow-x: auto;
     scrollbar-gutter: stable;
   }
+
+  .active-setup-reset-context,
+  .active-setup-reset-groups {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 620px), (min-width: 621px) and (max-width: 980px) and (orientation: portrait) {
@@ -5534,6 +5773,11 @@ th {
   }
 
   .dense-filter-bar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .active-setup-reset-context,
+  .active-setup-reset-groups {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -5613,6 +5857,20 @@ th {
   }
 
   .setup-import-review-actions button {
+    width: 100%;
+  }
+
+  .active-setup-reset-context,
+  .active-setup-reset-groups,
+  .active-setup-reset-group li {
+    grid-template-columns: 1fr;
+  }
+
+  .active-setup-reset-review {
+    max-height: none;
+  }
+
+  .active-setup-reset-actions button {
     width: 100%;
   }
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { PlannerMetric } from "@/domain/planner";
 import type { SimulationContext } from "@/domain/shared";
 import {
@@ -18,9 +18,9 @@ import type { CombatSetupFormState } from "../state/ui-state";
 import {
   createPlannerGearPoolEditorViewModel,
   type PlannerGearPoolEditorViewModel,
-  type PlannerPanelViewModel,
-  type PlannerStatus
+  type PlannerPanelViewModel
 } from "../view-models/planner";
+import type { CalculationLifecycleStatus } from "./calculation-lifecycle";
 
 export interface PlannerCalculationSource {
   form: CombatSetupFormState;
@@ -29,10 +29,27 @@ export interface PlannerCalculationSource {
   plannerState: PlannerUiState;
 }
 
-interface PlannerCalculationBuild {
-  panel: PlannerPanelViewModel | null;
-  error: string | null;
+export interface PlannerCalculationBuild {
+  panel: PlannerPanelViewModel;
   source: PlannerCalculationSource;
+}
+
+export interface PlannerCalculationFailure {
+  source: PlannerCalculationSource;
+  message: "Planner could not compute the current plan. Your inputs are unchanged.";
+}
+
+interface PlannerCalculationPending {
+  task: RunningCalculationTask<PlannerCalculationRequest>;
+  source: PlannerCalculationSource;
+}
+
+export interface PlannerCalculationPresentation {
+  status: CalculationLifecycleStatus;
+  displayIsCurrent: boolean;
+  message: string;
+  canRetry: boolean;
+  retryActionLabel: "Retry plan";
 }
 
 export interface UsePlannerCalculationInput {
@@ -53,9 +70,11 @@ export interface PlannerCalculationController {
   error: string | null;
   pending: boolean;
   draftDirty: boolean;
-  status: PlannerStatus;
+  status: CalculationLifecycleStatus;
+  presentation: PlannerCalculationPresentation;
   computedMetric: PlannerMetric;
   recompute(): void;
+  retry(): void;
 }
 
 type PlannerTaskStarter = (
@@ -78,22 +97,92 @@ export function isPlannerBuildFresh(
   );
 }
 
+export function isPlannerSourceCurrent(
+  candidate: PlannerCalculationSource | null,
+  source: PlannerCalculationSource | null
+): boolean {
+  return (
+    candidate != null &&
+    source != null &&
+    candidate.form === source.form &&
+    candidate.context === source.context &&
+    candidate.lootSettingsByMonster === source.lootSettingsByMonster &&
+    candidate.plannerState === source.plannerState
+  );
+}
+
 export function plannerDraftIsDirty(draft: PlannerUiState, computed: PlannerUiState): boolean {
   return JSON.stringify(draft) !== JSON.stringify(computed);
 }
 
-export function plannerStatusFor(input: {
-  error: string | null;
+export function derivePlannerCalculationPresentation(input: {
+  active: boolean;
+  source: PlannerCalculationSource | null;
+  lastSuccessfulBuild: PlannerCalculationBuild | null;
+  failure: PlannerCalculationFailure | null;
+  pendingSource: PlannerCalculationSource | null;
   draftDirty: boolean;
-  pending: boolean;
-  panel: PlannerPanelViewModel | null;
-}): PlannerStatus {
-  if (input.error) return "error";
-  if (input.draftDirty) return "pending";
-  if (input.pending) return "running";
-  if (input.panel?.isEmpty) return "empty";
-  if (input.panel) return "ready";
-  return "idle";
+}): PlannerCalculationPresentation {
+  const pendingIsCurrent = isPlannerSourceCurrent(input.pendingSource, input.source);
+  const failureIsCurrent = isPlannerSourceCurrent(input.failure?.source ?? null, input.source);
+  const successIsCurrent = isPlannerSourceCurrent(
+    input.lastSuccessfulBuild?.source ?? null,
+    input.source
+  );
+  const hasDisplay = input.lastSuccessfulBuild != null;
+
+  if (
+    pendingIsCurrent ||
+    (input.active && input.source != null && !failureIsCurrent && !successIsCurrent)
+  ) {
+    return {
+      status: "building",
+      displayIsCurrent: false,
+      message: hasDisplay
+        ? "Calculating the current plan. Showing the previous result."
+        : "Calculating the plan for current inputs.",
+      canRetry: false,
+      retryActionLabel: "Retry plan"
+    };
+  }
+  if (failureIsCurrent) {
+    return {
+      status: "failed",
+      displayIsCurrent: false,
+      message: hasDisplay
+        ? "Planner could not compute the current plan. Showing the previous result."
+        : input.failure!.message,
+      canRetry: input.active && input.source != null,
+      retryActionLabel: "Retry plan"
+    };
+  }
+  if (successIsCurrent && !input.draftDirty) {
+    return {
+      status: "ready",
+      displayIsCurrent: true,
+      message: "",
+      canRetry: false,
+      retryActionLabel: "Retry plan"
+    };
+  }
+  if (hasDisplay) {
+    return {
+      status: "stale",
+      displayIsCurrent: false,
+      message: input.draftDirty
+        ? "Planner inputs changed. This plan uses the last recomputed inputs."
+        : "Inputs changed. This plan does not include the current setup or price context.",
+      canRetry: false,
+      retryActionLabel: "Retry plan"
+    };
+  }
+  return {
+    status: "idle",
+    displayIsCurrent: false,
+    message: "",
+    canRetry: false,
+    retryActionLabel: "Retry plan"
+  };
 }
 
 export function usePlannerCalculation(
@@ -107,7 +196,13 @@ export function usePlannerCalculation(
         input.form.levels
       ).state
   );
-  const [build, setBuild] = useState<PlannerCalculationBuild | null>(null);
+  const [lastSuccessfulBuild, setLastSuccessfulBuild] = useState<PlannerCalculationBuild | null>(
+    null
+  );
+  const [failure, setFailure] = useState<PlannerCalculationFailure | null>(null);
+  const [pending, setPending] = useState<PlannerCalculationPending | null>(null);
+  const [retryVersion, setRetryVersion] = useState(0);
+  const pendingRef = useRef<PlannerCalculationPending | null>(null);
   const startTask = options.startTask ?? startPlannerTask;
   const onDraftReconciled = input.onDraftReconciled;
   const draftReconciliation = useMemo(
@@ -150,24 +245,85 @@ export function usePlannerCalculation(
         : null,
     [computedStateForLevels, input.context, input.form, input.lootSettingsByMonster]
   );
+  const currentRequestRef = useRef({ active: input.active, source });
+
+  /* eslint-disable react-hooks/set-state-in-effect -- Exact Planner source identity owns obsolete task cancellation and source-scoped failure cleanup before a Worker microtask can settle. */
+  useLayoutEffect(() => {
+    currentRequestRef.current = { active: input.active, source };
+    const current = pendingRef.current;
+    if (current && (!input.active || !isPlannerSourceCurrent(current.source, source))) {
+      current.task.cancel();
+      pendingRef.current = null;
+      setPending(null);
+    }
+    setFailure((currentFailure) =>
+      currentFailure && !isPlannerSourceCurrent(currentFailure.source, source)
+        ? null
+        : currentFailure
+    );
+  }, [input.active, source]);
 
   useEffect(() => {
     if (!input.active || !source) return;
     const task = startTask({ kind: "planner", ...source });
+    const current = { task, source } satisfies PlannerCalculationPending;
+    pendingRef.current = current;
+    setPending(current);
+    setFailure((currentFailure) =>
+      isPlannerSourceCurrent(currentFailure?.source ?? null, source) ? null : currentFailure
+    );
+    const ownsCurrentSlot = () => {
+      const currentRequest = currentRequestRef.current;
+      return (
+        pendingRef.current?.task === task &&
+        currentRequest.active &&
+        isPlannerSourceCurrent(source, currentRequest.source)
+      );
+    };
     void task.promise
-      .then((panel) => setBuild({ panel, error: null, source }))
+      .then((panel) => {
+        if (!ownsCurrentSlot()) return;
+        setLastSuccessfulBuild({ panel, source });
+        setFailure((currentFailure) =>
+          isPlannerSourceCurrent(currentFailure?.source ?? null, source) ? null : currentFailure
+        );
+      })
       .catch((error: unknown) => {
         if (error instanceof CalculationTaskCancelledError) return;
-        setBuild({ panel: null, error: "Planner could not compute the current plan", source });
+        if (!ownsCurrentSlot()) return;
+        setFailure({
+          source,
+          message: "Planner could not compute the current plan. Your inputs are unchanged."
+        });
+      })
+      .finally(() => {
+        if (!ownsCurrentSlot()) return;
+        pendingRef.current = null;
+        setPending(null);
       });
-    return task.cancel;
-  }, [input.active, source, startTask]);
+    return () => {
+      if (pendingRef.current?.task !== task) return;
+      task.cancel();
+      pendingRef.current = null;
+      setPending(null);
+    };
+  }, [input.active, retryVersion, source, startTask]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
-  const buildFresh = isPlannerBuildFresh(build, source);
-  const result = buildFresh ? build : null;
-  const pending = input.active && source != null && !buildFresh;
-  const panel = result?.panel ?? null;
-  const error = result?.error ?? null;
+  const presentation = useMemo(
+    () =>
+      derivePlannerCalculationPresentation({
+        active: input.active,
+        source,
+        lastSuccessfulBuild,
+        failure,
+        pendingSource: pending?.source ?? null,
+        draftDirty
+      }),
+    [draftDirty, failure, input.active, lastSuccessfulBuild, pending?.source, source]
+  );
+  const panel = lastSuccessfulBuild?.panel ?? null;
+  const error = presentation.status === "failed" ? presentation.message : null;
   const gearPoolEditor = useMemo(
     () =>
       input.context
@@ -180,16 +336,30 @@ export function usePlannerCalculation(
       onDraftReconciled?.(draftReconciliation.state, draftReconciliation.adjustments);
     }
     setComputedState(draftReconciliation.state);
-  }, [draftReconciliation, onDraftReconciled]);
+    if (!draftDirty && presentation.status === "failed") {
+      setRetryVersion((current) => current + 1);
+    }
+  }, [draftDirty, draftReconciliation, onDraftReconciled, presentation.status]);
+  const retry = useCallback(() => {
+    if (!presentation.canRetry) return;
+    if (draftReconciliation.adjustments.length > 0) {
+      onDraftReconciled?.(draftReconciliation.state, draftReconciliation.adjustments);
+    }
+    setComputedState(draftReconciliation.state);
+    setRetryVersion((current) => current + 1);
+  }, [draftReconciliation, onDraftReconciled, presentation.canRetry]);
 
   return {
     panel,
     gearPoolEditor,
     error,
-    pending,
+    pending: presentation.status === "building",
     draftDirty,
-    status: plannerStatusFor({ error, draftDirty, pending, panel }),
-    computedMetric: computedStateForLevels.metric,
-    recompute
+    status: presentation.status,
+    presentation,
+    computedMetric:
+      lastSuccessfulBuild?.source.plannerState.metric ?? computedStateForLevels.metric,
+    recompute,
+    retry
   };
 }

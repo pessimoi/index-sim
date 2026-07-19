@@ -63,7 +63,8 @@ test("shows dense compare calculation freshness while rows catch up", async ({ p
 
   await page.clock.install();
   await page.getByLabel("Combat setup").getByLabel("DEF", { exact: true }).fill("7");
-  await expect(freshness).toHaveText("Updating");
+  await expect(freshness).toHaveText("Previous result");
+  await expect(comparePanel).toContainText("previous inputs");
 
   const rockCrabRow = table.getByRole("row", { name: /Rock Crab/ });
   await rockCrabRow.focus();

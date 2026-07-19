@@ -126,7 +126,7 @@ describe("Risk analysis controller", () => {
       gpTarget: 100_000,
       targetDropRowId: null
     });
-    expect(controller!.statusLabel).toBe("Idle");
+    expect(controller!.presentation.status).toBe("idle");
     expect(controller!.targetDropOptions).toEqual([
       { id: "", label: "No target drop" },
       { id: "keep", label: "Kept drop" }
@@ -158,11 +158,11 @@ describe("Risk analysis controller", () => {
     await act(async () => controller!.run());
     expect(requests).toHaveLength(1);
     expect(requests[0]).toMatchObject({ kind: "risk-analysis", analysis: controller!.controls });
-    expect(controller!.statusLabel).toBe("Running");
+    expect(controller!.presentation.status).toBe("building");
     expect(statuses).toEqual(["Running modeled risk analysis"]);
 
     await act(async () => deferred.resolve(riskResult(1_000)));
-    expect(controller!.statusLabel).toBe("Ready");
+    expect(controller!.presentation.status).toBe("ready");
     expect(controller!.display).toMatchObject({ fresh: true, result: { sampleCount: 1_000 } });
     expect(controller!.fresh?.result.sampleCount).toBe(1_000);
     expect(statuses.at(-1)).toBe("Risk analysis ready: 1,000 trials");
@@ -173,15 +173,18 @@ describe("Risk analysis controller", () => {
     expect(controller!.display?.controls.targetKills).toBe(50);
     expect(controller!.display?.fresh).toBe(false);
     expect(controller!.fresh).toBeNull();
-    expect(controller!.statusLabel).toBe("Stale");
+    expect(controller!.presentation.status).toBe("stale");
   });
 
   it("cancels a running task silently when an exact source reference changes", async () => {
     const { context } = await loadBundledLegacyContext();
     const statuses: string[] = [];
-    const deferred = deferredTask();
+    const obsolete = deferredTask();
+    const current = deferredTask();
+    const tasks = [obsolete, current];
+    let index = 0;
     const startTask = () =>
-      deferred.task satisfies RunningCalculationTask<RiskAnalysisCalculationRequest>;
+      tasks[index++]!.task satisfies RunningCalculationTask<RiskAnalysisCalculationRequest>;
     let controller: RiskAnalysisController | null = null;
     const initialInput = riskInput(context, (message) => statuses.push(message));
 
@@ -202,11 +205,55 @@ describe("Risk analysis controller", () => {
     await act(async () => controller!.run());
     await render({ ...initialInput, lootPrefs: { keep: "skip" } });
 
-    expect(deferred.task.cancel).toHaveBeenCalledOnce();
-    expect(controller!.statusLabel).toBe("Cancelled");
+    expect(obsolete.task.cancel).toHaveBeenCalledOnce();
+    expect(controller!.presentation.status).toBe("idle");
     expect(statuses).toEqual(["Running modeled risk analysis"]);
-    await act(async () => deferred.resolve(riskResult()));
+    await act(async () => obsolete.reject(new Error("late obsolete risk failure")));
     expect(controller!.display).toBeNull();
+    expect(controller!.presentation.status).toBe("idle");
+
+    await act(async () => controller!.run());
+    expect(controller!.presentation.status).toBe("building");
+    await act(async () => current.resolve(riskResult(555)));
+    expect(controller!.fresh?.result.sampleCount).toBe(555);
+  });
+
+  it("keeps a first failure sanitized and recoverable through explicit Retry", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const first = deferredTask();
+    const retry = deferredTask();
+    const tasks = [first, retry];
+    let index = 0;
+    const startTask = () =>
+      tasks[index++]!.task satisfies RunningCalculationTask<RiskAnalysisCalculationRequest>;
+    let controller: RiskAnalysisController | null = null;
+
+    await act(async () => {
+      root.render(
+        createElement(RiskHarness, {
+          input: riskInput(context, vi.fn()),
+          startTask,
+          capture: (value) => {
+            controller = value;
+          }
+        })
+      );
+    });
+    await act(async () => controller!.run());
+    await act(async () => first.reject(new Error("private risk worker path")));
+    expect(controller!.presentation).toMatchObject({
+      status: "failed",
+      message: "Risk analysis could not be completed. Your inputs are unchanged.",
+      runActionLabel: "Retry analysis"
+    });
+    expect(controller!.display).toBeNull();
+    expect(JSON.stringify(controller!.presentation)).not.toContain("private risk worker path");
+
+    await act(async () => controller!.run());
+    expect(controller!.presentation.status).toBe("building");
+    await act(async () => retry.resolve(riskResult(444)));
+    expect(controller!.presentation).toMatchObject({ status: "ready", displayIsCurrent: true });
+    expect(controller!.fresh?.result.sampleCount).toBe(444);
   });
 
   it("settles only the latest replacement task and supports explicit cancellation", async () => {
@@ -256,7 +303,7 @@ describe("Risk analysis controller", () => {
     await act(async () => controller!.run());
     await act(async () => controller!.cancel());
     expect(third.task.cancel).toHaveBeenCalledOnce();
-    expect(controller!.statusLabel).toBe("Cancelled");
+    expect(controller!.presentation.status).toBe("stale");
     expect(statuses.at(-1)).toBe("Risk analysis cancelled");
   });
 
@@ -286,10 +333,14 @@ describe("Risk analysis controller", () => {
     await act(async () => ready.resolve(riskResult(321)));
     await act(async () => controller!.run());
     await act(async () => failed.reject(new Error("worker detail must not leak")));
-    expect(controller!.runStatus).toBe("unavailable");
-    expect(controller!.statusLabel).toBe("Unavailable");
-    expect(controller!.fresh?.result.sampleCount).toBe(321);
-    expect(statuses.at(-1)).toBe("Risk analysis unavailable");
+    expect(controller!.presentation.status).toBe("failed");
+    expect(controller!.presentation).toMatchObject({
+      message: "Risk analysis could not be completed. Showing the previous result.",
+      runActionLabel: "Retry analysis"
+    });
+    expect(controller!.display).toMatchObject({ fresh: false, result: { sampleCount: 321 } });
+    expect(controller!.fresh).toBeNull();
+    expect(statuses.at(-1)).toBe("Risk analysis could not be completed");
 
     const pending = deferredTask();
     const pendingStarter = () =>

@@ -49,11 +49,13 @@ test("runs, invalidates and cancels modeled Risk analysis", async ({ page }) => 
 
   await risk.getByLabel("Target kills").fill("11");
   await expect(risk.getByText("Stale", { exact: true })).toBeVisible();
-  await expect(results).toContainText("Results are stale");
+  await expect(risk).toContainText(
+    "Inputs changed. These results do not include the current setup, prices, loot policy or analysis controls."
+  );
 
   await risk.getByLabel("Horizon min").fill("1440");
   await risk.getByRole("button", { name: "Run analysis" }).click();
   await expect(risk.getByRole("button", { name: "Cancel" })).toBeEnabled();
   await risk.getByRole("button", { name: "Cancel" }).click();
-  await expect(risk.getByText("Cancelled", { exact: true })).toBeVisible();
+  await expect(risk.getByText("Stale", { exact: true })).toBeVisible();
 });

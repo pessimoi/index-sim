@@ -1,4 +1,4 @@
-import type { KeyboardEvent, ReactNode } from "react";
+import type { KeyboardEvent, ReactNode, RefObject } from "react";
 import type { CombatStyle, EntityId } from "@/domain/shared";
 import type { ActiveAssumptionsSummaryViewModel } from "../../view-models/active-assumptions";
 import type {
@@ -42,6 +42,7 @@ export interface WorkbenchShellActions {
   editDefaultSetup(): void;
   editCustomSetup(): void;
   removeCurrentCustomSetup(): void;
+  resetActiveSetup(): void;
   setSpell(spellId: EntityId): void;
   setPrimaryPrayer(prayerId: EntityId): void;
   setPrimaryBoost(boostId: EntityId): void;
@@ -59,12 +60,14 @@ export interface WorkbenchShellProps {
   currentMonsterLabel: string;
   hasCurrentCustomSetup: boolean;
   activeSetupIsCustom: boolean;
+  resetSetupButtonRef: RefObject<HTMLButtonElement | null>;
   monsterOptions: SelectOption[];
   styleOptions: SelectOption[];
   spellOptions: SelectOption[];
   foodPerKill: number;
   priceNotices: CurrentPriceNoticePresentation;
   activeAssumptions: ActiveAssumptionsSummaryViewModel;
+  setupReview: ReactNode;
   actions: WorkbenchShellActions;
   children: ReactNode;
   rail: ReactNode;
@@ -107,12 +110,14 @@ export function WorkbenchShell({
   currentMonsterLabel,
   hasCurrentCustomSetup,
   activeSetupIsCustom,
+  resetSetupButtonRef,
   monsterOptions,
   styleOptions,
   spellOptions,
   foodPerKill,
   priceNotices,
   activeAssumptions,
+  setupReview,
   actions,
   children,
   rail
@@ -296,11 +301,22 @@ export function WorkbenchShell({
               >
                 Remove
               </button>
+              <button
+                ref={resetSetupButtonRef}
+                type="button"
+                aria-label="Reset active setup"
+                title="Reset active setup"
+                onClick={actions.resetActiveSetup}
+              >
+                Reset
+              </button>
             </div>
             <div className="setup-context-metrics">
               <MetricList items={result.contextMetrics} />
             </div>
           </section>
+
+          <div className="setup-review-slot">{setupReview}</div>
 
           <nav className="tab-bar" aria-label="Workbench tabs" role="tablist">
             {WORKBENCH_TABS.map((tab) => (

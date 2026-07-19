@@ -5,15 +5,13 @@ import {
   formatRiskProbability,
   formatRiskRange,
   type RiskControls,
-  type RiskRunStatus,
-  type RiskStatusLabel,
   type RiskTargetDropOption
 } from "../../view-models/risk";
+import type { RiskAnalysisPresentation } from "../../controllers/use-risk-analysis";
 
 export interface RiskPaneModel {
   controls: RiskControls;
-  runStatus: RiskRunStatus;
-  statusLabel: RiskStatusLabel;
+  presentation: RiskAnalysisPresentation;
   targetDropOptions: RiskTargetDropOption[];
   display: { result: RiskAnalysisResult; controls: RiskControls; fresh: boolean } | null;
   expectedTtkSec: number;
@@ -57,10 +55,12 @@ export function RiskPane({
           </p>
         </div>
         <span
-          className={`status-pill ${model.runStatus === "running" ? "pending" : fresh ? "ready" : ""}`}
+          className={`status-pill ${
+            model.presentation.status === "building" ? "pending" : fresh ? "ready" : ""
+          }`}
           aria-live="polite"
         >
-          {model.statusLabel}
+          {model.presentation.status[0]!.toUpperCase() + model.presentation.status.slice(1)}
         </span>
       </div>
 
@@ -94,23 +94,32 @@ export function RiskPane({
           onChange={(targetDropRowId) => actions.setTargetDropRowId(targetDropRowId || null)}
         />
         <div className="risk-actions">
-          <button type="button" onClick={actions.run} disabled={model.runStatus === "running"}>
-            Run analysis
+          <button type="button" onClick={actions.run} disabled={!model.presentation.canRun}>
+            {model.presentation.runActionLabel}
           </button>
-          <button type="button" onClick={actions.cancel} disabled={model.runStatus !== "running"}>
+          <button
+            type="button"
+            onClick={actions.cancel}
+            disabled={model.presentation.status !== "building"}
+          >
             Cancel
           </button>
         </div>
       </div>
 
+      {model.presentation.message && (
+        <p
+          className={`inline-status calculation-lifecycle-message ${
+            model.presentation.status === "failed" ? "error" : "warning"
+          }`}
+          role={model.presentation.status === "failed" ? "alert" : "status"}
+        >
+          {model.presentation.message}
+        </p>
+      )}
+
       {result ? (
         <div className="risk-results" aria-label="Modeled risk results">
-          {!fresh && (
-            <p className="inline-status warning" role="status">
-              Results are stale because the setup, prices, loot policy or analysis controls changed.
-              Run again to refresh them.
-            </p>
-          )}
           <p className="risk-range-key">
             Ranges show P10 / median / P90 from {formatNumber(result.sampleCount)} deterministic
             seeded trials.

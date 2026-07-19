@@ -31,7 +31,8 @@ const compareActions: ComparePaneActions = {
   resetDenseFilters: noOp,
   sortBy: noOp,
   selectTarget: noOp,
-  toggleDenseIrrelevant: noOp
+  toggleDenseIrrelevant: noOp,
+  retryDenseCompare: noOp
 };
 
 const duelActions: DuelPaneActions = {
@@ -73,11 +74,16 @@ describe("Compare and Duel panes", () => {
       denseCompareRows: rows,
       denseCompareScale: createDenseCompareScaleModel(rows),
       denseCompareTotalRows: Object.keys(context.gameData.monsters).length,
-      denseComparePending: true,
-      denseCompareFreshnessLabel: "Updating",
-      denseCompareFreshnessSummary: "rows may reflect previous loadout",
-      denseCompareFreshnessAria:
-        "Compare calculation status: Updating. Rows may reflect the previous loadout.",
+      denseComparePresentation: {
+        status: "building",
+        displayIsCurrent: false,
+        message: "Calculating current comparison. Showing the previous result.",
+        statusLabel: "Updating",
+        summary: "calculating current inputs",
+        aria: "Compare calculation status: Updating. Showing the previous result.",
+        canRetry: false,
+        retryActionLabel: "Retry comparison"
+      },
       selectedMonsterId: DEFAULT_FORM_STATE.monsterId
     };
     const markup = renderToStaticMarkup(
@@ -91,7 +97,7 @@ describe("Compare and Duel panes", () => {
     ).toBe(true);
     inOrder(markup, [
       "<h2>All monsters</h2>",
-      'aria-label="Compare calculation status: Updating. Rows may reflect the previous loadout."',
+      'aria-label="Compare calculation status: Updating. Showing the previous result."',
       'aria-label="Dense compare filters"',
       "Monster filter",
       "Drop filter",
@@ -103,6 +109,42 @@ describe("Compare and Duel panes", () => {
     expect(markup).toContain('aria-selected="true"');
     expect(markup).toContain('tabindex="0"');
     expect(markup).toContain("Reset filters");
+    expect(markup).toContain("Calculating current comparison. Showing the previous result.");
+    expect(markup).toContain('aria-label="Previous Dense result"');
+  });
+
+  it("shows a fixed Dense failure, retained previous rows and Retry", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const rows = createDenseCompareRows(DEFAULT_FORM_STATE, context).slice(0, 2);
+    const markup = renderToStaticMarkup(
+      createElement(ComparePane, {
+        hidden: false,
+        model: {
+          denseCompare: DEFAULT_DENSE_COMPARE_STATE,
+          denseCompareRows: rows,
+          denseCompareScale: createDenseCompareScaleModel(rows),
+          denseCompareTotalRows: Object.keys(context.gameData.monsters).length,
+          denseComparePresentation: {
+            status: "failed",
+            displayIsCurrent: false,
+            message: "Comparison could not be calculated. Showing the previous result.",
+            statusLabel: "Calculation failed",
+            summary: "calculation failed",
+            aria: "Compare calculation status: Failed. Showing the previous result.",
+            canRetry: true,
+            retryActionLabel: "Retry comparison"
+          },
+          selectedMonsterId: DEFAULT_FORM_STATE.monsterId
+        },
+        actions: compareActions
+      })
+    );
+
+    expect(markup).toContain('role="alert"');
+    expect(markup).toContain("Comparison could not be calculated. Showing the previous result.");
+    expect(markup).toContain("Retry comparison");
+    expect(markup).toContain('aria-label="Previous Dense result"');
+    expect(markup).toContain('aria-label="All monsters"');
   });
 
   it("keeps saved setup controls, current-target comparison and diff disclosure semantics", async () => {

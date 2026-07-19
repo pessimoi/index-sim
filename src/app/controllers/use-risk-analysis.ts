@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { RiskAnalysisResult } from "@/domain/risk";
 import type { SimulationContext } from "@/domain/shared";
 import {
@@ -13,13 +13,11 @@ import { formatNumber } from "../view-models/formatting";
 import {
   DEFAULT_RISK_CONTROLS,
   createRiskTargetDropOptions,
-  riskStatusLabelFor,
   type RiskControls,
-  type RiskRunStatus,
-  type RiskStatusLabel,
   type RiskTargetDropCandidate,
   type RiskTargetDropOption
 } from "../view-models/risk";
+import type { CalculationLifecycleStatus } from "./calculation-lifecycle";
 
 export interface RiskAnalysisSource {
   form: CombatSetupFormState;
@@ -30,9 +28,27 @@ export interface RiskAnalysisSource {
   analysis: RiskControls;
 }
 
-interface RiskAnalysisBuild {
+export interface RiskAnalysisBuild {
   result: RiskAnalysisResult;
   source: RiskAnalysisSource;
+}
+
+export interface RiskAnalysisFailure {
+  source: RiskAnalysisSource;
+  message: "Risk analysis could not be completed. Your inputs are unchanged.";
+}
+
+interface RiskAnalysisPending {
+  task: RunningCalculationTask<RiskAnalysisCalculationRequest>;
+  source: RiskAnalysisSource;
+}
+
+export interface RiskAnalysisPresentation {
+  status: CalculationLifecycleStatus;
+  displayIsCurrent: boolean;
+  message: string;
+  canRun: boolean;
+  runActionLabel: "Run analysis" | "Running…" | "Retry analysis";
 }
 
 export interface UseRiskAnalysisInput {
@@ -56,8 +72,7 @@ export interface RiskDisplaySnapshot extends RiskResultSnapshot {
 
 export interface RiskAnalysisController {
   controls: RiskControls;
-  runStatus: RiskRunStatus;
-  statusLabel: RiskStatusLabel;
+  presentation: RiskAnalysisPresentation;
   targetDropOptions: RiskTargetDropOption[];
   display: RiskDisplaySnapshot | null;
   fresh: RiskResultSnapshot | null;
@@ -91,14 +106,96 @@ export function isRiskBuildFresh(
   );
 }
 
+export function isRiskSourceCurrent(
+  candidate: RiskAnalysisSource | null,
+  source: RiskAnalysisSource | null
+): boolean {
+  return (
+    candidate != null &&
+    source != null &&
+    candidate.form === source.form &&
+    candidate.context === source.context &&
+    candidate.cannonByMonster === source.cannonByMonster &&
+    candidate.lootPrefs === source.lootPrefs &&
+    candidate.lootSettingsByMonster === source.lootSettingsByMonster &&
+    candidate.analysis === source.analysis
+  );
+}
+
+export function deriveRiskAnalysisPresentation(input: {
+  source: RiskAnalysisSource | null;
+  lastSuccessfulBuild: RiskAnalysisBuild | null;
+  failure: RiskAnalysisFailure | null;
+  pendingSource: RiskAnalysisSource | null;
+}): RiskAnalysisPresentation {
+  const pendingIsCurrent = isRiskSourceCurrent(input.pendingSource, input.source);
+  const failureIsCurrent = isRiskSourceCurrent(input.failure?.source ?? null, input.source);
+  const successIsCurrent = isRiskSourceCurrent(
+    input.lastSuccessfulBuild?.source ?? null,
+    input.source
+  );
+  const hasDisplay = input.lastSuccessfulBuild != null;
+  const canRun = input.source != null;
+
+  if (pendingIsCurrent) {
+    return {
+      status: "building",
+      displayIsCurrent: false,
+      message: hasDisplay
+        ? "Running the current analysis. Showing the previous result."
+        : "Running the analysis for current inputs.",
+      canRun: false,
+      runActionLabel: "Running…"
+    };
+  }
+  if (failureIsCurrent) {
+    return {
+      status: "failed",
+      displayIsCurrent: false,
+      message: hasDisplay
+        ? "Risk analysis could not be completed. Showing the previous result."
+        : input.failure!.message,
+      canRun,
+      runActionLabel: "Retry analysis"
+    };
+  }
+  if (successIsCurrent) {
+    return {
+      status: "ready",
+      displayIsCurrent: true,
+      message: "",
+      canRun,
+      runActionLabel: "Run analysis"
+    };
+  }
+  if (hasDisplay) {
+    return {
+      status: "stale",
+      displayIsCurrent: false,
+      message:
+        "Inputs changed. These results do not include the current setup, prices, loot policy or analysis controls.",
+      canRun,
+      runActionLabel: "Run analysis"
+    };
+  }
+  return {
+    status: "idle",
+    displayIsCurrent: false,
+    message: "",
+    canRun,
+    runActionLabel: "Run analysis"
+  };
+}
+
 export function useRiskAnalysis(
   input: UseRiskAnalysisInput,
   options: { startTask?: RiskTaskStarter } = {}
 ): RiskAnalysisController {
   const [controls, setControls] = useState<RiskControls>(DEFAULT_RISK_CONTROLS);
-  const [build, setBuild] = useState<RiskAnalysisBuild | null>(null);
-  const [runStatus, setRunStatus] = useState<RiskRunStatus>("idle");
-  const taskRef = useRef<RunningCalculationTask<RiskAnalysisCalculationRequest> | null>(null);
+  const [lastSuccessfulBuild, setLastSuccessfulBuild] = useState<RiskAnalysisBuild | null>(null);
+  const [failure, setFailure] = useState<RiskAnalysisFailure | null>(null);
+  const [pending, setPending] = useState<RiskAnalysisPending | null>(null);
+  const pendingRef = useRef<RiskAnalysisPending | null>(null);
   const startTask = options.startTask ?? startRiskTask;
   const source = useMemo<RiskAnalysisSource | null>(
     () =>
@@ -121,73 +218,111 @@ export function useRiskAnalysis(
       input.lootSettingsByMonster
     ]
   );
+  const currentSourceRef = useRef(source);
   const targetDropOptions = useMemo(
     () => createRiskTargetDropOptions(input.targetDropCandidates),
     [input.targetDropCandidates]
   );
-  const buildFresh = isRiskBuildFresh(build, source);
-  const display = build
-    ? { result: build.result, controls: build.source.analysis, fresh: buildFresh }
+  const presentation = useMemo(
+    () =>
+      deriveRiskAnalysisPresentation({
+        source,
+        lastSuccessfulBuild,
+        failure,
+        pendingSource: pending?.source ?? null
+      }),
+    [failure, lastSuccessfulBuild, pending?.source, source]
+  );
+  const display = lastSuccessfulBuild
+    ? {
+        result: lastSuccessfulBuild.result,
+        controls: lastSuccessfulBuild.source.analysis,
+        fresh: presentation.displayIsCurrent
+      }
     : null;
   const fresh =
-    buildFresh && build ? { result: build.result, controls: build.source.analysis } : null;
+    presentation.displayIsCurrent && lastSuccessfulBuild
+      ? {
+          result: lastSuccessfulBuild.result,
+          controls: lastSuccessfulBuild.source.analysis
+        }
+      : null;
 
-  useEffect(() => {
-    if (!taskRef.current) return;
-    taskRef.current.cancel();
-    taskRef.current = null;
-    setRunStatus("cancelled");
+  /* eslint-disable react-hooks/set-state-in-effect -- Exact Risk source identity owns obsolete task cancellation and source-scoped failure cleanup before a Worker microtask can settle. */
+  useLayoutEffect(() => {
+    currentSourceRef.current = source;
+    const current = pendingRef.current;
+    if (current && !isRiskSourceCurrent(current.source, source)) {
+      current.task.cancel();
+      pendingRef.current = null;
+      setPending(null);
+    }
+    setFailure((currentFailure) =>
+      currentFailure && !isRiskSourceCurrent(currentFailure.source, source) ? null : currentFailure
+    );
   }, [source]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(
     () => () => {
-      taskRef.current?.cancel();
-      taskRef.current = null;
+      pendingRef.current?.task.cancel();
+      pendingRef.current = null;
     },
     []
   );
 
   const run = useCallback(() => {
     if (!source) return;
-    taskRef.current?.cancel();
+    pendingRef.current?.task.cancel();
     const task = startTask({ kind: "risk-analysis", ...source });
-    taskRef.current = task;
-    setRunStatus("running");
+    const current = { task, source } satisfies RiskAnalysisPending;
+    pendingRef.current = current;
+    setPending(current);
+    setFailure((currentFailure) =>
+      isRiskSourceCurrent(currentFailure?.source ?? null, source) ? null : currentFailure
+    );
+    const ownsCurrentSlot = () =>
+      pendingRef.current?.task === task && isRiskSourceCurrent(source, currentSourceRef.current);
     input.onStatus("Running modeled risk analysis");
     void task.promise
       .then((result) => {
-        if (taskRef.current !== task) return;
-        setBuild({ result, source });
-        setRunStatus("ready");
+        if (!ownsCurrentSlot()) return;
+        setLastSuccessfulBuild({ result, source });
+        setFailure((currentFailure) =>
+          isRiskSourceCurrent(currentFailure?.source ?? null, source) ? null : currentFailure
+        );
         input.onStatus(`Risk analysis ready: ${formatNumber(result.sampleCount)} trials`);
       })
       .catch((error: unknown) => {
-        if (taskRef.current !== task) return;
+        if (!ownsCurrentSlot()) return;
         if (error instanceof CalculationTaskCancelledError) {
-          setRunStatus("cancelled");
-          input.onStatus("Risk analysis cancelled");
           return;
         }
-        setRunStatus("unavailable");
-        input.onStatus("Risk analysis unavailable");
+        setFailure({
+          source,
+          message: "Risk analysis could not be completed. Your inputs are unchanged."
+        });
+        input.onStatus("Risk analysis could not be completed");
       })
       .finally(() => {
-        if (taskRef.current === task) taskRef.current = null;
+        if (!ownsCurrentSlot()) return;
+        pendingRef.current = null;
+        setPending(null);
       });
   }, [input, source, startTask]);
 
   const cancel = useCallback(() => {
-    if (!taskRef.current) return;
-    taskRef.current.cancel();
-    taskRef.current = null;
-    setRunStatus("cancelled");
+    const current = pendingRef.current;
+    if (!current) return;
+    current.task.cancel();
+    pendingRef.current = null;
+    setPending(null);
     input.onStatus("Risk analysis cancelled");
   }, [input]);
 
   return {
     controls,
-    runStatus,
-    statusLabel: riskStatusLabelFor({ runStatus, hasBuild: build != null, fresh: buildFresh }),
+    presentation,
     targetDropOptions,
     display,
     fresh,

@@ -23,7 +23,8 @@ const actions: PlannerPaneActions = {
   setAverageOverSession: noOp,
   setGearPoolItem: noOp,
   resetGearPool: noOp,
-  recompute: noOp
+  recompute: noOp,
+  retry: noOp
 };
 
 function panelFixture(isEmpty = false): PlannerPanelViewModel {
@@ -129,10 +130,14 @@ function model(overrides: Partial<PlannerPaneModel> = {}): PlannerPaneModel {
       totalSelectedCount: 1,
       totalOptionCount: 1
     },
-    error: null,
-    pending: false,
     draftDirty: false,
-    status: "ready",
+    presentation: {
+      status: "ready",
+      displayIsCurrent: true,
+      message: "",
+      canRetry: false,
+      retryActionLabel: "Retry plan"
+    },
     computedMetric: "balanced",
     combatStyleLabel: "melee",
     targetLabel: "Rock Crab",
@@ -198,6 +203,13 @@ describe("Planner pane", () => {
         model: model({
           draftState: state,
           draftDirty: true,
+          presentation: {
+            status: "stale",
+            displayIsCurrent: false,
+            message: "Planner inputs changed. This plan uses the last recomputed inputs.",
+            canRetry: false,
+            retryActionLabel: "Retry plan"
+          },
           skillInputs: createPlannerSkillInputViewModels(DEFAULT_FORM_STATE, state),
           adjustmentNotice: "Planner inputs adjusted for current levels: Strength XP uses Auto."
         }),
@@ -208,7 +220,7 @@ describe("Planner pane", () => {
     expect(markup).toContain('placeholder="Auto:');
     expect(markup).toContain("Locked at current level 60; saved target 70 is not used.");
     expect(markup).toContain("Planner inputs adjusted for current levels");
-    expect(markup).toContain("Current output uses the last recomputed inputs.");
+    expect(markup).toContain("Planner inputs changed. This plan uses the last recomputed inputs.");
     expect(markup).toContain('aria-live="polite"');
   });
 
@@ -216,7 +228,16 @@ describe("Planner pane", () => {
     const pendingMarkup = renderToStaticMarkup(
       createElement(PlannerPane, {
         hidden: false,
-        model: model({ panel: null, pending: true, status: "running" }),
+        model: model({
+          panel: null,
+          presentation: {
+            status: "building",
+            displayIsCurrent: false,
+            message: "Calculating the plan for current inputs.",
+            canRetry: false,
+            retryActionLabel: "Retry plan"
+          }
+        }),
         actions
       })
     );
@@ -225,34 +246,49 @@ describe("Planner pane", () => {
         hidden: false,
         model: model({
           panel: null,
-          error: "Planner could not compute the current plan",
-          status: "error"
+          presentation: {
+            status: "failed",
+            displayIsCurrent: false,
+            message: "Planner could not compute the current plan. Your inputs are unchanged.",
+            canRetry: true,
+            retryActionLabel: "Retry plan"
+          }
         }),
         actions
       })
     );
 
-    expect(pendingMarkup).toContain(
-      '<p class="inline-status" role="status" aria-live="polite">Calculating plan</p>'
-    );
+    expect(pendingMarkup).toContain("Calculating the plan for current inputs.");
     expect(pendingMarkup).not.toContain('aria-label="Planner output"');
     expect(errorMarkup).toContain(
-      '<p class="inline-status error" role="alert">Planner could not compute the current plan</p>'
+      "Planner could not compute the current plan. Your inputs are unchanged."
     );
+    expect(errorMarkup).toContain('role="alert"');
+    expect(errorMarkup).toContain("Retry plan");
   });
 
   it("keeps unavailable and fresh-empty output states distinct", () => {
     const unavailableMarkup = renderToStaticMarkup(
       createElement(PlannerPane, {
         hidden: false,
-        model: model({ panel: null, gearPoolEditor: null, status: "idle" }),
+        model: model({
+          panel: null,
+          gearPoolEditor: null,
+          presentation: {
+            status: "idle",
+            displayIsCurrent: false,
+            message: "",
+            canRetry: false,
+            retryActionLabel: "Retry plan"
+          }
+        }),
         actions
       })
     );
     const emptyMarkup = renderToStaticMarkup(
       createElement(PlannerPane, {
         hidden: false,
-        model: model({ panel: panelFixture(true), status: "empty" }),
+        model: model({ panel: panelFixture(true) }),
         actions
       })
     );

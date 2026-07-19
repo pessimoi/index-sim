@@ -3,9 +3,9 @@ import { PLANNER_METRICS, plannerMetricLabel, type PlannerUiState } from "../../
 import {
   type PlannerGearPoolEditorViewModel,
   type PlannerPanelViewModel,
-  type PlannerSkillInputViewModel,
-  type PlannerStatus
+  type PlannerSkillInputViewModel
 } from "../../view-models/planner";
+import type { PlannerCalculationPresentation } from "../../controllers/use-planner-calculation";
 import { formatNumber, signedDecimal } from "../../view-models/formatting";
 import { MetricList } from "../app-presenters";
 import { NumberField, OptionalNumberField, ReadOnlyField, SelectField } from "../form-fields";
@@ -22,10 +22,8 @@ export interface PlannerPaneModel {
   draftState: PlannerUiState;
   panel: PlannerPanelViewModel | null;
   gearPoolEditor: PlannerGearPoolEditorViewModel | null;
-  error: string | null;
-  pending: boolean;
   draftDirty: boolean;
-  status: PlannerStatus;
+  presentation: PlannerCalculationPresentation;
   computedMetric: PlannerMetric;
   combatStyleLabel: string;
   targetLabel: string;
@@ -43,6 +41,7 @@ export interface PlannerPaneActions {
   setGearPoolItem(slot: PlannerGearSlot, itemId: string, selected: boolean): void;
   resetGearPool(slot: PlannerGearSlot): void;
   recompute(): void;
+  retry(): void;
 }
 
 export interface PlannerPaneProps {
@@ -71,8 +70,16 @@ export function PlannerPane({ hidden, model, actions }: PlannerPaneProps) {
     <section className="planner-pane" aria-label="Planner" hidden={hidden}>
       <div className="section-title-row">
         <h2>Planner</h2>
-        <span className={`status-pill ${model.status === "ready" ? "ready" : ""}`}>
-          {model.status}
+        <span
+          className={`status-pill ${
+            model.presentation.status === "building"
+              ? "pending"
+              : model.presentation.status === "ready"
+                ? "ready"
+                : ""
+          }`}
+        >
+          {model.presentation.status}
         </span>
       </div>
 
@@ -207,21 +214,25 @@ export function PlannerPane({ hidden, model, actions }: PlannerPaneProps) {
         )}
       </div>
 
-      {model.pending ? (
-        <p className="inline-status" role="status" aria-live="polite">
-          Calculating plan
-        </p>
-      ) : model.error ? (
-        <p className="inline-status error" role="alert">
-          {model.error}
-        </p>
-      ) : model.panel ? (
-        <div className="planner-output" aria-label="Planner output">
-          {model.draftDirty && (
-            <p className="inline-status planner-output-stale-note">
-              Current output uses the last recomputed inputs.
-            </p>
+      {model.presentation.message && (
+        <div
+          className={`inline-status calculation-lifecycle-message ${
+            model.presentation.status === "failed" ? "error" : "warning"
+          }`}
+          role={model.presentation.status === "failed" ? "alert" : "status"}
+          aria-live={model.presentation.status === "building" ? "polite" : undefined}
+        >
+          <span>{model.presentation.message}</span>
+          {model.presentation.canRetry && (
+            <button type="button" onClick={actions.retry}>
+              {model.presentation.retryActionLabel}
+            </button>
           )}
+        </div>
+      )}
+
+      {model.panel ? (
+        <div className="planner-output" aria-label="Planner output">
           <div className="summary-strip planner-summary" aria-label="Planner summary">
             <MetricList
               items={[
@@ -413,9 +424,9 @@ export function PlannerPane({ hidden, model, actions }: PlannerPaneProps) {
             </div>
           ) : null}
         </div>
-      ) : (
+      ) : model.presentation.status === "idle" ? (
         <p className="empty-state">Planner is available after bundled data loads.</p>
-      )}
+      ) : null}
     </section>
   );
 }

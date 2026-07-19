@@ -9,7 +9,8 @@ import type {
   DuelMatrixCalculationRequest
 } from "../app/calculation-task";
 import {
-  denseCompareFreshnessState,
+  deriveDenseComparePresentation,
+  isDenseCompareSourceCurrent,
   useCompareCalculation,
   type CompareCalculationController,
   type UseCompareCalculationInput
@@ -26,6 +27,7 @@ import { DEFAULT_DENSE_COMPARE_STATE } from "../app/state/dense-compare";
 import { createDuelSnapshot } from "../app/state/duel-snapshots";
 import { DEFAULT_FORM_STATE } from "../app/state/ui-state";
 import type { DuelMatrixViewModel } from "../app/view-models/duel";
+import { createDenseCompareRows } from "../app/view-models/compare";
 import type { SimulationContext } from "../domain/shared";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT =
@@ -192,23 +194,186 @@ describe("Compare and Duel controllers", () => {
     expect(requests).toHaveLength(2);
   });
 
-  it("keeps fixed Dense freshness labels and Duel matrix filtering pure", () => {
-    expect(denseCompareFreshnessState({ pending: false, failed: false })).toEqual({
-      freshnessLabel: "Current",
-      freshnessSummary: "current loadout",
-      freshnessAria: "Compare calculation status: Current. Rows match the live setup."
+  it("derives every Dense lifecycle state and keeps Duel matrix filtering pure", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const source = {
+      form: DEFAULT_FORM_STATE,
+      context,
+      cannonByMonster: {},
+      lootPrefsByMonster: {},
+      customSetupsByMonster: {},
+      lootSettingsByMonster: {}
+    };
+    const changedSource = { ...source, form: { ...source.form } };
+    const success = { rows: [], source };
+    const failure = {
+      source,
+      message: "Comparison could not be calculated. Your inputs are unchanged." as const
+    };
+
+    expect(isDenseCompareSourceCurrent(source, source)).toBe(true);
+    expect(isDenseCompareSourceCurrent(source, changedSource)).toBe(false);
+    expect(
+      deriveDenseComparePresentation({
+        active: false,
+        source,
+        taskSource: source,
+        lastSuccessfulBuild: null,
+        failure: null,
+        pendingSource: null
+      })
+    ).toMatchObject({ status: "idle", statusLabel: "Not calculated" });
+    expect(
+      deriveDenseComparePresentation({
+        active: true,
+        source,
+        taskSource: source,
+        lastSuccessfulBuild: null,
+        failure: null,
+        pendingSource: source
+      })
+    ).toMatchObject({ status: "building", statusLabel: "Updating" });
+    expect(
+      deriveDenseComparePresentation({
+        active: true,
+        source,
+        taskSource: source,
+        lastSuccessfulBuild: success,
+        failure: null,
+        pendingSource: null
+      })
+    ).toMatchObject({ status: "ready", statusLabel: "Current", displayIsCurrent: true });
+    expect(
+      deriveDenseComparePresentation({
+        active: true,
+        source: changedSource,
+        taskSource: source,
+        lastSuccessfulBuild: success,
+        failure: null,
+        pendingSource: null
+      })
+    ).toMatchObject({ status: "stale", statusLabel: "Previous result" });
+    expect(
+      deriveDenseComparePresentation({
+        active: true,
+        source,
+        taskSource: source,
+        lastSuccessfulBuild: success,
+        failure,
+        pendingSource: null
+      })
+    ).toMatchObject({
+      status: "failed",
+      statusLabel: "Calculation failed",
+      message: "Comparison could not be calculated. Showing the previous result.",
+      canRetry: true
     });
-    expect(denseCompareFreshnessState({ pending: true, failed: false }).freshnessLabel).toBe(
-      "Updating"
-    );
-    expect(denseCompareFreshnessState({ pending: false, failed: true }).freshnessLabel).toBe(
-      "Unavailable"
-    );
 
     const matrix = matrixFixture();
     expect(filterDuelMatrixRows(matrix, "rock").map((row) => row.monsterId)).toEqual(["rock_crab"]);
     expect(filterDuelMatrixRows(matrix, "GIANT").map((row) => row.monsterId)).toEqual(["giant"]);
     expect(filterDuelMatrixRows(null, "rock")).toEqual([]);
+  });
+
+  it("keeps Dense first and refresh failures recoverable with the latest successful rows", async () => {
+    const { context } = await loadBundledLegacyContext();
+    vi.useFakeTimers();
+    const requests: DenseCompareCalculationRequest[] = [];
+    const resolvers: Array<(rows: ReturnType<typeof createDenseCompareRows>) => void> = [];
+    const rejectors: Array<(reason: unknown) => void> = [];
+    const cancels: Array<ReturnType<typeof vi.fn>> = [];
+    const startTask = (request: DenseCompareCalculationRequest) => {
+      requests.push(request);
+      const cancel = vi.fn();
+      cancels.push(cancel);
+      return {
+        promise: new Promise<ReturnType<typeof createDenseCompareRows>>((resolve, reject) => {
+          resolvers.push(resolve);
+          rejectors.push(reject);
+        }),
+        cancel
+      } satisfies RunningCalculationTask<DenseCompareCalculationRequest>;
+    };
+    let controller: CompareCalculationController | null = null;
+    const initial = compareInput(context);
+    const render = async (input: UseCompareCalculationInput) => {
+      await act(async () => {
+        root.render(
+          createElement(CompareHarness, {
+            input,
+            startTask,
+            capture: (value) => {
+              controller = value;
+            }
+          })
+        );
+      });
+    };
+
+    await render(initial);
+    await act(async () => rejectors[0]!(new Error("private dense worker path")));
+    expect(controller!.presentation).toMatchObject({
+      status: "failed",
+      message: "Comparison could not be calculated. Your inputs are unchanged.",
+      canRetry: true
+    });
+    expect(controller!.rows).toEqual([]);
+    expect(JSON.stringify(controller!.presentation)).not.toContain("private dense worker path");
+
+    await act(async () => controller!.retry());
+    expect(controller!.presentation.status).toBe("building");
+    const successfulRows = createDenseCompareRows(DEFAULT_FORM_STATE, context);
+    await act(async () => resolvers[1]!(successfulRows));
+    expect(controller!.presentation.status).toBe("ready");
+    expect(controller!.rows).toHaveLength(successfulRows.length);
+
+    const changed = { ...initial, form: { ...initial.form } };
+    await render(changed);
+    expect(controller!.presentation.status).toBe("stale");
+    await act(async () => vi.advanceTimersByTime(250));
+    expect(requests).toHaveLength(3);
+    expect(controller!.presentation).toMatchObject({
+      status: "building",
+      message: "Calculating current comparison. Showing the previous result."
+    });
+    await act(async () => rejectors[2]!(new Error("raw refresh failure")));
+    expect(controller!.presentation).toMatchObject({
+      status: "failed",
+      message: "Comparison could not be calculated. Showing the previous result."
+    });
+    expect(controller!.rows).toHaveLength(successfulRows.length);
+
+    await act(async () => controller!.retry());
+    await act(async () => resolvers[3]!(successfulRows));
+    expect(controller!.presentation).toMatchObject({ status: "ready", displayIsCurrent: true });
+
+    const lateSource = { ...changed, form: { ...changed.form } };
+    await render(lateSource);
+    await act(async () => vi.advanceTimersByTime(250));
+    expect(requests).toHaveLength(5);
+    const latestSource = { ...lateSource, form: { ...lateSource.form } };
+    await render(latestSource);
+    expect(cancels[4]).toHaveBeenCalledOnce();
+    await act(async () => vi.advanceTimersByTime(250));
+    expect(requests).toHaveLength(6);
+    await act(async () => resolvers[4]!(successfulRows));
+    expect(controller!.presentation.status).toBe("building");
+    await act(async () => resolvers[5]!(successfulRows));
+    expect(controller!.presentation.status).toBe("ready");
+
+    const lateFailureSource = { ...latestSource, form: { ...latestSource.form } };
+    await render(lateFailureSource);
+    await act(async () => vi.advanceTimersByTime(250));
+    expect(requests).toHaveLength(7);
+    const finalSource = { ...lateFailureSource, form: { ...lateFailureSource.form } };
+    await render(finalSource);
+    expect(cancels[6]).toHaveBeenCalledOnce();
+    await act(async () => vi.advanceTimersByTime(250));
+    expect(requests).toHaveLength(8);
+    await act(async () => rejectors[6]!(new Error("late obsolete dense failure")));
+    expect(controller!.presentation.status).toBe("building");
+    await act(async () => resolvers[7]!(successfulRows));
+    expect(controller!.presentation.status).toBe("ready");
   });
 
   it("derives every Duel matrix lifecycle state with strict source identity", async () => {

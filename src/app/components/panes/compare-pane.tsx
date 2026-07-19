@@ -6,6 +6,7 @@ import type {
   DenseCompareRowViewModel,
   DenseCompareScaleViewModel
 } from "../../view-models/compare";
+import type { DenseComparePresentation } from "../../controllers/use-compare-calculation";
 
 const DENSE_TABLE_COLUMNS: Array<{
   key: DenseCompareSortKey;
@@ -80,10 +81,7 @@ export interface ComparePaneModel {
   denseCompareRows: DenseCompareRowViewModel[];
   denseCompareScale: DenseCompareScaleViewModel;
   denseCompareTotalRows: number;
-  denseComparePending: boolean;
-  denseCompareFreshnessLabel: string;
-  denseCompareFreshnessSummary: string;
-  denseCompareFreshnessAria: string;
+  denseComparePresentation: DenseComparePresentation;
   selectedMonsterId: EntityId;
 }
 
@@ -95,6 +93,7 @@ export interface ComparePaneActions {
   sortBy(key: DenseCompareSortKey): void;
   selectTarget(monsterId: EntityId): void;
   toggleDenseIrrelevant(monsterId: EntityId): void;
+  retryDenseCompare(): void;
 }
 
 export interface ComparePaneProps {
@@ -109,10 +108,7 @@ export function ComparePane({ hidden, model, actions }: ComparePaneProps) {
     denseCompareRows,
     denseCompareScale,
     denseCompareTotalRows,
-    denseComparePending,
-    denseCompareFreshnessLabel,
-    denseCompareFreshnessSummary,
-    denseCompareFreshnessAria,
+    denseComparePresentation,
     selectedMonsterId
   } = model;
   const {
@@ -122,7 +118,8 @@ export function ComparePane({ hidden, model, actions }: ComparePaneProps) {
     resetDenseFilters,
     sortBy,
     selectTarget,
-    toggleDenseIrrelevant
+    toggleDenseIrrelevant,
+    retryDenseCompare
   } = actions;
   const sortDescription = `${
     DENSE_TABLE_COLUMNS.find((column) => column.key === denseCompare.sort.key)?.label ??
@@ -136,18 +133,24 @@ export function ComparePane({ hidden, model, actions }: ComparePaneProps) {
           <div className="table-title-row">
             <h2>All monsters</h2>
             <div
-              className={`status-pill ${denseComparePending ? "pending" : "ready"}`}
+              className={`status-pill ${
+                denseComparePresentation.status === "building"
+                  ? "pending"
+                  : denseComparePresentation.status === "ready"
+                    ? "ready"
+                    : ""
+              }`}
               role="status"
               aria-live="polite"
               aria-atomic="true"
-              aria-label={denseCompareFreshnessAria}
+              aria-label={denseComparePresentation.aria}
             >
-              {denseCompareFreshnessLabel}
+              {denseComparePresentation.statusLabel}
             </div>
           </div>
           <span>
             {denseCompareRows.length} / {denseCompareTotalRows} monsters -{" "}
-            {denseCompareFreshnessSummary} - sort {sortDescription}
+            {denseComparePresentation.summary} - sort {sortDescription}
           </span>
         </div>
         <div className="dense-filter-bar" aria-label="Dense compare filters">
@@ -184,7 +187,29 @@ export function ComparePane({ hidden, model, actions }: ComparePaneProps) {
           </button>
         </div>
       </div>
-      <div className="dense-table-wrap">
+      {denseComparePresentation.message && (
+        <div
+          className={`inline-status calculation-lifecycle-message ${
+            denseComparePresentation.status === "failed" ? "error" : "warning"
+          }`}
+          role={denseComparePresentation.status === "failed" ? "alert" : "status"}
+        >
+          <span>{denseComparePresentation.message}</span>
+          {denseComparePresentation.canRetry && (
+            <button type="button" onClick={retryDenseCompare}>
+              {denseComparePresentation.retryActionLabel}
+            </button>
+          )}
+        </div>
+      )}
+      <div
+        className="dense-table-wrap"
+        aria-label={
+          denseCompareRows.length > 0 && !denseComparePresentation.displayIsCurrent
+            ? "Previous Dense result"
+            : undefined
+        }
+      >
         <table className="dense-table" aria-label="All monsters">
           <thead>
             <tr>

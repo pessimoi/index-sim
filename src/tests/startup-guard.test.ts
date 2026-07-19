@@ -22,6 +22,7 @@ function startingDocument(): void {
 describe("application startup guard", () => {
   it("keeps a readable static startup and no-script fallback in the HTML entry", () => {
     const indexHtml = readFileSync(resolve("index.html"), "utf8");
+    const mainSource = readFileSync(resolve("src/app/main.tsx"), "utf8");
 
     expect(indexHtml).toContain('data-app-startup-state="starting"');
     expect(indexHtml).toContain("Starting 2004scape Combat Simulator...");
@@ -33,6 +34,8 @@ describe("application startup guard", () => {
     expect(indexHtml.indexOf("/src/app/startup-guard.ts")).toBeLessThan(
       indexHtml.indexOf("/src/app/main.tsx")
     );
+    expect(mainSource).toContain("<ApplicationErrorBoundary>");
+    expect(mainSource).toContain("<App />");
   });
 
   it("replaces pending startup content with one sanitized error state", () => {
