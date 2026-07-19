@@ -17,15 +17,16 @@ auditin jälkeen. MonsterCard- ja target-option-vastuut siirrettiin speksin
 mukaiseen suoraan omistajaan ilman compatibility-re-exportteja tai toista
 composed-polun combat-simulaatiota. Legacy-migraation julkinen omistaja säilyi,
 mutta exact-key-sopimus, raportti, setup-mapper sekä setup-, preference- ja
-price/review-inspektorit saivat erilliset sisäiset omistajat. Elävä arkkitehtuuri
-on nyt 121/109. App-, Trip-, generaattori- ja Worker-rajat on lisäksi suljettu
+price/review-inspektorit saivat erilliset sisäiset omistajat. Toteutuspäivityksen
+auditointihetken moduuligraafi oli 121/109. App-, Trip-, generaattori- ja
+Worker-rajat on lisäksi suljettu
 omilla retention/trigger-speksillään, ja tarkat nykytilatiedot ovat
 [`architecture.md`](../technical/architecture.md)-dokumentissa.
 
 ## Yhteenveto
 
 - P0- tai P1-tasoista arkkitehtuurivirhettä ei löytynyt.
-- Tuotantograafissa on 121 lähdemoduulia, joista 109 on client-entrypointista
+- Auditointihetken tuotantograafissa oli 121 lähdemoduulia, joista 109 oli client-entrypointista
   saavutettavia. Graafissa ei ole syklejä, kiellettyjä kerrossuuntia,
   dokumentoituja poikkeuksia, selittämättömiä orpoja tai vanhentuneita
   entrypoint-luokituksia.

@@ -65,6 +65,7 @@ They cover:
 - active weapon, gear, ammo and spell selection mapping into `SimulationRequest`, including two-handed weapon shield lock/clear behavior
 - deterministic visible-candidate gear quick actions for the active combat style, including current-selection ties, shield-lock disabled state and generated-or-fallback requirement reason copy
 - rewrite-owned monster-specific custom setup create/restore/remove helpers, persisted schema validation and dense row marker/calculation mapping
+- implemented active setup reset candidate/review coverage for current target/style/mode preservation, all-three-style-cache canonical defaults, Default/current-target Custom ownership, stale/no-op safety, complete durable/session-only Undo and protected Duel/custom/Dense/Cannon/loot/price/history/Hiscores boundaries
 - per-monster loot settings for high-alch enablement, kill overhead and talisman spot, with separate persistence and reset helpers from `index-sim:loot-prefs`
 - defaulting and sanitization for newly modeled trip-control fields in persisted rewrite setups
 - defaulting and sanitization for special attack controls in persisted rewrite setups, including unknown, combat-style-incompatible and DBA-conflicting active/per-style/custom setup state
@@ -75,6 +76,7 @@ They cover:
 - refusal to implicitly migrate mismatched persisted versions
 - validated `PriceSet` import errors with non-fatal UI notices and retry recovery
 - non-fatal rewrite setup import failures for invalid JSON, unsupported setup versions, invalid schema data and oversized files, preserving the visible and persisted setup while leaving file input retryable
+- root application recovery for a fixed sanitized bootstrap failure and a distinct post-ready pane render failure, including normal reload, tab-scoped saved-data-ignore startup, visible session-only status and byte-for-byte preservation of the original local setup
 - Playwright smoke covers the workbench shell and complete accepted workflow inventory, including generated requirement copy and the remaining missing-size legacy dragon-halberd warning path; detailed cases live in `src/tests/e2e/*.spec.ts` and the visual matrix.
 
 Run the focused browser smoke for the visible Stats workflow with:
@@ -110,6 +112,17 @@ Run the focused browser smoke for Dense Compare calculation freshness with:
 ```sh
 npm run test:e2e -- --grep "calculation freshness"
 ```
+
+Run the combined Dense/Planner/Risk first-build and refresh-failure lifecycle
+workflow with:
+
+```sh
+npm run test:e2e -- --workers=1 src/tests/e2e/calculation-lifecycle.spec.ts
+```
+
+This path injects one sanitized Worker failure per task kind at a time, proves
+visible fixed-copy Retry, retains and labels the previous successful output,
+recovers to `ready` and checks that raw Worker details never render.
 
 Run the focused browser smoke for Dense Compare release-path numeric snapshots with:
 

@@ -17,11 +17,15 @@ This is an adopter operations/release runbook. D-067 does not require the curren
 The repository currently has:
 
 - a root Vite/React application built with `npm run build`
-- static runtime data emitted to `dist`, including the three market JSON files
+- static runtime data emitted to `dist`, including the four market JSON
+  artifacts (`prices.json`, `price-provenance.json`, compatibility `alch.json`
+  and `price-history.json`)
 - local `npm run dev` and `npm run preview` commands
 - same-origin Hiscores middleware with the D-061 provider in local dev/preview plus the D-066 Cloudflare Worker production entrypoint
-- a narrow scheduled market-price workflow, not a general CI/CD pipeline
-- Node 22/npm 10 alignment through `.nvmrc`, package engines and the current workflow
+- a retained but disabled narrow scheduled market-price workflow template, not
+  an active workflow or general CI/CD pipeline
+- Node 22/npm 10 alignment through `.nvmrc`, package engines and the retained
+  workflow template
 - `npm run deploy:verify-artifact` for deterministic root-path artifact, market-contract and hygiene checks
 - `npm run deploy:smoke` for bounded provider-preview HTTPS route/header/cache/status checks
 - exact Cloudflare Worker build/dry-run/preview/deploy commands, `wrangler.jsonc` and static `_headers`; account ownership and any custom domain belong to the adopter
@@ -108,6 +112,7 @@ Public HTTPS origin
   /                         -> current index document
   /assets/<hash>.*          -> immutable Vite assets
   /prices.json              -> scheduled static market data
+  /price-provenance.json    -> item-level origin and refresh status
   /alch.json                -> compatibility/regression alch artifact (not runtime authority)
   /price-history.json       -> scheduled static shared history
   /api/hiscores/status      -> same-origin runtime, if enabled
@@ -253,7 +258,9 @@ Against preview and production, verify:
 
 - `/` returns the intended release and application shell
 - all referenced hashed assets load with correct content types
-- `prices.json` and `price-history.json` parse as active market artifacts; compatibility `alch.json` also parses but does not override generated runtime alch
+- `prices.json`, `price-provenance.json` and `price-history.json` parse as the
+  active market logical set; compatibility `alch.json` also parses but does not
+  override generated runtime alch
 - hard refresh and a representative SPA/fallback path do not 404
 - shareable setup fragments open to review without a server round trip or fragment leakage
 - required CSP and security headers are present on representative routes

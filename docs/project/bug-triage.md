@@ -1,14 +1,16 @@
 # Bug triage for golden fixtures
 
-- Status: current baseline triage
+- Status: retained archived-behavior baseline triage
 - Date: 2026-07-10
 - Sources: `PROJECT_REVIEW_NOTES.md`, `engine.js`, `trip.js`, `gamedata.js`, `equipment.js`
 
-This document separates known current behavior from rewrite decisions. No legacy behavior was fixed before capturing the current golden fixtures.
+This document separates known archived legacy behavior from rewrite decisions.
+No legacy behavior was fixed before the retained golden fixtures were captured.
 
 ## Fixture policy
 
-- Golden fixtures preserve the current `SimEngine.simulate()` behavior temporarily.
+- Golden fixtures preserve the archived `SimEngine.simulate()` baseline for
+  regression comparison; they are not the current product truth.
 - The fixture harness does not load `market.js`, `planner-core.js`, `views.jsx`, browser `localStorage` or live network data.
 - Bugs outside `SimEngine.simulate()` are triaged here but not locked as simulation parity.
 - No item below is an accepted intentional behavioral change unless a decision records it in [decisions.md](decisions.md).

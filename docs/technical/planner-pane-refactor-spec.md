@@ -2,6 +2,13 @@
 
 Status: implemented on 2026-07-13 as D-093 composition-root Phase 3D.
 
+Current lifecycle note: the later
+[calculation failure and Retry contract](calculation-failure-retry-lifecycle-spec.md)
+supersedes this extraction's `error/pending/running/empty/ready/idle`
+presentation with `idle/building/ready/stale/failed`, retained labelled previous
+plans and visible Retry. Explicit Recompute, source identity and module
+ownership remain unchanged.
+
 ## Purpose
 
 Extract the Planner presentation family from `src/app/App.tsx`, move its

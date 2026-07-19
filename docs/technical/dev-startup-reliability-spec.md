@@ -4,23 +4,24 @@ Status: implemented on 2026-07-15.
 
 ## Problem
 
-The repository currently proves two different production concerns but does not
-prove the first rendered navigation of a newly started Vite development server:
+Before this implementation, the repository proved two different production
+concerns but did not prove the first rendered navigation of a newly started
+Vite development server:
 
-- `npm run dev` starts Vite directly and treats Vite's listening state as the
+- `npm run dev` started Vite directly and treated Vite's listening state as the
   command's readiness boundary.
-- the functional Playwright suite builds and serves the production preview
+- the functional Playwright suite built and served the production preview
   instead of exercising Vite's development transform and middleware pipeline;
-- `npm run startup:measure` also uses a production build and preview server;
-- `index.html` leaves `#root` empty until the React module graph evaluates and
-  `main.tsx` renders; and
-- the runtime bootstrap loading and fatal-error states begin only after that
+- `npm run startup:measure` also used a production build and preview server;
+- `index.html` left `#root` empty until the React module graph evaluated and
+  `main.tsx` rendered; and
+- the runtime bootstrap loading and fatal-error states began only after that
   module graph has loaded far enough to mount React.
 
 Consequently, a development-only transform, middleware or module-load failure
-can leave the browser with an empty root even though Vite has printed a local
-URL. The URL proves that the HTTP listener is available, not that the simulator
-is ready.
+could leave the browser with an empty root even though Vite had printed a local
+URL. The URL proved that the HTTP listener was available, not that the
+simulator was ready.
 
 The current scheduled-price routing regression test protects one known failure
 class: query-free `/prices.json`-style requests belong to the repository

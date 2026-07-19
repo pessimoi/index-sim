@@ -2,6 +2,13 @@
 
 Status: implemented on 2026-07-13 as D-093 composition-root Phase 3E.
 
+Current lifecycle note: the later
+[calculation failure and Retry contract](calculation-failure-retry-lifecycle-spec.md)
+supersedes this behavior-preserving extraction's `Running`/`Cancelled`/
+`Unavailable` presentation with the shared `idle/building/ready/stale/failed`
+vocabulary, retained labelled previous output and visible Retry. The ownership
+boundary, explicit Run/Cancel trigger and Worker protocol remain unchanged.
+
 ## Purpose
 
 Extract the Risk presentation family from `src/app/App.tsx`, move its small

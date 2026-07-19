@@ -17,7 +17,12 @@ This document owns the product and API contracts. The remaining implementation a
 
 ## Purpose
 
-Hiscores lookup and market price refresh are accepted product features, not local-dev-only helpers or removal candidates. The current repo does not contain the legacy `run_sim.py` backend, so this spec defines the product behavior and integration boundary needed to implement those features in the rewrite.
+Hiscores lookup and committed market-price refresh are accepted product
+features, not local-dev-only helpers or removal candidates. The current repo
+does not contain the legacy `run_sim.py` backend. This specification preserves
+the implemented product and integration contracts; the current runtime shape
+is owned by [architecture.md](architecture.md), and adopter-operated live
+evidence is owned by the execution specifications above.
 
 The implementation must preserve the useful legacy workflows while replacing the fragile parts:
 
@@ -50,7 +55,7 @@ MVP behavior:
 - stores the last searched player name locally only when browser storage is available
 - provides understandable empty, not-found, rate-limited and service-unavailable states
 
-Current implementation note: the rewrite header exposes player input, service status, lookup and a bounded preview/Apply overlay for these seven skills. It calls the same-origin hiscores API through `src/adapters/hiscores`, stores the last searched player with the rewrite `PersistedEnvelope<T>` helper only after a fresh response still matches the normalized current Player input and never calls a live upstream directly from the browser. Changing the Player input to a different normalized name clears the preview, late responses for old inputs are ignored, Apply rechecks freshness before mutating levels and the preview shows the returned player, source and fetchedAt metadata from the validated response. Vite dev/preview injects the D-061 source-backed provider into the repo-owned middleware; upstream failures remain sanitized and manual Player level fields stay usable. A static production build still needs an accepted same-origin runtime before live availability can be claimed.
+Current implementation note: the rewrite header exposes player input, service status, lookup and a bounded preview/Apply overlay for these seven skills. It calls the same-origin hiscores API through `src/adapters/hiscores`, stores the last searched player with the rewrite `PersistedEnvelope<T>` helper only after a fresh response still matches the normalized current Player input and never calls a live upstream directly from the browser. Changing the Player input to a different normalized name clears the preview, late responses for old inputs are ignored, Apply rechecks freshness before mutating levels and the preview shows the returned player, source and fetchedAt metadata from the validated response. Vite dev/preview injects the D-061 source-backed provider into the repo-owned middleware; upstream failures remain sanitized and manual Player level fields stay usable. D-066 supplies the accepted same-origin production runtime through the root-path Cloudflare Worker + Static Assets adapter. A concrete public-live claim still requires the adopter's deployed routing and privacy evidence.
 
 ### Market price refresh
 
@@ -483,7 +488,12 @@ No automated test should call live upstream services. Use fixtures and mocked fe
 - Add tests for validation, item expansion and source mapping.
 - Do not change visible UI behavior yet.
 
-Current implementation note: the first contract/fixture slice exists in `src/domain/shared`, `src/data/schemas/live-integrations.ts`, `src/data/market-source-mapping.ts` and `src/tests/live-integrations.test.ts`. It adds validation and mocked fixtures only; it does not add UI, backend runtime, hosting, scheduled jobs or live upstream calls.
+Implementation note: the original contract/fixture slice remains in
+`src/domain/shared`, `src/data/schemas/live-integrations.ts`,
+`src/data/market-source-mapping.ts` and `src/tests/live-integrations.test.ts`.
+Later phases implemented the repo-owned handlers, adapters, UI wiring,
+Cloudflare runtime and retained market writer described below. Default tests
+still use fixtures or mocked fetches and do not call live upstream services.
 
 ### Phase 2: same-origin integration service
 
@@ -501,7 +511,8 @@ Decision update: this handler remains useful for mocked tests and local compatib
 ### Phase 2b: market snapshot writer and disabled scheduler
 
 - Fetch approved market data from `markets.lostcity.rs` on a fixed schedule.
-- Generate `prices.json` and `price-history.json`; do not write `alch.json`.
+- Generate the validated `prices.json`, `price-provenance.json` and
+  `price-history.json` logical set; do not write `alch.json`.
 - Retain 12-hour shared history for 90 days, then one latest point per older UTC day.
 - Validate the generated files with the data/economy schemas and relevant tests.
 - Commit only when the generated JSON differs.

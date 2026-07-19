@@ -1,5 +1,12 @@
 # Risk and variability specification
 
+Current lifecycle note: the implemented
+[calculation failure and Retry contract](calculation-failure-retry-lifecycle-spec.md)
+replaces the original visible `Running`/`Cancelled`/`Unavailable` states with
+`building`/derived post-cancel state/`failed`, retains failed-refresh output as
+labelled previous data and exposes Retry. The stochastic model and explicit
+Run/Cancel boundary specified here are unchanged.
+
 - Status: implemented and browser-verified on 2026-07-11
 - Date: 2026-07-11
 - Owner: technical docs

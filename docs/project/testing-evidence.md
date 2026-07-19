@@ -5,6 +5,50 @@ It does not own current commands, required gates or test strategy; those remain 
 [the testing guide](../technical/testing.md). Counts and artifact hashes below
 apply only to the source state described by each entry.
 
+## 2026-07-19 application error boundary and safe-session recovery
+
+The focused application recovery command passes 3 files / 23 tests. It proves
+the fixed runtime-bootstrap presenter, post-ready render and lifecycle
+replacement, raw message/path/stack exclusion, both actions, normal reload,
+tab-flag and query-fallback memory selection before any localStorage property
+read, path/query/fragment preservation and independent session-only health
+semantics.
+
+Typecheck, the cycle-free 135-source / 120-client-reachable / eight-entrypoint
+architecture graph, the 231-module production build, focused ESLint/Prettier
+and `git diff --check` pass. The named production-preview Chromium recovery
+transaction passes 1/1 and preserves the original saved setup through failure,
+safe reload and later safe-session editing by comparing a sorted byte snapshot
+of every localStorage key and value. The first managed startup check hit
+the sandbox's `listen EPERM 127.0.0.1:4179` boundary; the approved localhost
+rerun passed with one ready marker, one controlled error marker and verified
+asset routing, then exited its managed server. This is `LOCAL_RUNTIME` /
+`SYNTHETIC_TEST` evidence, not production evidence.
+
+## 2026-07-19 calculation lifecycle worktree verification
+
+The current shared worktree contains the implemented Dense/Planner/Risk
+failure-and-Retry lifecycle plus adjacent application-recovery and specification
+work. The lifecycle-focused controller, pane and calculation-task command passes
+7 files / 39 tests. Its production-preview Chromium workflow passes 1/1 after
+covering first and refresh failure, retained previous output, fixed safe Retry,
+ready recovery and raw-detail exclusion for all three calculation paths.
+
+The broader `npm run verify` execution passes typecheck, the 135-source /
+120-client-reachable / eight-entrypoint architecture graph with no cycles,
+86 files / 865 unit and integration tests, 19/19 goldens, lint, production build
+and artifact validation. The 10-file/two-asset/three-JavaScript-chunk artifact is
+2,133,357 bytes with a 768,434 raw / 222,945 gzip direct entry and SHA-256
+`f0511fb55747060875465c3f6d534175e496bfc1481a470a66e113b1d65b32bd`.
+The command exits 1 only at the final repository-wide Prettier check because the
+pre-existing, unrelated untracked
+`docs/technical/active-setup-reset-spec.md` is not formatted. The complete
+lifecycle source/test/document set passes scoped Prettier and `git diff --check`.
+
+The complete production-preview functional Chromium gate passes 88/88 with one
+worker in 2.5 minutes. Browser servers exit after the run. This is
+`LOCAL_RUNTIME` / `SYNTHETIC_TEST` evidence, not production evidence.
+
 ## 2026-07-19 release-readiness finishing integration
 
 The integrated G1-G7 source state passes the authoritative `npm run verify`

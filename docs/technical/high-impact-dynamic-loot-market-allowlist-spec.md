@@ -87,9 +87,10 @@ invented. Admitted ids without a committed numeric row continue to use their
 explicit generated object-cost fallback until a later scheduled writer run
 accepts enough current observations.
 
-The next normal scheduled run may update or retain these mappings under the
-existing D-062/D-085 quality and freshness rules. This specification does not
-claim a successful configured cron run for the expanded 92-row allowlist.
+If D-099 is explicitly reversed, the next restored scheduled run may update or
+retain these mappings under the existing D-062/D-085 quality and freshness
+rules. This specification does not claim a successful configured cron run for
+the expanded 92-row allowlist.
 
 ## Acceptance evidence
 

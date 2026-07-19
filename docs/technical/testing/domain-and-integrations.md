@@ -5,7 +5,9 @@ This guide owns detailed commands for goldens, performance, combat/XP/Trip/Risk/
 
 ## Golden legacy fixtures
 
-Current-behavior golden fixtures live in `src/tests/fixtures/legacy-golden.json`.
+Archived-behavior golden fixtures live in
+`src/tests/fixtures/legacy-golden.json`. They preserve the retained
+`SimEngine.simulate()` comparison baseline, not current product truth.
 
 They are captured from `SimEngine.simulate()` through a Node VM harness in `src/tests/helpers/legacy-sim.ts`. The harness loads only:
 
@@ -37,10 +39,10 @@ V1 rewrite performance is part of acceptance, not a later polish pass.
 Accepted budgets:
 
 - normal single-input updates should complete in about 100 ms in representative local runs
-- heavy compare/planner work must not block the UI in chunks longer than about 200 ms
-- if compare/planner misses the budget, move that workload behind the calculation runner boundary into a Web Worker
+- heavy calculation work must not block the UI in chunks longer than about 200 ms
+- workloads that miss that budget belong behind the typed calculation runner and Web Worker boundary
 
-Representative direct Dense Compare/Planner and maximum Duel matrix calculations exceeded this budget, so all three heavy paths now use `src/app/calculation-task.ts` through a cancellable one-shot Web Worker. Pure dispatch, structured-clone safety, success/failure and cancellation are covered by:
+Representative direct Dense Compare/Planner and maximum Duel matrix calculations exceeded this budget. Dense, Planner, Duel matrix and Risk now use `src/app/calculation-task.ts` through the cancellable one-shot Web Worker boundary. Pure dispatch, structured-clone safety, success/failure and cancellation are covered by:
 
 ```sh
 npm run test -- src/tests/calculation-task.test.ts src/tests/ui-performance.test.ts
@@ -68,16 +70,11 @@ construction, sender-side request posting, startup/request delivery, execution,
 response delivery, total time and UTF-8 JSON payload sizes. These are local
 workstation comparisons, not merge-blocking wall-clock budgets.
 
-The D-095 Apple M2 / Node 22.19.0 / Chromium 149 evidence measured warm median
-request posting at 1.6-2.3 ms for 0.90-1.09 MB requests and startup/delivery at
-31.8-56.7 ms. Dense typical/heavy totals were 140.8/137.7 ms with roughly 25%
-non-execution share; typical Duel was 244.0 ms/14.9%. Planner, Risk and heavy
-Duel spent 96-99% in execution. All 160 tasks across the raw and concise
-five-pair captures completed with aligned clocks. The initial all-skills-at-99
-Planner stress candidate exceeded the measurement-only 120-second ceiling and
-is an algorithmic stress finding, not a persistent-worker result. D-095 retains
-the one-shot lifecycle until low-end-device, production or repeated-task
-evidence establishes a material task-start regression.
+The dated D-095 workstation measurements and stress finding belong in the
+[Worker measurement specification](../calculation-worker-measurement-spec.md)
+and [testing evidence](../../project/testing-evidence.md). D-095 retains the
+one-shot lifecycle until low-end-device, production or repeated-task evidence
+establishes a material task-start regression.
 
 ## Domain core tests
 
@@ -238,12 +235,10 @@ tests live in:
 npm run test -- src/tests/legacy-migration-*.test.ts src/tests/ui-adapters.test.ts
 ```
 
-The four state suites own 41 cases and the view-model suite owns three, retaining
-the 44/44 characterized public boundary after the internal split. Production
-internals are exercised only through the stable
-`src/app/state/legacy-storage-migration.ts` facade. The 2026-07-10 Duel
-migration extension's browser assertion remains part of `reviews and imports
-compatible legacy setup data`.
+Four state suites plus the presentation suite exercise production internals
+only through the stable `src/app/state/legacy-storage-migration.ts` facade.
+The browser migration workflow retains the compatible Duel import assertion;
+dated case totals belong in [testing evidence](../../project/testing-evidence.md).
 
 They cover known legacy key detection, the policy table that classifies every known legacy key as `migrate`, `review-only`, `intentional-reset` or `legacy-only`, defensive `sim_input_v3` JSON parsing, invalid non-object legacy setup state, safe mapping into the current rewrite form schema, unknown entity-id skips, numeric range/default handling, oversized payload rejection, nested `sim_input_v3.monsterSetups` import into rewrite-owned monster-specific custom setup state, nested `sim_input_v3.cannonByMonster` import into rewrite-owned per-monster cannon state and bounded nested `sim_input_v3.duelSetups` import into rewrite-owned Duel snapshot state. Duel migration inherits the legacy player context, maps only validated setup fields, keeps existing rewrite snapshots, rejects computed rows, applies the shared 12-entry cap and reports malformed/conflicting/overflow rows with sanitized reasons. The suite also covers compatible `sim_hiscore_player`, price/alch, loot preference, hidden-tier and dense-compare imports; invalid, ambiguous, unsafe and oversized paths; no inspection-time storage writes; exact known-key clearing; and the review-only `sim_planner_v1` boundary.
 
@@ -338,24 +333,11 @@ The complete delivery gate also requires `npm run test`, `npm run test:golden`,
 must remain unchanged; risk fixtures use explicit seeds and tolerance/property
 assertions instead of accepting incidental random snapshots.
 
-The 2026-07-11 implementation pass completed the repository gate with 38 files
-and 586 unit tests, 19/19 legacy goldens, typecheck, production build/artifact
-validation, lint, format and diff checks. The generated artifact had 8 files, 2
-assets, 1,712,492 bytes and SHA-256
-`2bffcddb2651d3283a51f8324ba4485a28ee3fe35ca7602fd312201ce9f1cc65`.
-Focused 10,000-trial one-hour and 24-hour-block measurements completed in about
-2.1 s and 1.8 s respectively outside the UI main thread.
-
-The focused Playwright case `runs, invalidates and cancels modeled Risk
-analysis` passes 1/1 in Chromium against the production preview. It verifies
-Run, all five outputs, coverage and warning copy, source-change staleness and
-cancellation. The first runtime attempt exposed a status-priority race: a stale
-prior result hid the latest `Cancelled` state even though cancellation itself
-had succeeded. Prioritizing the latest cancellation state closed the defect,
-and the focused rerun plus typecheck passed.
-The focused runtime browser gate later passed in an allowed preview environment
-and is included in the current 77/77 functional gate. Historical managed-sandbox
-bind failures remain environment evidence, not product regressions.
+The focused browser workflow verifies Run, all modeled outputs, coverage and
+warning copy, source-change staleness, cancellation and the current explicit
+failure/Retry lifecycle. Dated implementation counts, artifact hashes,
+performance samples and the superseded status-priority failure belong in
+[testing evidence](../../project/testing-evidence.md).
 
 ## Planner domain tests
 

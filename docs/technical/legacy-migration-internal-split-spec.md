@@ -2,11 +2,11 @@
 
 Status: implemented, 2026-07-14.
 
-## Trigger and problem
+## Activation-time trigger and problem
 
-The 2026-07-14 architecture audit classified
+The 2026-07-14 architecture audit classified the then-monolithic
 `src/app/state/legacy-storage-migration.ts` as a conditional maintenance risk. The
-file is 1,799 lines and currently owns six independently reviewable concerns:
+file was 1,799 lines and owned six independently reviewable concerns:
 
 - the exact legacy-key allowlist and review policy
 - metadata-only inspection orchestration
@@ -15,11 +15,11 @@ file is 1,799 lines and currently owns six independently reviewable concerns:
 - current-price import plus Planner and full-history review-only boundaries
 - shared bounded parsing, sanitization and report bookkeeping
 
-The current implementation is behaviorally strong: 41 focused migration tests
-and three migration view-model tests pass. The user has now explicitly activated
-the conditional split as a bounded maintenance goal. This is sufficient trigger
-for an internal responsibility split, but it does not authorize a broader
-migration product scope.
+The pre-split implementation was behaviorally strong: 41 focused migration
+tests and three migration view-model tests passed. The user then explicitly
+activated the conditional split as a bounded maintenance goal. That was a
+sufficient trigger for the implemented internal responsibility split, but it
+did not authorize a broader migration product scope.
 
 ## Goals
 

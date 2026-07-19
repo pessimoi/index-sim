@@ -20,13 +20,13 @@ market allowlist or make low-quality prices unavailable. Calculations continue
 to consume numeric item prices; provenance and freshness become validated
 parallel data used for audit, warnings and presentation.
 
-## Current state and verified problem
+## Pre-implementation state and verified problem
 
-`PriceSet` currently carries one top-level `source`, `createdAt` and optional
-`provenance` beside the complete `itemPrices` record. It cannot describe
+Before D-085, `PriceSet` carried one top-level `source`, `createdAt` and optional
+`provenance` beside the complete `itemPrices` record. It could not describe
 different origins inside that record.
 
-The root runtime combines at least three distinct value classes into the same
+The root runtime already combined at least three distinct value classes into the same
 map:
 
 1. values committed in `prices.json` and eligible for scheduled market
@@ -36,13 +36,13 @@ map:
 3. missing values filled from generated Revision 274 item object costs by
    `src/adapters/generated/price-fallback.ts`.
 
-The committed snapshot has 136 non-metadata price keys. The current scheduled
+The implementation audit snapshot had 136 non-metadata price keys. The then-current scheduled
 mapping contains 80 item ids: 77 are also present in `prices.json`, 59 committed
 price keys are outside the mapping and three mapped ids (`bass`, `bolt` and
 `bones`) have no committed price. These counts are point-in-time audit evidence,
 not fixed acceptance values.
 
-The scheduled writer already calculates useful transient item facts:
+The scheduled writer already calculated useful transient item facts:
 
 - updated or retained/skipped status;
 - high, medium, low or retained quality;
@@ -50,10 +50,10 @@ The scheduled writer already calculates useful transient item facts:
 - latest usable trade time; and
 - a retention reason.
 
-Those facts exist only in the process report. The writer then copies the
-complete current price map into `price-history.json` and sets one global
-`_scraped_at` capture time. The browser converts that time into
-`PriceSet.createdAt` and labels every shared history snapshot `Scheduled
+Those facts existed only in the process report. The writer then copied the
+complete current price map into `price-history.json` and set one global
+`_scraped_at` capture time. The browser converted that time into
+`PriceSet.createdAt` and labelled every shared history snapshot `Scheduled
 market`.
 
 Consequently:

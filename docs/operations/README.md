@@ -5,7 +5,7 @@
 - [market-live-evidence-spec.md](market-live-evidence-spec.md): exact live response verification, fetch hardening, repository variable setup and first successful scheduled-run evidence.
 - [public-deployment-spec.md](public-deployment-spec.md): D-066 Cloudflare Worker configuration, CSP, release, market propagation, evidence and rollback plan.
 - [../technical/hiscores-live-implementation-spec.md](../technical/hiscores-live-implementation-spec.md): accepted provider/privacy/runtime boundary plus remaining deployed Hiscores evidence.
-- [../project/worktree-delivery-spec.md](../project/worktree-delivery-spec.md): safe review, commit grouping and push sequence for the current worktree.
+- [../project/worktree-delivery-spec.md](../project/worktree-delivery-spec.md): historical 2026-07-10/13 review, commit-grouping, validation and push evidence; it is not a plan for the current worktree.
 
 ## Current run state
 

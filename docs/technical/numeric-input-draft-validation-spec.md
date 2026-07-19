@@ -357,7 +357,7 @@ Pure and browser tests must prove:
 Run at minimum:
 
 ```sh
-npm run test -- src/tests/numeric-field-core.test.ts src/tests/ui-state.test.ts src/tests/planner-ui.test.ts
+npm run test -- src/tests/numeric-field-core.test.ts src/tests/numeric-field-components.test.tsx src/tests/planner-ui-state.test.ts src/tests/planner-ui-adapter.test.ts
 npm run typecheck
 npm run architecture:check
 npm run test:e2e -- --workers=1 --grep "numeric input|Food/kill|Manual price|Current XP"

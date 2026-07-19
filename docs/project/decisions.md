@@ -113,16 +113,16 @@ Use this log for choices that future agents must not re-litigate accidentally.
 
 ## Recommended, not final implementation decisions
 
-| ID    | Recommendation                                                                                                                                                                 | Status                                                          |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- |
-| R-001 | Use TypeScript strict mode, React, Vite, Vitest, Playwright and Zod for the rewrite.                                                                                           | Recommended until a human confirms or changes the target stack. |
-| R-002 | Keep simulation/domain work static-first and avoid choosing Next.js/FastAPI. D-066 later selected a narrow Cloudflare Worker only for same-origin Hiscores and static hosting. | Superseded in part by D-066; domain remains static-first.       |
-| R-003 | Make domain modules free of React, DOM, `window`, `fetch` and `localStorage`.                                                                                                  | Recommended architectural boundary.                             |
+| ID    | Recommendation                                                                                                                                                                 | Status                                                                |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------- |
+| R-001 | Use TypeScript strict mode, React, Vite, Vitest, Playwright and Zod for the rewrite.                                                                                           | Implemented current stack; changing it requires an explicit decision. |
+| R-002 | Keep simulation/domain work static-first and avoid choosing Next.js/FastAPI. D-066 later selected a narrow Cloudflare Worker only for same-origin Hiscores and static hosting. | Superseded in part by D-066; domain remains static-first.             |
+| R-003 | Make domain modules free of React, DOM, `window`, `fetch` and `localStorage`.                                                                                                  | Implemented and enforced architectural boundary.                      |
 
 ## Open decision boundaries
 
 - Package manager: npm is used for the initial scaffold; changing package manager remains a future explicit decision.
-- Backend/runtime: D-066 accepts the Cloudflare Worker production runtime and D-067 treats repository handoff readiness as complete. A future adopter may connect an account and collect privacy/routing/live evidence before claiming public availability. Manual levels remain the fallback. Market refresh stays scheduled repo automation; D-044 keeps archived legacy shims out of the rewrite.
+- Backend/runtime: D-066 accepts the Cloudflare Worker production runtime and D-067 treats repository handoff readiness as complete. A future adopter may connect an account and collect privacy/routing/live evidence before claiming public availability. Manual levels remain the fallback. D-099 keeps the scheduled market automation as a disabled repository template pending a new capacity/freshness decision; D-044 keeps archived legacy shims out of the rewrite.
 - Database: no general application database is accepted; market price refresh remains file-backed JSON. D-097's dedicated SQLite Durable Object may persist aggregate Hiscores provider-budget window/config state only.
 - Deployment: D-066 fixes the optional Cloudflare production path, while D-067 leaves account ownership, public activation and any custom domain to a future adopter. They are runbook steps, not unfinished repository implementation.
 - D-066 implements Cloudflare static/API security headers; effective preview and production responses still require deployed smoke evidence.
@@ -144,9 +144,16 @@ Use this log for choices that future agents must not re-litigate accidentally.
 - Dynamic loot market dependency coverage: D-086 and the implemented [dynamic dependency specification](../technical/dynamic-loot-market-dependency-coverage-spec.md) make the Trip calculation tables the dependency source of truth. D-087's [high-impact allowlist specification](../technical/high-impact-dynamic-loot-market-allowlist-spec.md) admits twelve identified rows with source evidence; readiness is now 39/49 and the remaining ten are unsupported species-specific unidentified herbs.
 - Live integrations: [../technical/live-integrations-spec.md](../technical/live-integrations-spec.md) owns the target contract for hiscores and market prices. D-061 accepts the first-party 2004Scape Hiscores JSON API and D-062 fixes the parsed market page shape. D-067 classifies deployed Hiscores and first configured scheduled-run evidence as adopter operations required only for the corresponding public freshness/availability claims.
 - Hiscores upstream: D-061 accepts `https://2004.lostcity.rs/api/hiscores/player/:username` behind the repo-owned server provider. D-065 fixes the no-player-name/query logging and maximum seven-day unavoidable metadata policy. D-066 selects the Cloudflare Worker same-origin runtime; D-067 leaves account connection and deployed verification to the adopting operator. D-097 accepts the disabled repository-owned coordinator in the [distributed/global rate-limit specification](../technical/hiscores-global-rate-limit-spec.md); the exact quota, WAF rule and production activation remain evidence-gated operator decisions.
-- UI language policy: existing UI strings are English; documentation is now mostly Finnish.
-- Rewrite setup persistence is versioned; a focused `sim_input_v3` setup-migration foundation is captured, while unsupported broader legacy `localStorage` migration fixtures remain open only if a later explicit decision raises them.
-- Legacy Migration V1 implementation: D-042 accepts compatible import for the audited nested `sim_input_v3.monsterSetups` and `sim_input_v3.cannonByMonster` fields. Exact compatible field mapping, unknown-id handling and validation details belong to the implementation/test pass. D-048 keeps `sim_planner_v1` review-only/not migrated for V1, and D-049 keeps full legacy price-history payloads review-only/not migrated for V1.
+- UI language policy: existing UI strings are English. Living documentation is
+  predominantly English, while project instructions explicitly permit Finnish;
+  adopting a different product-language or documentation-language policy still
+  requires a deliberate change.
+- Legacy Migration V1 implementation: D-042's compatible import for the audited
+  nested `sim_input_v3.monsterSetups` and `sim_input_v3.cannonByMonster` fields,
+  including bounded field mapping, unknown-id handling and validation, is
+  implemented and tested. D-048 keeps `sim_planner_v1` review-only/not migrated
+  for V1, and D-049 keeps full legacy price-history payloads review-only/not
+  migrated for V1; widening either boundary requires a new decision.
 - Cannon occupancy/overlay, cannonball cost and cannon ranged XP are ported into pure `src/domain/trip`, and the root workbench exposes the implemented per-monster Cannon pane with sparse-link, reset and output review. New Cannon formulas, encounter modeling or archived-runtime re-promotion remain separate future decisions.
 - Legacy source files are retained for fixtures, reference comparison and legacy-derived static snapshot regeneration. D-059 completes the authoritative source-backed generated-runtime switch; deleting the legacy/reference assets still requires separate full-replacement evidence and an explicit deletion decision.
 - The current composed UI-facing result contract is `FullSimulationResult`; whether a later public contract should be renamed back to `SimulationResult` remains open.

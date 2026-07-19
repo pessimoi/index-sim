@@ -1,18 +1,21 @@
-# Current worktree delivery specification
+# Worktree delivery specification and evidence
 
-- Status: completed
+- Status: completed historical delivery record
 - Date: 2026-07-10
 - Owner: project delivery
-- Source: current repository worktree and backlog delivery work
+- Source: the dated 2026-07-10 and 2026-07-13 worktree delivery windows
 - Related documents: [backlog.md](backlog.md), [../technical/testing.md](../technical/testing.md), [../operations/README.md](../operations/README.md)
 
 ## Purpose
 
-Deliver the current accumulated rewrite work to `origin/master` as reviewable commits without losing, rewriting or silently mixing existing user changes. This is a repository-delivery task, not a product feature, so it does not change a feature-inventory status.
+This document records delivery of the dated accumulated rewrite work to
+`origin/master` as reviewable commits without losing, rewriting or silently
+mixing existing user changes. It is historical repository-delivery evidence,
+not instructions for the current worktree and not a product feature.
 
 The executor must treat the worktree present at execution time as the source of truth. The snapshot below is orientation evidence only and must be refreshed before staging.
 
-## Current snapshot
+## Activation snapshot
 
 On 2026-07-10:
 

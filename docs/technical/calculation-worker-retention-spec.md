@@ -16,6 +16,11 @@ evidence required to reopen persistence, and the minimum safe target shape if a
 later trigger is met. It does not authorize a persistent Worker from payload
 size or workstation timing alone.
 
+The later [calculation failure and Retry lifecycle](calculation-failure-retry-lifecycle-spec.md)
+owns current Dense/Planner/Risk presentation, previous-result retention and
+task-identity settlement behavior. The one-shot protocol and feature-specific
+trigger rules retained here are unchanged.
+
 ## Verified source inventory
 
 Source and reference inspection on 2026-07-14 records:
@@ -107,8 +112,11 @@ references.
   and unmount.
 - A build is current only when form, context, cannon, loot preferences, custom
   setups and loot settings are the exact captured references.
-- During debounce or replacement, retained rows may be shown only with the
-  fixed `Updating` freshness state; failure is sanitized as `Unavailable`.
+- The latest successful rows remain displayable as labelled previous output
+  while stale, rebuilding or failed. Non-cancelled failure is fixed-copy
+  `failed` with explicit Retry.
+- Task identity rejects late settlement after exact-source cancellation,
+  deactivation or replacement.
 
 ### Planner
 
@@ -117,20 +125,20 @@ references.
   is accepted, form/context/loot-source changes refresh automatically.
 - Effect cleanup cancels the old task on computed-source replacement, tab
   deactivation and unmount.
-- A panel/error is usable only when form, context, loot settings and computed
-  Planner state references still match.
-- Draft-dirty, running and sanitized error precedence remains controller-owned.
+- A matching panel is `ready`; draft-dirty or source-mismatched retained output
+  is `stale`. Building and failed refreshes retain that previous panel.
+- Fixed failure copy and Retry remain controller-owned, and task identity
+  rejects late settlement after exact-source cancellation or replacement.
 
 ### Duel matrix
 
 - Matrix work starts only from explicit intent, never merely from render or tab
   activation.
 - A busy guard prevents parallel matrix starts. A fresh matrix is reused.
-- Source changes make the retained matrix unavailable and require another
-  explicit build; they do not silently recompute it.
-- An in-flight task is not cancelled merely because a source or active-tab
-  reference changes. Its captured result remains source-tagged and cannot be
-  displayed as fresh. Unmount hard-cancels the task.
+- Source changes retain the matrix as labelled previous output and require
+  another explicit build; they do not silently recompute it.
+- An in-flight task for an obsolete source is cancelled. Unmount hard-cancels
+  the task.
 - Task-object identity prevents an obsolete settlement from mutating the active
   task slot; failure copy remains sanitized.
 
@@ -139,16 +147,17 @@ references.
 - Work starts only from explicit `Run`; controls are transient.
 - A replacement Run first cancels the active task. Exact source-reference
   change also cancels it without a duplicate global status announcement.
-- Explicit Cancel and unmount hard-cancel active work.
+- Explicit Cancel and unmount hard-cancel active work. Cancel returns visible
+  state to the retained build's `ready`/`stale` status or to `idle`.
 - Task-object identity makes latest settlement win. A previous build may remain
   visible as stale, but only an exact current-source build is exposed through
   the `fresh` bridge to other panes.
-- Failure retains any previous build and exposes only the fixed unavailable
-  state/copy.
+- Failure retains any previous build as labelled previous output, removes it
+  from the `fresh` bridge and exposes only fixed `failed` copy plus Retry.
 
 These four policies are intentionally not normalized into one generic
-controller. Their automatic, explicit, stale-display and tab-lifecycle rules
-differ.
+controller. Dense, Planner and Risk share only the five-state vocabulary; their
+automatic, explicit, stale-display and tab-lifecycle rules differ.
 
 ## Accepted measurement evidence
 

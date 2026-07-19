@@ -12,6 +12,7 @@
 - [conditional-quest-clue-loot-spec.md](conditional-quest-clue-loot-spec.md): implemented source eligibility and zero-calculation contract for conditional loot.
 - [conditional-loot-presentation-spec.md](conditional-loot-presentation-spec.md): D-089 grouped inactive quest/clue loot presentation without calculation changes.
 - [manual-item-price-overrides-spec.md](manual-item-price-overrides-spec.md): D-090 browser-local per-item price overlay and reset contract.
+- [contextual-item-price-correction-spec.md](contextual-item-price-correction-spec.md): specified direct Result/Loot/Economy path to the existing manual-price editor.
 - [requirement-aware-loadout-optimizer-spec.md](requirement-aware-loadout-optimizer-spec.md): implemented checked-by-default numeric-level eligibility for the bounded loadout optimizer.
 - [hit-distribution-visualization-spec.md](hit-distribution-visualization-spec.md): implemented discrete normal-versus-special hit-distribution comparison contract.
 - [legacy-planner-parity-spec.md](legacy-planner-parity-spec.md): implemented archived Planner behavior comparison and gap-classification contract.
@@ -31,19 +32,24 @@
 - [runtime-bootstrap-controller-spec.md](runtime-bootstrap-controller-spec.md): implemented generated-runtime lifecycle, compatibility and startup PriceSet resolution extraction preserving the D-094 chunk boundary.
 - [local-state-recovery-controller-spec.md](local-state-recovery-controller-spec.md): implemented browser-state health/block/persist/clear orchestration and pure Settings recovery panel boundary.
 - [local-state-attention-surface-spec.md](local-state-attention-surface-spec.md): implemented always-visible local-state attention notice and direct Settings recovery focus path without migration-policy changes.
+- [workspace-backup-restore-spec.md](workspace-backup-restore-spec.md): specified complete versioned browser-local Workspace export, reviewable area Replace/Merge policy, atomic restore/Undo and sensitive-state inclusion boundary.
 - [hiscores-lookup-controller-spec.md](hiscores-lookup-controller-spec.md): implemented request-race-safe Hiscores lifecycle extraction and topbar panel boundary.
 - [setup-file-transfer-controller-spec.md](setup-file-transfer-controller-spec.md): implemented bounded rewrite setup import/export orchestration and typed caller-owned Apply boundary.
 - [setup-replacement-review-undo-spec.md](setup-replacement-review-undo-spec.md): implemented review-before-Apply and persistence-aware Undo for setup file and saved-row replacement paths.
+- [active-setup-reset-spec.md](active-setup-reset-spec.md): implemented canonical active Default/current-target Custom reset with grouped Review, all-style-cache scope, protected surrounding state and persistence-aware Undo.
 - [price-set-transfer-controller-spec.md](price-set-transfer-controller-spec.md): implemented PriceSet import/acceptance/export/reset transaction extraction with typed caller-owned runtime application.
 - [price-set-import-discoverability-spec.md](price-set-import-discoverability-spec.md): implemented D-102 workflow with one advanced Market-owned full-PriceSet disclosure, explicit replacement/format guidance and no topbar/Settings duplicates.
+- [user-facing-language-units-information-hierarchy-spec.md](user-facing-language-units-information-hierarchy-spec.md): specced source-name-first entity labels, technical-id disclosure, semantic units/abbreviations and a concise Settings-to-Economy price hierarchy.
 - [cannon-pane-extraction-spec.md](cannon-pane-extraction-spec.md): implemented first low-coupling feature-pane extraction with explicit calculated presentation and action props.
 - [cannon-finite-occupancy-spec.md](cannon-finite-occupancy-spec.md): implemented D-100 finite sparse occupancy, combined/player-only/cannon-only result separation, cannonball cost routing and aligned Cannon presentation.
 - [numeric-input-draft-validation-spec.md](numeric-input-draft-validation-spec.md): implemented shared draft, validation, keyboard and external-update contract for required, decimal and optional numeric fields.
 - [planner-xp-target-integrity-spec.md](planner-xp-target-integrity-spec.md): implemented Planner Auto-XP, live-level reconciliation and visible effective target/start-XP semantics.
 - [duel-matrix-failure-state-spec.md](duel-matrix-failure-state-spec.md): implemented explicit idle/building/ready/stale/failed Duel matrix lifecycle with visible Retry and retained, labelled previous output.
+- [calculation-failure-retry-lifecycle-spec.md](calculation-failure-retry-lifecycle-spec.md): implemented shared idle/building/ready/stale/failed vocabulary, fixed visible failure/Retry and retained previous output for Dense Compare, Planner and Risk.
 - [game-revision-transfer-context-spec.md](game-revision-transfer-context-spec.md): implemented typed active revision plus contextual setup/saved-setup/share external contracts with legacy unknown-context support and unchanged browser persistence versions.
 - [startup-bundle-performance-spec.md](startup-bundle-performance-spec.md): measured cold/warm startup, deterministic entry-JavaScript budgets and generated-runtime bootstrap splitting.
 - [dev-startup-reliability-spec.md](dev-startup-reliability-spec.md): implemented non-empty pre-React startup shell, canonical readiness states, real Vite-dev first-navigation smoke and checked agent localhost handoff.
+- [application-error-boundary-spec.md](application-error-boundary-spec.md): implemented root React render/lifecycle recovery, sanitized reload controls and tab-scoped in-memory startup that leaves saved browser data untouched.
 - [calculation-worker-measurement-spec.md](calculation-worker-measurement-spec.md): measured production one-shot Worker construction, full-request posting, startup/delivery, execution and response phases; D-095 retains the cancellable lifecycle.
 - [calculation-worker-retention-spec.md](calculation-worker-retention-spec.md): implemented D-095 one-shot protocol/controller retention contract, quantified persistent-Worker reopen triggers and hard-cancellation-safe future target.
 - [feature-test-suite-split-spec.md](feature-test-suite-split-spec.md): implemented ARCH-2026-05 split of functional Playwright, composed view-model and current/topic/historical testing owners with title and gate preservation.
@@ -67,12 +73,21 @@
 - [testing/domain-and-integrations.md](testing/domain-and-integrations.md): golden, performance, domain, schema and same-origin integration testing.
 - [testing/ui-state-and-browser.md](testing/ui-state-and-browser.md): feature view-model, persistence, controller, pane and browser coverage.
 
+Implemented specifications preserve their dated implementation contract and
+evidence. Their activation-time phase lists, measurements and “next phase”
+questions are not current backlog or living architecture facts unless
+[the backlog](../project/backlog.md), [decisions](../project/decisions.md) or a
+current owner above explicitly reopens them. Current runtime boundaries belong
+in [architecture.md](architecture.md), current validation commands in
+[testing.md](testing.md) and dated run results in
+[testing evidence](../project/testing-evidence.md).
+
 ## Related evidence
 
-- [../project/npc-attack-source-audit.md](../project/npc-attack-source-audit.md): generated Revision 274 NPC attack-handler coverage and open decision package.
-- [../project/architecture-audit.md](../project/architecture-audit.md): current production-path architecture audit and classified maintenance findings.
-- [../project/security-audit.md](../project/security-audit.md): current production-path security audit, remediated workflow finding and residual operational questions.
-- [../project/code-audit.md](../project/code-audit.md): current production-path code audit, fixed low-severity defects and focused regression evidence.
+- [../project/npc-attack-source-audit.md](../project/npc-attack-source-audit.md): generated Revision 274 NPC attack-handler coverage, D-081 evidence and remaining partial source cases.
+- [../project/architecture-audit.md](../project/architecture-audit.md): dated 2026-07-14 production-path architecture audit and classified maintenance findings.
+- [../project/security-audit.md](../project/security-audit.md): dated 2026-07-14 production-path security audit, D-099 follow-up and residual operational questions.
+- [../project/code-audit.md](../project/code-audit.md): dated 2026-07-14 production-path code audit, fixed low-severity defects and focused regression evidence.
 - [../project/testing-evidence.md](../project/testing-evidence.md): dated validation, release and superseded failure snapshots that no longer belong in the current command owner.
 - [../../ARCHITECTURE_AUDIT.md](../../ARCHITECTURE_AUDIT.md): historical 2026-07-13 architecture audit and implementation snapshot.
 - [../../PROJECT_REVIEW_NOTES.md](../../PROJECT_REVIEW_NOTES.md): file-by-file review findings.

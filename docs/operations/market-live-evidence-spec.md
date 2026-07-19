@@ -15,7 +15,7 @@ The retained architecture still permits twice-daily GitHub Actions to write vali
 
 ## Feature-inventory check
 
-`Market price sync` is `Valmis` in [feature-inventory.md](../product/feature-inventory.md) for the accepted visible workflow: scheduled-static status, imported-price fallback, explicit selected `PriceSet`, local history and sanitized failure behavior.
+`Market price sync` is `Valmis` in [feature-inventory.md](../product/feature-inventory.md) for the accepted visible workflow: dated committed-static and automatic-refresh-disabled status, imported-price fallback, explicit selected `PriceSet`, local history and sanitized failure behavior.
 
 The remaining checklist is adopter release/operations evidence, not a duplicate feature implementation or repository backlog. The feature status stays `Valmis`; only the allowed freshness claim changes after a specific deployment collects it.
 
@@ -26,14 +26,16 @@ The repository already has:
 - `scripts/markets-lostcity-item-page-adapter.ts` for first-page Inertia `soldListings` parsing
 - `scripts/write-scheduled-market-prices.ts` for `--input`, `--upstream-url` and `--dry-run`
 - adaptive MAD/median filtering, 90/30-day freshness gates and prior-price retention
-- validated candidate generation for `prices.json` and `price-history.json`; generated game data owns high alch
+- validated candidate generation for `prices.json`, `price-provenance.json` and
+  `price-history.json`; generated game data owns high alch
 - duplicate, unknown-item, canonical mapping and output validation gates
 - 12-hour shared history for 90 days plus one latest point per older UTC day
 - no-op behavior when generated files are unchanged
 - disabled `.github/disabled-workflows/update-market-prices.yml` template with retained 00:15 and 12:15 UTC cron
 - same-repo commit-if-diff with `GITHUB_TOKEN` and `contents: write`
 - a repository variable boundary named `MARKET_PRICES_UPSTREAM_URL`
-- workflow guards that allow only the two approved market files to change
+- workflow guards that allow only the three writer-owned market artifacts to
+  change
 - fixed-origin fetch hardening with redirect rejection, one 15-second fetch/body timeout,
   HTML/JSON contract enforcement and a one-megabyte pre-parse response limit per item page
 
@@ -158,7 +160,8 @@ The check must:
 - parse every allowlisted first-page response through the same item-page adapter used by cron
 - report sanitized candidate counts and warnings
 - pass canonical item mapping and duplicate gates
-- produce valid candidates for both market files without changing `alch.json`
+- produce valid candidates for all three writer-managed market artifacts
+  without changing `alch.json`
 - stay within the accepted response and timeout limits
 
 Review differences against the committed market snapshots without accepting unexplained mass deletion, timestamp regression, implausible price distributions or unknown canonical identities.
@@ -194,7 +197,8 @@ a manual upstream-refresh trigger. For the first successful run, verify:
 
 - the writer fetched one first page per approved mapping sequentially
 - validation and focused tests passed
-- only `prices.json` and `price-history.json` changed, or the run correctly reported no diff
+- only the approved `prices.json`, `price-provenance.json` and
+  `price-history.json` set changed, or the run correctly reported no diff
 - any commit author/message matches the workflow contract
 - `_scraped_at` and the history bucket reflect the accepted source time policy
 - a changed run produced exactly one intended commit
@@ -238,7 +242,8 @@ claim.
 - The endpoint variable contains no secret; if the source later requires a credential, stop and reopen the security/operations decision boundary.
 - Network requests are fixed to the approved HTTPS origin and protected against redirect-based SSRF.
 - Response time and size are bounded before full parsing.
-- Workflow permissions stay repository-content-only and file changes stay limited to the two market JSON files.
+- Workflow permissions stay repository-content-only and file changes stay
+  limited to the three writer-owned market JSON artifacts.
 - Error output is sanitized and contains no raw body, token, absolute path or parser-internal dump.
 - Generated-data workflow remains repository-local with deterministic source/output hygiene.
 
@@ -255,12 +260,15 @@ git diff --check
 After a candidate write in a controlled review branch, if one is intentionally performed:
 
 ```sh
-node -e "JSON.parse(require('fs').readFileSync('prices.json','utf8')); JSON.parse(require('fs').readFileSync('price-history.json','utf8'))"
+node -e "for (const f of ['prices.json','price-provenance.json','price-history.json']) JSON.parse(require('fs').readFileSync(f,'utf8'))"
 npm run test -- src/tests/market-writer.test.ts src/tests/data-economy.test.ts
 git diff --check
 ```
 
-Live checks are opt-in and must not run in the default unit suite. The GitHub cron remains the authority for the first scheduled-run evidence.
+Live checks are opt-in and must not run in the default unit suite. While D-099
+is active, no GitHub cron runs. After an explicit restoration, the resulting
+scheduled run—not a manual upstream refresh—is the authority for first-run
+evidence.
 
 ## Explicitly out of scope
 

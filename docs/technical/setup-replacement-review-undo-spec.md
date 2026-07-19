@@ -326,7 +326,7 @@ Focused tests must prove:
 Run at minimum:
 
 ```sh
-npm run test -- src/tests/setup-file-transfer-controller.test.ts src/tests/shareable-setup.test.ts src/tests/duel-snapshots.test.ts
+npm run test -- src/tests/setup-file-transfer-controller.test.ts src/tests/setup-import-review.test.tsx src/tests/shareable-setup.test.ts src/tests/ui-adapters.test.ts
 npm run typecheck
 npm run architecture:check
 npm run test:e2e -- --workers=1 --grep "Import setup|saved setup|Undo"

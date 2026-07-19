@@ -16,13 +16,15 @@ This work closes onboarding and reproducibility gaps. It does not add product
 features, deploy a public instance, enable a database, add general CI or weaken
 the live-integration claim gates.
 
-## Current-state check
+## Pre-implementation state check
 
-The root Vite rewrite, generated Revision 274 runtime, Hiscores provider,
-scheduled market writer and optional Cloudflare deployment package are already
-implemented. Feature inventory marks the accepted user workflows `Valmis`.
+At activation, the root Vite rewrite, generated Revision 274 runtime, Hiscores
+provider, scheduled market writer and optional Cloudflare deployment package
+were already implemented. Feature inventory marked the accepted user workflows
+`Valmis`.
 
-The remaining handoff gaps are repository ergonomics and stale documentation:
+The remaining handoff gaps at activation were repository ergonomics and stale
+documentation:
 
 - root `README.md` starts with run commands but omits lockfile installation;
 - no generic repository verification command exists outside the Cloudflare-

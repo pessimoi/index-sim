@@ -1,6 +1,8 @@
 # D-095 worker measurement commit specification
 
-Status: Specced, not executed.
+Status: completed as commit `7cce5e4` (`Measure calculation worker startup and
+transfer`). This document is the retained delivery manifest, not a current
+staging instruction.
 
 ## Purpose
 
@@ -11,7 +13,7 @@ assessment or the Simulation/MonsterCard refactor specification.
 This is a delivery-scope specification. It does not change Worker behavior,
 measurement output, acceptance evidence or D-095 itself.
 
-## Current context
+## Activation-time context
 
 On 2026-07-14 the worktree contains multiple completed or specced slices:
 

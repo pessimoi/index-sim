@@ -56,27 +56,10 @@ npm run runtime:readiness -- --example-limit 5
 `numeric:audit` is read-only here. Do not use `numeric:audit:write`, visual
 update or golden refresh as failure recovery.
 
-The 2026-07-11 Goal 1 completion gate passed the 25/25 focused audit/parser
-tests and `npm run verify`: 592/592 unit tests, 19/19 golden tests, typecheck,
-production build/artifact validation, ESLint, Prettier and `git diff --check`.
-The artifact contained 8 files / 2 assets, 1,724,342 bytes and SHA-256
-`a223e3040a46854245378a84af4d58a9850c9ec32950af589c3d9546f1540db9`.
-The gate skipped npm audit under its documented network-disabled policy; no
-browser, baseline-write, snapshot-refresh or deployment command is part of this
-audit-only goal.
-
-The D-081/D-082 follow-up, rebased onto scheduled-price commit `af0d2a4`,
-passes 595/595 unit tests and 19/19 unchanged legacy goldens plus typecheck,
-production build/artifact validation, ESLint, Prettier and `git diff --check`.
-The artifact contains 8 files / 2 assets, 1,807,135 bytes and SHA-256
-`08465aa5092b10b79f42e6a4110a002a8e582e1ca27f23ab85dcd164aad235d1`.
-Runtime readiness is green with blocking `monsters.incomingAttacks` coverage at
-63/63, and the read-only numeric audit reports 5,958 cross-path comparisons
-with zero mismatches and no unclassified legacy findings. Sandbox-external
-localhost execution passed the complete Chromium gate 74/74 and the reviewed
-Darwin visual gate 20/20. The visual update was limited to the documented
-D-075–D-082 and scheduled-price integration reviews and followed by a clean
-read-only comparison run.
+Dated Goal 1 and D-081/D-082 gate counts, artifact hashes and browser/visual
+results belong in [testing evidence](../../project/testing-evidence.md). The
+current command contract above remains the owner here; the generated NPC report
+and runtime-readiness command own current source coverage.
 
 ## Cloudflare deployment validation
 
@@ -95,9 +78,10 @@ npm run deploy:cloudflare:dry-run
 
 `workflow-security.test.ts` statically requires immutable commit-SHA pins for
 the official checkout/setup actions, non-persistent checkout credentials, one
-final-step-only repository token reference and schedule-only triggers. It does
-not execute or authenticate the remote workflow; the first configured scheduled
-run remains external operations evidence.
+final-step-only repository token reference and schedule-only triggers in the
+retained disabled template. It does not restore, execute or authenticate that
+template; any first configured scheduled run after an explicit D-099 reversal
+remains external operations evidence.
 
 The artifact command requires root `index.html`, Cloudflare `_headers`, hashed
 Vite JavaScript/CSS references, `prices.json`, `price-provenance.json`, `alch.json` and
@@ -151,10 +135,8 @@ npm run planner:parity
 
 The command runs `src/tests/planner-parity.test.ts` and
 `src/tests/planner-domain.test.ts`, then regenerates and checks
-`docs/project/planner-parity/current.md` against the reviewed baseline. The
-current matrix has 16 cases and 32 reference-context/current-product
-comparisons, classified as 29 accepted rewrite deltas and three Revision 274
-source-data deltas, with no open review row or rewrite gap.
+`docs/project/planner-parity/current.md` against the reviewed baseline. That
+generated report owns the current matrix counts and classifications.
 
 Baseline changes are never automatic failure recovery. During an explicit audit
 review, regenerate a candidate with:
@@ -173,12 +155,13 @@ For the broad numeric user-path audit, run:
 npm run numeric:audit
 ```
 
-The command evaluates the default setup for all 189 generated
-monster/combat-style combinations and 18 legacy golden setup variants. It
-compares Result, Dense Compare, calculation worker, Duel live, Duel matrix and
-saved-setup round-trip values at absolute and relative tolerance `1e-9`. The
-2026-07-12 baseline contains 5,958 current-path comparisons and zero
-mismatches. It also reports legacy-to-rewrite changes only when both the
+The command evaluates the generated monster/combat-style matrix and retained
+legacy golden setup variants. It compares Result, Dense Compare, calculation
+worker, Duel live, Duel matrix and saved-setup round-trip values at absolute
+and relative tolerance `1e-9`. The generated
+[numeric audit report](../../project/numeric-user-path-audit.md) owns current
+case/comparison counts and mismatch status. The audit also reports
+legacy-to-rewrite changes only when both the
 metric-specific absolute and relative thresholds are exceeded; those findings
 must be classified rather than silently treated as rewrite truth. Its focused
 casket section reports Dagannoth 74, Dagannoth 92 and Rock Crab separately as

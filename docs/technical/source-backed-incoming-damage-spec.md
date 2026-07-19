@@ -17,13 +17,15 @@ This is a calculation-correctness extension to the accepted Trip and Risk
 workflows. It does not add player accounts, quest state, a backend or new
 persisted setup fields.
 
-## Current state and verified problem
+## Implemented current state and original problem
 
 The committed Revision 274 snapshot contains 63 monsters with typed
 `incomingAttacks`: 55 exact and eight partial. Legacy/test snapshots may still
 omit the contract and exercise the visible compatibility fallback.
 
-`computeIncomingDamage()` therefore:
+The current `createIncomingDamageDescriptor()` validates and normalizes those
+typed profiles for both Trip and Risk. Before D-081, the compatibility path was
+the only path and `computeIncomingDamage()`:
 
 - reads untyped `atkType` through a generic record and defaults it to `melee`,
 - reads untyped `maxHit` when present,
@@ -31,21 +33,22 @@ omit the contract and exercise the visible compatibility fallback.
 - selects the player's melee slash defence unless the untyped attack type says
   `ranged` or `magic`.
 
-The standard melee max-hit fallback is not inherently fabricated. The pinned
+The retained legacy/test standard melee max-hit fallback is not inherently
+fabricated. The pinned
 LostCity melee procedure calculates the same source formula from NPC Strength
 and `strengthbonus`, and the current generated snapshot has those inputs for all
-63 rows. The correctness gap is broader:
+63 rows. The original correctness gap was broader:
 
 - a single untyped/default-melee interpretation cannot represent standard
   ranged or magic attacks,
 - fixed-max-hit and spell-backed attacks use different source rules,
 - scripted dragonfire, boss and other special attacks can be conditional or
   multi-style, and
-- Risk currently samples whatever aggregate values Trip produced without a
+- Risk sampled whatever aggregate values Trip produced without a
   typed statement of which incoming sources are exact or mean-only.
 
-The implementation must therefore model attack profiles and coverage, not
-blindly add one manually maintained `maxHit` number to every monster.
+The implemented contract therefore models attack profiles and coverage rather
+than adding one manually maintained `maxHit` number to every monster.
 
 ## Accepted source evidence for the specification
 

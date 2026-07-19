@@ -3,11 +3,15 @@
 - Status: living target specification; the accepted V1 root rewrite is implemented, while explicit later decisions remain open
 - Owner: technical docs
 - Date: 2026-07-06
+- Reviewed: 2026-07-19 documentation truth audit
 - Scope: rewrite the current static 2004scape Combat Simulator into a maintainable, tested, typed architecture.
 
 ## 1. Purpose
 
-This document is the implementation-grade specification for a future rewrite. It does not describe the current app as an ideal architecture. Current-state details live in [architecture.md](architecture.md); this file describes the target system and the path to get there.
+This document preserves the implementation-grade rewrite contract and its
+acceptance boundary. It does not compete with the current architecture owner:
+current-state details live in [architecture.md](architecture.md), while this
+file describes the accepted target system and the path that produced it.
 
 The rewrite should be treated as a new implementation that preserves the same end-user workflows, not as a line-by-line preservation of legacy architecture or legacy calculation decisions. Legacy behavior is regression evidence; the current accepted LostCityRS/Content revision, accepted decisions and documented intentional deltas may supersede it.
 
@@ -31,7 +35,9 @@ Verified current facts:
 - The archived legacy app uses plain `.js` and `.jsx` files loaded in script order.
 - Archived legacy modules attach APIs to `window.GameData`, `window.SimEngine`, `window.TripModel`, `window.Equipment` and `window.SimPlanner`.
 - Main UI is in `views.jsx`; planner UI is in `planner.jsx`.
-- Data and prices are spread across `gamedata.js`, `prices.json`, `alch.json`, `price-history.json`, market imports and `localStorage`.
+- Data and prices are spread across `gamedata.js`, `prices.json`,
+  `price-provenance.json`, `alch.json`, `price-history.json`, market imports and
+  `localStorage`.
 - A npm-based TypeScript/Vite/Vitest rewrite implementation owns the root app path in `src/`.
 - No active GitHub Actions workflow, application database schema or stateful
   simulation backend exists in this checkout. D-099 retains the scheduled
@@ -287,7 +293,10 @@ Accepted target source:
 
 - Use `markets.lostcity.rs` as the target source for live/current market prices.
 - The accepted history direction is to keep a latest `PriceSet` plus retained 12-hour price history snapshots.
-- The retained market writer writes `prices.json` and `price-history.json`, validates them and commits only real diffs when used through the archived template. Generated game data owns high alch.
+- The retained market writer writes and validates the three-file
+  `prices.json`/`price-provenance.json`/`price-history.json` logical set and
+  commits only real diffs when used through the archived template. Generated
+  game data owns high alch.
 - The retained scheduler template is GitHub Actions cron at 00:15 and 12:15 UTC, using the repository `GITHUB_TOKEN` with `contents: write` and no `workflow_dispatch` manual trigger. D-099 keeps it outside `.github/workflows`, so no automatic run is active.
 - Do not add databases, user-triggered upstream refresh or deploy-specific shared storage for market prices.
 - The local writer, normalized fixture contract, D-062 item-page adapter/estimator, catalog-audited mapping, public crawler-policy review, full 80-mapping live dry-run, exact root Actions variable and archived hardened workflow template are present. D-099 disables automatic execution; first successful configured scheduled-run evidence remains a future re-enable gate.
@@ -496,7 +505,8 @@ Validate:
 Current implemented schema coverage:
 
 - `src/tests/data-economy.test.ts` validates the adapted legacy game-data snapshot.
-- The same test validates committed `prices.json`, `alch.json` and `price-history.json`.
+- The same test validates committed `prices.json`, `price-provenance.json`,
+  `alch.json` and `price-history.json`.
 - The same test rejects malformed imported `PriceSet` JSON and checks missing-price warnings.
 - `src/tests/planner-ui-state.test.ts` validates the versioned rewrite Planner UI state envelope, default state, invalid/version fallback and gear-pool id cleanup against the active planner pool.
 - `src/tests/ui-adapters.test.ts` validates the new rewrite setup envelope, invalid envelope/data rejection and version-mismatch behavior.
@@ -575,7 +585,12 @@ Current checkout status: the rewrite root, generated runtime, Planner, migration
 - Make `SimulationRequest`, `GameDataSnapshot` and `PriceSet` explicit.
 - Run golden tests after each ported slice.
 
-Current checkout status: Phase 3 is partially started. `src/domain/combat` and `src/domain/equipment` contain pure TypeScript logic for the combat/equipment slice and are covered by `src/tests/domain-core.test.ts`. `src/domain/trip` contains pure TypeScript logic for the trip/loot/supply slice, including cannon occupancy/overlay, and is covered by `src/tests/trip-loot-supply.test.ts`. `src/domain/planner` contains pure TypeScript planning logic and is covered by `src/tests/planner-domain.test.ts`. Final full-result composition is not ported yet.
+Current checkout status: Phase 3 is complete for the accepted rewrite scope.
+Pure combat, equipment, Trip/loot/supply, economy, Risk and Planner modules live
+under `src/domain`; `src/domain/simulation` owns the composed
+`FullSimulationResult`. Current ownership and dependency direction belong in
+[architecture.md](architecture.md), and current gates belong in
+[testing.md](testing.md).
 
 ### Phase 4: data and economy
 
@@ -584,7 +599,7 @@ Current checkout status: Phase 3 is partially started. `src/domain/combat` and `
 - Move price loading into `src/economy` and browser adapters.
 - Remove global price mutation from the core path.
 
-Current checkout status: Phase 4 is complete for the accepted rewrite scope. The root app consumes a schema-validated source-backed Revision 274 snapshot generated from the pinned raw checkout, while scheduled/static and imported `PriceSet` ownership remains separate. Runtime readiness reports zero coverage blockers, and legacy runtime/bootstrap data is retained only as reference and rollback evidence. Authoritative requirement skill inference, quest/clue loot policy and live provider evidence remain explicit later boundaries rather than gaps in the active snapshot bootstrap.
+Current checkout status: Phase 4 is complete for the accepted rewrite scope. The root app consumes a schema-validated source-backed Revision 274 snapshot generated from the pinned raw checkout, while scheduled/static and imported `PriceSet` ownership remains separate. Runtime readiness reports zero coverage blockers, and legacy runtime/bootstrap data is retained only as reference and rollback evidence. Numeric requirement rows and typed quest/clue loot exclusions are implemented; exact quest/clue activation state and live deployed-provider evidence remain separate decisions or adopter evidence rather than snapshot-bootstrap gaps.
 
 ### Phase 5: UI rebuild
 
@@ -594,7 +609,13 @@ Current checkout status: Phase 4 is complete for the accepted rewrite scope. The
 - Add Playwright smoke tests.
 - For full replacement, follow [ui-parity-spec.md](ui-parity-spec.md) so layout, tab order and workflow discoverability match the legacy workbench.
 
-Current checkout status: Phase 5 has a first selected parity UI. `src/app` renders combat setup, result summary, special attack controls/metrics, loot/economy, trip, monster compare, planner and service-aware hiscores/market controls through `src/app/view-models`, but its layout and workflow grouping do not yet match the legacy workbench. The full UI parity target is now documented in [ui-parity-spec.md](ui-parity-spec.md), and feature coverage is tracked in [../product/feature-inventory.md](../product/feature-inventory.md). The rewrite uses new versioned keys such as `index-sim:rewrite-setup`, `index-sim:hiscores:last-player` and `index-sim:price-history`. It now detects known legacy keys and shows a user-facing import/keep/clear flow. Import writes only rewrite-owned setup, last-player, accepted-price-history and dismissed state and keeps legacy keys; keep writes only rewrite-owned dismissed state; clear removes only known legacy keys after explicit confirmation. Legacy planner/custom setup/loot prefs/compare/cannon/hidden tiers and full price-history migrations remain future work.
+Current checkout status: Phase 5 is complete for the accepted V1 replacement
+slice and its accepted legacy-migration boundary. Current visible coverage is
+owned by [the feature inventory](../product/feature-inventory.md), detailed
+layout/workflow parity by [ui-parity-spec.md](ui-parity-spec.md), and browser
+state/controller ownership by [architecture.md](architecture.md). Broader
+legacy Planner and full-history migration remain explicitly review-only under
+D-048/D-049 rather than unfinished V1 implementation work.
 
 ### Phase 6: legacy removal
 
@@ -621,20 +642,40 @@ The rewrite is architecturally acceptable when:
 - Data and price imports are schema-validated.
 - Current state, target plan, accepted decisions and open questions are updated in docs.
 
-Current acceptance status: the 2026-07-06 consolidated release-evidence pass is recorded in [rewrite-parity-report.md](rewrite-parity-report.md). Build, typecheck, unit tests, golden fixtures, Playwright smoke, dependency audit, static security searches and release-copy classification passed for the current rewrite path, with classified residuals and explicit `not run` scope for live upstream calls and full visual regression. Re-run the same gate after each release-impacting change. Full user replacement remains gated by feature coverage in [../product/feature-inventory.md](../product/feature-inventory.md), deeper legacy migration decisions, authoritative generated data workflow, production live market/hiscores runtime and provider wiring, deploy/security-header acceptance and any broader all-fixture browser-display or visual-regression evidence that a future release decision requires.
+Current acceptance status: the dated 2026-07-06 consolidated pass remains in
+[rewrite-parity-report.md](rewrite-parity-report.md), and later accepted
+decisions completed the authoritative Revision 274 runtime, the selected V1
+feature slice, repository-owned live-integration boundaries, Cloudflare release
+package and repository-local browser/visual evidence. Re-run the current gate
+owned by [testing.md](testing.md) after release-impacting changes. Public
+availability, scheduled-current market wording and any wider parity scope remain
+separate adopter-evidence or product decisions; they do not make the accepted
+repository implementation incomplete.
 
 ## 14. Open decisions
 
 - Initial scaffold uses npm; changing away from npm remains an open future decision.
-- Backend/runtime: still required for accepted hiscores if direct browser APIs are not viable, but concrete framework, hosting, cache and deployment shape remain undecided. Market price refresh uses scheduled static JSON instead of a user-triggered backend sync path.
+- Backend/runtime: D-066 selected one Cloudflare Worker + Static Assets release
+  unit for the same-origin Hiscores boundary and root application. Account
+  connection, public activation, custom domain and deployed evidence remain
+  adopter decisions; the application still has no stateful simulation backend.
+  Market price refresh uses the retained, currently disabled scheduled static
+  JSON writer instead of a user-triggered backend sync path.
 - Database: no database for market price refresh; D-097 accepts only its
   aggregate Hiscores provider-budget Durable Object, and broader application
   database use is still undecided.
-- Live integrations: implement hiscores and market price refresh according to [live-integrations-spec.md](live-integrations-spec.md); hiscores waits for the authoritative API answer.
+- Live integrations: repository implementation follows
+  [live-integrations-spec.md](live-integrations-spec.md); D-061 fixed the
+  authoritative Hiscores API and D-062 fixed the market page contract. Deployed
+  Hiscores proof and any future re-enabled market cron evidence remain adopter
+  operations, not unanswered provider-selection questions.
 - Price history: `price-history.json` keeps 12-hour points for 90 days and one latest point per older UTC day; Economy loads it read-only beside local comparisons. The item-page writer, catalog audit, crawler-policy review, live dry-run and root URL configuration are evidenced. A concrete first successful scheduled run is adopter evidence before a scheduled-current claim.
 - Data generator implementation: `npm run data:generate` reads the pinned raw Revision 274 checkout and writes the active schema-valid source pin, game-data snapshot and revision-impact report. Every expected runtime identity and all 63 core-loot tables resolve, and runtime readiness has zero blockers. Normalized `index-sim-source-slice` inputs remain fixture-only parser/schema tests.
 - Game revision updates: the PR/review policy, 11-case representative report and 189-evaluation all-monster scan are accepted. D-055 through D-059 and D-071/D-072 record reviewed combat, loot, equipment, catalog, canonical-identity, runtime-switch, requirement/size and conditional-loot decisions. Four quest-gated and 21 clue-scroll tertiary rows are typed snapshot rows but remain inactive default-valuation exclusions until exact player state is modeled.
-- Planner item requirements: generated snapshot data is consumed when present with a manual fallback; which authoritative upstream fields and fallback-removal policy should close this?
+- Planner item requirements: generated numeric Attack, Strength, Defence,
+  Ranged and Magic requirements are consumed when present. Removing D-051's
+  bounded fallback for legacy or missing rows still requires explicit coverage
+  and player-state evidence.
 - UI language: keep English UI or localize?
 - Historical revisions: keep one current accepted revision only, or later support user-selectable historical revisions?
 
