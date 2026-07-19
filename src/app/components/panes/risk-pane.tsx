@@ -127,10 +127,10 @@ export function RiskPane({
           <div className="summary-strip risk-summary">
             <div className="metric">
               <span>Kill time</span>
-              <strong className="teal">{formatRiskRange(result.killTimeSeconds, 1, "s")}</strong>
+              <strong className="teal">{formatRiskRange(result.killTimeSeconds, 1, " s")}</strong>
               <small>
-                Modeled mean {formatNumber(result.killTimeSeconds.mean, 1)}s; expected{" "}
-                {formatNumber(model.expectedTtkSec, 1)}s
+                Modeled mean {formatNumber(result.killTimeSeconds.mean, 1)} s; expected{" "}
+                {formatNumber(model.expectedTtkSec, 1)} s
               </small>
             </div>
             <div className="metric">
@@ -156,19 +156,19 @@ export function RiskPane({
             </div>
             <div className="metric">
               <span>Trip cycle</span>
-              <strong>{formatRiskRange(result.tripCycleMinutes, 1, "m")}</strong>
+              <strong>{formatRiskRange(result.tripCycleMinutes, 1, " min")}</strong>
               <small>
                 Mean{" "}
                 {result.tripCycleMinutes
-                  ? formatNumber(result.tripCycleMinutes.mean, 1) + "m"
+                  ? formatNumber(result.tripCycleMinutes.mean, 1) + " min"
                   : "unbounded"}
                 ; includes bank and altar time
               </small>
             </div>
             <div className="metric">
-              <span>{formatNumber(displayControls.horizonMinutes)}m net GP</span>
-              <strong className="gold">{formatRiskRange(result.timedNetGp, 0, " gp")}</strong>
-              <small>Mean {formatNumber(result.timedNetGp.mean)} gp; completed kills only</small>
+              <span>{formatNumber(displayControls.horizonMinutes)} min net GP</span>
+              <strong className="gold">{formatRiskRange(result.timedNetGp, 0, " GP")}</strong>
+              <small>Mean {formatNumber(result.timedNetGp.mean)} GP; completed kills only</small>
             </div>
             <div className="metric">
               <span>Reach GP target</span>
@@ -176,8 +176,8 @@ export function RiskPane({
                 {formatRiskProbability(result.gpTargetProbability, result.sampleCount)}
               </strong>
               <small>
-                At least {formatNumber(displayControls.gpTarget)} gp in{" "}
-                {formatNumber(displayControls.horizonMinutes)}m
+                At least {formatNumber(displayControls.gpTarget)} GP in{" "}
+                {formatNumber(displayControls.horizonMinutes)} min
               </small>
             </div>
             <div className="metric">

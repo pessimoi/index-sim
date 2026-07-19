@@ -1,6 +1,7 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type Ref } from "react";
 import type { SetupSelectionOption } from "../state/ui-state";
 import { formatNumber } from "../view-models/formatting";
+import { expandedCompactLabel } from "../view-models/presentation-language";
 import { useNumericDraftField } from "./use-numeric-draft-field";
 
 export type SelectOption = { id: string; label: string; hint?: string };
@@ -11,7 +12,8 @@ export function SelectField({
   options,
   onChange,
   disabled = false,
-  className
+  className,
+  accessibleLabel
 }: {
   label: string;
   value: string;
@@ -19,9 +21,11 @@ export function SelectField({
   onChange: (value: string) => void;
   disabled?: boolean;
   className?: string;
+  accessibleLabel?: string;
 }) {
   const id = useId();
   const selectedLabel = options.find((option) => option.id === value)?.label ?? value;
+  const resolvedAccessibleLabel = accessibleLabel ?? expandedCompactLabel(label) ?? undefined;
   return (
     <div className={`field ${className ?? ""}`.trim()}>
       <label htmlFor={id}>{label}</label>
@@ -29,6 +33,7 @@ export function SelectField({
         id={id}
         value={value}
         title={selectedLabel}
+        aria-label={resolvedAccessibleLabel}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
       >
@@ -135,7 +140,8 @@ export function SearchableSelectField({
   onChange,
   disabled = false,
   searchPlaceholder = "Search",
-  className
+  className,
+  accessibleLabel
 }: {
   label: string;
   value: string;
@@ -144,6 +150,7 @@ export function SearchableSelectField({
   disabled?: boolean;
   searchPlaceholder?: string;
   className?: string;
+  accessibleLabel?: string;
 }) {
   const labelId = useId();
   const triggerId = useId();
@@ -157,6 +164,7 @@ export function SearchableSelectField({
   const normalizedQuery = query.trim().toLocaleLowerCase();
   const selectedOption = options.find((option) => option.id === value);
   const selectedLabel = selectedOption?.label ?? value;
+  const resolvedAccessibleLabel = accessibleLabel ?? expandedCompactLabel(label) ?? undefined;
   const filteredOptions =
     normalizedQuery.length === 0
       ? options
@@ -253,7 +261,8 @@ export function SearchableSelectField({
         role="combobox"
         className="searchable-combobox-trigger"
         title={selectedLabel}
-        aria-labelledby={labelId}
+        aria-label={resolvedAccessibleLabel}
+        aria-labelledby={resolvedAccessibleLabel ? undefined : labelId}
         aria-controls={listboxId}
         aria-expanded={expanded}
         aria-haspopup="listbox"
@@ -342,7 +351,8 @@ export function NumberField({
   min = 1,
   max = 99,
   disabled = false,
-  description
+  description,
+  accessibleLabel
 }: {
   label: string;
   value: number;
@@ -351,8 +361,10 @@ export function NumberField({
   max?: number;
   disabled?: boolean;
   description?: string;
+  accessibleLabel?: string;
 }) {
   const id = useId();
+  const resolvedAccessibleLabel = accessibleLabel ?? expandedCompactLabel(label) ?? undefined;
   const field = useNumericDraftField({
     value,
     onChange: (nextValue) => {
@@ -374,6 +386,7 @@ export function NumberField({
         step={1}
         disabled={disabled}
         value={field.draft}
+        aria-label={resolvedAccessibleLabel}
         aria-invalid={field.invalid || undefined}
         aria-describedby={field.describedBy}
         onChange={field.handleChange}
@@ -408,7 +421,9 @@ export function DecimalField({
   max = 999,
   step = 0.05,
   disabled = false,
-  description
+  description,
+  inputRef,
+  accessibleLabel
 }: {
   label: string;
   value: number;
@@ -418,8 +433,11 @@ export function DecimalField({
   step?: number;
   disabled?: boolean;
   description?: string;
+  inputRef?: Ref<HTMLInputElement>;
+  accessibleLabel?: string;
 }) {
   const id = useId();
+  const resolvedAccessibleLabel = accessibleLabel ?? expandedCompactLabel(label) ?? undefined;
   const field = useNumericDraftField({
     value,
     onChange: (nextValue) => {
@@ -433,6 +451,7 @@ export function DecimalField({
     <div className="field">
       <label htmlFor={id}>{label}</label>
       <input
+        ref={inputRef}
         id={id}
         type="text"
         inputMode="decimal"
@@ -441,6 +460,7 @@ export function DecimalField({
         step={step}
         disabled={disabled}
         value={field.draft}
+        aria-label={resolvedAccessibleLabel}
         aria-invalid={field.invalid || undefined}
         aria-describedby={field.describedBy}
         onChange={field.handleChange}
@@ -478,7 +498,8 @@ export function OptionalNumberField({
   resetLabel = "Reset",
   compactReset = false,
   disabled = false,
-  description
+  description,
+  accessibleLabel
 }: {
   label: string;
   value: number | null;
@@ -491,8 +512,10 @@ export function OptionalNumberField({
   compactReset?: boolean;
   disabled?: boolean;
   description?: string;
+  accessibleLabel?: string;
 }) {
   const id = useId();
+  const resolvedAccessibleLabel = accessibleLabel ?? expandedCompactLabel(label) ?? undefined;
   const field = useNumericDraftField({
     value,
     onChange,
@@ -520,6 +543,7 @@ export function OptionalNumberField({
           disabled={disabled}
           value={field.draft}
           placeholder={placeholder}
+          aria-label={resolvedAccessibleLabel}
           aria-invalid={field.invalid || undefined}
           aria-describedby={field.describedBy}
           onChange={field.handleChange}
@@ -560,17 +584,27 @@ export function OptionalNumberField({
 export function ReadOnlyField({
   label,
   value,
-  disabled = false
+  disabled = false,
+  accessibleLabel
 }: {
   label: string;
   value: string;
   disabled?: boolean;
+  accessibleLabel?: string;
 }) {
   const labelId = useId();
+  const resolvedAccessibleLabel = accessibleLabel ?? expandedCompactLabel(label) ?? undefined;
   return (
     <div className={`field readonly-field ${disabled ? "disabled" : ""}`}>
-      <span id={labelId}>{label}</span>
-      <output aria-labelledby={labelId}>{value}</output>
+      <span id={labelId} aria-hidden={resolvedAccessibleLabel ? true : undefined}>
+        {label}
+      </span>
+      <output
+        aria-label={resolvedAccessibleLabel ? `${resolvedAccessibleLabel}: ${value}` : undefined}
+        aria-labelledby={resolvedAccessibleLabel ? undefined : labelId}
+      >
+        {value}
+      </output>
     </div>
   );
 }

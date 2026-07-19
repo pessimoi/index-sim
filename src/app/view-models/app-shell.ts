@@ -373,7 +373,7 @@ export function createWorkbenchResultViewModel(input: {
       {
         label: "TTK",
         value: formatDuration(input.ttkSec),
-        detail: risk ? `P10/50/90 ${formatRiskRange(risk.killTimeSeconds, 1, "s")}` : undefined,
+        detail: risk ? `P10/50/90 ${formatRiskRange(risk.killTimeSeconds, 1, " s")}` : undefined,
         reviewTarget: risk ? "risk" : undefined
       },
       { label: "KILLS/HR", value: formatNumber(input.killsPerHour) },
@@ -384,10 +384,10 @@ export function createWorkbenchResultViewModel(input: {
         value: formatNumber(input.effectiveNetGpPerHour),
         tone: "gold",
         detail: risk
-          ? `${formatNumber(risk.horizonMinutes)}m P10/50/90 ${formatRiskRange(
+          ? `${formatNumber(risk.horizonMinutes)} min P10/50/90 ${formatRiskRange(
               risk.timedNetGp,
               0,
-              " gp"
+              " GP"
             )}`
           : undefined,
         reviewTarget: risk ? "risk" : undefined

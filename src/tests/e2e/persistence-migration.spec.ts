@@ -272,9 +272,12 @@ test("reviews and imports compatible legacy setup data", async ({ page }) => {
       )
     );
   });
+  const tabs = page.getByLabel("Workbench tabs");
+  await tabs.getByRole("tab", { name: "Economy" }).click();
   await expect(page.getByLabel("Market active PriceSet summary")).toContainText(
     "Legacy browser prices"
   );
+  await tabs.getByRole("tab", { name: "Monsters" }).click();
   const legacyImport = await resultMetricSnapshot(page);
   expect({
     legacyImport
@@ -298,9 +301,9 @@ test("updates manual combat overrides and resets to derived values", async ({ pa
   await page.goto("/");
 
   const setup = page.getByLabel("Combat setup");
-  await setup.getByLabel("ACC+", { exact: true }).fill("120");
-  await setup.getByLabel("DMG+", { exact: true }).fill("95");
-  await setup.getByLabel("SPD", { exact: true }).fill("1.2");
+  await setup.getByLabel("Accuracy bonus", { exact: true }).fill("120");
+  await setup.getByLabel("Damage bonus", { exact: true }).fill("95");
+  await setup.getByLabel("Attack speed in seconds", { exact: true }).fill("1.2");
   const assumptions = page.getByLabel("Active assumptions");
   await expect(assumptions).toContainText("Manual combat overrides");
 
@@ -321,7 +324,7 @@ test("updates manual combat overrides and resets to derived values", async ({ pa
   const overrides = page.getByLabel("Manual combat overrides");
   await expect(overrides.getByLabel("Accuracy bonus")).toHaveValue("");
   await expect(overrides.getByLabel("Damage bonus")).toHaveValue("");
-  await expect(overrides.getByLabel("Attack speed sec")).toHaveValue("");
+  await expect(overrides.getByLabel("Attack speed (seconds)")).toHaveValue("");
   await page.waitForFunction(() => {
     const saved = window.localStorage.getItem("index-sim:rewrite-setup") ?? "";
     return (
@@ -864,10 +867,10 @@ test("keeps global actions focused and completes setup export and Import setup r
   await expect(denseFilters.getByLabel("Show hidden / irrelevant")).toBeChecked();
 
   await tabs.getByRole("tab", { name: "Cannon" }).click();
-  const cannon = page.getByLabel("Cannon", { exact: true });
+  const cannon = page.locator('section.cannon-strip[aria-label="Cannon"]');
   await expect(cannon.getByLabel("Set up cannon")).toBeChecked();
   await expect(cannon.getByLabel("Mobs at spot")).toHaveValue("4");
-  await expect(cannon.getByLabel("Respawn", { exact: true })).toHaveValue("45");
+  await expect(cannon.getByLabel("Respawn (seconds)", { exact: true })).toHaveValue("45");
 
   await page.waitForFunction((expectedSetup) => {
     const raw = window.localStorage.getItem("index-sim:rewrite-setup");
@@ -997,6 +1000,8 @@ test("round-trips a full PriceSet through the one advanced Market workflow", asy
   await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Settings" }).click();
 
   const settings = page.getByLabel("Price data settings");
+  await expect(page.getByLabel("Market price data")).toHaveCount(0);
+  await settings.getByRole("button", { name: "Review in Economy" }).click();
   const market = page.getByLabel("Market price data");
   const advancedPriceSetTools = market.locator("details.advanced-price-set-tools");
   await expect(settings.locator('input[type="file"]')).toHaveCount(0);
@@ -1113,8 +1118,11 @@ test("keeps PriceSet import failures non-fatal and recoverable", async ({ page }
   await page.goto("/");
   await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Settings" }).click();
   const settings = page.locator('[aria-label="Price data settings"]');
-  const priceSetSummary = settings.locator('[aria-label="Active PriceSet summary"]');
-  const historySummary = page.locator('[aria-label="Price history summary"]');
+  await expect(page.getByLabel("Market price data")).toHaveCount(0);
+  await settings.getByRole("button", { name: "Review in Economy" }).click();
+  const market = page.getByLabel("Market price data");
+  const priceSetSummary = market.locator('[aria-label="Market active PriceSet summary"]');
+  const historySummary = market.locator('[aria-label="Price history summary"]');
   const summaryText = async (locator: Locator) =>
     (await locator.locator("span").allTextContents()).map((text) => text.trim()).join(" | ");
 
@@ -1123,7 +1131,6 @@ test("keeps PriceSet import failures non-fatal and recoverable", async ({ page }
   const storedHistoryBefore = await page.evaluate(() =>
     window.localStorage.getItem("index-sim:price-history")
   );
-  const market = page.getByLabel("Market price data");
   const advancedPriceSetTools = market.locator("details.advanced-price-set-tools");
   await expect(advancedPriceSetTools).not.toHaveAttribute("open", "");
   await advancedPriceSetTools.locator(":scope > summary").click();

@@ -1,6 +1,6 @@
 # Contextual item-price correction specification
 
-Status: specified on 2026-07-19; implementation pending.
+Status: implemented on 2026-07-19.
 
 Priority: high. Estimated implementation size: S.
 
@@ -40,14 +40,13 @@ The current source already provides most of the required contract:
 - applying or resetting D-090 state already recomposes the active PriceSet and
   updates every current calculated consumer.
 
-The remaining gap is one missing intent path between these implemented
-surfaces. For example, a notice that says an item uses a fallback value explains
-the risk but still requires the user to search for that item again in the
-manual editor.
+The remaining gap was one missing intent path between these implemented
+surfaces. The implemented path now carries the exact structured action through
+the shared App coordinator, so a correctable notice no longer requires the user
+to search for the item again in the manual editor.
 
 This follow-up does not downgrade any inventory row to `Osittain`: the accepted
-workflows are implemented. The backlog tracks this as a high-priority usability
-hardening card until the direct path is delivered.
+workflows and the direct usability hardening path are implemented.
 
 ## Goals
 
@@ -319,7 +318,60 @@ release-visible.
 - Focused tests, production-preview browser coverage, full functional Chromium
   and repository gates pass.
 
+## Implemented result
+
+- `src/app/view-models/price-data.ts` derives a stable `noticeId` and exact
+  typed `correct-price` or `inspect-item` action from structured warning data
+  plus the latest active base-PriceSet item set. Missing high-alch remains
+  inspect-only and itemless notices remain actionless.
+- One actionable Result issue renders its direct action. Multiple or
+  actionless issues retain `Review price data`; Result still contains no
+  per-item advisory list or confidence notes.
+- Result, row and nested Loot notices and Economy disclosure rows emit the same
+  `PriceNoticeAction`. `App.tsx` alone revalidates the latest D-090 option set,
+  selects and initializes the exact item, clears pending clear-all state,
+  activates Economy and consumes one monotonically identified focus request.
+- Correct-price focus lands on the native `Manual price` input. Inspect focus
+  lands on the exact Economy notice action, with the existing disclosure
+  summary and bounded neutral status as the vanished-notice fallback.
+- D-090 Apply and Reset remain the only overlay/persistence transaction. Their
+  bounded Market/app status now identifies the item and GP value and states
+  whether current results use the manual or base PriceSet value; the existing
+  session-only suffix remains intact when persistence is unavailable.
+- Manual overlay storage, the base PriceSet, generated high alch, histories,
+  warning relevance, calculations, D-102 advanced tools and provider/backend
+  boundaries are unchanged.
+
+## Implementation evidence
+
+- Pure tests cover stable identity, all correctable notice families,
+  high-alch/itemless handling, allowlist re-derivation and single-versus-
+  multiple Result eligibility.
+- Component tests cover exact typed Result, row/nested Loot and Economy action
+  emission plus the native manual-input ref. The advanced full-PriceSet
+  disclosure remains separate and collapsed.
+- The production-preview Playwright test `corrects a warned item price` covers
+  Result inspect focus for the current non-editable missing-key issue, Loot to
+  exact item/input focus, Apply and warning removal, Reset feedback and Economy
+  to exact item/input focus. The existing imported-PriceSet case covers the
+  multiple-issue aggregate Result route.
+- The required focused command passes 4 files / 31 tests; the adjacent Loot
+  pane action suite passes 4/4. `npm run verify` passes 88 files / 881 tests,
+  19/19 goldens, architecture, lint, formatting, production build and artifact
+  checks. The complete functional Chromium suite passes 92/92.
+- Evidence is local runtime, synthetic test and source inspection only; no live
+  provider or deployment claim is made.
+
+## Deviations
+
+No implementation-contract deviation. The browser's current Result fallback
+is inspect-only because its missing item is outside D-090's active base-item
+allowlist; selecting it for correction would violate the accepted boundary.
+The direct correctable Result branch is therefore proven with pure and
+component integration evidence, while the production browser proves the
+correctable shared transition from Loot and Economy.
+
 ## Open questions
 
-None. This specification accepts the direct contextual correction path while
-preserving D-090, D-101 and D-102 ownership and schema boundaries.
+None. The implementation preserves D-090, D-101 and D-102 ownership and schema
+boundaries.

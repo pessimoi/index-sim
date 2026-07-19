@@ -282,6 +282,42 @@ The documented `npm run test:e2e:visual:update` path then changed exactly those
 passed 20/20 in 40.4 and 43.6 seconds. The current 31-snapshot Darwin set is the
 accepted fixture-only baseline for this integrated source state.
 
+## 2026-07-19 language, units and hierarchy review
+
+The user-facing presentation pass first ran the complete Darwin matrix
+read-only. Nine scenarios passed their accepted screenshots and 11 stopped at
+their first mismatch. The actual/diff images for root/MonsterCard desktop,
+compact landscape and mobile, Dense Compare desktop/tablet, Loot
+desktop/mobile, Economy desktop, Planner mobile, Duel mobile and Settings
+desktop were reviewed. An ignored candidate config then generated all 31
+current images under `.codex-tmp/`, allowing the later Loot action/nested,
+Economy trend and Settings Price data/legacy-review captures to be inspected
+before any tracked write. A nested Loot locator was narrowed to the direct row
+disclosure after the new technical disclosure made the old descendant-last
+selector ambiguous; this changed test selection only.
+
+The accepted tracked update changed exactly 15 screenshots:
+
+- root shell desktop, compact landscape and mobile;
+- Dense Compare desktop and tablet;
+- Loot desktop/mobile and both nested desktop/mobile captures;
+- Economy desktop and trend;
+- Planner mobile and Duel mobile; and
+- Settings desktop and Settings Price data.
+
+The differences are explained by source-backed primary names, removal of
+always-visible technical ids, explicit time/GP/XP presentation, and the short
+Settings Price data hierarchy. Settings desktop also integrates the previously
+reviewed Workspace backup section between Calculation context and Local state
+recovery. Cannon, Trip, loadout, Stats, Loot action impact, Duel desktop,
+Planner desktop and Settings legacy review stayed within the accepted
+comparison or byte-identical contract and were not rewritten by the tracked
+update. Review found no numeric change, missing control, table widening,
+clipping, accidental overflow, real player data, imported payload, secret,
+absolute path or raw diagnostic. The explicit update completed 20/20, and the
+following full tracked-baseline read-only run passed 20/20 against all 31
+fixture-only images. Candidate evidence remains workspace-local and ignored.
+
 ## Diff policy
 
 Use Playwright `toHaveScreenshot` with:

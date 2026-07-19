@@ -1,6 +1,8 @@
 # Workspace backup and restore specification
 
-Status: specced; implementation pending.
+Status: implemented 2026-07-19. The bounded envelope/registry, safe
+export/Review-before-restore, typed area planning and logical atomic
+Apply/Undo/recovery slices are complete.
 
 Priority: high.
 
@@ -12,16 +14,16 @@ The product intentionally keeps user-owned state in the browser and has no
 account or general application database. That makes a user-controlled file the
 appropriate durability and browser-transfer boundary.
 
-The current app can export a rewrite setup, a saved-setup collection and a
-PriceSet as separate files. Local-state health and recovery cover all eleven
-known rewrite-owned browser states, but the health export contains metadata
-only. Those workflows do not form one complete, reviewable and restorable local
-workspace.
+Before this feature, the app could export a rewrite setup, a saved-setup
+collection and a PriceSet only as separate files. Local-state health and
+recovery covered all eleven known rewrite-owned browser states, but the health
+export contained metadata only. Those workflows did not form one complete,
+reviewable and restorable local workspace.
 
-This specification adds one bounded, versioned Workspace backup file for the
-user-owned local state. Import remains review-only until the user selects areas,
-chooses the supported Replace or Merge behavior and explicitly applies one
-atomic restore plan.
+The implemented workflow adds one bounded, versioned Workspace backup file for
+the user-owned local state. Import remains review-only until the user selects
+areas, chooses the supported Replace or Merge behavior and explicitly applies
+one atomic restore plan.
 
 This is not account storage, database storage or a server synchronization
 feature.
@@ -70,10 +72,10 @@ The Workspace workflow composes those rules. It must not weaken or fork them.
 
 ## Feature-inventory classification
 
-`Workspace backup and restore` is a new `Suunniteltu` product workflow. The
-existing setup, saved-setup, PriceSet, local-state attention and local-state
-recovery workflows remain `Valmis`; their status must not imply that a complete
-workspace file already exists.
+`Workspace backup and restore` is a `Valmis` product workflow. The existing
+setup, saved-setup, PriceSet, local-state attention and local-state recovery
+workflows remain separate `Valmis` owners and their individual transfer files
+and metadata-only diagnostics remain available.
 
 ## Goals
 
@@ -457,11 +459,12 @@ type WorkspaceDurableApplyOutcome =
   | { status: "failed"; reason: "rollback-failed" | "stale-review" };
 ```
 
-The core owns bounded parsing, area codecs, review state, latest-request
-sequencing, plan construction, deterministic storage batching and rollback. It
-receives file reading, time, download, the selected `KeyValueStorage`,
-`persistenceUnavailable` and React application through injected dependencies
-so Node tests require no DOM.
+The file-transfer core owns bounded parsing, area codecs, review state,
+latest-request sequencing and plan construction. The lazily loaded executor
+owns preflight serialization, deterministic storage batching, rollback and its
+single complete Undo record. They receive file reading, time, download, the
+selected `KeyValueStorage`, `persistenceUnavailable` and typed React
+application through injected dependencies so Node tests require no DOM.
 
 `App` owns one coherent current live-state capture and applies only a typed
 prevalidated outcome. Existing setup, Planner, Loot, Duel, PriceSet, price
@@ -535,15 +538,46 @@ git diff --check
 
 ## Implementation slices
 
-1. **Bounded envelope and registry**: exhaustive policy, area codecs, Revision
-   stamp, export builder/parser and pure review summaries.
-2. **Safe export and Review-before-restore**: Settings surface, opt-in Hiscores
-   privacy choice, bounded latest-request import and zero-mutation review.
-3. **Area restore planning**: explicit selection, Replace/Merge implementations,
-   compatibility and cap previews, typed live-state outcome.
-4. **Atomic Apply/Undo and recovery**: preflight serialization, deterministic
-   batch, exact rollback, session-only path, persistence suppression, Undo and
-   local-state attention integration.
+1. **Implemented 2026-07-19 — Bounded envelope and registry**: exhaustive
+   policy, area codecs, Revision stamp and export builder/parser.
+2. **Implemented 2026-07-19 — Safe export and Review-before-restore**:
+   DOM-free controller plus browser hook, coherent live-state capture, Settings
+   surface, session-only Hiscores privacy choice, bounded latest-request import,
+   raw-free area compatibility summaries, zero-mutation review, input reset and
+   focus-correct Dismiss.
+3. **Implemented 2026-07-19 — Area restore planning**: mutable accessible area
+   selection and mode controls, all ten Replace outcomes, the six closed Merge
+   policies, fresh Revision/entity validation, exact effect/cap previews and one
+   typed selected-area plus PriceSet-composition outcome. Plan construction has
+   no storage, recovery or live-state mutation authority.
+4. **Implemented 2026-07-19 — Atomic Apply/Undo and recovery**: exhaustive
+   registry-order preflight and serialization, exact raw/missing preimages,
+   deterministic write/remove plus reverse rollback, one typed live outcome,
+   bounded recovery transitions, explicit session-only Apply and complete
+   durable/session-only Undo.
+
+The implemented controller revalidates the exact candidate and current context
+immediately before Apply and consumes a successful candidate, so stale and
+double Apply have no authority. `WorkspaceRestoreExecutorCore` serializes every
+selected value before the first write, uses the closed target registry rather
+than file order and applies live state only after durable success. App composes
+the selected PriceSet and manual overlay together, does not append history,
+restores Hiscores only after recipient selection and suppresses each selected
+normal persistence effect once. Recovery completion is selected-only; safe
+exact rollback exposes the explicit session action without blocking unrelated
+persistence, while rollback failure blocks every affected id and offers no
+session-only success.
+
+Implementation evidence is owned by `src/app/state/workspace-backup.ts`,
+`src/app/controllers/workspace-file-transfer*.ts`,
+`src/app/controllers/workspace-restore-plan.ts`,
+`src/app/controllers/workspace-restore-executor.ts`,
+`src/app/controllers/local-state-recovery.ts`, `src/app/App.tsx` and the pure
+Settings presenters. Dated unit, Chromium, visual and release-gate evidence is
+recorded in [the testing evidence log](../project/testing-evidence.md). The
+evidence ceiling is local runtime/synthetic tests: V1 provides logical
+rollback atomicity for handled browser operations, not crash-atomic storage,
+account backup, deployment proof or cross-device synchronization.
 
 ## Done criteria
 

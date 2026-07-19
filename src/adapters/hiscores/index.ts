@@ -26,11 +26,13 @@ export const HISCORES_LAST_PLAYER_STORAGE_VERSION = 1;
 
 type Fetcher = typeof fetch;
 
-const LastHiscoresPlayerSchema = z
+export const LastHiscoresPlayerStateSchema = z
   .object({
     player: HiscoresPlayerNameSchema
   })
   .strict();
+
+export type LastHiscoresPlayerState = z.infer<typeof LastHiscoresPlayerStateSchema>;
 
 export interface HiscoresFetchOptions {
   fetcher?: Fetcher;
@@ -189,7 +191,7 @@ export function loadLastHiscoresPlayer(storage: KeyValueStorage): string {
   const result = loadPersisted({
     key: HISCORES_LAST_PLAYER_STORAGE_KEY,
     version: HISCORES_LAST_PLAYER_STORAGE_VERSION,
-    schema: LastHiscoresPlayerSchema,
+    schema: LastHiscoresPlayerStateSchema,
     storage
   });
   return result.status === "loaded" ? result.value.player : "";
@@ -201,7 +203,7 @@ export function saveLastHiscoresPlayer(storage: KeyValueStorage, player: string)
     {
       key: HISCORES_LAST_PLAYER_STORAGE_KEY,
       version: HISCORES_LAST_PLAYER_STORAGE_VERSION,
-      schema: LastHiscoresPlayerSchema,
+      schema: LastHiscoresPlayerStateSchema,
       storage
     },
     { player: request.player }

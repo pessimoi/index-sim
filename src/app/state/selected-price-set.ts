@@ -50,6 +50,12 @@ const SelectedPriceSetStateV1Schema = z
 
 export type SelectedPriceSetState = z.infer<typeof SelectedPriceSetStateSchema>;
 
+/** Canonical logical value used by aggregate transfers, without persistence metadata. */
+export const SelectedPriceSetValueSchema: z.ZodType<PriceSet | null> =
+  PriceSetSchema.nullable().transform((priceSet) =>
+    priceSet === null ? null : normalizePriceSetItemMetadata(priceSet)
+  );
+
 export type LoadSelectedPriceSetResult =
   | { status: "missing"; value: null }
   | {

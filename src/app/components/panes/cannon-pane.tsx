@@ -94,7 +94,7 @@ export function CannonPane({
           onChange={onTargetsChange}
         />
         <NumberField
-          label="Respawn"
+          label="Respawn (seconds)"
           value={respawnSeconds}
           min={1}
           max={3600}
@@ -170,7 +170,7 @@ export function CannonPane({
                     value: output.ballsPerTrip == null ? "-" : formatNumber(output.ballsPerTrip)
                   },
                   {
-                    label: "Ball gp/trip",
+                    label: "Ball GP/trip",
                     value:
                       output.ballCostPerTrip == null ? "-" : formatNumber(output.ballCostPerTrip),
                     tone: "gold"
@@ -193,7 +193,7 @@ export function CannonPane({
                   { label: "XP rule", value: "Ranged XP" },
                   {
                     label: "Supply impact",
-                    value: `${formatNumber(output.ballCostPerKill)} gp/kill`,
+                    value: `${formatNumber(output.ballCostPerKill)} GP/kill`,
                     tone: "gold"
                   },
                   { label: "Sparse link", value: sparseSummary },

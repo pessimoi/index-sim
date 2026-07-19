@@ -141,7 +141,7 @@ function activeAssumptionManualOverrideParts(
     parts.push(`damage ${activeAssumptionSigned(overrides.damageBonus)}`);
   }
   if (overrides.attackSpeedSec != null) {
-    parts.push(`speed ${formatNumber(overrides.attackSpeedSec, 1)}s`);
+    parts.push(`speed ${formatNumber(overrides.attackSpeedSec, 1)} s`);
   }
   return parts;
 }
@@ -158,14 +158,14 @@ function activeAssumptionLootSettingParts(
     parts.push("high alch on");
   }
   if (rawSettings?.overheadSec != null)
-    parts.push(`overhead ${formatNumber(settings.overheadSec ?? 0, 1)}s`);
+    parts.push(`overhead ${formatNumber(settings.overheadSec ?? 0, 1)} s`);
   if (rawSettings?.talismanSpot === "overground") parts.push("talisman overground");
   return parts;
 }
 
 function activeAssumptionTripManualParts(form: CombatSetupFormState): string[] {
   const parts: string[] = [];
-  if (form.trip.bankSeconds != null) parts.push(`bank ${formatNumber(form.trip.bankSeconds)}s`);
+  if (form.trip.bankSeconds != null) parts.push(`bank ${formatNumber(form.trip.bankSeconds)} s`);
   if (form.trip.foodCount != null) parts.push(`food ${formatNumber(form.trip.foodCount)}`);
   if (form.trip.foodPerKillOverride != null) {
     parts.push(`food/kill ${formatNumber(form.trip.foodPerKillOverride, 2)}`);
@@ -177,7 +177,7 @@ function activeAssumptionTripManualParts(form: CombatSetupFormState): string[] {
       parts.push(`prayer ${formatNumber(form.trip.prayerPotionSets)} vials`);
     }
   } else if (form.trip.prayerMode === "altar" && form.trip.altarSeconds != null) {
-    parts.push(`altar ${formatNumber(form.trip.altarSeconds)}s`);
+    parts.push(`altar ${formatNumber(form.trip.altarSeconds)} s`);
   }
   return parts;
 }
@@ -289,7 +289,7 @@ export function createActiveAssumptionsSummaryViewModel(input: {
       value: output?.idle ? "Enabled, idle" : "Enabled",
       detail: [
         `targets ${formatNumber(currentCannon.targets ?? 3)}`,
-        respawn != null ? `respawn ${formatNumber(respawn)}s` : null
+        respawn != null ? `respawn ${formatNumber(respawn)} s` : null
       ]
         .filter(Boolean)
         .join(", "),
@@ -398,7 +398,7 @@ export function createActiveAssumptionsSummaryViewModel(input: {
       value: "On",
       detail: [
         `targets ${formatNumber(input.form.trip.targetsAtSpot ?? input.trip.trip.scarce.targetsAtSpot)}`,
-        `respawn ${formatNumber(input.form.trip.respawnSeconds ?? input.trip.trip.scarce.respawnSeconds)}s`
+        `respawn ${formatNumber(input.form.trip.respawnSeconds ?? input.trip.trip.scarce.respawnSeconds)} s`
       ].join(", "),
       reviewTab: "trip",
       tone: "info",

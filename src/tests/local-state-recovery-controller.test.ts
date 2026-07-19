@@ -165,6 +165,72 @@ describe("local state recovery controller", () => {
     expect(recovery.shouldSkipPersist("hidden-gear-tiers")).toBe(false);
   });
 
+  it("prepares and completes one external batch with one-shot skips and one published refresh", () => {
+    const storage = createMemoryStorage({
+      [HIDDEN_GEAR_TIERS_STORAGE_KEY]: "{",
+      [REWRITE_SETUP_STORAGE_KEY]: persistedEnvelope(999, {})
+    });
+    const { controller: recovery } = controller(storage);
+    const listener = vi.fn();
+    recovery.subscribe(listener);
+
+    recovery.prepareExternalApply(["hidden-gear-tiers", "rewrite-setup"]);
+    expect(listener).not.toHaveBeenCalled();
+    recovery.recordExternalApplyFailure([
+      { id: "hidden-gear-tiers", reason: "save_failed" },
+      { id: "rewrite-setup", reason: "clear_failed" }
+    ]);
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(reportItem(recovery, "hidden-gear-tiers")).toMatchObject({
+      status: "save-failed",
+      reason: "save_failed"
+    });
+
+    listener.mockClear();
+    recovery.prepareExternalApply(["hidden-gear-tiers", "rewrite-setup"]);
+    recovery.completeExternalApply(["hidden-gear-tiers", "rewrite-setup"]);
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(recovery.getSnapshot().blockedIds).not.toEqual(
+      expect.arrayContaining(["hidden-gear-tiers", "rewrite-setup"])
+    );
+    expect(recovery.shouldSkipPersist("hidden-gear-tiers")).toBe(true);
+    expect(recovery.shouldSkipPersist("hidden-gear-tiers")).toBe(false);
+    expect(recovery.shouldSkipPersist("rewrite-setup")).toBe(true);
+    expect(recovery.shouldSkipPersist("rewrite-setup")).toBe(false);
+  });
+
+  it("reports a rolled-back external save failure without blocking ordinary persistence", () => {
+    const { controller: recovery } = controller(createMemoryStorage());
+
+    recovery.recordExternalApplyFailure([{ id: "rewrite-setup", reason: "save_failed" }]);
+
+    expect(recovery.getSnapshot().blockedIds).not.toContain("rewrite-setup");
+    expect(reportItem(recovery, "rewrite-setup")).toMatchObject({
+      status: "save-failed",
+      reason: "save_failed"
+    });
+
+    recovery.recordExternalApplyFailure([{ id: "planner-ui", reason: "save_failed" }], true);
+    expect(recovery.getSnapshot().blockedIds).toContain("planner-ui");
+  });
+
+  it("reconciles selected attention from exact raw values after external Undo", () => {
+    const storage = createMemoryStorage();
+    const { controller: recovery } = controller(storage);
+    storage.setItem(HIDDEN_GEAR_TIERS_STORAGE_KEY, "{");
+    const listener = vi.fn();
+    recovery.subscribe(listener);
+
+    recovery.completeExternalUndo(["hidden-gear-tiers"]);
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(recovery.getSnapshot().blockedIds).toContain("hidden-gear-tiers");
+    expect(reportItem(recovery, "hidden-gear-tiers")).toMatchObject({
+      status: "invalid",
+      needsAttention: true
+    });
+  });
+
   it("clear failure keeps the block and exposes sanitized report metadata and copy", () => {
     const backing = createMemoryStorage({ [HIDDEN_GEAR_TIERS_STORAGE_KEY]: "{" });
     const storage: KeyValueStorage = {

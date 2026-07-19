@@ -4,6 +4,7 @@ import type { PriceImportNotice } from "../state/price-import";
 import type { InlineNoticeViewModel } from "../view-models/contracts";
 import { formatNumber } from "../view-models/formatting";
 import type { DenseCompareScaleCellViewModel } from "../view-models/compare";
+import { expandedCompactLabel } from "../view-models/presentation-language";
 
 export interface ShareSetupDialogState {
   url: string;
@@ -27,17 +28,27 @@ export interface DisplayMetric {
   label: string;
   value: string;
   tone?: string;
+  accessibleLabel?: string;
 }
 
 export function MetricList({ items }: { items: readonly DisplayMetric[] }) {
   return (
     <>
-      {items.map((item) => (
-        <div className="metric" key={item.label}>
-          <span>{item.label}</span>
-          <strong className={item.tone}>{item.value}</strong>
-        </div>
-      ))}
+      {items.map((item) => {
+        const accessibleLabel = item.accessibleLabel ?? expandedCompactLabel(item.label);
+        return (
+          <div
+            className="metric"
+            key={item.label}
+            aria-label={accessibleLabel ? `${accessibleLabel}: ${item.value}` : undefined}
+          >
+            <span aria-hidden={accessibleLabel ? true : undefined}>{item.label}</span>
+            <strong aria-hidden={accessibleLabel ? true : undefined} className={item.tone}>
+              {item.value}
+            </strong>
+          </div>
+        );
+      })}
     </>
   );
 }

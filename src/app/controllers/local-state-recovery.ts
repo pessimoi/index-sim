@@ -108,6 +108,26 @@ export function unblockReplacedLocalStateTransition(
   };
 }
 
+export function prepareExternalLocalStateApplyTransition(
+  state: LocalStateRecoveryTransitionState,
+  ids: readonly LocalStateHealthItemId[]
+): LocalStateRecoveryTransitionState {
+  return {
+    ...state,
+    skipNextPersistIds: uniqueIds([...state.skipNextPersistIds, ...ids])
+  };
+}
+
+export function cancelExternalLocalStateApplyTransition(
+  state: LocalStateRecoveryTransitionState,
+  ids: readonly LocalStateHealthItemId[]
+): LocalStateRecoveryTransitionState {
+  return {
+    ...state,
+    skipNextPersistIds: withoutIds(state.skipNextPersistIds, ids)
+  };
+}
+
 export function consumeLocalStatePersistSkip(
   state: LocalStateRecoveryTransitionState,
   id: LocalStateHealthItemId
@@ -290,6 +310,79 @@ export class LocalStateRecoveryControllerCore {
   unblockReplaced = (ids: readonly LocalStateHealthItemId[]): void => {
     if (ids.length === 0) return;
     this.transition = unblockReplacedLocalStateTransition(this.transition, ids);
+    this.refresh();
+  };
+
+  prepareExternalApply = (ids: readonly LocalStateHealthItemId[]): void => {
+    if (ids.length === 0) return;
+    this.transition = prepareExternalLocalStateApplyTransition(this.transition, uniqueIds(ids));
+  };
+
+  cancelExternalApply = (ids: readonly LocalStateHealthItemId[]): void => {
+    if (ids.length === 0) return;
+    this.transition = cancelExternalLocalStateApplyTransition(this.transition, uniqueIds(ids));
+  };
+
+  completeExternalApply = (ids: readonly LocalStateHealthItemId[]): void => {
+    const selectedIds = uniqueIds(ids);
+    if (selectedIds.length === 0) return;
+    this.transition = unblockReplacedLocalStateTransition(
+      {
+        ...this.transition,
+        storageFailures: removeLocalStateStorageFailures(
+          this.transition.storageFailures,
+          selectedIds
+        )
+      },
+      selectedIds
+    );
+    this.refresh();
+  };
+
+  completeExternalUndo = (ids: readonly LocalStateHealthItemId[]): void => {
+    const selectedIds = uniqueIds(ids);
+    if (selectedIds.length === 0) return;
+    this.transition = {
+      ...this.transition,
+      blockedIds: withoutIds(this.transition.blockedIds, selectedIds),
+      contextInvalidIds: withoutIds(this.transition.contextInvalidIds, selectedIds),
+      storageFailures: removeLocalStateStorageFailures(this.transition.storageFailures, selectedIds)
+    };
+    const report = this.currentReport();
+    const restoredAttentionIds = report.items
+      .filter((item) => selectedIds.includes(item.id) && localStateHealthNeedsAttention(item))
+      .map((item) => item.id);
+    this.transition = {
+      ...this.transition,
+      blockedIds: uniqueIds([...this.transition.blockedIds, ...restoredAttentionIds])
+    };
+    this.publish(report);
+  };
+
+  recordExternalApplyFailure = (
+    failures: readonly LocalStateStorageFailure[],
+    blockPersistence = false
+  ): void => {
+    if (failures.length === 0) return;
+    let nextFailures = this.transition.storageFailures;
+    const failedIds: LocalStateHealthItemId[] = [];
+    for (const failure of failures) {
+      nextFailures = upsertLocalStateStorageFailure(nextFailures, failure);
+      failedIds.push(failure.id);
+    }
+    this.transition = cancelExternalLocalStateApplyTransition(
+      {
+        ...this.transition,
+        blockedIds: blockPersistence
+          ? uniqueIds([...this.transition.blockedIds, ...failedIds])
+          : this.transition.blockedIds,
+        storageFailures: nextFailures
+      },
+      failedIds
+    );
+    const notice = this.persistenceNotice();
+    this.snapshot = { ...this.snapshot, notice };
+    this.dependencies.onStatus(notice);
     this.refresh();
   };
 

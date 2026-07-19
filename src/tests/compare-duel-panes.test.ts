@@ -105,6 +105,10 @@ describe("Compare and Duel panes", () => {
       'aria-label="All monsters"'
     ]);
     expect(markup).toContain('aria-sort="descending"');
+    expect(markup).toContain('aria-label="Sort by time to kill"');
+    expect(markup).toContain('aria-label="Sort by experience points per hour"');
+    expect(markup).toContain('aria-label="Sort by gold pieces per kill"');
+    expect(markup).toContain('aria-label="Sort by net gold pieces per hour"');
     expect(markup).toContain(`data-monster-id="${DEFAULT_FORM_STATE.monsterId}"`);
     expect(markup).toContain('aria-selected="true"');
     expect(markup).toContain('tabindex="0"');

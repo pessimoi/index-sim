@@ -29,15 +29,58 @@ test("shows the accepted Revision 274 context in the ready shell and Settings", 
     "376072662e78a314bf35bb18815be39521491a6b"
   );
   await expect(calculationContext).toContainText("Generated2026-07-09T00:00:00.000Z");
-  await expect(calculationContext).toContainText(
-    "Uses the active PriceSet shown in Economy; setup transfers do not include prices."
-  );
+  await expect(calculationContext).toContainText("Setup transfers do not include prices.");
   await expect(calculationContext).not.toContainText(".sources");
   await expect(calculationContext).not.toContainText("data:generate");
 
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(revisionBadge).toBeVisible();
   await expectPageWidthContained(page);
+});
+
+test("reviews the Settings PriceSet in Economy without changing price or disclosure state", async ({
+  page
+}) => {
+  await page.goto("/");
+  const tabs = page.getByLabel("Workbench tabs");
+  await tabs.getByRole("tab", { name: "Economy" }).click();
+
+  const market = page.getByLabel("Market price data");
+  const activeSummary = market.getByLabel("Market active PriceSet summary");
+  await expect(activeSummary.locator("span").first()).toBeVisible();
+  const activeSummaryBefore = await activeSummary.locator("span").allTextContents();
+  const advancedTools = market.getByLabel("Advanced PriceSet tools");
+  const priceNotes = market.getByLabel("Economy price data notes");
+  await expect(advancedTools).not.toHaveAttribute("open", "");
+  await expect(priceNotes).not.toHaveAttribute("open", "");
+
+  await tabs.getByRole("tab", { name: "Settings" }).click();
+  const settingsPriceData = page.getByLabel("Price data settings");
+  await expect(settingsPriceData.getByLabel("Active PriceSet summary")).toBeVisible();
+  await expect(page.getByLabel("Market price data")).toHaveCount(0);
+  await expect(page.getByLabel("Scheduled price snapshot summary")).toHaveCount(0);
+  const urlBefore = page.url();
+  const storageBefore = await page.evaluate(() => ({
+    selected: window.localStorage.getItem("index-sim:price-set:selected"),
+    manual: window.localStorage.getItem("index-sim:manual-price-overrides"),
+    history: window.localStorage.getItem("index-sim:price-history")
+  }));
+
+  await settingsPriceData.getByRole("button", { name: "Review in Economy" }).click();
+
+  await expect(tabs.getByRole("tab", { name: "Economy" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("heading", { name: "Market", level: 2 })).toBeFocused();
+  expect(await activeSummary.locator("span").allTextContents()).toEqual(activeSummaryBefore);
+  await expect(advancedTools).not.toHaveAttribute("open", "");
+  await expect(priceNotes).not.toHaveAttribute("open", "");
+  expect(page.url()).toBe(urlBefore);
+  expect(
+    await page.evaluate(() => ({
+      selected: window.localStorage.getItem("index-sim:price-set:selected"),
+      manual: window.localStorage.getItem("index-sim:manual-price-overrides"),
+      history: window.localStorage.getItem("index-sim:price-history")
+    }))
+  ).toEqual(storageBefore);
 });
 
 test("looks up hiscores through the same-origin API and applies previewed levels", async ({
@@ -233,6 +276,14 @@ test("keeps manual item drafts and unavailable overrides scoped across base chan
   await expect(manualItem).toHaveAttribute("data-selected-id", initialManualItemId ?? "");
   await expect(priceInput).toHaveValue("777");
 
+  await manualItem.click();
+  await panel.getByLabel("Search Manual price item options").fill("big_bones");
+  const bigBonesOption = panel.getByRole("option", { name: "Big bones", exact: true });
+  await expect(bigBonesOption).toBeVisible();
+  await bigBonesOption.click();
+  await expect(manualItem).toHaveAttribute("data-selected-id", "big_bones");
+  await expect(manualItem).toContainText("Big bones");
+
   await chooseSearchableOption(panel, "Manual price item", "Lobster", true);
   const baseLabel = await summary
     .locator("span")
@@ -353,6 +404,67 @@ test("keeps manual item drafts and unavailable overrides scoped across base chan
   await expect(capacityPanel).toContainText("Stored 512/512");
 });
 
+test("corrects a warned item price", async ({ page }) => {
+  await page.goto("/");
+  const tabs = page.getByLabel("Workbench tabs");
+  const resultIssue = page.getByLabel("Price data issue");
+
+  await expect(resultIssue).toContainText("Price data incomplete");
+  const directIssueAction = resultIssue.getByRole("button");
+  const directIssueActionName = await directIssueAction.getAttribute("aria-label");
+  expect(directIssueActionName).not.toBeNull();
+  await directIssueAction.click();
+  const priceNotes = page.getByLabel("Economy price data notes");
+  await expect(tabs.getByRole("tab", { name: "Economy" })).toHaveAttribute("aria-selected", "true");
+  await expect(priceNotes.getByRole("button", { name: directIssueActionName ?? "" })).toBeFocused();
+
+  await tabs.getByRole("tab", { name: "Loot" }).click();
+  const warnedRow = page
+    .locator('table[aria-label="Current monster drops"] > tbody > tr')
+    .filter({ hasText: "Iron full helm" })
+    .first();
+  await warnedRow.getByText("Value details", { exact: true }).click();
+  await warnedRow.getByRole("button", { name: "Correct price for Iron full helm" }).click();
+
+  const economyTab = tabs.getByRole("tab", { name: "Economy" });
+  const panel = page.getByRole("region", { name: "Manual item price", exact: true });
+  const summary = panel.getByLabel("Manual item price summary");
+  const manualItem = searchableCombobox(panel, "Manual price item");
+  const priceInput = panel.getByLabel("Manual price", { exact: true });
+  await expect(economyTab).toHaveAttribute("aria-selected", "true");
+  await expect(manualItem).toHaveAttribute("data-selected-id", "iron_full_helm");
+  await expect(priceInput).toBeFocused();
+
+  await priceInput.fill("54321");
+  await panel.getByRole("button", { name: "Apply price" }).click();
+  await expect(summary).toContainText("Active 54,321");
+  await expect(summary).toContainText("Status Manual");
+  await expect(page.getByLabel("Market price data")).toContainText(
+    "Applied 54,321 GP manual price for Iron full helm. Current results use this manual value."
+  );
+  await expect(
+    page
+      .getByLabel("Current monster loot")
+      .getByRole("button", { name: "Correct price for Iron full helm" })
+  ).toHaveCount(0);
+
+  await panel.getByRole("button", { name: "Reset item" }).click();
+  await expect(summary).toContainText("Base 154");
+  await expect(summary).toContainText("Active 154");
+  await expect(summary).toContainText("Status Base");
+  await expect(page.getByLabel("Market price data")).toContainText(
+    "Reset Iron full helm to 154 GP. Current results use the base PriceSet value."
+  );
+
+  await expect(priceNotes).toHaveAttribute("open", "");
+  const economyNotice = priceNotes
+    .locator("li")
+    .filter({ has: page.getByText("Rune javelin", { exact: true }) });
+  await economyNotice.getByRole("button", { name: "Correct price for Rune javelin" }).click();
+  await expect(manualItem).toHaveAttribute("data-selected-id", "rune_javelin");
+  await expect(priceInput).toBeFocused();
+});
+
 test("refreshes the latest price-history age while Economy stays open", async ({ page }) => {
   await page.clock.install({ time: new Date("2026-07-14T12:00:30.000Z") });
   await page.route("**/price-history.json", async (route) => {
@@ -382,9 +494,9 @@ test("refreshes the latest price-history age while Economy stays open", async ({
   await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Economy" }).click();
   const summary = page.getByLabel("Price history summary");
 
-  await expect(summary).toContainText("Latest age <1m");
+  await expect(summary).toContainText("Latest age <1 min");
   await page.clock.fastForward(60_000);
-  await expect(summary).toContainText("Latest age 1m");
+  await expect(summary).toContainText("Latest age 1 min");
 });
 
 test("analyzes and manages browser-local price history in Economy", async ({ page }) => {
@@ -439,7 +551,12 @@ test("analyzes and manages browser-local price history in Economy", async ({ pag
     .locator(".economy-item-cell");
   await expect(lobsterItemCell).toHaveCSS("display", "grid");
   await expect(lobsterItemCell.locator("strong")).toHaveText("Lobster");
-  await expect(lobsterItemCell.locator("small")).toHaveText("Item ID: lobster");
+  await expect(lobsterItemCell.locator("small")).toHaveCount(0);
+  const lobsterTechnicalDetails = lobsterItemCell.locator("details.technical-details");
+  await expect(lobsterTechnicalDetails).not.toHaveAttribute("open", "");
+  await lobsterTechnicalDetails.locator("summary").click();
+  await expect(lobsterTechnicalDetails.getByText("Item ID", { exact: true })).toBeVisible();
+  await expect(lobsterTechnicalDetails.locator("code")).toHaveText("lobster");
   await expect(page.getByRole("img", { name: /Big bones price trend/ })).toBeVisible();
   await chooseSearchableOption(page, "Trend item", "Big bones");
   const itemTrend = page.getByLabel("Item price trend");
@@ -455,7 +572,7 @@ test("analyzes and manages browser-local price history in Economy", async ({ pag
   const bigBonesRow = page.getByRole("table", { name: "Current monster drops" }).getByRole("row", {
     name: /Big bones/
   });
-  await bigBonesRow.locator("details").last().locator("summary").click();
+  await bigBonesRow.locator(":scope > td:last-child > details > summary").click();
   const localHistory = page.getByLabel("Price history for Big bones");
   await expect(localHistory).toContainText("Tracked");
   await expect(localHistory).toContainText("350");

@@ -1,6 +1,6 @@
 import { useState, useSyncExternalStore } from "react";
 import type { VersionedStorageOptions } from "@/adapters/storage";
-import type { LocalStateHealthItemId } from "../state/local-state-health";
+import type { LocalStateHealthItemId, LocalStateStorageFailure } from "../state/local-state-health";
 import {
   LocalStateRecoveryControllerCore,
   type LocalStateClearPendingId,
@@ -17,6 +17,14 @@ export interface LocalStateRecoveryController extends LocalStateRecoverySnapshot
   markPersistenceUnavailable(): void;
   blockContextInvalid(ids: readonly LocalStateHealthItemId[], notice: string | null): void;
   unblockReplaced(ids: readonly LocalStateHealthItemId[]): void;
+  prepareExternalApply(ids: readonly LocalStateHealthItemId[]): void;
+  cancelExternalApply(ids: readonly LocalStateHealthItemId[]): void;
+  completeExternalApply(ids: readonly LocalStateHealthItemId[]): void;
+  completeExternalUndo(ids: readonly LocalStateHealthItemId[]): void;
+  recordExternalApplyFailure(
+    failures: readonly LocalStateStorageFailure[],
+    blockPersistence?: boolean
+  ): void;
   beginClear(id: Exclude<LocalStateClearPendingId, null>): void;
   cancelClear(): void;
   confirmClearItem(id: LocalStateHealthItemId): LocalStateRecoveryOutcome;
@@ -44,6 +52,11 @@ export function useLocalStateRecovery(
     markPersistenceUnavailable: controller.markPersistenceUnavailable,
     blockContextInvalid: controller.blockContextInvalid,
     unblockReplaced: controller.unblockReplaced,
+    prepareExternalApply: controller.prepareExternalApply,
+    cancelExternalApply: controller.cancelExternalApply,
+    completeExternalApply: controller.completeExternalApply,
+    completeExternalUndo: controller.completeExternalUndo,
+    recordExternalApplyFailure: controller.recordExternalApplyFailure,
     beginClear: controller.beginClear,
     cancelClear: controller.cancelClear,
     confirmClearItem: controller.confirmClearItem,

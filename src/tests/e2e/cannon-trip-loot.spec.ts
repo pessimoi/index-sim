@@ -17,11 +17,12 @@ test("enables cannon for the selected monster and shows cannon rates", async ({ 
 
   const cannon = page.locator('section[aria-label="Cannon"]');
   await expect(cannon).toBeVisible();
+  await expect(page.getByLabel("Monster card").getByLabel(/game ticks$/)).toBeVisible();
   await expect(cannon.getByText("off", { exact: true })).toBeVisible();
 
   await cannon.getByLabel("Set up cannon").check();
   await cannon.getByLabel("Mobs at spot").fill("6");
-  await cannon.getByLabel("Respawn").fill("30");
+  await cannon.getByLabel("Respawn (seconds)").fill("30");
   await cannon.getByLabel("Link Trip sparse").check();
 
   const output = page.locator('[aria-label="Cannon output"]');
@@ -71,7 +72,7 @@ test("enables cannon for the selected monster and shows cannon rates", async ({ 
   await expectSearchableSelection(page.getByLabel("Setup context"), "Monster", "dagannoth");
   await expect(reloadedCannon.getByLabel("Set up cannon")).toBeChecked();
   await expect(reloadedCannon.getByLabel("Mobs at spot")).toHaveValue("6");
-  await expect(reloadedCannon.getByLabel("Respawn")).toHaveValue("30");
+  await expect(reloadedCannon.getByLabel("Respawn (seconds)")).toHaveValue("30");
   await expect(reloadedCannon.getByLabel("Link Trip sparse")).toBeChecked();
   await expect(page.locator('[aria-label="Cannon output"]')).toContainText("Linked");
   await reloadedCannon.getByRole("button", { name: "Reset monster cannon" }).click();
@@ -100,7 +101,7 @@ test("updates trip survival controls and keeps the trip summary visible", async 
   await trip.getByLabel("Antipoison").check();
   await trip.getByLabel("Scarce spot").check();
   await trip.getByLabel("Targets at spot").fill("2");
-  await trip.getByLabel("Respawn sec").fill("90");
+  await trip.getByLabel("Respawn (seconds)").fill("90");
 
   await expect(summary).toContainText("Off");
   await expect(summary).toContainText("Melee");
@@ -133,7 +134,7 @@ test("updates trip survival controls and keeps the trip summary visible", async 
   await expect(reloadedTrip.getByLabel("Antipoison")).toBeChecked();
   await expect(reloadedTrip.getByLabel("Scarce spot")).toBeChecked();
   await expect(reloadedTrip.getByLabel("Targets at spot")).toHaveValue("2");
-  await expect(reloadedTrip.getByLabel("Respawn sec")).toHaveValue("90");
+  await expect(reloadedTrip.getByLabel("Respawn (seconds)")).toHaveValue("90");
   await expect(page.locator('[aria-label="Trip summary"]')).toBeVisible();
 });
 
@@ -162,7 +163,7 @@ test("updates manual food controls and recoil ring count", async ({ page }) => {
 
   await trip.getByLabel("Food mode").selectOption("manual");
   await trip.getByLabel("Food count").fill("4");
-  await trip.getByLabel("F/KL override").selectOption("on");
+  await trip.getByLabel("Food per kill override").selectOption("on");
   await trip.getByLabel("Food/kill").fill("0.5");
   await trip.getByLabel("Recoil rings").fill("6");
 
@@ -171,7 +172,7 @@ test("updates manual food controls and recoil ring count", async ({ page }) => {
   await expect(summary).toContainText("Auto estimate");
   await expect(summary).toContainText("Food left");
   await expect(summary).toContainText("Recoil/kill");
-  await expect(summary).toContainText("Recoil gp/kill");
+  await expect(summary).toContainText("Recoil GP/kill");
   await page.waitForFunction(() => {
     const saved = window.localStorage.getItem("index-sim:rewrite-setup") ?? "";
     return (
@@ -187,7 +188,7 @@ test("updates manual food controls and recoil ring count", async ({ page }) => {
   const reloadedTrip = page.locator('section[aria-label="Trip assumptions"]');
   await expect(reloadedTrip.getByLabel("Food mode")).toHaveValue("manual");
   await expect(reloadedTrip.getByLabel("Food count")).toHaveValue("4");
-  await expect(reloadedTrip.getByLabel("F/KL override")).toHaveValue("on");
+  await expect(reloadedTrip.getByLabel("Food per kill override")).toHaveValue("on");
   await expect(reloadedTrip.getByLabel("Food/kill")).toHaveValue("0.5");
   await expect(reloadedTrip.getByLabel("Recoil rings")).toHaveValue("6");
 });
@@ -209,7 +210,7 @@ test("updates trip food, banking and inventory reserve controls across styles", 
   await expect(trip.getByLabel("Recover ammo")).toBeDisabled();
   await expect(trip.getByLabel("DBA restore")).toBeHidden();
   await expect(trip.getByLabel("Rune slots")).toBeDisabled();
-  await expect(summary).toContainText("Auto 90s");
+  await expect(summary).toContainText("Auto 90 s");
   await expect(summary).toContainText("Food count");
   await expect(summary).toContainText(/Auto [0-9]+/);
   await expect(summary).toContainText("Loot capacity");
@@ -222,7 +223,7 @@ test("updates trip food, banking and inventory reserve controls across styles", 
   await trip.getByLabel("Teleport item").uncheck();
 
   await expect(summary).toContainText("Swordfish");
-  await expect(summary).toContainText("Manual 120s");
+  await expect(summary).toContainText("Manual 120 s");
   await expect(summary).toContainText("Teleport");
   await expect(summary).toContainText("Off");
 
@@ -445,11 +446,11 @@ test("updates per-monster loot settings and keeps them after reload", async ({ p
 
   await loot.getByLabel("High alch").selectOption("enabled");
   await loot.getByLabel("Overhead", { exact: true }).selectOption("manual");
-  await loot.getByLabel("Overhead sec").fill("12.5");
+  await loot.getByLabel("Overhead (seconds)").fill("12.5");
   await loot.getByLabel("Talisman spot").selectOption("overground");
 
   await expect(summary).toContainText("On");
-  await expect(summary).toContainText("12.5s");
+  await expect(summary).toContainText("12.5 s");
   await expect(summary).toContainText("Overground");
   await page.waitForFunction(() => {
     const saved = window.localStorage.getItem("index-sim:loot-settings") ?? "";
@@ -470,7 +471,7 @@ test("updates per-monster loot settings and keeps them after reload", async ({ p
   const reloadedLoot = page.locator('section[aria-label="Current monster loot"]');
   await expect(reloadedLoot.getByLabel("High alch")).toHaveValue("enabled");
   await expect(reloadedLoot.getByLabel("Overhead", { exact: true })).toHaveValue("manual");
-  await expect(reloadedLoot.getByLabel("Overhead sec")).toHaveValue("12.5");
+  await expect(reloadedLoot.getByLabel("Overhead (seconds)")).toHaveValue("12.5");
   await expect(reloadedLoot.getByLabel("Talisman spot")).toHaveValue("overground");
 });
 
@@ -481,10 +482,11 @@ test("sorts current monster drops from accessible column headings", async ({ pag
 
   const table = page.getByRole("table", { name: "Current monster drops" });
   const rows = table.locator(":scope > tbody > tr");
-  const evHeader = table.getByRole("columnheader", { name: "EV/kill" });
+  const evSortButton = table.getByRole("button", { name: "Sort by expected value per kill" });
+  const evHeader = evSortButton.locator("..");
   await expect(evHeader).toHaveAttribute("aria-sort", "none");
 
-  await evHeader.getByRole("button").click();
+  await evSortButton.click();
   await expect(evHeader).toHaveAttribute("aria-sort", "descending");
   const descendingEv = (await rows.locator(":scope > td:nth-child(5)").allTextContents()).map(
     (value) => Number(value.replaceAll(",", ""))
@@ -498,8 +500,9 @@ test("sorts current monster drops from accessible column headings", async ({ pag
   );
   expect(ascendingEv).toEqual([...ascendingEv].sort((left, right) => left - right));
 
-  const dropHeader = table.getByRole("columnheader", { name: "Drop" });
-  await dropHeader.getByRole("button").click();
+  const dropSortButton = table.getByRole("button", { name: "Sort by Drop" });
+  const dropHeader = dropSortButton.locator("..");
+  await dropSortButton.click();
   await expect(dropHeader).toHaveAttribute("aria-sort", "ascending");
   const dropNames = await rows.locator(":scope > td:first-child > span").allTextContents();
   expect(dropNames).toEqual(
@@ -521,8 +524,8 @@ test("shows source-backed conditional clue loot without allowing a value action"
   const disclosure = loot.locator("details.conditional-loot-group");
   await expect(table).not.toContainText("Clue scroll (hard)");
   await expect(disclosure).not.toHaveAttribute("open", "");
-  await expect(disclosure.locator("summary")).toContainText("Conditional drops (1)");
-  await disclosure.locator("summary").click();
+  await expect(disclosure.locator(":scope > summary")).toContainText("Conditional drops (1)");
+  await disclosure.locator(":scope > summary").click();
 
   const conditionalTable = loot.getByRole("table", { name: "Conditional monster drops" });
   const row = conditionalTable.getByRole("row", { name: /Clue scroll \(hard\)/ });
@@ -530,7 +533,10 @@ test("shows source-backed conditional clue loot without allowing a value action"
   await expect(row).toContainText("Clue eligibility not modeled");
   await expect(row).toContainText("Skip (locked)");
   await expect(row).toContainText("0.78%");
-  await expect(row).not.toContainText("trail_hardcluedrop");
+  const technicalDetails = row.locator("details.technical-details");
+  await expect(technicalDetails).not.toHaveAttribute("open", "");
+  await expect(technicalDetails).toContainText("Tagclue_hard");
+  await expect(technicalDetails).toContainText("Loot row IDtag_clue_hard_clue_scroll_hard_20");
 });
 
 test("resets one Active modifiers loot row while preserving neighboring loot state", async ({
@@ -548,7 +554,7 @@ test("resets one Active modifiers loot row while preserving neighboring loot sta
 
   await loot.getByLabel("High alch").selectOption("enabled");
   await loot.getByLabel("Overhead", { exact: true }).selectOption("manual");
-  await loot.getByLabel("Overhead sec").fill("12.5");
+  await loot.getByLabel("Overhead (seconds)").fill("12.5");
   await loot.getByLabel("Talisman spot").selectOption("overground");
   await dragonBonesAction.selectOption("skip");
 
@@ -569,7 +575,7 @@ test("resets one Active modifiers loot row while preserving neighboring loot sta
   await tabs.getByRole("tab", { name: "Loot" }).click();
   await expect(loot.getByLabel("High alch")).toHaveValue("enabled");
   await expect(loot.getByLabel("Overhead", { exact: true })).toHaveValue("manual");
-  await expect(loot.getByLabel("Overhead sec")).toHaveValue("12.5");
+  await expect(loot.getByLabel("Overhead (seconds)")).toHaveValue("12.5");
   await expect(loot.getByLabel("Talisman spot")).toHaveValue("overground");
   await expect(dragonBonesAction).toHaveValue("skip");
 
@@ -643,9 +649,9 @@ test("shows loot value composition, nested detail and action impact detail", asy
     "selected"
   );
   await expect(page.getByRole("table", { name: /Action impact for Big bones/ })).toContainText(
-    "prayer XP/kill"
+    "Prayer XP/kill"
   );
-  await bigBonesRow.locator("details").last().locator("summary").click();
+  await bigBonesRow.locator(":scope > td:last-child > details > summary").click();
   await expect(page.getByLabel("Price history for Big bones")).toContainText("Tracked");
 
   await page
@@ -657,7 +663,7 @@ test("shows loot value composition, nested detail and action impact detail", asy
 
   const nestedRow = table.getByRole("row", { name: /Random herb/ }).first();
   await nestedRow.scrollIntoViewIfNeeded();
-  await nestedRow.locator("details").last().locator("summary").click();
+  await nestedRow.locator(":scope > td:last-child > details > summary").click();
   const nested = page.getByRole("table", { name: /Nested rows for Random herb/ });
   await expect(nested).toContainText("Ranarr");
   await expect(nested).toContainText("Weight");
@@ -679,7 +685,7 @@ test("shows source-backed opened-casket value composition", async ({ page }) => 
   const casketRow = drops.getByRole("row", { name: /Casket/ }).first();
   await expect(casketRow).toBeVisible();
   await casketRow.scrollIntoViewIfNeeded();
-  await casketRow.locator("details").last().locator("summary").click();
+  await casketRow.locator(":scope > td:last-child > details > summary").click();
 
   await expect(casketRow).toContainText("Opened contents EV");
   await expect(casketRow.getByLabel("Price history for Casket")).toContainText("Component-derived");
@@ -688,9 +694,14 @@ test("shows source-backed opened-casket value composition", async ({ page }) => 
   );
   const nested = page.getByRole("table", { name: "Nested rows for Casket" });
   await expect(nested.locator("tbody tr")).toHaveCount(8);
-  await expect(nested).toContainText("20-640 coins (210 average)");
-  await expect(nested).toContainText("tooth_half_key");
-  await expect(nested).toContainText("loop_half_key");
+  await expect(nested).toContainText("Coins");
+  await expect(nested).toContainText("Face value; six equiprobable coin amounts");
+  await expect(
+    nested.locator("details.technical-details code").filter({ hasText: "tooth_half_key" })
+  ).toHaveCount(1);
+  await expect(
+    nested.locator("details.technical-details code").filter({ hasText: "loop_half_key" })
+  ).toHaveCount(1);
 });
 
 test("matches browser-rendered numeric snapshots for loot action and trip overrides", async ({
@@ -730,7 +741,7 @@ test("matches browser-rendered numeric snapshots for loot action and trip overri
   await expectSearchableSelection(page.getByLabel("Setup context"), "Monster", "firegiant");
   await trip.getByLabel("Food mode").selectOption("manual");
   await trip.getByLabel("Food count").fill("4");
-  await trip.getByLabel("F/KL override").selectOption("on");
+  await trip.getByLabel("Food per kill override").selectOption("on");
   await trip.getByLabel("Food/kill").fill("0.5");
   await trip.getByLabel("Prayer restore").selectOption("manual_doses");
   await trip.getByLabel("Prayer doses").fill("8");
@@ -767,7 +778,7 @@ test("matches browser-rendered numeric snapshots for loot action and trip overri
       "Kills/trip": "6.1",
       "Effective K/hr": "45",
       "Recoil/kill": "4.5 dmg",
-      "Recoil gp/kill": "96"
+      "Recoil GP/kill": "96"
     },
     tripManual: {
       DPS: "2.59",
@@ -789,9 +800,16 @@ test("matches browser-rendered numeric snapshots for imported price sets", async
   await page.goto("/");
   await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Settings" }).click();
   const settings = page.locator('[aria-label="Price data settings"]');
-  const priceSetSummary = settings.locator('[aria-label="Active PriceSet summary"]');
-  const scheduledSummary = settings.locator('[aria-label="Scheduled price snapshot summary"]');
+  const settingsPriceSetSummary = settings.locator('[aria-label="Active PriceSet summary"]');
   await expect(settings).toContainText("Price data");
+  await expect(settings.locator('[aria-label="Scheduled price snapshot summary"]')).toHaveCount(0);
+  await expect(page.getByLabel("Market price data")).toHaveCount(0);
+  await expect(settingsPriceSetSummary).toContainText("Active source Scheduled snapshot");
+  await settings.getByRole("button", { name: "Review in Economy" }).click();
+
+  const market = page.getByLabel("Market price data");
+  const scheduledSummary = market.locator('[aria-label="Scheduled price snapshot summary"]');
+  const priceSetSummary = market.locator('[aria-label="Market active PriceSet summary"]');
   await expect(scheduledSummary).toContainText("Status Loaded");
   await expect(scheduledSummary).toContainText("Label Scheduled static prices");
   await expect(priceSetSummary).toContainText("Active source Scheduled snapshot");
@@ -807,7 +825,6 @@ test("matches browser-rendered numeric snapshots for imported price sets", async
     alchValues: { big_bones: 0, lobster: 0 }
   };
 
-  const market = page.getByLabel("Market price data");
   const advancedPriceSetTools = market.locator("details.advanced-price-set-tools");
   await advancedPriceSetTools.locator(":scope > summary").click();
   await advancedPriceSetTools
@@ -856,6 +873,8 @@ test("matches browser-rendered numeric snapshots for imported price sets", async
   await expect(reloadedSettings.locator('[aria-label="Active PriceSet summary"]')).toContainText(
     "Label Imported fixture prices"
   );
+  await expect(page.getByLabel("Price history summary")).toHaveCount(0);
+  await reloadedSettings.getByRole("button", { name: "Review in Economy" }).click();
   await expect(page.getByLabel("Price history summary")).toContainText("Snapshots 1");
   await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Monsters" }).click();
   const reloadedImportedPrices = await resultMetricSnapshot(page);
@@ -876,8 +895,10 @@ test("matches browser-rendered numeric snapshots for imported price sets", async
   const priceDataNotes = page.getByLabel("Economy price data notes");
   await expect(economyTab).toHaveAttribute("aria-selected", "true");
   await expect(priceDataNotes).toHaveAttribute("open", "");
-  await expect(priceDataNotes.locator("summary")).toBeFocused();
-  await expect(priceDataNotes.locator("summary")).toContainText(/Price data notes \([1-9][0-9]*\)/);
+  await expect(priceDataNotes.locator(":scope > summary")).toBeFocused();
+  await expect(priceDataNotes.locator(":scope > summary")).toContainText(
+    /Price data notes \([1-9][0-9]*\)/
+  );
   expect(await priceDataNotes.locator("li").count()).toBeGreaterThan(4);
   await expect(priceDataNotes).not.toContainText(/\d+ more/);
   await expect(page.locator('[aria-label="Economy price warnings"]')).toHaveCount(0);

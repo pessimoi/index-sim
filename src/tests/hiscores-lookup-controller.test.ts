@@ -328,7 +328,7 @@ describe("Hiscores lookup controller", () => {
     [new HiscoresAdapterError("rate-limited", "raw rate"), "Rate limited"],
     [
       new HiscoresAdapterError("rate-limited", "raw rate", { retryAfterSeconds: 12 }),
-      "Rate limited. Try again in 12s"
+      "Rate limited. Try again in 12 s"
     ],
     [
       new HiscoresAdapterError("upstream-unavailable", "raw unavailable"),

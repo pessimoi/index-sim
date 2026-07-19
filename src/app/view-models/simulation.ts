@@ -95,6 +95,7 @@ export interface SimulationViewModelOptions {
   monsterCard?: MonsterCardViewModelOptions;
   lootPriceHistoryByItem?: Readonly<Record<string, ItemPriceHistoryContext | undefined>>;
   activeAssumptions?: ActiveAssumptionsViewModelOptions;
+  editablePriceItemIds?: ReadonlySet<string>;
 }
 
 export function createSimulationViewModel(
@@ -132,7 +133,8 @@ export function createSimulationViewModel(
   const priceNotices = createCurrentPriceNoticePresentation({
     warnings: calculationWarnings,
     gameData: context.gameData,
-    lootBreakdown: trip.lootBreakdown
+    lootBreakdown: trip.lootBreakdown,
+    editableItemIds: options.editablePriceItemIds
   });
   const loot = createLootPresentationViewModel({
     form,

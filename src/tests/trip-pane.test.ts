@@ -50,6 +50,8 @@ describe("Trip pane", () => {
     expect(markup).toContain("Risk ranges");
     expect(markup).toContain("Apply recommendation");
     expect(markup).toContain("Modeled P10/50/90");
+    expect(markup).toContain(">Respawn (seconds)</label>");
+    expect(markup).toContain('aria-label="Food per kill override"');
     let previous = -1;
     for (const title of [
       "Survival",

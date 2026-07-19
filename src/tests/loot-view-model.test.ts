@@ -44,6 +44,81 @@ async function fixture(
 }
 
 describe("Loot view model", () => {
+  it("uses game-data, row-source and conditional names without replacing technical identity", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const form = DEFAULT_FORM_STATE;
+    const request = formToSimulationRequest(form, context.gameData);
+    const fullInput = createFullSimulationInput(form, request, {}, {});
+    const result = simulateFullSimulation(fullInput, context);
+    const templateDrop = result.trip.lootBreakdown[0]!;
+    const itemTemplate = Object.values(context.gameData.items)[0]!;
+    const fixtureContext = {
+      ...context,
+      gameData: {
+        ...context.gameData,
+        items: {
+          ...context.gameData.items,
+          uncut_dragonstone: { ...itemTemplate, name: "Uncut dragonstone" }
+        }
+      }
+    };
+    const sourceBackedParent = {
+      ...templateDrop,
+      rowId: "fixture-parent-row",
+      key: "uncut_dragonstone",
+      name: "Row-source dragonstone",
+      _expand: [
+        {
+          key: "rune_spear",
+          name: "Rune spear",
+          tag: "rare",
+          weight: 1,
+          price: 30_000
+        }
+      ]
+    };
+    const conditionalSourceRow = {
+      ...templateDrop,
+      rowId: "fixture-conditional-row",
+      key: "conditional_fixture_item",
+      name: "Conditional source item",
+      pref: "skip" as const,
+      eligibilityActive: false,
+      eligibility: {
+        kind: "quest" as const,
+        policyId: "fixture-quest",
+        description: "Requires the fixture quest."
+      }
+    };
+    const presentation = createLootPresentationViewModel({
+      form,
+      context: fixtureContext,
+      tripInput: { ...fullInput, combat: result.combat },
+      trip: {
+        ...result.trip,
+        lootBreakdown: [sourceBackedParent, conditionalSourceRow]
+      },
+      lootPrefs: {}
+    });
+
+    const parent = presentation.actionableRows.find((row) => row.rowId === "fixture-parent-row");
+    expect(parent?.displayLabel).toEqual({
+      name: "Uncut dragonstone",
+      technicalId: "uncut_dragonstone",
+      source: "game-data"
+    });
+    expect(parent?.expandedRows[0]?.displayLabel).toEqual({
+      name: "Rune spear",
+      technicalId: "rune_spear",
+      source: "row-source"
+    });
+    expect(presentation.conditionalRows[0]?.displayLabel).toEqual({
+      name: "Conditional source item",
+      technicalId: "conditional_fixture_item",
+      source: "row-source"
+    });
+  });
+
   it("owns row partitions, policy presentation and summary composition", async () => {
     const presentation = await fixture();
 

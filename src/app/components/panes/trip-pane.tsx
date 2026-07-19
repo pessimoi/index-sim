@@ -272,7 +272,7 @@ export function TripPane({ hidden, model, actions }: TripPaneProps) {
           onChange={(targetsAtSpot) => actions.updateTrip({ targetsAtSpot })}
         />
         <NumberField
-          label="Respawn sec"
+          label="Respawn (seconds)"
           value={controls.scarceRespawnValue}
           min={1}
           max={3600}
@@ -315,6 +315,7 @@ export function TripPane({ hidden, model, actions }: TripPaneProps) {
         />
         <SelectField
           label="F/KL override"
+          accessibleLabel="Food per kill override"
           value={controls.foodPerKillOverrideMode}
           options={TRIP_FOOD_PER_KILL_OVERRIDE_OPTIONS}
           onChange={(mode) =>

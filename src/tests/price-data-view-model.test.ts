@@ -174,6 +174,11 @@ describe("price-data view model", () => {
         consumer: "supply"
       })
     ]);
+    expect(presentation.issues[0]?.itemDisplayLabel).toEqual({
+      name: "Vial of water",
+      technicalId: "vial_water",
+      source: "game-data"
+    });
     expect(presentation.notes).toEqual([
       expect.objectContaining({
         code: "price-generated-fallback",
@@ -193,6 +198,123 @@ describe("price-data view model", () => {
     );
   });
 
+  it("derives stable exact-item correction and inspection actions from editable ids", () => {
+    const warnings = [
+      "price-fallback-used",
+      "price-generated-fallback",
+      "price-market-retained",
+      "price-freshness-unknown",
+      "price-alias-used",
+      "approximate-data-source"
+    ].map((code, index) => ({
+      code,
+      severity: "warning" as const,
+      message: `${code} fixture`,
+      itemId: `item_${index}`,
+      priceContext: { consumer: "loot" as const, affectsCurrentResult: true }
+    }));
+    const input = {
+      warnings: [
+        ...warnings,
+        {
+          code: "missing-alch-value",
+          severity: "warning" as const,
+          message: "missing alch fixture",
+          itemId: "alch_item",
+          priceContext: { consumer: "loot" as const, affectsCurrentResult: true }
+        },
+        {
+          code: "unidentified-herb-price-approximation",
+          severity: "warning" as const,
+          message: "itemless fixture",
+          priceContext: { consumer: "loot" as const, affectsCurrentResult: true }
+        }
+      ],
+      gameData: {
+        items: Object.fromEntries([
+          ...warnings.map((warning) => [
+            warning.itemId,
+            { id: warning.itemId, name: warning.itemId }
+          ]),
+          ["alch_item", { id: "alch_item", name: "Alch item" }]
+        ])
+      },
+      lootBreakdown: []
+    };
+    const editable = new Set(warnings.map((warning) => warning.itemId));
+    const presentation = createCurrentPriceNoticePresentation({
+      ...input,
+      editableItemIds: editable
+    });
+
+    expect(
+      presentation.all
+        .filter((notice) => notice.itemId?.startsWith("item_"))
+        .map((notice) => notice.action)
+    ).toEqual(
+      expect.arrayContaining(
+        warnings.map((warning) =>
+          expect.objectContaining({
+            kind: "correct-price",
+            itemId: warning.itemId,
+            label: "Correct price"
+          })
+        )
+      )
+    );
+    expect(presentation.all.find((notice) => notice.itemId === "alch_item")?.action).toMatchObject({
+      kind: "inspect-item",
+      itemId: "alch_item",
+      label: "Inspect item"
+    });
+    expect(
+      presentation.all.find((notice) => notice.code === "unidentified-herb-price-approximation")
+        ?.action
+    ).toBeUndefined();
+    expect(presentation.all[0]?.noticeId).toBe(
+      `${presentation.all[0]?.code}:${presentation.all[0]?.itemId}:${presentation.all[0]?.consumer}:`
+    );
+
+    const noLongerEditable = createCurrentPriceNoticePresentation({
+      ...input,
+      editableItemIds: new Set()
+    });
+    expect(noLongerEditable.all.find((notice) => notice.itemId === "item_0")?.action).toMatchObject(
+      { kind: "inspect-item", itemId: "item_0" }
+    );
+  });
+
+  it("offers one direct Result action but keeps aggregate review for multiple issues", () => {
+    const warning = (itemId: string) => ({
+      code: "price-fallback-used",
+      severity: "warning" as const,
+      message: `fallback ${itemId}`,
+      itemId,
+      priceContext: { consumer: "supply" as const, affectsCurrentResult: true }
+    });
+    const common = {
+      gameData: {
+        items: {
+          lobster: { id: "lobster", name: "Lobster" },
+          swordfish: { id: "swordfish", name: "Swordfish" }
+        }
+      },
+      lootBreakdown: [],
+      editableItemIds: new Set(["lobster", "swordfish"])
+    };
+    const one = createCurrentPriceNoticePresentation({
+      ...common,
+      warnings: [warning("lobster")]
+    });
+    const multiple = createCurrentPriceNoticePresentation({
+      ...common,
+      warnings: [warning("lobster"), warning("swordfish")]
+    });
+
+    expect(one.resultAction).toMatchObject({ kind: "correct-price", itemId: "lobster" });
+    expect(multiple.resultAction).toBeNull();
+  });
+
   it("presents active, scheduled and reset price-set ownership without UI dependencies", () => {
     const bundled = priceSet({ id: "bundled-prices", source: "bundled" });
     const selected = priceSet();
@@ -210,7 +332,8 @@ describe("price-data view model", () => {
       available: true,
       sourceLabel: "Manual item overrides (2)",
       label: "Fixture prices",
-      ageLabel: "1h",
+      ageLabel: "1 hr",
+      ageAccessibleLabel: "1 hour",
       itemCount: 2,
       alchCount: 2,
       metadata: { observedHigh: 1, generatedFallback: 1 }
@@ -218,7 +341,7 @@ describe("price-data view model", () => {
     expect(presentation.scheduled).toMatchObject({
       ready: true,
       label: "Scheduled prices",
-      ageLabel: "2h",
+      ageLabel: "2 hr",
       itemCount: 2
     });
     expect(presentation.reset).toMatchObject({
@@ -356,6 +479,11 @@ describe("price-data view model", () => {
       "Big bones",
       "Lobster"
     ]);
+    expect(presentation.itemOptions[1]?.displayLabel).toEqual({
+      name: "Lobster",
+      technicalId: "lobster",
+      source: "game-data"
+    });
     expect(presentation).toMatchObject({
       itemId: "lobster",
       itemLabel: "Lobster",
@@ -447,6 +575,11 @@ describe("price-data view model", () => {
       })
     ]);
     expect(history.trend.points.map((point) => point.price)).toEqual([190, 205]);
+    expect(history.itemDisplayLabels.lobster).toEqual({
+      name: "Lobster",
+      technicalId: "lobster",
+      source: "game-data"
+    });
     expect(history.lootHistoryByItem.lobster).toMatchObject({
       itemLabel: "Lobster",
       latestPrice: 205,
@@ -457,7 +590,7 @@ describe("price-data view model", () => {
       snapshotCount: 2,
       trackedItemCount: 2,
       latestAgeSeconds: 90,
-      latestAgeLabel: "1m",
+      latestAgeLabel: "1 min",
       activeMatchesLatest: true
     });
   });
@@ -617,7 +750,7 @@ describe("price-data view model", () => {
         }
       ])
     });
-    const missingRows = createEconomyHistoryPresentation({
+    const missingPresentation = createEconomyHistoryPresentation({
       sources: missingSources,
       itemLabels: {},
       controls: {
@@ -627,17 +760,27 @@ describe("price-data view model", () => {
         trendItemId: "latest_only",
         sort: { key: "item", direction: "asc" }
       }
-    }).movers.rows;
+    });
+    const missingRows = missingPresentation.movers.rows;
     expect(missingRows).toEqual([
       expect.objectContaining({ itemId: "baseline_only", latestPrice: null, gpDelta: null }),
       expect.objectContaining({ itemId: "latest_only", baselinePrice: null, gpDelta: null })
     ]);
+    expect(missingPresentation.itemDisplayLabels.latest_only).toEqual({
+      name: "Latest only",
+      technicalId: "latest_only",
+      source: "fallback"
+    });
+    expect(missingPresentation.trendItemOptions).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: "latest_only", label: "Latest only" })])
+    );
   });
 
   it("derives selected provenance freshness and compact formatter semantics", () => {
     const selected = createSelectedPriceItemPresentation({
       activePriceSet: priceSet(),
       itemId: "lobster",
+      itemLabels: { lobster: "Lobster" },
       freshnessNow: new Date("2026-07-14T13:00:00.000Z")
     });
 
@@ -647,9 +790,14 @@ describe("price-data view model", () => {
       freshness: "observed-current",
       metadata: { valueOrigin: "market-observation", quality: "high" }
     });
+    expect(selected.itemDisplayLabel).toEqual({
+      name: "Lobster",
+      technicalId: "lobster",
+      source: "game-data"
+    });
     expect(formatPriceAge(null)).toBe("-");
-    expect(formatPriceAge(59)).toBe("<1m");
-    expect(formatPriceAge(86_400)).toBe("1d");
+    expect(formatPriceAge(59)).toBe("<1 min");
+    expect(formatPriceAge(86_400)).toBe("1 day");
     expect(economyAriaSort({ key: "gpDelta", direction: "desc" }, "gpDelta")).toBe("descending");
     expect(economyMoverTone({ gpDelta: 1 })).toBe("gain");
     expect(economyMoverTone({ gpDelta: -1 })).toBe("loss");

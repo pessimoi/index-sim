@@ -101,7 +101,7 @@ export const CANNON_NUMERIC_LABELS = [
   "Ball cost/kill",
   "Ball price",
   "Cannonballs/trip",
-  "Ball gp/trip",
+  "Ball GP/trip",
   "K/hr uplift"
 ] as const;
 
@@ -114,7 +114,7 @@ export const TRIP_NUMERIC_LABELS = [
   "Kills/trip",
   "Effective K/hr",
   "Recoil/kill",
-  "Recoil gp/kill"
+  "Recoil GP/kill"
 ] as const;
 
 export async function metricSnapshot(region: Locator, labels: readonly string[]) {

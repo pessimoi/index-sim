@@ -16,9 +16,13 @@ import {
   type WorkbenchResultViewModel,
   type WorkbenchTabId
 } from "../../view-models/app-shell";
-import type { CurrentPriceNoticePresentation } from "../../view-models/price-data";
+import type {
+  CurrentPriceNoticePresentation,
+  PriceNoticeAction
+} from "../../view-models/price-data";
 import type { ManualCombatOverrideField } from "../../view-models/loadout";
 import { formatNumber } from "../../view-models/formatting";
+import { expandedCompactLabel } from "../../view-models/presentation-language";
 import type { CombatSetupFormState } from "../../state/ui-state";
 import { ActiveAssumptionsSummary } from "../combat-result-presenters";
 import {
@@ -48,6 +52,7 @@ export interface WorkbenchShellActions {
   setPrimaryBoost(boostId: EntityId): void;
   setManualOverride(field: ManualCombatOverrideField, value: number | null): void;
   reviewPriceData(): void;
+  reviewPriceItem(action: PriceNoticeAction): void;
   reviewActiveAssumption(target: ActiveAssumptionReviewTarget): void;
   resetActiveAssumption(target: ActiveAssumptionResetTarget, statusLabel: string): void;
 }
@@ -80,10 +85,16 @@ function WorkbenchMetric({
   metric: WorkbenchResultViewModel["metrics"][number];
   onActivateTab(tabId: WorkbenchTabId): void;
 }) {
+  const accessibleLabel = expandedCompactLabel(metric.label);
   return (
-    <div className="metric">
-      <span>{metric.label}</span>
-      <strong className={metric.tone}>{metric.value}</strong>
+    <div
+      className="metric"
+      aria-label={accessibleLabel ? `${accessibleLabel}: ${metric.value}` : undefined}
+    >
+      <span aria-hidden={accessibleLabel ? true : undefined}>{metric.label}</span>
+      <strong aria-hidden={accessibleLabel ? true : undefined} className={metric.tone}>
+        {metric.value}
+      </strong>
       {metric.detail ? (
         <small>
           {metric.detail}
@@ -420,6 +431,7 @@ export function WorkbenchShell({
                 />
                 <OptionalNumberField
                   label="SPD"
+                  accessibleLabel="Attack speed in seconds"
                   value={form.manualOverrides.attackSpeedSec}
                   min={0.6}
                   max={12}
@@ -428,7 +440,11 @@ export function WorkbenchShell({
                   compactReset
                   onChange={(value) => actions.setManualOverride("attackSpeedSec", value)}
                 />
-                <ReadOnlyField label="F/KL" value={formatNumber(foodPerKill, 2)} />
+                <ReadOnlyField
+                  label="F/KL"
+                  accessibleLabel="Food per kill"
+                  value={formatNumber(foodPerKill, 2)}
+                />
                 <SelectField
                   label="TARGET"
                   value={form.monsterId}
@@ -481,8 +497,20 @@ export function WorkbenchShell({
                         fallback prices.
                       </span>
                     </div>
-                    <button type="button" onClick={actions.reviewPriceData}>
-                      Review price data
+                    <button
+                      type="button"
+                      aria-label={
+                        priceNotices.resultAction
+                          ? `${priceNotices.resultAction.label} for ${priceNotices.issues[0]?.itemLabel ?? priceNotices.resultAction.itemId}`
+                          : undefined
+                      }
+                      onClick={() =>
+                        priceNotices.resultAction
+                          ? actions.reviewPriceItem(priceNotices.resultAction)
+                          : actions.reviewPriceData()
+                      }
+                    >
+                      {priceNotices.resultAction?.label ?? "Review price data"}
                     </button>
                   </section>
                 ) : null}

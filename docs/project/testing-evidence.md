@@ -5,6 +5,188 @@ It does not own current commands, required gates or test strategy; those remain 
 [the testing guide](../technical/testing.md). Counts and artifact hashes below
 apply only to the source state described by each entry.
 
+## 2026-07-19 user-facing language, units and information hierarchy
+
+The implemented presentation owner resolves source/snapshot/row names before a
+deterministic classified fallback and carries exact technical ids separately.
+Focused Price/Loot/MonsterCard/Settings, field/presenter and shell coverage is
+included in the complete Vitest pass: 94 files / 935 tests. It proves parent,
+nested and conditional Loot name precedence, PriceSet/history-only fallback,
+selectable labelled Item/Monster/Loot-row/Tag disclosures, singular/plural time
+units, source game ticks versus derived seconds, uppercase GP/XP, complete
+accessible compact labels and the short Settings summary derived from the same
+active PriceSet presentation as Economy.
+
+The complete production-preview Chromium gate passes 98/98 with one worker.
+It includes the state-neutral `Review in Economy` tab/focus transaction, exact
+id search with a human selected label, full gold-pieces/food-per-kill role
+names, tick/second target and reload paths, and unchanged PriceSet import/reset,
+manual-price, history, Workspace and recovery transactions. This is semantic
+browser evidence, not assistive-technology certification or a WCAG-conformance
+claim.
+
+The first complete Darwin comparison passed 9/20 scenarios and produced 11
+expected first-screenshot mismatches. Every actual/diff plus all 31 ignored
+candidate images was reviewed. The accepted differences were source names,
+primary-id removal, explicit units and the short Settings hierarchy; the
+integrated Settings candidate also retained the previously reviewed Workspace
+section. No numeric change, control loss, table widening, clipping, overflow,
+private player data, imported payload, secret, local path or raw diagnostic was
+found. The explicit update changed 15 tracked PNGs and passed 20/20; the
+following full read-only comparison also passes 20/20. Candidate evidence is
+workspace-local under ignored `.codex-tmp/`.
+
+`npm run verify` passes 94 files / 935 tests, 19/19 goldens, typecheck, the
+145-source/130-client-reachable/eight-entrypoint cycle-free architecture check,
+the 241-module production build, artifact validation, lint, Prettier and diff
+checks. The 14-file/two-asset/seven-JavaScript-chunk artifact is 2,215,181 bytes
+with a 788,136 raw / 228,803 gzip direct entry and SHA-256
+`b15dd9b9400b28401768b77d1513216fdb61d45597f71d09f8c0928df677f26f`.
+Dependency audit remains skipped by the network-disabled gate. This is
+`LOCAL_RUNTIME` / `SYNTHETIC_TEST` evidence and makes no deployment, provider or
+real-user-data claim.
+
+## 2026-07-19 Workspace atomic Apply/Undo and queue verification
+
+The G4 Workspace/recovery/area-owner regression command passes 27 files / 245
+tests. Dedicated executor coverage proves the exhaustive ten-target registry
+order, preflight before writes, exact raw/missing preimages, nth-write and
+nth-clear reverse rollback, rollback-failure affected ids, no live mutation
+before durable success, safe-session isolation without original storage reads,
+all-area durable Apply/exact raw Undo, session-only Apply/live-only Undo and
+failed durable-Undo rollback. Recovery coverage passes 14 cases for bounded
+batch preparation/completion, selected failure clearing, single publish,
+one-shot skips and exact-raw Undo attention reconciliation. The plan matrix now
+also reconciles Planner targets against the resulting setup before
+serialization, preventing a later level-reconciliation effect from escaping
+the one-shot persistence boundary.
+
+The production-preview Workspace run passes 5/5. It covers nine-area export and
+zero-mutation review/Dismiss, an eight-selected-area transaction whose
+unselected raw value stays exact and whose one Undo restores every storage
+byte, keyboard mixed Merge with unrelated Duel/history/hidden-tier rows,
+different-Revision incompatibility and a forced Planner write failure. The
+forced failure restores all touched bytes exactly, changes no live value,
+retains the review, requires the explicit `Apply for this session` action and
+keeps durable bytes identical through that action and its live-only Undo. The
+complete current-source functional Chromium suite then passes 97/97 with one
+worker.
+
+Typecheck, lint and the cycle-free architecture graph pass with 144 source
+modules, 129 client-reachable modules, eight external entrypoints and no
+exception or orphan. `npm run verify` passes 93 files / 927 tests, 19/19
+goldens, typecheck, architecture, lint, Prettier, the 240-module production
+build, artifact validation and diff checks. The 14-file/two-asset/
+seven-JavaScript-chunk artifact is 2,204,720 bytes with a 781,082 raw / 226,806
+gzip direct entry and SHA-256
+`d8f8e9910d3a109eb6b92fbc763fdc7498620b7e651d3fa73b47961b2b937501`.
+An intermediate artifact correctly failed at 802,652 raw bytes; moving the
+feature-owning Economy/Settings pane behind a lazy boundary restored the
+unchanged D-094/D-098 budgets. Dependency audit is skipped by the gate under
+the network-disabled policy.
+
+The required read-only `Settings desktop` comparison first hit the managed
+sandbox's `listen EPERM 127.0.0.1:5174` boundary and then ran through the
+approved localhost path. The unchanged accepted baseline differs by 9,536
+pixels, ratio 0.03. Expected/actual/diff inspection attributes the difference
+to the new Workspace section between Calculation context and Local state
+recovery; there is no unexplained overlap, horizontal overflow, wrong pane,
+private player name, raw payload or local path. No PNG baseline was updated
+without explicit human acceptance.
+
+This is `LOCAL_RUNTIME` / `SYNTHETIC_TEST` evidence. It proves logical
+all-or-rollback behavior for handled write/remove failures in one browser
+execution; it does not prove browser-crash durability, a real user backup,
+production deployment, accounts, server storage or cross-device sync.
+
+## 2026-07-19 Workspace area Replace/Merge planning
+
+The G3 Workspace plan, controller and current area-owner regression command
+passes 10 files / 100 tests. The dedicated
+`workspace-restore-plan.test.ts` matrix passes 12 cases covering every Replace
+area, all six closed Merge policies, four Replace-only mode rejections, Duel
+add/update/skip at cap 12, price-history collision/newest-first/cap-drop
+behavior, manual-price backup authority and invalid 512 overflow, hidden-tier
+union, both Loot identities, null selected-PriceSet fallback, current generated
+high-alch authority, manual overlay, zero history append, exact/same/different
+Revision, complete setup/Duel/Planner/Loot incompatibility, stale review, zero
+selection and the second Hiscores privacy choice. The parser regression also
+rejects duplicate Duel and price-history identities before they can enter a
+plan.
+
+Typecheck, lint and the cycle-free architecture graph pass with 143 source
+modules, 128 client-reachable modules, eight external entrypoints and no
+exception or orphan. The focused production-preview
+`Workspace backup|workspace restore` Chromium run passes 3/3. It retains G2's
+byte-for-byte zero-mutation review/Dismiss case and adds a mixed keyboard-driven
+Merge preview with an unrelated current hidden-tier row plus a different-
+Revision file whose incompatible setup row is disabled while unrelated rows
+remain selectable. `test-results/.last-run.json` records `passed` with no failed
+tests.
+
+The authoritative `npm run verify` gate passes on the final G3 source: 92 files
+/ 915 tests, 19/19 goldens, typecheck, the 143/128/eight-entrypoint architecture
+check, lint, Prettier, a 239-module production build, artifact validation and
+diff checks. Artifact evidence is 12 files, 2 assets, 5 JavaScript chunks,
+2,183,730 total bytes, 794,657 raw / 229,994 gzip direct entry and SHA-256
+`56b11d038c712dcb08509e886fe90df4523c58a084152878db7f0c91b0c47205`.
+The first full gate exposed a 230,585-byte gzip entry, 585 bytes above the
+accepted ceiling; moving the plan session behind its existing lazy boundary
+restored compliance without changing restore semantics. The final entry is six
+bytes below the current ceiling. Dependency audit was skipped by the gate in
+the network-disabled sandbox.
+
+G3 performs no storage write/remove, React feature-state mutation, recovery
+transition, PriceSet acceptance, session-only Apply or Undo. Its visible Apply
+control remains disabled even for a ready plan; G4 owns the executor and final
+queue verification. The default Settings surface is unchanged from G2 until a
+file opens the review, so this slice introduces no new default-layout visual
+baseline delta; G4 still owns the final documented visual comparison required
+for the completed workflow. Evidence remains `LOCAL_RUNTIME` /
+`SYNTHETIC_TEST` and does not prove multi-key storage atomicity.
+
+## 2026-07-19 Workspace safe export and Review-before-restore
+
+The G1/G2 Workspace state, controller, pure Settings presenter and local-state
+recovery commands pass eight files / 64 tests across the focused runs. They
+prove exhaustive eleven-id policy, nine required canonical records, default
+Hiscores exclusion plus explicit normalized opt-in, duplicate/unsafe/bounded
+input rejection, latest-request-wins, raw-free unsupported/malformed rows,
+current entity compatibility, the ten-row optional-Hiscores presentation,
+default-off recipient privacy, exact candidate Dismiss and unchanged recovery
+behavior.
+
+The named production-preview `Workspace backup` Chromium path passes 1/1. It
+downloads a Revision 274 nine-area file without the typed private fixture
+player, imports that exact file, focuses `Review before restore`, renders nine
+area rows, resets the file input and returns focus on Dismiss. Sorted byte-for-
+byte localStorage snapshots and the visible ATT field are identical before
+review, after review and after Dismiss. This is zero-mutation review evidence;
+G3/G4 still own selection, Replace/Merge results, storage mutation,
+session-only Apply and Undo.
+
+Typecheck and the cycle-free architecture graph pass with 142 source modules,
+127 client-reachable modules, eight external entrypoints and no exceptions or
+orphans. The authoritative `npm run verify` gate passes 91 files / 902 tests,
+19/19 goldens, lint, Prettier, the 238-module production build, artifact
+validation and diff checks. The 12-file/two-asset/five-JavaScript-chunk artifact
+is 2,172,520 bytes with a 793,830 raw / 229,717 gzip direct entry and SHA-256
+`0cc16afc2263a5ec7d389f512141660f2dcfaa899250d73286d53d71cec9e128`.
+The Workspace review and Settings presenter are lazy 3.78 kB and 5.79 kB chunks;
+this corrected two intermediate verification failures at the direct-entry raw
+and gzip budgets without changing the controller contract or UI behavior.
+Dependency audit is skipped by the gate in the network-disabled sandbox.
+
+The required read-only `Settings desktop` visual comparison first reached the
+managed sandbox's expected `listen EPERM 127.0.0.1:5174` boundary and then ran
+through the approved localhost path. It reports the intentional new-panel
+difference against the unchanged baseline: 8,279 pixels, ratio 0.03. The actual
+image was reviewed and shows the new Workspace section in the correct Settings
+order with no unexplained horizontal overflow, wrong pane, private player name,
+raw payload or local path. No visual baseline was updated during this non-final
+feature slice. This is `LOCAL_RUNTIME` / `SYNTHETIC_TEST` evidence, not a real
+user backup, deployed environment or crash-durability claim.
+
 ## 2026-07-19 safe active setup reset
 
 The required candidate/review/persistence/Planner command passes 4 files / 70
@@ -31,6 +213,18 @@ pre-existing Reset-external 1 px / 0.01-ratio mobile differences remain in
 Loot, Planner and Duel and their baselines were not changed by this goal. This
 is `LOCAL_RUNTIME` / `SYNTHETIC_TEST` evidence, not deployed or provider
 evidence.
+
+The final `npm run verify` gate passes the same 137/122/eight-entrypoint
+architecture graph, 88 files / 877 tests, 19/19 goldens, lint, Prettier,
+production build, artifact validation and diff checks. The 10-file artifact is
+2,147,223 bytes with a 779,232 raw / 226,183 gzip direct entry and SHA-256
+`a5dea13d288ca9950e17275a446bfaa9b0820962ddcc1db367795fd5b4a58f17`.
+Dependency audit is skipped by the verification script in the network-disabled
+sandbox. Two earlier gate attempts exposed that the generated all-monster,
+all-style numeric invariant could take 5.4-7.6 seconds under full parallel
+load despite passing in 0.76 seconds alone; its case-local harness timeout is
+now 15 seconds, and the final full run passes it in 3.26 seconds without any
+calculation or assertion change.
 
 ## 2026-07-19 application error boundary and safe-session recovery
 

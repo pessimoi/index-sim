@@ -56,6 +56,9 @@ test("loads the dense combat spreadsheet root", async ({ page }) => {
   );
   await expect(page.getByRole("table", { name: "All monsters" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "All monsters", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sort by gold pieces per kill" })).toBeVisible();
+  await expect(page.getByLabel(/Food per kill: /)).toBeVisible();
+  await expect(page.getByText("F/KL", { exact: true })).toBeVisible();
   await expect(page.getByText("DPS").first()).toBeVisible();
   const hiscores = page.getByRole("region", { name: "Hiscores" });
   await expect(hiscores).toBeVisible();
@@ -473,7 +476,7 @@ test("shows Stats XP routing and trip summary plus setup damage distribution", a
   const cannon = page.locator('section[aria-label="Cannon"]');
   await cannon.getByLabel("Set up cannon").check();
   await cannon.getByLabel("Mobs at spot").fill("6");
-  await cannon.getByLabel("Respawn").fill("30");
+  await cannon.getByLabel("Respawn (seconds)").fill("30");
   await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Stats" }).click();
   const assumptions = page.getByLabel("Active assumptions");
   await expect(assumptions).toContainText("Cannon");
@@ -519,6 +522,8 @@ test("switches the target through MonsterCard and keeps shell state in sync", as
   const beforeMetrics = await resultMetricSnapshot(page);
 
   await expect(card.getByRole("heading", { name: "Giant" })).toBeVisible();
+  await expect(card.getByLabel(/game ticks$/)).toBeVisible();
+  await expect(card.getByLabel(/seconds$/)).toBeVisible();
   await expect(card.getByLabel("Current setup state")).toContainText("Default setup");
   await chooseSearchableOption(card, "Target", "Rock Crab");
 

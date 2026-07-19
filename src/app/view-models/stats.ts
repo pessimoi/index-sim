@@ -643,12 +643,12 @@ export function createStatsSourceBreakdownViewModel(input: {
 
 function finiteMinutesLabel(minutes: number): string {
   if (minutes === Number.POSITIVE_INFINITY) return "unlimited";
-  return Number.isFinite(minutes) ? `${formatNumber(minutes, 1)}m` : "-";
+  return Number.isFinite(minutes) ? `${formatNumber(minutes, 1)} min` : "-";
 }
 
 function finiteSecondsLabel(seconds: number): string {
   if (seconds === Number.POSITIVE_INFINITY) return "unlimited";
-  return Number.isFinite(seconds) ? `${formatNumber(seconds)}s` : "-";
+  return Number.isFinite(seconds) ? `${formatNumber(seconds)} s` : "-";
 }
 
 function statsTripRow(input: {
@@ -1128,7 +1128,7 @@ export function createStatsCombatRollDetailViewModel(input: {
     statsCombatRollMetric({
       id: "attack-speed",
       label: "Attack speed",
-      value: attackSpeedSec == null ? "-" : `${formatNumber(attackSpeedSec, 1)}s`,
+      value: attackSpeedSec == null ? "-" : `${formatNumber(attackSpeedSec, 1)} s`,
       numericValue: attackSpeedSec,
       note: "Normal attack seconds per swing.",
       tone: "default"

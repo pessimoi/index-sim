@@ -30,6 +30,8 @@ export interface SettingsPaneViewModel {
   hasHiddenGearTiers: boolean;
 }
 
+export type SettingsNavigationIntent = { kind: "review-price-data-in-economy" };
+
 export function createGameRevisionViewModel(gameData: GameDataSnapshot): GameRevisionViewModel {
   const context = requireGameDataRevisionContext(gameData);
   return {

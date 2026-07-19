@@ -37,7 +37,7 @@ test("numeric input drafts stay literal and only accepted values reach applicati
   const tabs = page.getByLabel("Workbench tabs");
   await tabs.getByRole("tab", { name: "Trip" }).click();
   const trip = page.getByLabel("Trip assumptions");
-  await trip.getByLabel("F/KL override").selectOption("on");
+  await trip.getByLabel("Food per kill override").selectOption("on");
   const foodPerKill = trip.getByLabel("Food/kill");
   await foodPerKill.fill("1.");
   await expect(foodPerKill).toHaveValue("1.");

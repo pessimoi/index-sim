@@ -70,7 +70,7 @@ describe("rewrite UI view models", () => {
       label: "Cannon",
       value: expect.stringContaining("Enabled"),
       reviewTab: "cannon",
-      detail: "targets 6, respawn 30s",
+      detail: "targets 6, respawn 30 s",
       resetAction: {
         target: "cannon-enabled",
         ariaLabel: "Reset current monster cannon",

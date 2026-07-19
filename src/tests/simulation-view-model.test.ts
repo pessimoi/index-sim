@@ -154,7 +154,7 @@ describe("rewrite UI view models", () => {
       }
     });
     expect(activeAssumptionRow(overridden, "manual-combat-overrides")?.detail).toContain(
-      "speed 1.2s"
+      "speed 1.2 s"
     );
   });
 

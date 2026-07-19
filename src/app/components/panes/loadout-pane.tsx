@@ -193,7 +193,7 @@ export function LoadoutPane({
               onChange={(value) => actions.setManualOverride("damageBonus", value)}
             />
             <OptionalNumberField
-              label="Attack speed sec"
+              label="Attack speed (seconds)"
               value={viewModel.manualOverrides.attackSpeedSec}
               min={0.6}
               max={12}

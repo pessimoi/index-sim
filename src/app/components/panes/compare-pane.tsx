@@ -7,6 +7,7 @@ import type {
   DenseCompareScaleViewModel
 } from "../../view-models/compare";
 import type { DenseComparePresentation } from "../../controllers/use-compare-calculation";
+import { expandedCompactLabel } from "../../view-models/presentation-language";
 
 const DENSE_TABLE_COLUMNS: Array<{
   key: DenseCompareSortKey;
@@ -219,8 +220,13 @@ export function ComparePane({ hidden, model, actions }: ComparePaneProps) {
                   className={column.align === "right" ? "numeric" : undefined}
                   aria-sort={ariaSort(denseCompare.sort, column.key)}
                 >
-                  <button type="button" className="sort-button" onClick={() => sortBy(column.key)}>
-                    <span>{column.label}</span>
+                  <button
+                    type="button"
+                    className="sort-button"
+                    aria-label={`Sort by ${expandedCompactLabel(column.label)?.toLowerCase() ?? column.label}`}
+                    onClick={() => sortBy(column.key)}
+                  >
+                    <span aria-hidden="true">{column.label}</span>
                     <span aria-hidden="true">
                       {denseCompare.sort.key === column.key
                         ? denseCompare.sort.direction === "asc"

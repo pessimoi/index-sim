@@ -1,4 +1,4 @@
-import { createElement, createRef } from "react";
+import { createElement, createRef, isValidElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { AppHeader } from "../app/components/shell/app-header";
 import { LegacyMigrationPanel } from "../app/components/shell/legacy-migration-panel";
@@ -22,6 +22,13 @@ function inOrder(markup: string, fragments: readonly string[]): void {
     expect(next, `missing or out-of-order fragment: ${fragment}`).toBeGreaterThan(previous);
     previous = next;
   }
+}
+
+function elements(node: ReactNode): ReactElement[] {
+  if (Array.isArray(node)) return node.flatMap(elements);
+  if (!isValidElement(node)) return [];
+  const children = (node.props as { children?: ReactNode }).children;
+  return [node, ...elements(children)];
 }
 
 describe("app shell components", () => {
@@ -234,7 +241,14 @@ describe("app shell components", () => {
       supplyCostsExceedLoot: true,
       risk: null
     });
-    const markup = renderToStaticMarkup(
+    const reviewCalls: unknown[] = [];
+    const directAction = {
+      kind: "correct-price" as const,
+      itemId: "lobster",
+      noticeId: "missing-price:lobster:supply:",
+      label: "Correct price" as const
+    };
+    const shellElement = (
       <WorkbenchShell
         activeTab="stats"
         form={DEFAULT_FORM_STATE}
@@ -251,19 +265,27 @@ describe("app shell components", () => {
         priceNotices={{
           issues: [
             {
+              noticeId: "missing-price:lobster:supply:",
               code: "missing-price",
               itemId: "lobster",
               itemLabel: "Lobster",
+              itemDisplayLabel: {
+                name: "Lobster",
+                technicalId: "lobster",
+                source: "game-data"
+              },
               level: "issue",
               consumer: "supply",
               affectsCurrentResult: true,
               summary: "Missing price",
-              detail: "Lobster has no usable price."
+              detail: "Lobster has no usable price.",
+              action: directAction
             }
           ],
           notes: [],
           all: [],
-          byLootRowId: {}
+          byLootRowId: {},
+          resultAction: directAction
         }}
         activeAssumptions={{
           statusLabel: "No active assumptions",
@@ -290,6 +312,7 @@ describe("app shell components", () => {
           setPrimaryBoost: noOp,
           setManualOverride: noOp,
           reviewPriceData: noOp,
+          reviewPriceItem: (action) => reviewCalls.push(action),
           reviewActiveAssumption: noOp,
           resetActiveAssumption: noOp
         }}
@@ -298,6 +321,8 @@ describe("app shell components", () => {
         <section aria-label="Feature pane fixture">Pane fixture</section>
       </WorkbenchShell>
     );
+    const tree = WorkbenchShell(shellElement.props);
+    const markup = renderToStaticMarkup(tree);
 
     inOrder(markup, [
       'aria-label="Setup quick navigation"',
@@ -326,11 +351,26 @@ describe("app shell components", () => {
     expect(markup).toContain("View stats");
     expect(markup).toContain('aria-label="Reset active setup" title="Reset active setup"');
     expect(markup).toContain("Effective XP/hr");
+    expect(markup).toContain(">SPD</label>");
+    expect(markup).toContain('aria-label="Attack speed in seconds"');
+    expect(markup).toContain(">F/KL</span>");
+    expect(markup).toContain('aria-label="Food per kill: 1.50"');
+    expect(markup).toContain('aria-label="Time to kill: 30.0 s"');
+    expect(markup).toContain('aria-label="Experience points per hour: 20,000"');
+    expect(markup).toContain('aria-label="Gold pieces per kill: 50"');
     expect(markup).toContain('aria-label="Price data issue"');
     expect(markup).toContain("Price data incomplete");
-    expect(markup).toContain("Review price data");
+    expect(markup).toContain('aria-label="Correct price for Lobster"');
+    expect(markup).not.toContain("Review price data");
     expect(markup).not.toContain("Price warnings");
     expect(markup).not.toContain('aria-label="Effective trip rates"');
     expect(markup).toContain('hidden=""');
+    const correctionButton = elements(tree).find(
+      (element) =>
+        element.type === "button" &&
+        (element.props as { "aria-label"?: string })["aria-label"] === "Correct price for Lobster"
+    );
+    (correctionButton!.props as { onClick(): void }).onClick();
+    expect(reviewCalls).toEqual([directAction]);
   });
 });

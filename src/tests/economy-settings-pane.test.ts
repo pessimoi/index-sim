@@ -38,6 +38,8 @@ const revision: GameRevisionViewModel = {
 
 const defaultActions: EconomySettingsPaneActions = {
   setPriceNotesOpen: noOp,
+  reviewPriceItem: noOp,
+  navigate: noOp,
   prices: {
     importPriceSet: async () => undefined,
     exportActivePriceSet: noOp,
@@ -76,6 +78,13 @@ const defaultActions: EconomySettingsPaneActions = {
     cancelClear: noOp,
     confirmClearItem: noOp,
     confirmClearInvalid: noOp
+  },
+  workspace: {
+    setIncludeLastHiscoresPlayer: noOp,
+    exportWorkspace: noOp,
+    dismissReview: noOp,
+    reviewRecovery: noOp,
+    restore: async () => undefined
   }
 };
 
@@ -146,7 +155,7 @@ function model(mode: EconomySettingsPaneMode): EconomySettingsPaneModel {
     mode,
     prices: priceData(),
     settings: createSettingsPaneViewModel({ bronze: true }, revision),
-    priceNotices: { issues: [], notes: [], all: [], byLootRowId: {} },
+    priceNotices: { issues: [], notes: [], all: [], byLootRowId: {}, resultAction: null },
     priceNotesOpen: false,
     marketNotice: null,
     importNotice: null,
@@ -164,6 +173,18 @@ function model(mode: EconomySettingsPaneMode): EconomySettingsPaneModel {
       },
       notice: null,
       pendingClearId: null
+    },
+    workspace: {
+      phase: "idle",
+      includeLastHiscoresPlayer: false,
+      notice: null,
+      review: null,
+      selection: null,
+      restorePlan: null,
+      currentRevisionLabel: revision.revisionLabel,
+      currentSnapshotLabel: revision.snapshotLabel,
+      currentSnapshotId: revision.snapshotId,
+      canIncludeLastHiscoresPlayer: false
     }
   };
 }
@@ -203,9 +224,15 @@ describe("Economy and Settings pane", () => {
     ]);
     expect(markup).not.toContain('aria-label="Price data settings"');
     expect(markup).not.toContain('aria-label="Hidden gear tiers"');
+    expect(markup.match(/aria-label="Market price data"/g)).toHaveLength(1);
+    expect(markup.match(/aria-label="Scheduled price snapshot summary"/g)).toHaveLength(1);
+    expect(markup.match(/aria-label="Market active PriceSet summary"/g)).toHaveLength(1);
+    expect(markup.match(/aria-label="Advanced PriceSet tools"/g)).toHaveLength(1);
+    expect(markup).toContain("<summary>Technical details</summary>");
+    expect(markup).not.toContain("Item ID:");
   });
 
-  it("keeps Settings Price data, Gear menu and shared Market composition in order", () => {
+  it("keeps Settings calculation, Workspace, short PriceSet summary and Gear menu in order", () => {
     const markup = renderToStaticMarkup(
       createElement(EconomySettingsPane, { model: model("settings"), actions: defaultActions })
     );
@@ -216,56 +243,78 @@ describe("Economy and Settings pane", () => {
     inOrder(markup, [
       'aria-label="Calculation context"',
       "Revision 274",
+      'aria-label="Workspace tools"',
       'aria-label="Price data settings"',
       'aria-label="Active PriceSet summary"',
       'aria-label="Hidden gear tiers"',
-      'aria-label="Gear tier visibility"',
-      'aria-label="Market price data"',
-      'aria-label="Price history summary"'
+      'aria-label="Gear tier visibility"'
     ]);
+    expect(markup).toContain("Review in Economy");
+    expect(markup).toContain("Active source Bundled fallback");
+    expect(markup).toContain('aria-label="Age 1 hour"');
+    expect(markup).not.toContain('aria-label="Scheduled price snapshot summary"');
+    expect(markup).not.toContain('aria-label="Market price data"');
+    expect(markup).not.toContain("Advanced PriceSet tools");
     expect(markup).not.toContain('aria-label="Manual item price"');
     expect(markup).not.toContain('aria-label="Price history analysis"');
+    expect(markup.match(/aria-label="Active PriceSet summary"/g)).toHaveLength(1);
     expect(markup).toContain("LostCity fixture runtime");
     expect(markup).toContain("lostcity-376072662e78-runtime");
     expect(markup).toContain("LostCityRS/Content · 376072662e78");
     expect(markup).toContain("2026-07-09T00:00:00.000Z");
-    expect(markup).toContain("setup transfers do not include prices");
+    expect(markup).toContain("Setup transfers do not include prices");
     expect(markup).not.toContain(".sources");
   });
 
-  it.each(["economy", "settings"] as const)(
-    "renders one collapsed, fully explained PriceSet workflow in %s mode",
-    (mode) => {
-      const markup = renderToStaticMarkup(
-        createElement(EconomySettingsPane, { model: model(mode), actions: defaultActions })
-      );
+  it("emits only the typed Review-in-Economy navigation intent from Settings", () => {
+    const calls: unknown[] = [];
+    const tree = EconomySettingsPane({
+      model: model("settings"),
+      actions: { ...defaultActions, navigate: (intent) => calls.push(intent) }
+    });
+    const reviewButton = elements(tree).find(
+      (element) =>
+        element.type === "button" &&
+        (element.props as { children?: ReactNode }).children === "Review in Economy"
+    );
 
-      expect(markup.match(/class="advanced-price-set-tools"/g)).toHaveLength(1);
-      expect(markup.match(/type="file"/g)).toHaveLength(1);
-      expect(markup).toContain(
-        '<details class="advanced-price-set-tools" aria-label="Advanced PriceSet tools"><summary>Advanced PriceSet tools</summary>'
-      );
-      expect(markup).toContain("Importing replaces the complete local base PriceSet");
-      expect(markup).toContain("Missing items are not merged from the committed snapshot");
-      expect(markup).toContain("Use <strong>Manual item price</strong>");
-      expect(markup).toContain("a PriceSet JSON exported by this app, up to 1 MB");
-      expect(markup).toContain("High alch values always come from current game data");
-      expect(markup).toContain("File format");
-      expect(markup).toContain("complete replacement map, not a patch");
-      expect(markup).toContain('accept="application/json,.json"');
-      expect(markup).toMatch(/aria-describedby="[^"]+ [^"]+"/);
-      inOrder(markup, [
-        "Export active PriceSet",
-        "Import full PriceSet",
-        "Reset imported PriceSet"
-      ]);
-      expect(markup).not.toContain("Import prices");
-      expect(markup).not.toContain("Import PriceSet");
-      expect(markup).not.toContain("Reset local price override");
-    }
-  );
+    expect(reviewButton).toBeDefined();
+    (reviewButton!.props as { onClick(): void }).onClick();
+    expect(calls).toEqual([{ kind: "review-price-data-in-economy" }]);
+  });
 
-  it("keeps the hidden shared service strip mounted with the Market boundary", () => {
+  it("renders one collapsed, fully explained PriceSet workflow only in Economy", () => {
+    const mode = "economy" as const;
+    const markup = renderToStaticMarkup(
+      createElement(EconomySettingsPane, { model: model(mode), actions: defaultActions })
+    );
+
+    expect(markup.match(/class="advanced-price-set-tools"/g)).toHaveLength(1);
+    expect(markup.match(/type="file"/g)).toHaveLength(1);
+    expect(markup).toContain(
+      '<details class="advanced-price-set-tools" aria-label="Advanced PriceSet tools"><summary>Advanced PriceSet tools</summary>'
+    );
+    expect(markup).toContain("Importing replaces the complete local base PriceSet");
+    expect(markup).toContain("Missing items are not merged from the committed snapshot");
+    expect(markup).toContain("Use <strong>Manual item price</strong>");
+    expect(markup).toContain("a PriceSet JSON exported by this app, up to 1 MB");
+    expect(markup).toContain("High alch values always come from current game data");
+    expect(markup).toContain("File format");
+    expect(markup).toContain("complete replacement map, not a patch");
+    expect(markup).toContain('accept="application/json,.json"');
+    expect(markup).toMatch(/aria-describedby="[^"]+ [^"]+"/);
+    inOrder(markup, ["Export active PriceSet", "Import full PriceSet", "Reset imported PriceSet"]);
+    expect(markup).not.toContain("Import prices");
+    expect(markup).not.toContain("Import PriceSet");
+    expect(markup).not.toContain("Reset local price override");
+    const settingsMarkup = renderToStaticMarkup(
+      createElement(EconomySettingsPane, { model: model("settings"), actions: defaultActions })
+    );
+    expect(settingsMarkup).not.toContain("Advanced PriceSet tools");
+    expect(settingsMarkup).not.toContain("Import full PriceSet");
+  });
+
+  it("keeps the hidden shared service strip mounted without detailed Market content", () => {
     const markup = renderToStaticMarkup(
       createElement(EconomySettingsPane, { model: model("hidden"), actions: defaultActions })
     );
@@ -273,7 +322,7 @@ describe("Economy and Settings pane", () => {
     expect(
       markup.startsWith('<section class="service-strip" aria-label="Live services" hidden="">')
     ).toBe(true);
-    expect(markup).toContain('aria-label="Market price data"');
+    expect(markup).not.toContain('aria-label="Market price data"');
     expect(markup).not.toContain('aria-label="Price data settings"');
     expect(markup).not.toContain('aria-label="Price history analysis"');
   });
@@ -281,19 +330,37 @@ describe("Economy and Settings pane", () => {
   it("renders every current price note in one controlled native disclosure", () => {
     const priceNotices = [
       {
+        noticeId: "missing-price:lobster:supply:",
         code: "missing-price",
         itemId: "lobster",
         itemLabel: "Lobster",
+        itemDisplayLabel: {
+          name: "Lobster",
+          technicalId: "lobster",
+          source: "game-data" as const
+        },
         level: "issue" as const,
         consumer: "supply" as const,
         affectsCurrentResult: true,
         summary: "Missing price",
-        detail: "Lobster has no usable price."
+        detail: "Lobster has no usable price.",
+        action: {
+          kind: "correct-price" as const,
+          itemId: "lobster",
+          noticeId: "missing-price:lobster:supply:",
+          label: "Correct price" as const
+        }
       },
       {
+        noticeId: "price-generated-fallback:bones:loot:bones-row",
         code: "price-generated-fallback",
         itemId: "bones",
         itemLabel: "Bones",
+        itemDisplayLabel: {
+          name: "Bones",
+          technicalId: "bones",
+          source: "game-data" as const
+        },
         level: "note" as const,
         consumer: "loot" as const,
         affectsCurrentResult: true,
@@ -302,20 +369,22 @@ describe("Economy and Settings pane", () => {
         detail: "Bones use a game-data estimate."
       }
     ];
-    const calls: boolean[] = [];
+    const calls: Array<boolean | string> = [];
     const paneModel: EconomySettingsPaneModel = {
       ...model("economy"),
       priceNotices: {
         issues: [priceNotices[0]!],
         notes: [priceNotices[1]!],
         all: priceNotices,
-        byLootRowId: { "bones-row": [priceNotices[1]!] }
+        byLootRowId: { "bones-row": [priceNotices[1]!] },
+        resultAction: null
       },
       priceNotesOpen: true
     };
     const paneActions: EconomySettingsPaneActions = {
       ...defaultActions,
-      setPriceNotesOpen: (open) => calls.push(open)
+      setPriceNotesOpen: (open) => calls.push(open),
+      reviewPriceItem: (action) => calls.push(`${action.kind}:${action.itemId}:${action.noticeId}`)
     };
     const tree = EconomySettingsPane({ model: paneModel, actions: paneActions });
     const details = elements(tree).find(
@@ -328,15 +397,63 @@ describe("Economy and Settings pane", () => {
     expect(markup).toContain("Price data notes (2)");
     expect(markup).toContain("Lobster");
     expect(markup).toContain("Bones");
+    expect(markup).toContain('aria-label="Correct price for Lobster"');
+    expect(markup).toContain("<dt>Item ID</dt><dd><code>lobster</code></dd>");
+    expect(markup).not.toContain("Item ID: lobster");
     expect(markup).not.toContain("2 more");
     expect(details?.props).toMatchObject({ open: true });
     (details!.props as { onToggle(event: { currentTarget: { open: boolean } }): void }).onToggle({
       currentTarget: { open: false }
     });
-    expect(calls).toEqual([false]);
+    const correctButton = elements(tree).find(
+      (element) =>
+        element.type === "button" &&
+        (element.props as { "aria-label"?: string })["aria-label"] === "Correct price for Lobster"
+    );
+    (correctButton!.props as { onClick(): void }).onClick();
+    expect(calls).toEqual([false, "correct-price:lobster:missing-price:lobster:supply:"]);
   });
 
-  it("keeps confirmations and the one PriceSet notice in the shared Market section", () => {
+  it("passes the dedicated ref only to the native Manual price field", () => {
+    const inputRef = { current: null };
+    const tree = EconomySettingsPane({
+      model: model("economy"),
+      actions: defaultActions,
+      manualPriceInputRef: inputRef
+    });
+    const manualInput = elements(tree).find(
+      (element) =>
+        typeof element.type === "function" &&
+        (element.props as { label?: string }).label === "Manual price"
+    );
+
+    expect((manualInput?.props as { inputRef?: unknown }).inputRef).toBe(inputRef);
+  });
+
+  it("passes the Workspace model, actions and focus refs through the lazy Settings boundary", () => {
+    const paneModel = model("settings");
+    const inputRef = { current: null };
+    const headingRef = { current: null };
+    const tree = EconomySettingsPane({
+      model: paneModel,
+      actions: defaultActions,
+      workspaceImportInputRef: inputRef,
+      workspaceReviewHeadingRef: headingRef
+    });
+    const workspaceElement = elements(tree).find((element) => {
+      const props = element.props as { model?: unknown };
+      return props.model === paneModel.workspace;
+    });
+
+    expect(workspaceElement?.props).toMatchObject({
+      model: paneModel.workspace,
+      actions: defaultActions.workspace,
+      importInputRef: inputRef,
+      reviewHeadingRef: headingRef
+    });
+  });
+
+  it("keeps Market confirmations and notices exclusively in Economy", () => {
     const settingsModel: EconomySettingsPaneModel = {
       ...model("settings"),
       priceSetResetPending: true,
@@ -356,16 +473,17 @@ describe("Economy and Settings pane", () => {
     );
     inOrder(settingsMarkup, [
       'aria-label="Calculation context"',
+      'aria-label="Workspace tools"',
       'aria-label="Local state recovery"',
       "Recovery fixture notice",
       'aria-label="Price data settings"',
-      'aria-label="Hidden gear tiers"',
-      'aria-label="Market price data"',
-      "Advanced PriceSet tools",
-      "Confirm reset to bundled prices",
-      "Settings import fixture failed"
+      'aria-label="Hidden gear tiers"'
     ]);
-    expect(settingsMarkup).toContain("Market fixture warning");
+    expect(settingsMarkup).not.toContain('aria-label="Market price data"');
+    expect(settingsMarkup).not.toContain("Advanced PriceSet tools");
+    expect(settingsMarkup).not.toContain("Confirm reset to bundled prices");
+    expect(settingsMarkup).not.toContain("Settings import fixture failed");
+    expect(settingsMarkup).not.toContain("Market fixture warning");
 
     const economyModel: EconomySettingsPaneModel = {
       ...model("economy"),

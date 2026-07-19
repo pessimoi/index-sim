@@ -15,6 +15,11 @@ import {
 } from "../state/ui-state";
 import { formatNumber } from "./formatting";
 import { signedBonus, styleOptions } from "./loadout";
+import {
+  createEntityDisplayLabel,
+  formatSemanticUnitValue,
+  type EntityDisplayLabel
+} from "./presentation-language";
 
 type MonsterCardStatKey =
   "combat" | "hitpoints" | "attack" | "strength" | "defence" | "magic" | "attackSpeed";
@@ -23,6 +28,8 @@ interface MonsterCardStatViewModel {
   key: MonsterCardStatKey;
   label: string;
   value: number | null;
+  displayValue: string;
+  accessibleValue: string;
   missing: boolean;
 }
 
@@ -48,6 +55,7 @@ interface MonsterCardSetupBadgeViewModel {
 interface MonsterCardNamedSelectionViewModel {
   id: EntityId;
   label: string;
+  displayLabel: EntityDisplayLabel;
 }
 
 interface MonsterCardSetupOverviewViewModel {
@@ -71,6 +79,7 @@ interface MonsterCardSetupOverviewViewModel {
 export interface MonsterCardViewModel {
   monsterId: EntityId;
   monsterName: string;
+  monsterDisplayLabel: EntityDisplayLabel;
   stats: MonsterCardStatViewModel[];
   defenceRows: MonsterCardDefenceRowViewModel[];
   activeDefenceField: MonsterCardDefenceField | null;
@@ -111,9 +120,15 @@ function namedSelection(
   id: EntityId | undefined,
   label: string | undefined
 ): MonsterCardNamedSelectionViewModel {
+  const displayLabel = createEntityDisplayLabel({
+    technicalId: id ?? "none",
+    gameDataName: label,
+    rowSourceName: id === undefined ? "None" : null
+  });
   return {
     id: id ?? "none",
-    label: label ?? id ?? "None"
+    label: displayLabel.name,
+    displayLabel
   };
 }
 
@@ -150,9 +165,25 @@ function createMonsterCardStats(
     { key: "defence", label: "Defence", value: monsterNumber(monster, "defLevel") },
     { key: "magic", label: "Magic", value: monsterNumber(monster, "magicLevel") },
     { key: "attackSpeed", label: "Attack speed", value: monsterNumber(monster, "attackSpeed") }
-  ] satisfies Array<Omit<MonsterCardStatViewModel, "missing">>;
+  ] satisfies Array<Omit<MonsterCardStatViewModel, "missing" | "displayValue" | "accessibleValue">>;
 
-  return rows.map((row) => ({ ...row, missing: row.value == null }));
+  return rows.map((row) => {
+    if (row.key === "attackSpeed" && row.value !== null) {
+      const speed = formatSemanticUnitValue(formatNumber(row.value), row.value, "tick");
+      return {
+        ...row,
+        displayValue: speed.visible,
+        accessibleValue: speed.accessible,
+        missing: false
+      };
+    }
+    return {
+      ...row,
+      displayValue: row.value === null ? "-" : formatNumber(row.value),
+      accessibleValue: row.value === null ? "-" : formatNumber(row.value),
+      missing: row.value == null
+    };
+  });
 }
 
 function createMonsterCardDefenceRows(
@@ -214,7 +245,7 @@ function createMonsterCardSetupOverview(
     `Style: ${styleLabel}`,
     `ACC ${signedBonus(combat.debug.accuracyBonus)}`,
     `DMG ${signedBonus(combat.debug.damageBonus)}`,
-    `Speed ${formatNumber(combat.attackSpeedSec, 1)}s`
+    `Speed ${formatNumber(combat.attackSpeedSec, 1)} s`
   ].filter((item): item is string => item != null);
 
   return {
@@ -249,9 +280,14 @@ export function createMonsterCardViewModelFromCombat(
   const defenceRows = createMonsterCardDefenceRows(monster, activeField);
   const activeDefenceKey = defenceRows.find((row) => row.active)?.key ?? null;
 
+  const monsterDisplayLabel = createEntityDisplayLabel({
+    technicalId: monster.id,
+    gameDataName: monster.name
+  });
   return {
     monsterId: monster.id,
-    monsterName: monster.name,
+    monsterName: monsterDisplayLabel.name,
+    monsterDisplayLabel,
     stats: createMonsterCardStats(monster),
     defenceRows,
     activeDefenceField: activeField,

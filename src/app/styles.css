@@ -4345,6 +4345,103 @@ th {
   padding-bottom: 0.75rem;
 }
 
+.workspace-backup-panel {
+  border-bottom: 1px solid #26303d;
+  min-width: 0;
+  padding-bottom: 0.75rem;
+}
+
+.workspace-hiscores-toggle {
+  margin-top: 0.65rem;
+  max-width: 32rem;
+}
+
+.workspace-restore-review {
+  border-top: 1px solid #394150;
+  display: grid;
+  gap: 0.15rem;
+  margin-top: 0.8rem;
+  min-width: 0;
+  padding-top: 0.75rem;
+}
+
+.workspace-review-table-wrap {
+  border: 1px solid #26303d;
+  border-radius: 6px;
+  margin-top: 0.65rem;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.workspace-review-table-wrap table {
+  min-width: 92rem;
+}
+
+.workspace-review-table-wrap th,
+.workspace-review-table-wrap td {
+  vertical-align: top;
+}
+
+.workspace-area-choice {
+  align-items: start;
+  display: inline-grid;
+  gap: 0.4rem;
+  grid-template-columns: auto minmax(0, 1fr);
+  min-width: 8.5rem;
+}
+
+.workspace-area-choice input {
+  margin-top: 0.16rem;
+}
+
+.workspace-area-mode select {
+  min-width: 7rem;
+}
+
+.technical-details {
+  margin-top: 0.35rem;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.technical-details > summary {
+  color: #9ba8b7;
+  cursor: pointer;
+  font-size: 0.72rem;
+}
+
+.technical-details dl {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0.35rem 0 0;
+  min-width: 0;
+}
+
+.technical-details dl > div {
+  display: grid;
+  gap: 0.15rem;
+  grid-template-columns: minmax(5rem, auto) minmax(0, 1fr);
+}
+
+.technical-details dt {
+  color: #9ba8b7;
+}
+
+.technical-details dd {
+  margin: 0;
+  min-width: 0;
+}
+
+.technical-details code {
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.monster-card-technical-details {
+  border-top: 1px solid #26303d;
+  padding-top: 0.5rem;
+}
+
 .calculation-context-grid {
   display: grid;
   gap: 0.45rem;

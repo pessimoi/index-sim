@@ -185,8 +185,8 @@ describe("app shell view model", () => {
       "GP/KILL"
     ]);
     expect(viewModel.metrics.find((metric) => metric.label === "TTK")).toMatchObject({
-      value: "30.0s",
-      detail: "P10/50/90 10.0 / 20.0 / 30.0s",
+      value: "30.0 s",
+      detail: "P10/50/90 10.0 / 20.0 / 30.0 s",
       reviewTarget: "risk"
     });
     expect(viewModel.netGpGuidance).toEqual({

@@ -1,4 +1,4 @@
-import { useId, type Ref } from "react";
+import { lazy, Suspense, useId, type Ref } from "react";
 import type {
   LocalStateHealthItemId,
   LocalStateHealthReport
@@ -13,9 +13,10 @@ import {
   economyMoverTone,
   PRICE_HISTORY_BASELINE_OPTIONS,
   type CurrentPriceNoticePresentation,
-  type PriceDataViewModel
+  type PriceDataViewModel,
+  type PriceNoticeAction
 } from "../../view-models/price-data";
-import type { SettingsPaneViewModel } from "../../view-models/settings";
+import type { SettingsNavigationIntent, SettingsPaneViewModel } from "../../view-models/settings";
 import { formatNumber } from "../../view-models/formatting";
 import { InlineImportNotice } from "../app-presenters";
 import { DecimalField, SearchableSelectField, SelectField } from "../form-fields";
@@ -27,7 +28,13 @@ import {
 } from "../presentation-formatters";
 import { PriceTrendChart, PriceTrendSparkline } from "../price-history-charts";
 import { LocalStateRecoveryPanel } from "../settings/local-state-recovery-panel";
+import type {
+  WorkspaceBackupPanelActions,
+  WorkspaceBackupPanelModel
+} from "../settings/workspace-backup-panel";
 import { importPriceSetFromInput } from "./price-set-import-input";
+
+const WorkspaceBackupPanel = lazy(() => import("../settings/workspace-backup-panel"));
 
 export type EconomySettingsPaneMode = "economy" | "settings" | "hidden";
 
@@ -48,10 +55,13 @@ export interface EconomySettingsPaneModel {
     notice: string | null;
     pendingClearId: LocalStateClearPendingId;
   };
+  workspace: WorkspaceBackupPanelModel;
 }
 
 export interface EconomySettingsPaneActions {
   setPriceNotesOpen(open: boolean): void;
+  reviewPriceItem(action: PriceNoticeAction): void;
+  navigate(intent: SettingsNavigationIntent): void;
   prices: {
     importPriceSet(file: File): Promise<void>;
     exportActivePriceSet(): void;
@@ -91,12 +101,49 @@ export interface EconomySettingsPaneActions {
     confirmClearItem(id: LocalStateHealthItemId): void;
     confirmClearInvalid(): void;
   };
+  workspace: WorkspaceBackupPanelActions;
 }
 
 export interface EconomySettingsPaneProps {
   model: EconomySettingsPaneModel;
   actions: EconomySettingsPaneActions;
   priceNotesSummaryRef?: Ref<HTMLElement>;
+  manualPriceInputRef?: Ref<HTMLInputElement>;
+  workspaceImportInputRef?: Ref<HTMLInputElement>;
+  workspaceReviewHeadingRef?: Ref<HTMLHeadingElement>;
+  setPriceNoticeActionRef?(noticeId: string, element: HTMLButtonElement | null): void;
+  marketHeadingRef?: Ref<HTMLHeadingElement>;
+}
+
+function TechnicalDetails({
+  itemId,
+  sourceNameUnavailable = false
+}: {
+  itemId: string | null;
+  sourceNameUnavailable?: boolean;
+}) {
+  if (!itemId && !sourceNameUnavailable) return null;
+  return (
+    <details className="technical-details">
+      <summary>Technical details</summary>
+      <dl>
+        {itemId ? (
+          <div>
+            <dt>Item ID</dt>
+            <dd>
+              <code>{itemId}</code>
+            </dd>
+          </div>
+        ) : null}
+        {sourceNameUnavailable ? (
+          <div>
+            <dt>Name source</dt>
+            <dd>Source name unavailable</dd>
+          </div>
+        ) : null}
+      </dl>
+    </details>
+  );
 }
 
 function ScheduledSnapshotSummary({ prices }: { prices: PriceDataViewModel }) {
@@ -108,7 +155,7 @@ function ScheduledSnapshotSummary({ prices }: { prices: PriceDataViewModel }) {
         <span>Label {scheduled.label}</span>
         <span>Source scheduled static JSON</span>
         <span>Created {scheduled.createdAt}</span>
-        <span>Age {scheduled.ageLabel}</span>
+        <span aria-label={`Age ${scheduled.ageAccessibleLabel}`}>Age {scheduled.ageLabel}</span>
         <span>Item prices {formatNumber(scheduled.itemCount)}</span>
         <span>Observed high {formatNumber(scheduled.metadata.observedHigh)}</span>
         <span>Observed medium {formatNumber(scheduled.metadata.observedMedium)}</span>
@@ -236,7 +283,12 @@ function AdvancedPriceSetTools({
 export function EconomySettingsPane({
   model,
   actions,
-  priceNotesSummaryRef
+  priceNotesSummaryRef,
+  manualPriceInputRef,
+  workspaceImportInputRef,
+  workspaceReviewHeadingRef,
+  setPriceNoticeActionRef,
+  marketHeadingRef
 }: EconomySettingsPaneProps) {
   const economyVisible = model.mode === "economy";
   const settingsVisible = model.mode === "settings";
@@ -292,10 +344,26 @@ export function EconomySettingsPane({
               </dd>
             </div>
           </dl>
-          <p className="inline-status neutral">
-            Uses the active PriceSet shown in Economy; setup transfers do not include prices.
-          </p>
+          <p className="inline-status neutral">Setup transfers do not include prices.</p>
         </section>
+      )}
+      {settingsVisible && (
+        <Suspense
+          fallback={
+            <section className="service-group workspace-backup-panel" aria-label="Workspace tools">
+              <p className="inline-status neutral" role="status">
+                Loading Workspace tools…
+              </p>
+            </section>
+          }
+        >
+          <WorkspaceBackupPanel
+            model={model.workspace}
+            actions={actions.workspace}
+            importInputRef={workspaceImportInputRef}
+            reviewHeadingRef={workspaceReviewHeadingRef}
+          />
+        </Suspense>
       )}
       <LocalStateRecoveryPanel
         visible={settingsVisible && model.recovery.visible}
@@ -316,16 +384,19 @@ export function EconomySettingsPane({
               {prices.active.available ? prices.active.sourceLabel : "empty"}
             </span>
           </div>
-          <ScheduledSnapshotSummary prices={prices} />
           <div className="price-history-summary" aria-label="Active PriceSet summary">
-            <span>Active source {prices.active.sourceLabel}</span>
             <span>Label {prices.active.label}</span>
-            <span>Source {prices.active.source}</span>
-            <span>Created {prices.active.createdAt}</span>
-            <span>Age {prices.active.ageLabel}</span>
-            <span>Item prices {formatNumber(prices.active.itemCount)}</span>
-            <span>Alch values {formatNumber(prices.active.alchCount)}</span>
+            <span>Active source {prices.active.sourceLabel}</span>
+            <span aria-label={`Age ${prices.active.ageAccessibleLabel}`}>
+              Age {prices.active.ageLabel}
+            </span>
           </div>
+          <button
+            type="button"
+            onClick={() => actions.navigate({ kind: "review-price-data-in-economy" })}
+          >
+            Review in Economy
+          </button>
         </section>
       )}
       {settingsVisible && (
@@ -368,37 +439,41 @@ export function EconomySettingsPane({
           </div>
         </section>
       )}
-      <section className="service-group" aria-label="Market price data">
-        <div className="section-title-row">
-          <h2>Market</h2>
-          <span className={`status-pill ${prices.scheduled.ready ? "ready" : ""}`}>
-            {prices.scheduled.statusLabel}
-          </span>
-        </div>
-        <ScheduledSnapshotSummary prices={prices} />
-        <p className="inline-status neutral">
-          Automatic market upstream refresh is currently disabled. The committed snapshot remains
-          the base unless a local PriceSet has been selected. High alch always uses current
-          generated game data.
-        </p>
-        <div className="price-history-summary" aria-label="Market active PriceSet summary">
-          <span>Active source {prices.active.sourceLabel}</span>
-          <span>Label {prices.active.label}</span>
-          <span>Source {prices.active.source}</span>
-          <span>Created {prices.active.createdAt}</span>
-          <span>Age {prices.active.ageLabel}</span>
-          <span>Item prices {formatNumber(prices.active.itemCount)}</span>
-          <span>Observed high {formatNumber(prices.active.metadata.observedHigh)}</span>
-          <span>Observed medium {formatNumber(prices.active.metadata.observedMedium)}</span>
-          <span>Observed low {formatNumber(prices.active.metadata.observedLow)}</span>
-          <span>Retained {formatNumber(prices.active.metadata.retained)}</span>
-          <span>Generated fallback {formatNumber(prices.active.metadata.generatedFallback)}</span>
-          <span>Manual {formatNumber(prices.active.metadata.manual)}</span>
-          <span>Unknown provenance {formatNumber(prices.active.metadata.unknown)}</span>
-          <span>Missing mapped {formatNumber(prices.active.metadata.missingMapped)}</span>
-          <span>Alch values {formatNumber(prices.active.alchCount)}</span>
-        </div>
-        {economyVisible && (
+      {economyVisible && (
+        <section className="service-group" aria-label="Market price data">
+          <div className="section-title-row">
+            <h2 ref={marketHeadingRef} tabIndex={-1}>
+              Market
+            </h2>
+            <span className={`status-pill ${prices.scheduled.ready ? "ready" : ""}`}>
+              {prices.scheduled.statusLabel}
+            </span>
+          </div>
+          <ScheduledSnapshotSummary prices={prices} />
+          <p className="inline-status neutral">
+            Automatic market upstream refresh is currently disabled. The committed snapshot remains
+            the base unless a local PriceSet has been selected. High alch always uses current
+            generated game data.
+          </p>
+          <div className="price-history-summary" aria-label="Market active PriceSet summary">
+            <span>Active source {prices.active.sourceLabel}</span>
+            <span>Label {prices.active.label}</span>
+            <span>Source {prices.active.source}</span>
+            <span>Created {prices.active.createdAt}</span>
+            <span aria-label={`Age ${prices.active.ageAccessibleLabel}`}>
+              Age {prices.active.ageLabel}
+            </span>
+            <span>Item prices {formatNumber(prices.active.itemCount)}</span>
+            <span>Observed high {formatNumber(prices.active.metadata.observedHigh)}</span>
+            <span>Observed medium {formatNumber(prices.active.metadata.observedMedium)}</span>
+            <span>Observed low {formatNumber(prices.active.metadata.observedLow)}</span>
+            <span>Retained {formatNumber(prices.active.metadata.retained)}</span>
+            <span>Generated fallback {formatNumber(prices.active.metadata.generatedFallback)}</span>
+            <span>Manual {formatNumber(prices.active.metadata.manual)}</span>
+            <span>Unknown provenance {formatNumber(prices.active.metadata.unknown)}</span>
+            <span>Missing mapped {formatNumber(prices.active.metadata.missingMapped)}</span>
+            <span>Alch values {formatNumber(prices.active.alchCount)}</span>
+          </div>
           <section className="manual-price-panel" aria-label="Manual item price">
             <div className="loot-section-heading">
               <div>
@@ -426,6 +501,7 @@ export function EconomySettingsPane({
               />
               <DecimalField
                 label="Manual price"
+                inputRef={manualPriceInputRef}
                 value={manual.inputValue}
                 min={0}
                 max={1_000_000_000_000}
@@ -489,97 +565,113 @@ export function EconomySettingsPane({
               )}
             </div>
           </section>
-        )}
-        <AdvancedPriceSetTools model={model} actions={actions} />
-        {model.marketNotice && (
-          <p
-            className={`inline-status ${model.marketNotice.tone}`}
-            role={model.marketNotice.tone === "error" ? "alert" : "status"}
-          >
-            {model.marketNotice.message}
-          </p>
-        )}
-        <div className="market-sync-bar">
-          <button
-            type="button"
-            disabled={!prices.active.available}
-            onClick={actions.history.saveLocalComparison}
-          >
-            Save local comparison
-          </button>
-          {model.priceHistoryClearPending ? (
-            <>
-              <button type="button" onClick={actions.history.confirmClear}>
-                Confirm clear local history
-              </button>
-              <button type="button" onClick={actions.history.cancelClear}>
-                Cancel
-              </button>
-            </>
-          ) : (
+          <AdvancedPriceSetTools model={model} actions={actions} />
+          {model.marketNotice && (
+            <p
+              className={`inline-status ${model.marketNotice.tone}`}
+              role={model.marketNotice.tone === "error" ? "alert" : "status"}
+            >
+              {model.marketNotice.message}
+            </p>
+          )}
+          <div className="market-sync-bar">
             <button
               type="button"
-              disabled={history.localSnapshotCount === 0}
-              onClick={actions.history.requestClear}
+              disabled={!prices.active.available}
+              onClick={actions.history.saveLocalComparison}
             >
-              Clear local history
+              Save local comparison
             </button>
-          )}
-        </div>
-        <div className="price-history-summary" aria-label="Price history summary">
-          <span>Snapshots {formatNumber(history.summary.snapshotCount)}</span>
-          <span>Shared {formatNumber(history.sharedSnapshotCount)}</span>
-          <span>Local {formatNumber(history.localSnapshotCount)}</span>
-          <span>Items {formatNumber(history.summary.trackedItemCount)}</span>
-          <span>Moved {formatNumber(history.movers.movedItemCount)}</span>
-          <span>Latest age {history.summary.latestAgeLabel}</span>
-          <span>Active {history.summary.activeLabel}</span>
-          <span>
-            Latest {history.summary.latestLabel}
-            {history.summary.activeMatchesLatest ? " active" : ""}
-          </span>
-          <span>Baseline {history.movers.baselineLabel}</span>
-        </div>
-        {model.priceNotices.all.length > 0 ? (
-          <details
-            className="price-data-notes"
-            aria-label="Economy price data notes"
-            open={model.priceNotesOpen}
-            onToggle={(event) => {
-              if (event.currentTarget.open !== model.priceNotesOpen) {
-                actions.setPriceNotesOpen(event.currentTarget.open);
-              }
-            }}
-          >
-            <summary ref={priceNotesSummaryRef}>
-              Price data notes ({formatNumber(model.priceNotices.all.length)})
-            </summary>
-            <p>These values affect the current monetary result. Calculations remain available.</p>
-            <ul>
-              {model.priceNotices.all.map((notice) => (
-                <li
-                  className={notice.level}
-                  key={`${notice.code}:${notice.itemId ?? notice.itemLabel}:${notice.consumer}:${notice.lootRowId ?? ""}`}
-                >
-                  <div>
-                    <strong>{notice.itemLabel}</strong>
-                    <span>{notice.summary}</span>
-                  </div>
-                  <p>{notice.detail}</p>
-                  <small>
-                    {notice.consumer === "loot"
-                      ? "Loot"
-                      : notice.consumer === "cannon"
-                        ? "Cannon"
-                        : "Supply"}
-                    {notice.itemId ? ` · ${notice.itemId}` : ""}
-                  </small>
-                </li>
-              ))}
-            </ul>
-          </details>
-        ) : null}
-      </section>
+            {model.priceHistoryClearPending ? (
+              <>
+                <button type="button" onClick={actions.history.confirmClear}>
+                  Confirm clear local history
+                </button>
+                <button type="button" onClick={actions.history.cancelClear}>
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                disabled={history.localSnapshotCount === 0}
+                onClick={actions.history.requestClear}
+              >
+                Clear local history
+              </button>
+            )}
+          </div>
+          <div className="price-history-summary" aria-label="Price history summary">
+            <span>Snapshots {formatNumber(history.summary.snapshotCount)}</span>
+            <span>Shared {formatNumber(history.sharedSnapshotCount)}</span>
+            <span>Local {formatNumber(history.localSnapshotCount)}</span>
+            <span>Items {formatNumber(history.summary.trackedItemCount)}</span>
+            <span>Moved {formatNumber(history.movers.movedItemCount)}</span>
+            <span aria-label={`Latest age ${history.summary.latestAgeAccessibleLabel}`}>
+              Latest age {history.summary.latestAgeLabel}
+            </span>
+            <span>Active {history.summary.activeLabel}</span>
+            <span>
+              Latest {history.summary.latestLabel}
+              {history.summary.activeMatchesLatest ? " active" : ""}
+            </span>
+            <span>Baseline {history.movers.baselineLabel}</span>
+          </div>
+          {model.priceNotices.all.length > 0 ? (
+            <details
+              className="price-data-notes"
+              aria-label="Economy price data notes"
+              open={model.priceNotesOpen}
+              onToggle={(event) => {
+                if (event.currentTarget.open !== model.priceNotesOpen) {
+                  actions.setPriceNotesOpen(event.currentTarget.open);
+                }
+              }}
+            >
+              <summary ref={priceNotesSummaryRef}>
+                Price data notes ({formatNumber(model.priceNotices.all.length)})
+              </summary>
+              <p>These values affect the current monetary result. Calculations remain available.</p>
+              <ul>
+                {model.priceNotices.all.map((notice) => (
+                  <li
+                    className={notice.level}
+                    id={`price-notice-${notice.noticeId}`}
+                    key={`${notice.code}:${notice.itemId ?? notice.itemLabel}:${notice.consumer}:${notice.lootRowId ?? ""}`}
+                  >
+                    <div>
+                      <strong>{notice.itemLabel}</strong>
+                      <span>{notice.summary}</span>
+                    </div>
+                    <p>{notice.detail}</p>
+                    {notice.action ? (
+                      <button
+                        ref={(element) => setPriceNoticeActionRef?.(notice.noticeId, element)}
+                        type="button"
+                        aria-label={`${notice.action.label} for ${notice.itemLabel}`}
+                        onClick={() => actions.reviewPriceItem(notice.action!)}
+                      >
+                        {notice.action.label}
+                      </button>
+                    ) : null}
+                    <small>
+                      {notice.consumer === "loot"
+                        ? "Loot"
+                        : notice.consumer === "cannon"
+                          ? "Cannon"
+                          : "Supply"}
+                    </small>
+                    <TechnicalDetails
+                      itemId={notice.itemId ?? null}
+                      sourceNameUnavailable={notice.itemDisplayLabel.source === "fallback"}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ) : null}
+        </section>
+      )}
       {economyVisible && (
         <section
           className="service-group economy-history-panel"
@@ -636,7 +728,7 @@ export function EconomySettingsPane({
             />
           </div>
           <div className="price-history-summary" aria-label="Selected item price provenance">
-            <span>Item {history.selectedItem.itemId || "-"}</span>
+            <span>Item {history.selectedItem.itemDisplayLabel.name}</span>
             <span>Price {optionalPrice(history.selectedItem.price)}</span>
             <span>Origin {itemPriceMetadataLabel(history.selectedItem.metadata?.valueOrigin)}</span>
             <span>
@@ -647,6 +739,10 @@ export function EconomySettingsPane({
             <span>Observed {history.selectedItem.metadata?.valueObservedAt ?? "-"}</span>
             <span>Evaluated {history.selectedItem.metadata?.evaluatedAt ?? "-"}</span>
             <span>Reason {itemPriceMetadataLabel(history.selectedItem.metadata?.reasonCode)}</span>
+            <TechnicalDetails
+              itemId={history.selectedItem.itemId || null}
+              sourceNameUnavailable={history.selectedItem.itemDisplayLabel.source === "fallback"}
+            />
           </div>
           <div className="movers-grid" aria-label="Top movers">
             <div className="mover-list" aria-label="Top gainers">
@@ -751,7 +847,12 @@ export function EconomySettingsPane({
                     <tr key={row.itemId}>
                       <td className="economy-item-cell">
                         <strong>{row.itemLabel}</strong>
-                        <small>Item ID: {row.itemId}</small>
+                        <TechnicalDetails
+                          itemId={row.itemId}
+                          sourceNameUnavailable={
+                            history.itemDisplayLabels[row.itemId]?.source === "fallback"
+                          }
+                        />
                       </td>
                       <td className="numeric">{optionalPrice(row.latestPrice)}</td>
                       <td className="numeric">{optionalPrice(row.baselinePrice)}</td>
@@ -779,3 +880,5 @@ export function EconomySettingsPane({
     </section>
   );
 }
+
+export default EconomySettingsPane;

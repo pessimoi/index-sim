@@ -147,8 +147,8 @@ export function createTripPaneViewModel(input: {
   const bankSecondsValue = policy.bankSeconds ?? Math.max(0, Math.round(trip.bankSeconds));
   const bankTimeSummary =
     policy.bankSeconds == null
-      ? `Auto ${formatNumber(trip.bankSeconds)}s`
-      : `Manual ${formatNumber(policy.bankSeconds)}s`;
+      ? `Auto ${formatNumber(trip.bankSeconds)} s`
+      : `Manual ${formatNumber(policy.bankSeconds)} s`;
   const recoverAmmoApplies = form.combatStyle === "ranged";
   const recoverAmmoSummary = recoverAmmoApplies ? yesNo(policy.recoverAmmo) : "Ranged only";
   const dbaSpecActive = form.combatStyle === "melee" && form.boosts.includes("dba_spec");
@@ -257,11 +257,11 @@ export function createTripPaneViewModel(input: {
       ? `${formatNumber(recommendation.recommendedDoses)} doses/type`
       : `${formatNumber(recommendation.recommendedVials)} vials/type`;
   const recommendationTrip =
-    recommendation.tripMinutes == null ? "-" : `${formatNumber(recommendation.tripMinutes, 1)}m`;
+    recommendation.tripMinutes == null ? "-" : `${formatNumber(recommendation.tripMinutes, 1)} min`;
   const recommendationInterval =
     recommendation.repotIntervalMinutes == null
       ? "-"
-      : `${formatNumber(recommendation.repotIntervalMinutes, 1)}m`;
+      : `${formatNumber(recommendation.repotIntervalMinutes, 1)} min`;
 
   return {
     controls: {
@@ -329,7 +329,7 @@ export function createTripPaneViewModel(input: {
           { label: "Altar sec", value: trip.altarOn ? formatNumber(trip.altarSeconds) : "-" },
           {
             label: "Altar/kill",
-            value: trip.altarOn ? `${formatNumber(trip.altarSecPerKill, 2)}s` : "-"
+            value: trip.altarOn ? `${formatNumber(trip.altarSecPerKill, 2)} s` : "-"
           }
         ]
       },
@@ -362,8 +362,8 @@ export function createTripPaneViewModel(input: {
           { label: "Potion carry", value: potionCarrySummary },
           { label: "Potion slots", value: formatNumber(trip.slots.potionSlots) },
           { label: "Potion parts", value: potionPartsSummary },
-          { label: "Potion gp/trip", value: formatNumber(trip.potionCostPerTrip), tone: "gold" },
-          { label: "Potion gp/kill", value: formatNumber(trip.potionCostPerKill), tone: "gold" }
+          { label: "Potion GP/trip", value: formatNumber(trip.potionCostPerTrip), tone: "gold" },
+          { label: "Potion GP/kill", value: formatNumber(trip.potionCostPerKill), tone: "gold" }
         ]
       },
       {
@@ -393,7 +393,7 @@ export function createTripPaneViewModel(input: {
             value: trip.recoilOn ? `${formatNumber(trip.recoilDmgPerKill, 1)} dmg` : "-"
           },
           {
-            label: "Recoil gp/kill",
+            label: "Recoil GP/kill",
             value: trip.recoilOn ? formatNumber(trip.recoilCostPerKill) : "-",
             tone: "gold"
           }
@@ -406,7 +406,9 @@ export function createTripPaneViewModel(input: {
           { label: "Kills/trip", value: formatNumber(trip.killsPerTrip, 1) },
           {
             label: "Trip length",
-            value: Number.isFinite(trip.tripMinutes) ? `${formatNumber(trip.tripMinutes, 1)}m` : "-"
+            value: Number.isFinite(trip.tripMinutes)
+              ? `${formatNumber(trip.tripMinutes, 1)} min`
+              : "-"
           },
           { label: "Effective K/hr", value: formatNumber(result.effectiveKph) },
           {

@@ -96,7 +96,7 @@ describe("rewrite UI view models", () => {
     expect(buryImpact?.label).toBe("Bury");
     expect(buryImpact?.isSelected).toBe(true);
     expect(buryImpact?.isDefault).toBe(true);
-    expect(buryImpact?.notes.some((note) => note.includes("prayer XP/kill"))).toBe(true);
+    expect(buryImpact?.notes.some((note) => note.includes("Prayer XP/kill"))).toBe(true);
     expect(lootImpact?.gpPerKillContribution).toBeGreaterThan(0);
     expect(skipImpact?.gpPerKillContribution).toBe(0);
   });
@@ -174,11 +174,17 @@ describe("rewrite UI view models", () => {
     expect(casket?.expandedRows).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          label: "20-640 coins (210 average)",
+          label: "Coins",
           key: "coins",
           chance: 60 / 128,
           qty: 210,
-          price: 1
+          price: 1,
+          displayLabel: {
+            name: "Coins",
+            technicalId: "coins",
+            source: "game-data"
+          },
+          notes: expect.arrayContaining(["Face value; six equiprobable coin amounts"])
         }),
         expect.objectContaining({ key: "tooth_half_key", chance: 1 / 128 }),
         expect.objectContaining({ key: "loop_half_key", chance: 1 / 128 })
@@ -471,7 +477,7 @@ describe("rewrite UI view models", () => {
         statusLabel: "Current monster loot settings reset"
       }
     });
-    expect(activeAssumptionRow(summarized, "loot-settings")?.detail).toContain("overhead 12.5s");
+    expect(activeAssumptionRow(summarized, "loot-settings")?.detail).toContain("overhead 12.5 s");
     expect(activeAssumptionRow(summarized, "loot-settings")?.detail).toContain(
       "talisman overground"
     );

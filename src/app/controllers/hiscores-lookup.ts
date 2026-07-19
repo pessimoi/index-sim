@@ -63,7 +63,7 @@ export function describeHiscoresError(error: unknown): string {
     if (error.code === "not-found") return "Player not found";
     if (error.code === "rate-limited") {
       return error.retryAfterSeconds
-        ? `Rate limited. Try again in ${error.retryAfterSeconds}s`
+        ? `Rate limited. Try again in ${error.retryAfterSeconds} s`
         : "Rate limited";
     }
     if (error.code === "upstream-unavailable") return hiscoresUnavailableMessage(null);

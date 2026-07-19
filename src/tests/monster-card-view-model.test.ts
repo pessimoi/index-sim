@@ -135,14 +135,14 @@ describe("MonsterCard view model", () => {
       tone: "default",
       hasCustomSetup: true
     });
-    expect(defaultCard.setupOverview.weapon).toEqual({
+    expect(defaultCard.setupOverview.weapon).toMatchObject({
       id: "rune_scimitar",
       label: "Rune scimitar"
     });
     expect(defaultCard.setupOverview.ammo).toBeNull();
     expect(defaultCard.setupOverview.spell).toBeNull();
     expect(defaultCard.setupOverview.summary).toContain("Weapon: Rune scimitar");
-    expect(rangedCard.setupOverview.ammo).toEqual({
+    expect(rangedCard.setupOverview.ammo).toMatchObject({
       id: "mith_arrow",
       label: "Mithril arrow"
     });
@@ -152,7 +152,7 @@ describe("MonsterCard view model", () => {
       tone: "custom",
       hasCustomSetup: true
     });
-    expect(magicCard.setupOverview.spell).toEqual({
+    expect(magicCard.setupOverview.spell).toMatchObject({
       id: "fire_wave",
       label: "Fire Wave"
     });
@@ -178,6 +178,20 @@ describe("MonsterCard view model", () => {
     expect(card.setupOverview.accuracyBonus).toBe(987);
     expect(card.setupOverview.damageBonus).toBe(-321);
     expect(card.setupOverview.summary).toEqual(expect.arrayContaining(["ACC +987", "DMG -321"]));
+  });
+
+  it("keeps source monster speed in game ticks and player setup speed in seconds", () => {
+    const { context } = createGeneratedRuntimeContext();
+    const card = createMonsterCardViewModel(DEFAULT_FORM_STATE, context);
+    const sourceSpeed = card.stats.find((row) => row.key === "attackSpeed");
+
+    expect(sourceSpeed).toMatchObject({
+      value: context.gameData.monsters[DEFAULT_FORM_STATE.monsterId].attackSpeed,
+      displayValue: "6 ticks",
+      accessibleValue: "6 game ticks"
+    });
+    expect(card.setupOverview.attackSpeedSec).toBe(2.4);
+    expect(card.setupOverview.summary).toContain("Speed 2.4 s");
   });
 
   it("sorts target options by the visible monster label", () => {

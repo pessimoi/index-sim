@@ -363,7 +363,7 @@ describe("rewrite UI view models", () => {
       numericValue: result.hitDistribution.averageHit
     });
     expect(metrics.get("attack-speed")).toMatchObject({
-      value: `${formatNumber(result.combat.attackSpeedSec, 1)}s`,
+      value: `${formatNumber(result.combat.attackSpeedSec, 1)} s`,
       numericValue: result.combat.attackSpeedSec
     });
     expect(metrics.get("attack-cycle")).toMatchObject({

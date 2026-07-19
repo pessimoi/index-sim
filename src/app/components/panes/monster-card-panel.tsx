@@ -3,6 +3,7 @@ import { formatNumber } from "../../view-models/formatting";
 import type { MonsterCardViewModel } from "../../view-models/monster-card";
 import { SearchableSelectField, type SelectOption } from "../form-fields";
 import { signedInteger, yesNo } from "../presentation-formatters";
+import { formatSemanticUnitValue } from "../../view-models/presentation-language";
 
 export interface MonsterCardPanelProps {
   card: MonsterCardViewModel;
@@ -37,7 +38,12 @@ export function MonsterCardPanel({
   onTargetChange
 }: MonsterCardPanelProps) {
   const setup = card.setupOverview;
-  const setupRows = [
+  const setupSpeed = formatSemanticUnitValue(
+    formatNumber(setup.attackSpeedSec, 1),
+    setup.attackSpeedSec,
+    "second"
+  );
+  const setupRows: Array<{ label: string; value: string; accessible?: string } | null> = [
     { label: "Weapon", value: setup.weapon.label },
     setup.ammo ? { label: "Ammo", value: setup.ammo.label } : null,
     setup.spell ? { label: "Spell", value: setup.spell.label } : null,
@@ -48,12 +54,15 @@ export function MonsterCardPanel({
     },
     { label: "Prayer", value: selectedOptionLabel(PRAYER_OPTIONS, setup.prayerIds) },
     { label: "Boost", value: selectedOptionLabel(BOOST_OPTIONS, setup.boostIds) },
-    { label: "Speed", value: `${formatNumber(setup.attackSpeedSec, 1)}s` },
+    { label: "Attack speed", value: setupSpeed.visible, accessible: setupSpeed.accessible },
     { label: "Accuracy", value: signedInteger(setup.accuracyBonus) },
     { label: "Damage", value: signedInteger(setup.damageBonus) },
     { label: "Sustained", value: yesNo(setup.sustained) },
     { label: "Ring", value: setup.ring?.label ?? "-" }
-  ].filter((row): row is { label: string; value: string } => row !== null);
+  ];
+  const visibleSetupRows = setupRows.filter(
+    (row): row is { label: string; value: string; accessible?: string } => row !== null
+  );
 
   return (
     <aside className="monster-rail" aria-label="Monster card">
@@ -61,7 +70,6 @@ export function MonsterCardPanel({
         <div className="section-title-row">
           <div>
             <h2>{card.monsterName}</h2>
-            <span className="monster-card-subtitle">{card.monsterId}</span>
           </div>
           <span
             className={`status-pill ${card.setupBadge.tone === "custom" ? "ready" : ""}`}
@@ -87,7 +95,13 @@ export function MonsterCardPanel({
             {card.stats.map((stat) => (
               <div key={stat.key} className={stat.missing ? "missing" : undefined}>
                 <dt>{stat.label}</dt>
-                <dd>{optionalNumber(stat.value)}</dd>
+                <dd
+                  aria-label={
+                    stat.accessibleValue !== stat.displayValue ? stat.accessibleValue : undefined
+                  }
+                >
+                  {stat.displayValue}
+                </dd>
               </div>
             ))}
           </dl>
@@ -114,14 +128,31 @@ export function MonsterCardPanel({
         <section className="monster-card-section" aria-label="Monster setup overview">
           <h3>Setup overview</h3>
           <dl className="monster-setup-grid">
-            {setupRows.map((row) => (
+            {visibleSetupRows.map((row) => (
               <div key={row.label}>
                 <dt>{row.label}</dt>
-                <dd>{row.value}</dd>
+                <dd aria-label={row.accessible}>{row.value}</dd>
               </div>
             ))}
           </dl>
         </section>
+        <details className="technical-details monster-card-technical-details">
+          <summary>Technical details</summary>
+          <dl>
+            <div>
+              <dt>Monster ID</dt>
+              <dd>
+                <code>{card.monsterId}</code>
+              </dd>
+            </div>
+            {card.monsterDisplayLabel.source === "fallback" ? (
+              <div>
+                <dt>Name source</dt>
+                <dd>Source name unavailable</dd>
+              </div>
+            ) : null}
+          </dl>
+        </details>
       </section>
     </aside>
   );

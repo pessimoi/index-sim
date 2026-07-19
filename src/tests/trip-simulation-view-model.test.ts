@@ -404,7 +404,7 @@ describe("rewrite UI view models", () => {
     });
     expect(rows.get("bank-time")).toMatchObject({
       label: "Bank time",
-      value: "150s",
+      value: "150 s",
       numericValue: 150
     });
     expect(rows.get("effective-kills-hour")?.numericValue).toBe(result.trip.effectiveKph);

@@ -12,7 +12,7 @@
 - [conditional-quest-clue-loot-spec.md](conditional-quest-clue-loot-spec.md): implemented source eligibility and zero-calculation contract for conditional loot.
 - [conditional-loot-presentation-spec.md](conditional-loot-presentation-spec.md): D-089 grouped inactive quest/clue loot presentation without calculation changes.
 - [manual-item-price-overrides-spec.md](manual-item-price-overrides-spec.md): D-090 browser-local per-item price overlay and reset contract.
-- [contextual-item-price-correction-spec.md](contextual-item-price-correction-spec.md): specified direct Result/Loot/Economy path to the existing manual-price editor.
+- [contextual-item-price-correction-spec.md](contextual-item-price-correction-spec.md): implemented direct Result/Loot/Economy path to the existing manual-price editor.
 - [requirement-aware-loadout-optimizer-spec.md](requirement-aware-loadout-optimizer-spec.md): implemented checked-by-default numeric-level eligibility for the bounded loadout optimizer.
 - [hit-distribution-visualization-spec.md](hit-distribution-visualization-spec.md): implemented discrete normal-versus-special hit-distribution comparison contract.
 - [legacy-planner-parity-spec.md](legacy-planner-parity-spec.md): implemented archived Planner behavior comparison and gap-classification contract.
@@ -32,14 +32,14 @@
 - [runtime-bootstrap-controller-spec.md](runtime-bootstrap-controller-spec.md): implemented generated-runtime lifecycle, compatibility and startup PriceSet resolution extraction preserving the D-094 chunk boundary.
 - [local-state-recovery-controller-spec.md](local-state-recovery-controller-spec.md): implemented browser-state health/block/persist/clear orchestration and pure Settings recovery panel boundary.
 - [local-state-attention-surface-spec.md](local-state-attention-surface-spec.md): implemented always-visible local-state attention notice and direct Settings recovery focus path without migration-policy changes.
-- [workspace-backup-restore-spec.md](workspace-backup-restore-spec.md): specified complete versioned browser-local Workspace export, reviewable area Replace/Merge policy, atomic restore/Undo and sensitive-state inclusion boundary.
+- [workspace-backup-restore-spec.md](workspace-backup-restore-spec.md): implemented complete versioned browser-local Workspace workflow with bounded export/review, typed Replace/Merge planning, logical atomic Apply/rollback, explicit session-only recovery and complete Undo.
 - [hiscores-lookup-controller-spec.md](hiscores-lookup-controller-spec.md): implemented request-race-safe Hiscores lifecycle extraction and topbar panel boundary.
 - [setup-file-transfer-controller-spec.md](setup-file-transfer-controller-spec.md): implemented bounded rewrite setup import/export orchestration and typed caller-owned Apply boundary.
 - [setup-replacement-review-undo-spec.md](setup-replacement-review-undo-spec.md): implemented review-before-Apply and persistence-aware Undo for setup file and saved-row replacement paths.
 - [active-setup-reset-spec.md](active-setup-reset-spec.md): implemented canonical active Default/current-target Custom reset with grouped Review, all-style-cache scope, protected surrounding state and persistence-aware Undo.
 - [price-set-transfer-controller-spec.md](price-set-transfer-controller-spec.md): implemented PriceSet import/acceptance/export/reset transaction extraction with typed caller-owned runtime application.
 - [price-set-import-discoverability-spec.md](price-set-import-discoverability-spec.md): implemented D-102 workflow with one advanced Market-owned full-PriceSet disclosure, explicit replacement/format guidance and no topbar/Settings duplicates.
-- [user-facing-language-units-information-hierarchy-spec.md](user-facing-language-units-information-hierarchy-spec.md): specced source-name-first entity labels, technical-id disclosure, semantic units/abbreviations and a concise Settings-to-Economy price hierarchy.
+- [user-facing-language-units-information-hierarchy-spec.md](user-facing-language-units-information-hierarchy-spec.md): implemented source-name-first entity labels, technical-id disclosure, semantic units/abbreviations and a concise Settings-to-Economy price hierarchy.
 - [cannon-pane-extraction-spec.md](cannon-pane-extraction-spec.md): implemented first low-coupling feature-pane extraction with explicit calculated presentation and action props.
 - [cannon-finite-occupancy-spec.md](cannon-finite-occupancy-spec.md): implemented D-100 finite sparse occupancy, combined/player-only/cannon-only result separation, cannonball cost routing and aligned Cannon presentation.
 - [numeric-input-draft-validation-spec.md](numeric-input-draft-validation-spec.md): implemented shared draft, validation, keyboard and external-update contract for required, decimal and optional numeric fields.

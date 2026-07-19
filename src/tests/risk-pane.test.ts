@@ -106,7 +106,7 @@ describe("Risk pane", () => {
       "Food runs out",
       "Kills / trip",
       "Trip cycle",
-      "60m net GP",
+      "60 min net GP",
       "Reach GP target",
       'aria-label="Risk model coverage"',
       "Player damage",
@@ -182,8 +182,8 @@ describe("Risk pane", () => {
       "Inputs changed. These results do not include the current setup, prices, loot policy or analysis controls."
     );
     expect(markup).toContain("Before 50 kills; not death chance");
-    expect(markup).toContain("60m net GP");
-    expect(markup).not.toContain("90m net GP");
+    expect(markup).toContain("60 min net GP");
+    expect(markup).not.toContain("90 min net GP");
   });
 
   it("shows a fixed failed state, Retry and a labelled previous result", () => {

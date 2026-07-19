@@ -58,7 +58,7 @@ async function captureLootDetails(loot: Locator, viewport: string) {
   }
 
   const randomHerb = table.getByRole("row", { name: /Random herb/ }).first();
-  await randomHerb.locator("details").last().locator("summary").click();
+  await randomHerb.locator(":scope > td").last().locator(":scope > details > summary").click();
   const nested = loot.getByRole("table", { name: /Nested rows for Random herb/ });
   await expect(nested).toContainText("Ranarr");
   await capturePane(nested, `loot-nested-${viewport}.png`);
@@ -226,7 +226,7 @@ test.describe("repository visual regression", () => {
     const cannon = page.getByRole("region", { name: "Cannon", exact: true });
     await cannon.getByLabel("Set up cannon").check();
     await cannon.getByLabel("Mobs at spot").fill("6");
-    await cannon.getByLabel("Respawn").fill("30");
+    await cannon.getByLabel("Respawn (seconds)").fill("30");
     await expect(cannon.getByLabel("Cannon output")).toContainText("Cannon DPS");
     await captureActivePane(page, "cannon-desktop.png");
   });

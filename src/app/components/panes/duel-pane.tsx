@@ -452,7 +452,7 @@ export function DuelPane({ hidden, model, actions }: DuelPaneProps) {
                               </div>
                               <div>
                                 <dt>TTK</dt>
-                                <dd>{duelDeltaDisplay(row.deltas.ttkSec, 1)}s</dd>
+                                <dd>{duelDeltaDisplay(row.deltas.ttkSec, 1)} s</dd>
                               </div>
                               <div>
                                 <dt>Kills/trip</dt>

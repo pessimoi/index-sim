@@ -78,6 +78,7 @@ describe("Cannon pane", () => {
     expect(markup).toContain('aria-label="Cannon output"');
     expect(markup).toContain('value="3"');
     expect(markup).toContain('value="60"');
+    expect(markup).toContain(">Respawn (seconds)</label>");
     expect(markup.match(/disabled=""/g)).toHaveLength(2);
     expect(markup).toContain("Reset monster cannon");
 
@@ -141,7 +142,7 @@ describe("Cannon pane", () => {
       "Ball cost/kill",
       "Ball price",
       "Cannonballs/trip",
-      "Ball gp/trip",
+      "Ball GP/trip",
       "K/hr uplift",
       "Accuracy rule",
       "XP rule",
@@ -164,7 +165,7 @@ describe("Cannon pane", () => {
       "77,796",
       "25.5%",
       "65.4% roll",
-      "2,222 gp/kill",
+      "2,222 GP/kill",
       "Linked",
       "5 slots",
       "88"

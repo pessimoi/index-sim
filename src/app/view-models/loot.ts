@@ -16,6 +16,7 @@ import {
 } from "../state/ui-state";
 import { formatNumber } from "./formatting";
 import type { ItemPriceHistoryContext, PriceDataNotice } from "./price-data";
+import { createEntityDisplayLabel, type EntityDisplayLabel } from "./presentation-language";
 import { createFullSimulationInput } from "./simulation-input";
 
 export interface LootActionImpactViewModel {
@@ -52,6 +53,7 @@ export interface LootValueCompositionViewModel {
 
 export interface LootExpandedRowViewModel {
   label: string;
+  displayLabel: EntityDisplayLabel;
   key: string | null;
   tag: string | null;
   weight: number | null;
@@ -89,6 +91,7 @@ export interface LootPriceHistoryContextViewModel {
 export interface LootDropRowViewModel {
   rowId: string;
   name: string;
+  displayLabel: EntityDisplayLabel;
   key: string | null;
   tag: string | null;
   chance: number;
@@ -339,6 +342,7 @@ function stringField(record: Record<string, unknown>, key: string): string | nul
 
 function expandedRows(
   drop: LootBreakdownEntry,
+  gameData: SimulationContext["gameData"],
   priceNotices: readonly PriceDataNotice[] = []
 ): LootExpandedRowViewModel[] {
   if (!Array.isArray(drop._expand)) return [];
@@ -352,9 +356,17 @@ function expandedRows(
     const rowValue = finiteNumberField(record, "rowValue") ?? price;
     const note = stringField(record, "note");
 
+    const key = stringField(record, "key");
+    const rowSourceName = typeof record.name === "string" ? record.name : `Row ${index + 1}`;
+    const displayLabel = createEntityDisplayLabel({
+      technicalId: key,
+      gameDataName: key ? gameData.items[key]?.name : null,
+      rowSourceName
+    });
     return {
-      label: typeof record.name === "string" ? record.name : `Row ${index + 1}`,
-      key: stringField(record, "key"),
+      label: displayLabel.name,
+      displayLabel,
+      key,
       tag: stringField(record, "tag"),
       weight,
       weightLabel:
@@ -410,9 +422,9 @@ function expandedRows(
 function lootValueDetails(drop: LootBreakdownEntry): LootDropValueDetailViewModel[] {
   const effectiveEvGp = effectiveDropEvGp(drop);
   const rows: LootDropValueDetailViewModel[] = [
-    { label: "Post-trip EV/kill", value: `${formatNumber(effectiveEvGp, 1)} gp`, tone: "default" },
-    { label: "Sale value", value: `${formatNumber(drop.saleValue)} gp`, tone: "muted" },
-    { label: "Alch value", value: `${formatNumber(drop.alchValue)} gp`, tone: "muted" },
+    { label: "Post-trip EV/kill", value: `${formatNumber(effectiveEvGp, 1)} GP`, tone: "default" },
+    { label: "Sale value", value: `${formatNumber(drop.saleValue)} GP`, tone: "muted" },
+    { label: "Alch value", value: `${formatNumber(drop.alchValue)} GP`, tone: "muted" },
     { label: "Slot fraction", value: formatNumber(drop.slotFrac, 2), tone: "muted" }
   ];
 
@@ -434,14 +446,14 @@ function lootValueDetails(drop: LootBreakdownEntry): LootDropValueDetailViewMode
   if (drop._displaced) {
     rows.push({
       label: "Pre-displacement EV",
-      value: `${formatNumber(drop.evGp, 1)} gp`,
+      value: `${formatNumber(drop.evGp, 1)} GP`,
       tone: "warning"
     });
   }
   if (drop.prayerXp > 0) {
     rows.push({
       label: "Bury prayer XP",
-      value: `${formatNumber(drop.chance * drop.qtyAvg * drop.prayerXp, 1)} xp/kill`,
+      value: `${formatNumber(drop.chance * drop.qtyAvg * drop.prayerXp, 1)} XP/kill`,
       tone: "muted"
     });
   }
@@ -504,7 +516,7 @@ function lootPriceHistoryContext(
       latestLabel: null,
       baselineLabel: null,
       statusLabel: "No history",
-      emptyMessage: `Item ${itemId} is not in local history.`
+      emptyMessage: `${drop.name} is not in local history.`
     };
   }
 
@@ -532,10 +544,10 @@ function actionImpactNotes(
   const rollsPerKill = drop.chance * drop.qtyAvg;
 
   if (action === "bury" && drop.isBone && drop.prayerXp > 0) {
-    notes.push(`${formatNumber(rollsPerKill * drop.prayerXp, 1)} prayer XP/kill`);
+    notes.push(`${formatNumber(rollsPerKill * drop.prayerXp, 1)} Prayer XP/kill`);
   }
   if (action === "alch") {
-    notes.push(`${formatNumber(Math.max(0, drop.alchValue - natureRuneCost))} gp/item after rune`);
+    notes.push(`${formatNumber(Math.max(0, drop.alchValue - natureRuneCost))} GP/item after rune`);
     notes.push(`${formatNumber(rollsPerKill, 2)} casts/kill`);
   }
   if (action === "unid" && drop.isHerb) {
@@ -547,7 +559,10 @@ function actionImpactNotes(
   return notes;
 }
 
-function createLootValueComposition(trip: TripLootSupplyResult): LootValueCompositionViewModel {
+function createLootValueComposition(
+  trip: TripLootSupplyResult,
+  gameData: SimulationContext["gameData"]
+): LootValueCompositionViewModel {
   const positiveDrops = trip.lootBreakdown
     .map((drop) => ({ drop, contribution: effectiveDropEvGp(drop) }))
     .filter((entry) => entry.contribution > 0)
@@ -557,7 +572,11 @@ function createLootValueComposition(trip: TripLootSupplyResult): LootValueCompos
   const hiddenDrops = positiveDrops.slice(8);
   const rows: LootValueCompositionRowViewModel[] = visibleDrops.map(({ drop, contribution }) => ({
     rowId: drop.rowId,
-    name: drop.name,
+    name: createEntityDisplayLabel({
+      technicalId: drop.key ?? null,
+      gameDataName: drop.key ? gameData.items[drop.key]?.name : null,
+      rowSourceName: drop.name
+    }).name,
     action: drop.pref,
     actionLabel: lootActionLabel(drop.pref),
     gpPerKill: contribution,
@@ -588,7 +607,7 @@ function createLootValueComposition(trip: TripLootSupplyResult): LootValueCompos
   const residualGpPerKill = trip.gpPerKill - positiveGpPerKill;
   const note =
     Math.abs(residualGpPerKill) >= 0.05
-      ? `Displayed GP/kill differs by ${formatNumber(residualGpPerKill, 1)} gp because trip state or zero-value rows are applied outside the positive-contributor list.`
+      ? `Displayed GP/kill differs by ${formatNumber(residualGpPerKill, 1)} GP because trip state or zero-value rows are applied outside the positive-contributor list.`
       : null;
 
   return {
@@ -647,16 +666,23 @@ function createLootRows(
     });
     const selectedImpact = actionImpacts.find((impact) => impact.action === drop.pref);
     const rowPriceNotices = priceNoticesByLootRowId[drop.rowId] ?? [];
-    const expandedPriceRows = expandedRows(drop, rowPriceNotices);
+    const expandedPriceRows = expandedRows(drop, context.gameData, rowPriceNotices);
     const nestedPriceItemIds = new Set(
       expandedPriceRows.flatMap((detail) =>
         detail.priceNotices.flatMap((notice) => notice.itemId ?? [])
       )
     );
 
+    const displayLabel = createEntityDisplayLabel({
+      technicalId: drop.key ?? null,
+      gameDataName: drop.key ? context.gameData.items[drop.key]?.name : null,
+      rowSourceName: drop.name
+    });
+
     return {
       rowId: drop.rowId,
-      name: drop.name,
+      name: displayLabel.name,
+      displayLabel,
       key: drop.key ?? null,
       tag: typeof drop.tag === "string" ? drop.tag : null,
       chance: drop.chance,
@@ -687,7 +713,10 @@ function createLootRows(
       slotFrac: drop.slotFrac,
       expandedRows: expandedPriceRows,
       valueDetails: lootValueDetails(drop),
-      historyContext: lootPriceHistoryContext(drop, lootPriceHistoryByItem),
+      historyContext: lootPriceHistoryContext(
+        { ...drop, name: displayLabel.name },
+        lootPriceHistoryByItem
+      ),
       priceNotices: rowPriceNotices.filter(
         (notice) => notice.itemId === undefined || !nestedPriceItemIds.has(notice.itemId)
       )
@@ -747,7 +776,7 @@ export function createLootPresentationViewModel(input: {
       defaultEffectiveNetGpPerHour: rowResult.defaultEffectiveNetGpPerHour,
       currentDeltaNetGpPerHour: rowResult.currentDeltaNetGpPerHour,
       overrideCount: rowResult.overrideCount,
-      valueComposition: createLootValueComposition(input.trip)
+      valueComposition: createLootValueComposition(input.trip, input.context.gameData)
     },
     highAlchEnabled,
     overheadMode,

@@ -1,5 +1,6 @@
 import type { JewelSpot, LootAction } from "@/domain/trip";
 import type { MonsterLootSettings } from "../../state/loot-settings";
+import type { PriceNoticeAction } from "../../view-models/price-data";
 import {
   lootActionLabel,
   sortLootNestedTableRows,
@@ -12,6 +13,7 @@ import {
   type LootTableSortState
 } from "../../view-models/loot";
 import { formatNumber } from "../../view-models/formatting";
+import { expandedCompactLabel } from "../../view-models/presentation-language";
 import { MetricList } from "../app-presenters";
 import { DecimalField, SelectField } from "../form-fields";
 import {
@@ -58,7 +60,7 @@ const LOOT_NESTED_TABLE_COLUMNS: ReadonlyArray<{
   numeric?: boolean;
 }> = [
   { label: "Child", sortKey: "child" },
-  { label: "Key/tag", sortKey: null },
+  { label: "Technical", sortKey: null },
   { label: "Weight", sortKey: "weight", numeric: true },
   { label: "Chance", sortKey: "chance", numeric: true },
   { label: "Qty", sortKey: "quantity", numeric: true },
@@ -88,6 +90,7 @@ export interface LootPaneActions {
   optimize(): void;
   sortBy(key: LootTableSortKey): void;
   sortNestedBy(key: LootNestedTableSortKey): void;
+  reviewPriceItem(action: PriceNoticeAction): void;
 }
 
 export interface LootPaneProps {
@@ -114,6 +117,57 @@ function lootNestedAriaSort(
 ): "ascending" | "descending" | "none" {
   if (sort.key !== key) return "none";
   return sort.direction === "asc" ? "ascending" : "descending";
+}
+
+function TechnicalDetails({
+  itemId,
+  lootRowId,
+  tag,
+  sourceNameUnavailable = false
+}: {
+  itemId?: string | null;
+  lootRowId?: string | null;
+  tag?: string | null;
+  sourceNameUnavailable?: boolean;
+}) {
+  if (!itemId && !lootRowId && !tag && !sourceNameUnavailable) return null;
+  return (
+    <details className="technical-details">
+      <summary>Technical details</summary>
+      <dl>
+        {itemId ? (
+          <div>
+            <dt>Item ID</dt>
+            <dd>
+              <code>{itemId}</code>
+            </dd>
+          </div>
+        ) : null}
+        {lootRowId ? (
+          <div>
+            <dt>Loot row ID</dt>
+            <dd>
+              <code>{lootRowId}</code>
+            </dd>
+          </div>
+        ) : null}
+        {tag ? (
+          <div>
+            <dt>Tag</dt>
+            <dd>
+              <code>{tag}</code>
+            </dd>
+          </div>
+        ) : null}
+        {sourceNameUnavailable ? (
+          <div>
+            <dt>Name source</dt>
+            <dd>Source name unavailable</dd>
+          </div>
+        ) : null}
+      </dl>
+    </details>
+  );
 }
 
 export function LootPane({ hidden, model, actions }: LootPaneProps) {
@@ -146,7 +200,7 @@ export function LootPane({ hidden, model, actions }: LootPaneProps) {
           onChange={(value) => actions.setOverheadMode(value === "manual" ? "manual" : "auto")}
         />
         <DecimalField
-          label="Overhead sec"
+          label="Overhead (seconds)"
           value={presentation.overheadValue}
           min={0}
           max={600}
@@ -198,8 +252,8 @@ export function LootPane({ hidden, model, actions }: LootPaneProps) {
               label: "Overhead",
               value:
                 presentation.overheadMode === "auto"
-                  ? `Auto ${formatNumber(presentation.derivedOverheadSec, 1)}s`
-                  : `${formatNumber(presentation.overheadValue, 1)}s`
+                  ? `Auto ${formatNumber(presentation.derivedOverheadSec, 1)} s`
+                  : `${formatNumber(presentation.overheadValue, 1)} s`
             },
             {
               label: "Talisman",
@@ -272,9 +326,10 @@ export function LootPane({ hidden, model, actions }: LootPaneProps) {
                     <button
                       type="button"
                       className="sort-button"
+                      aria-label={`Sort by ${expandedCompactLabel(column.label)?.toLowerCase() ?? column.label}`}
                       onClick={() => actions.sortBy(column.sortKey!)}
                     >
-                      <span>{column.label}</span>
+                      <span aria-hidden="true">{column.label}</span>
                       <span aria-hidden="true">
                         {model.sort.key === column.sortKey
                           ? model.sort.direction === "asc"
@@ -306,12 +361,11 @@ export function LootPane({ hidden, model, actions }: LootPaneProps) {
                 >
                   <td className="loot-name-cell">
                     <span>{row.name}</span>
-                    <small>{row.key ?? row.tag ?? row.rowId}</small>
                     {row.stateLabel && <small className="loot-state">{row.stateLabel}</small>}
                   </td>
                   <td>
                     <select
-                      aria-label={`Action for ${row.name} ${row.rowId}`}
+                      aria-label={`Action for ${row.name}`}
                       className="action-select"
                       value={row.pref}
                       disabled={row.availableActions.length === 1}
@@ -414,7 +468,7 @@ export function LootPane({ hidden, model, actions }: LootPaneProps) {
                             <strong>Price data</strong>
                             <ul>
                               {row.priceNotices.map((notice) => (
-                                <li key={`${notice.code}:${notice.itemId ?? notice.itemLabel}`}>
+                                <li key={notice.noticeId}>
                                   <span>{notice.summary}</span>
                                   <small>
                                     {notice.detail}
@@ -422,6 +476,21 @@ export function LootPane({ hidden, model, actions }: LootPaneProps) {
                                       ? " This displayed alternative is not used in current GP totals."
                                       : ""}
                                   </small>
+                                  {notice.action ? (
+                                    <button
+                                      type="button"
+                                      aria-label={`${notice.action.label} for ${notice.itemLabel}`}
+                                      onClick={() => actions.reviewPriceItem(notice.action!)}
+                                    >
+                                      {notice.action.label}
+                                    </button>
+                                  ) : null}
+                                  <TechnicalDetails
+                                    itemId={notice.itemId}
+                                    sourceNameUnavailable={
+                                      notice.itemDisplayLabel.source === "fallback"
+                                    }
+                                  />
                                 </li>
                               ))}
                             </ul>
@@ -435,6 +504,12 @@ export function LootPane({ hidden, model, actions }: LootPaneProps) {
                             </div>
                           ))}
                         </dl>
+                        <TechnicalDetails
+                          itemId={row.key}
+                          lootRowId={row.rowId}
+                          tag={row.tag}
+                          sourceNameUnavailable={row.displayLabel.source === "fallback"}
+                        />
                         <div
                           className={[
                             "loot-history-context",
@@ -516,7 +591,15 @@ export function LootPane({ hidden, model, actions }: LootPaneProps) {
                                 (detail) => (
                                   <tr key={`${row.rowId}-${detail.label}`}>
                                     <td>{detail.label}</td>
-                                    <td>{detail.key ?? detail.tag ?? "-"}</td>
+                                    <td>
+                                      <TechnicalDetails
+                                        itemId={detail.key}
+                                        tag={detail.tag}
+                                        sourceNameUnavailable={
+                                          detail.displayLabel.source === "fallback"
+                                        }
+                                      />
+                                    </td>
                                     <td className="numeric">{detail.weightLabel ?? "-"}</td>
                                     <td className="numeric">
                                       {detail.chance === null
@@ -530,13 +613,42 @@ export function LootPane({ hidden, model, actions }: LootPaneProps) {
                                     <td className="numeric">
                                       {detail.evGp === null
                                         ? "-"
-                                        : `${formatNumber(detail.evGp, 1)} gp`}
+                                        : `${formatNumber(detail.evGp, 1)} GP`}
                                     </td>
                                     <td>
-                                      {[
-                                        ...detail.notes,
-                                        ...detail.priceNotices.map((notice) => notice.summary)
-                                      ].join("; ") || "-"}
+                                      {detail.notes.join("; ") ||
+                                        (detail.priceNotices.length === 0 ? "-" : null)}
+                                      {detail.notes.length > 0 && detail.priceNotices.length > 0
+                                        ? "; "
+                                        : null}
+                                      {detail.priceNotices.map((notice) => (
+                                        <div
+                                          className="loot-nested-price-notice"
+                                          key={notice.noticeId}
+                                        >
+                                          <span>
+                                            {detail.priceNotices[0] === notice ? "" : "; "}
+                                            {notice.summary}{" "}
+                                          </span>
+                                          {notice.action ? (
+                                            <button
+                                              type="button"
+                                              aria-label={`${notice.action.label} for ${notice.itemLabel}`}
+                                              onClick={() =>
+                                                actions.reviewPriceItem(notice.action!)
+                                              }
+                                            >
+                                              {notice.action.label}
+                                            </button>
+                                          ) : null}
+                                          <TechnicalDetails
+                                            itemId={notice.itemId}
+                                            sourceNameUnavailable={
+                                              notice.itemDisplayLabel.source === "fallback"
+                                            }
+                                          />
+                                        </div>
+                                      ))}
                                     </td>
                                   </tr>
                                 )
@@ -574,6 +686,7 @@ export function LootPane({ hidden, model, actions }: LootPaneProps) {
                     <th>Eligibility</th>
                     <th>State</th>
                     <th>Action</th>
+                    <th>Details</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -581,12 +694,19 @@ export function LootPane({ hidden, model, actions }: LootPaneProps) {
                     <tr key={row.rowId} className="loot-row-attention">
                       <td className="loot-name-cell">
                         <span>{row.name}</span>
-                        <small>{row.key ?? row.tag ?? row.rowId}</small>
                       </td>
                       <td className="numeric">{formatNumber(row.chance * 100, 2)}%</td>
                       <td>{row.eligibilityDescription}</td>
                       <td>{row.stateLabel ?? "Conditional"}</td>
                       <td>Skip (locked)</td>
+                      <td>
+                        <TechnicalDetails
+                          itemId={row.key}
+                          lootRowId={row.rowId}
+                          tag={row.tag}
+                          sourceNameUnavailable={row.displayLabel.source === "fallback"}
+                        />
+                      </td>
                     </tr>
                   ))}
                 </tbody>

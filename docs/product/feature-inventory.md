@@ -35,12 +35,15 @@ hover/focus titles, and quick-navigation summaries wrap instead of ending in a
 hard ellipsis.
 
 User-facing entity names, unit semantics, compact abbreviation expansions and
-the remaining Settings/Economy price-information duplication are a separate
-`Specced` finishing pass in
+the remaining Settings/Economy price-information duplication are now an
+implemented finishing pass in
 [the user-facing language specification](../technical/user-facing-language-units-information-hierarchy-spec.md).
-This follow-up does not reopen Compact text readability, Loot/economy summary or
-Market price sync status: it changes presentation semantics and hierarchy, not
-their accepted calculations, selectors or PriceSet transactions.
+Source-backed names are primary, exact IDs remain in labelled technical
+disclosures, timing/GP/XP semantics share one presentation contract and
+Settings routes its short active-PriceSet summary to Economy's sole detailed
+Market owner. Compact text readability, Loot/economy summary and Market price
+sync remain `Valmis`; their calculations, selectors and PriceSet transactions
+did not change.
 
 The 2026-07-11 whole-UI audit is `Valmis` under D-078, the selector follow-up
 under D-079 and the control-ownership cleanup under D-080. All 11 workbench tabs
@@ -181,18 +184,19 @@ runs active entity compatibility checks, uses the recipient's current runtime
 and PriceSet and excludes prices, player identity, computed output and raw
 source provenance.
 
-### 2026-07-19 contextual item-price correction specification note
+### 2026-07-19 contextual item-price correction completion note
 
 `Result summary`, `Loot/economy summary` and `Market price sync` remain
-`Valmis`. D-101 already carries item identities into compact Result, row-local
-Loot and complete Economy price notices, while D-090 owns the manual item
-overlay and D-102 keeps full-PriceSet transfer separate. The new specification
-defines the remaining high-priority, size-S usability link: one shared action
-will open Economy, select an exact correctable item and focus `Manual price`; multiple
-Result issues will continue through the complete disclosure rather than choose
-an item implicitly. This direct transition is specced but not implemented, so
-the backlog owns its pending status. Price formulas, provenance, storage,
-history and generated high alch stay unchanged.
+`Valmis`. D-101's exact item identities now drive stable typed actions in
+compact Result, row/nested Loot and complete Economy price notices. One
+App-owned latest-request-wins transition revalidates D-090's active item set,
+opens Economy, selects the exact correctable item and focuses `Manual price`;
+inspect-only targets focus their exact disclosure action. A single actionable
+Result issue may use the direct route, while multiple issues retain aggregate
+review without an implicit selection. Apply/Reset identify item, value and
+manual/base current-result use. D-090 still owns the separate manual overlay,
+D-102 keeps full-PriceSet transfer separate and price formulas, provenance,
+storage, history and generated high alch stay unchanged.
 
 ### 2026-07-12 Loot and manual-price completion note
 
@@ -247,7 +251,7 @@ Dragonfire and poison retain their existing separate Trip ownership.
 | Feature                      | Rewrite status | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | ---------------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Setup sharing                | `Valmis`       | The root rewrite implements the static URL-fragment workflow in the [shareable setup permalink specification](../technical/shareable-setup-permalink-spec.md), extended by the contextual transfer contract. `Share setup` creates a bounded version 2 base64url link from validated Revision 274 context, active form and current-monster Cannon/loot choices; version 1 remains readable with exact-id or unknown-revision normalization. The recipient reviews context before explicit Load, may Dismiss and gets one complete in-memory Undo after loading. Strict size/schema/duplicate-key/entity checks and sanitized errors protect both versions. Prices, player name, history, custom/Duel collections, computed output and raw provenance remain excluded, and clipboard failure keeps the URL selectable. No backend, account, database, provider or production domain is required. |
-| Workspace backup and restore | `Suunniteltu`  | [The implementation specification](../technical/workspace-backup-restore-spec.md) defines one bounded Revision-aware file for the nine user-owned local-state areas currently split across setup, saved-setup, PriceSet and browser-only persistence. Import must show area content, versions, compatibility and exact Replace/Merge effects before one atomic Apply; successful durable or explicit session-only restore gets one complete Undo. The last Hiscores player is excluded from export by default and starts unselected on restore even when included; legacy-migration dismissal is never transferred. The existing metadata-only recovery report remains distinct. This is local file durability, not account, database or server synchronization.                                                                                                                                |
+| Workspace backup and restore | `Valmis`       | The root rewrite implements the complete local workflow in [the Workspace specification](../technical/workspace-backup-restore-spec.md): a bounded Revision-aware nine-area file, two-sided Hiscores opt-in, zero-mutation Review, typed Replace/Merge effects, selected-only logical atomic Apply with exact handled-failure rollback, explicit session-only recovery and one complete durable/session-only Undo. Legacy-migration dismissal is never transferred and the metadata-only recovery report remains distinct. This is user-controlled local file durability, not crash-atomic storage, account, database, server or cross-device synchronization.                                                                                                                                                                                                                                  |
 
 The implemented repository-local visual regression suite is tracked as
 test/release evidence in

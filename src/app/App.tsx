@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   PendingUndoStatus,
   ShareSetupDialog,
@@ -28,7 +28,6 @@ import { RiskPane } from "./components/panes/risk-pane";
 import { StatsPane } from "./components/panes/stats-pane";
 import { LootPane } from "./components/panes/loot-pane";
 import { TripPane } from "./components/panes/trip-pane";
-import { EconomySettingsPane } from "./components/panes/economy-settings-pane";
 import { LOCAL_STATE_RECOVERY_HEADING_ID } from "./components/settings/local-state-recovery-panel";
 import {
   captureBrowserShareableSetupFragment,
@@ -38,6 +37,7 @@ import {
   writeShareableSetupToClipboard
 } from "@/adapters/browser";
 import type { ScheduledStaticPriceSnapshotStatus } from "@/adapters/market";
+import { LastHiscoresPlayerStateSchema } from "@/adapters/hiscores";
 import { loadPersisted, tryClearPersisted } from "@/adapters/storage";
 import { SAFE_SESSION_NOTICE, createBrowserStorageAccess } from "./application-recovery";
 import {
@@ -58,7 +58,7 @@ import type {
   SimulationContext
 } from "@/domain/shared";
 import { lootPreferenceKeysForMonster, type LootAction } from "@/domain/trip";
-import type { ActivePriceSetOrigin } from "./state/market-sync";
+import { scheduledPriceSetFromStatus, type ActivePriceSetOrigin } from "./state/market-sync";
 import {
   LEGACY_MIGRATION_DISMISSED_STORAGE_KEY,
   LEGACY_MIGRATION_DISMISSED_VERSION,
@@ -73,6 +73,12 @@ import { useRiskAnalysis } from "./controllers/use-risk-analysis";
 import { useLocalStateRecovery } from "./controllers/use-local-state-recovery";
 import { useSetupFileTransfer } from "./controllers/use-setup-file-transfer";
 import { usePriceSetTransfer } from "./controllers/use-price-set-transfer";
+import { useWorkspaceFileTransfer } from "./controllers/use-workspace-file-transfer";
+import type {
+  WorkspaceRestoreApplyOutcome,
+  WorkspaceRestoreExecutionInput,
+  WorkspaceRestoreLiveOutcome
+} from "./controllers/workspace-file-transfer";
 import { formatRiskRange } from "./view-models/risk";
 import { buildLocalStateAttentionViewModel } from "./view-models/local-state-attention";
 import { buildSetupImportReviewViewModel } from "./view-models/setup-import-review";
@@ -254,9 +260,14 @@ import {
   createPriceItemLabels,
   createPriceSetPresentation,
   createSelectedPriceItemPresentation,
-  type ItemPriceHistoryContext
+  type ItemPriceHistoryContext,
+  type PriceNoticeAction
 } from "./view-models/price-data";
-import { createGameRevisionViewModel, createSettingsPaneViewModel } from "./view-models/settings";
+import {
+  createGameRevisionViewModel,
+  createSettingsPaneViewModel,
+  type SettingsNavigationIntent
+} from "./view-models/settings";
 import { createTripPaneViewModel } from "./view-models/trip";
 import type {
   ActiveAssumptionResetTarget,
@@ -287,6 +298,9 @@ import {
 import { createLegacyMigrationViewModel } from "./view-models/legacy-migration";
 import { defaultDuelSnapshotName, describeDuelSnapshotsImportError } from "./view-models/duel";
 import type { InlineNoticeViewModel } from "./view-models/contracts";
+import type { WorkspaceLiveState } from "./state/workspace-backup";
+
+const EconomySettingsPane = lazy(() => import("./components/panes/economy-settings-pane"));
 
 const browserStorageAccess = createBrowserStorageAccess(
   typeof window === "undefined" ? undefined : window
@@ -412,6 +426,11 @@ function localUndoId(): string {
   return `undo-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+interface PriceItemReviewRequest {
+  id: number;
+  action: PriceNoticeAction;
+}
+
 export function App() {
   const [context, setContext] = useState<SimulationContext | null>(null);
   const [initialSavedSetup] = useState(loadInitialSavedSetup);
@@ -473,7 +492,17 @@ export function App() {
   const persistLocalState = localStateRecovery.persist;
   const shouldSkipPersistLocalState = localStateRecovery.shouldSkipPersist;
   const blockedLocalStateIds = localStateRecovery.blockedIds;
+  const rewriteSetupBlocked = blockedLocalStateIds.includes("rewrite-setup");
+  const lootPrefsBlocked = blockedLocalStateIds.includes("loot-prefs");
+  const lootSettingsBlocked = blockedLocalStateIds.includes("loot-settings");
+  const hiddenGearTiersBlocked = blockedLocalStateIds.includes("hidden-gear-tiers");
+  const duelSnapshotsBlocked = blockedLocalStateIds.includes("duel-snapshots");
+  const priceHistoryBlocked = blockedLocalStateIds.includes("price-history");
+  const plannerUiBlocked = blockedLocalStateIds.includes("planner-ui");
   const setupFileTransfer = useSetupFileTransfer();
+  const workspaceFileTransfer = useWorkspaceFileTransfer();
+  const workspaceIncludesLastHiscoresPlayer = workspaceFileTransfer.includeLastHiscoresPlayer;
+  const setWorkspaceHiscoresOptIn = workspaceFileTransfer.setIncludeLastHiscoresPlayer;
   const priceSetTransfer = usePriceSetTransfer({
     storage,
     storageUnavailable: localPersistenceUnavailable,
@@ -490,6 +519,10 @@ export function App() {
     unblockReplaced: localStateRecovery.unblockReplaced,
     refreshLocalStateHealth: localStateRecovery.refresh
   });
+  const lastHiscoresPlayerState = useMemo(() => {
+    const parsed = LastHiscoresPlayerStateSchema.safeParse({ player: hiscores.player });
+    return parsed.success ? parsed.data : null;
+  }, [hiscores.player]);
   const [fatalError, setFatalError] = useState<string | null>(null);
   const [receivedShareableSetupPayload] = useState(captureBrowserShareableSetupFragment);
   const [shareReviewDismissed, setShareReviewDismissed] = useState(false);
@@ -542,13 +575,73 @@ export function App() {
   const [respectLoadoutRequirements, setRespectLoadoutRequirements] = useState(true);
   const [activeTab, setActiveTab] = useState<WorkbenchTabId>("compare");
   const [localStateReviewRequest, setLocalStateReviewRequest] = useState(0);
+  const [economyReviewRequest, setEconomyReviewRequest] = useState(0);
   const [priceNotesOpen, setPriceNotesOpen] = useState(false);
+  const [priceItemReviewRequest, setPriceItemReviewRequest] =
+    useState<PriceItemReviewRequest | null>(null);
   const shareSetupButtonRef = useRef<HTMLButtonElement>(null);
   const setupImportInputRef = useRef<HTMLInputElement>(null);
+  const workspaceImportInputRef = useRef<HTMLInputElement>(null);
+  const workspaceReviewHeadingRef = useRef<HTMLHeadingElement>(null);
   const resetSetupButtonRef = useRef<HTMLButtonElement>(null);
   const duelImportAttemptRef = useRef(0);
   const priceNotesSummaryRef = useRef<HTMLElement>(null);
+  const marketHeadingRef = useRef<HTMLHeadingElement>(null);
+  const manualPriceInputRef = useRef<HTMLInputElement>(null);
+  const priceNoticeActionRefs = useRef(new Map<string, HTMLButtonElement>());
+  const nextPriceItemReviewRequestRef = useRef(0);
+  const handledPriceItemReviewRequestRef = useRef(0);
   const handledLocalStateReviewRequestRef = useRef(0);
+  const handledEconomyReviewRequestRef = useRef(0);
+  const handledWorkspaceReviewIdRef = useRef(0);
+  const workspaceExecutionRef = useRef<WorkspaceRestoreExecutionInput | null>(null);
+
+  const setPriceNoticeActionRef = useCallback(
+    (noticeId: string, element: HTMLButtonElement | null) => {
+      if (element) {
+        priceNoticeActionRefs.current.set(noticeId, element);
+      } else {
+        priceNoticeActionRefs.current.delete(noticeId);
+      }
+    },
+    []
+  );
+
+  useEffect(() => {
+    const request = priceItemReviewRequest;
+    if (
+      !request ||
+      request.id === handledPriceItemReviewRequestRef.current ||
+      activeTab !== "economy" ||
+      (request.action.kind === "correct-price" && manualPriceItemId !== request.action.itemId) ||
+      (request.action.kind === "inspect-item" && !priceNotesOpen)
+    ) {
+      return;
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      const target =
+        request.action.kind === "correct-price"
+          ? manualPriceInputRef.current
+          : priceNoticeActionRefs.current.get(request.action.noticeId);
+      const focusTarget = target ?? priceNotesSummaryRef.current;
+      focusTarget?.focus({ preventScroll: true });
+      if (focusTarget) {
+        const bounds = focusTarget.getBoundingClientRect();
+        if (bounds.top < 0 || bounds.bottom > window.innerHeight) {
+          focusTarget.scrollIntoView({ block: "nearest" });
+        }
+      }
+      if (request.action.kind === "inspect-item" && !target) {
+        setMarketNotice({
+          tone: "neutral",
+          message: "That price note changed before review. Showing the current price data notes."
+        });
+      }
+      handledPriceItemReviewRequestRef.current = request.id;
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }, [activeTab, manualPriceItemId, priceItemReviewRequest, priceNotesOpen]);
 
   useEffect(() => {
     if (
@@ -574,6 +667,56 @@ export function App() {
     });
     return () => window.cancelAnimationFrame(frameId);
   }, [activeTab, localStateRecovery.report.hasAttention, localStateReviewRequest]);
+
+  useEffect(() => {
+    if (
+      activeTab !== "economy" ||
+      economyReviewRequest === 0 ||
+      economyReviewRequest === handledEconomyReviewRequestRef.current
+    ) {
+      return;
+    }
+    const frameId = window.requestAnimationFrame(() => {
+      const heading = marketHeadingRef.current;
+      heading?.focus({ preventScroll: true });
+      heading?.scrollIntoView({ block: "nearest" });
+      if (heading) handledEconomyReviewRequestRef.current = economyReviewRequest;
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }, [activeTab, economyReviewRequest]);
+
+  useEffect(() => {
+    if (!lastHiscoresPlayerState && workspaceIncludesLastHiscoresPlayer) {
+      setWorkspaceHiscoresOptIn(false);
+    }
+  }, [lastHiscoresPlayerState, setWorkspaceHiscoresOptIn, workspaceIncludesLastHiscoresPlayer]);
+
+  useEffect(() => {
+    const reviewId = workspaceFileTransfer.review?.id;
+    if (!reviewId || reviewId === handledWorkspaceReviewIdRef.current || activeTab !== "settings") {
+      return;
+    }
+    const frameId = window.requestAnimationFrame(() => {
+      const heading = workspaceReviewHeadingRef.current;
+      if (heading instanceof HTMLElement) {
+        heading.focus({ preventScroll: true });
+        const bounds = heading.getBoundingClientRect();
+        if (bounds.top < 0 || bounds.bottom > window.innerHeight) {
+          heading.scrollIntoView({ block: "nearest" });
+        }
+      }
+      handledWorkspaceReviewIdRef.current = reviewId;
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }, [activeTab, workspaceFileTransfer.review?.id]);
+
+  useEffect(() => {
+    if (activeTab !== "settings" || workspaceFileTransfer.notice?.tone !== "error") return;
+    const frameId = window.requestAnimationFrame(() => {
+      document.getElementById("workspace-restore-error-summary")?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }, [activeTab, workspaceFileTransfer.notice]);
 
   useEffect(() => {
     const timerId = window.setInterval(() => setPriceAgeNowMs(Date.now()), 60_000);
@@ -667,7 +810,9 @@ export function App() {
   }, [context, lootPrefsByMonster]);
 
   useEffect(() => {
-    if (!readyToPersist || shouldSkipPersistLocalState("rewrite-setup")) return;
+    if (!readyToPersist || rewriteSetupBlocked || shouldSkipPersistLocalState("rewrite-setup")) {
+      return;
+    }
     persistLocalState(
       "rewrite-setup",
       setupStorageOptions,
@@ -686,7 +831,7 @@ export function App() {
     defaultForm,
     denseCompareForGameData,
     form,
-    blockedLocalStateIds,
+    rewriteSetupBlocked,
     persistLocalState,
     readyToPersist,
     shouldSkipPersistLocalState,
@@ -694,10 +839,12 @@ export function App() {
   ]);
 
   useEffect(() => {
-    if (!readyToPersist || shouldSkipPersistLocalState("loot-prefs")) return;
+    if (!readyToPersist || lootPrefsBlocked || shouldSkipPersistLocalState("loot-prefs")) {
+      return;
+    }
     persistLocalState("loot-prefs", lootPrefsStorageOptions, lootPrefsForGameData);
   }, [
-    blockedLocalStateIds,
+    lootPrefsBlocked,
     lootPrefsForGameData,
     persistLocalState,
     readyToPersist,
@@ -705,10 +852,12 @@ export function App() {
   ]);
 
   useEffect(() => {
-    if (!readyToPersist || shouldSkipPersistLocalState("loot-settings")) return;
+    if (!readyToPersist || lootSettingsBlocked || shouldSkipPersistLocalState("loot-settings")) {
+      return;
+    }
     persistLocalState("loot-settings", lootSettingsStorageOptions, lootSettingsByMonster);
   }, [
-    blockedLocalStateIds,
+    lootSettingsBlocked,
     lootSettingsByMonster,
     persistLocalState,
     readyToPersist,
@@ -716,10 +865,16 @@ export function App() {
   ]);
 
   useEffect(() => {
-    if (!readyToPersist || shouldSkipPersistLocalState("hidden-gear-tiers")) return;
+    if (
+      !readyToPersist ||
+      hiddenGearTiersBlocked ||
+      shouldSkipPersistLocalState("hidden-gear-tiers")
+    ) {
+      return;
+    }
     persistLocalState("hidden-gear-tiers", hiddenGearTiersStorageOptions, hiddenGearTiers);
   }, [
-    blockedLocalStateIds,
+    hiddenGearTiersBlocked,
     hiddenGearTiers,
     persistLocalState,
     readyToPersist,
@@ -727,10 +882,12 @@ export function App() {
   ]);
 
   useEffect(() => {
-    if (!readyToPersist || shouldSkipPersistLocalState("duel-snapshots")) return;
+    if (!readyToPersist || duelSnapshotsBlocked || shouldSkipPersistLocalState("duel-snapshots")) {
+      return;
+    }
     persistLocalState("duel-snapshots", duelSnapshotsStorageOptions, duelSnapshots);
   }, [
-    blockedLocalStateIds,
+    duelSnapshotsBlocked,
     duelSnapshots,
     persistLocalState,
     readyToPersist,
@@ -740,6 +897,7 @@ export function App() {
   useEffect(() => {
     if (
       !readyToPersist ||
+      priceHistoryBlocked ||
       priceHistory.snapshots.length === 0 ||
       shouldSkipPersistLocalState("price-history")
     ) {
@@ -747,7 +905,7 @@ export function App() {
     }
     persistLocalState("price-history", priceHistoryStorageOptions, priceHistory);
   }, [
-    blockedLocalStateIds,
+    priceHistoryBlocked,
     persistLocalState,
     priceHistory,
     readyToPersist,
@@ -755,10 +913,12 @@ export function App() {
   ]);
 
   useEffect(() => {
-    if (!readyToPersist || shouldSkipPersistLocalState("planner-ui")) return;
+    if (!readyToPersist || plannerUiBlocked || shouldSkipPersistLocalState("planner-ui")) {
+      return;
+    }
     persistLocalState("planner-ui", plannerUiStorageOptions, plannerState);
   }, [
-    blockedLocalStateIds,
+    plannerUiBlocked,
     persistLocalState,
     plannerState,
     readyToPersist,
@@ -829,6 +989,10 @@ export function App() {
   );
   const lootPriceHistoryByItem: Readonly<Record<string, ItemPriceHistoryContext>> =
     economyHistory.lootHistoryByItem;
+  const editablePriceItemIds = useMemo(
+    () => new Set(Object.keys(basePriceSet?.itemPrices ?? {})),
+    [basePriceSet]
+  );
 
   const viewModel = useMemo(
     () =>
@@ -849,7 +1013,8 @@ export function App() {
               monsterCard: {
                 setupMode,
                 hasCustomSetup: customSetupsByMonster[form.monsterId] != null
-              }
+              },
+              editablePriceItemIds
             }
           )
         : null,
@@ -858,6 +1023,7 @@ export function App() {
       context,
       currentLootPrefs,
       customSetupsByMonster,
+      editablePriceItemIds,
       form,
       hiddenGearTiers,
       lootPriceHistoryByItem,
@@ -1121,6 +1287,19 @@ export function App() {
       setupMode
     );
 
+  const captureCurrentWorkspaceLiveState = (): WorkspaceLiveState => ({
+    "rewrite-setup": captureCurrentRewriteSetup(),
+    "planner-ui": plannerState,
+    "loot-prefs": lootPrefsForGameData,
+    "loot-settings": lootSettingsByMonster,
+    "hidden-gear-tiers": hiddenGearTiers,
+    "duel-snapshots": duelSnapshots,
+    "price-history": priceHistory,
+    "selected-price-set": activePriceSetOrigin === "selected" ? basePriceSet : null,
+    "manual-price-overrides": manualPriceOverrides,
+    "hiscores-last-player": lastHiscoresPlayerState
+  });
+
   const applyRewriteSetupState = (setup: SavedSetupState): void => {
     setForm(normalizeFormState(setup.form));
     setDefaultForm(normalizeFormState(setup.defaultForm));
@@ -1129,6 +1308,87 @@ export function App() {
     setDenseCompare(setup.denseCompare);
     setCannonByMonster(setup.cannonByMonster);
   };
+
+  const applyWorkspaceLiveState = (outcome: WorkspaceRestoreLiveOutcome): void => {
+    const selected = new Set(outcome.selectedIds);
+    if (selected.has("rewrite-setup")) {
+      applyRewriteSetupState(outcome.liveState["rewrite-setup"]);
+    }
+    if (selected.has("planner-ui")) setPlannerState(outcome.liveState["planner-ui"]);
+    if (selected.has("loot-prefs")) setLootPrefsByMonster(outcome.liveState["loot-prefs"]);
+    if (selected.has("loot-settings")) {
+      setLootSettingsByMonster(outcome.liveState["loot-settings"]);
+    }
+    if (selected.has("hidden-gear-tiers")) {
+      setHiddenGearTiers(outcome.liveState["hidden-gear-tiers"]);
+    }
+    if (selected.has("duel-snapshots")) {
+      setDuelSnapshots(outcome.liveState["duel-snapshots"]);
+    }
+    if (selected.has("price-history")) setPriceHistory(outcome.liveState["price-history"]);
+
+    if (selected.has("selected-price-set") || selected.has("manual-price-overrides")) {
+      setBasePriceSet(outcome.priceComposition.basePriceSet);
+      setManualPriceOverrides(outcome.priceComposition.manualPriceOverrides);
+      setActivePriceSetOrigin(outcome.priceComposition.activePriceSetOrigin);
+      setPriceLabel(outcome.priceComposition.activePriceSet.label);
+      setContext((current) =>
+        current ? { ...current, priceSet: outcome.priceComposition.activePriceSet } : current
+      );
+      setManualPriceDraft(null);
+      setManualPriceClearPending(false);
+      setPriceAgeNowMs(Date.now());
+    }
+    if (selected.has("hiscores-last-player")) {
+      hiscores.changePlayer(outcome.liveState["hiscores-last-player"]?.player ?? "");
+    }
+
+    for (const id of [
+      "selected-price-set",
+      "manual-price-overrides",
+      "hiscores-last-player"
+    ] as const) {
+      if (selected.has(id)) shouldSkipPersistLocalState(id);
+    }
+    if (
+      selected.has("price-history") &&
+      outcome.liveState["price-history"].snapshots.length === 0
+    ) {
+      shouldSkipPersistLocalState("price-history");
+    }
+    setFatalError(null);
+  };
+
+  useEffect(() => {
+    const fallback = scheduledPriceSetFromStatus(scheduledSnapshotStatus) ?? bundledPriceSet;
+    if (!context || !fallback) {
+      workspaceExecutionRef.current = null;
+      return;
+    }
+    workspaceExecutionRef.current = {
+      storageAccess: browserStorageAccess,
+      persistenceUnavailable: localPersistenceUnavailable,
+      context: {
+        gameData: context.gameData,
+        liveState: captureCurrentWorkspaceLiveState(),
+        allowedPool: plannerAllowedPool(form.combatStyle, context),
+        priceFallback: [
+          fallback,
+          scheduledPriceSetFromStatus(scheduledSnapshotStatus) ? "scheduled" : "bundled"
+        ]
+      },
+      applyLiveState: applyWorkspaceLiveState,
+      recovery: {
+        prepareExternalApply: localStateRecovery.prepareExternalApply,
+        cancelExternalApply: localStateRecovery.cancelExternalApply,
+        completeExternalApply: localStateRecovery.completeExternalApply,
+        completeExternalUndo: localStateRecovery.completeExternalUndo,
+        recordExternalApplyFailure: localStateRecovery.recordExternalApplyFailure,
+        markPersistenceUnavailable: localStateRecovery.markPersistenceUnavailable
+      },
+      now: () => new Date()
+    };
+  });
 
   const persistAndApplyRewriteSetup = (setup: SavedSetupState): boolean => {
     const persisted = persistLocalState("rewrite-setup", setupStorageOptions, setup);
@@ -1240,9 +1500,10 @@ export function App() {
 
   const undoPendingAction = () => {
     if (!pendingUndo) return;
-    const restoreStatus = pendingUndo.restore();
-    setStatus(restoreStatus ?? pendingUndo.restoreLabel);
+    const undo = pendingUndo;
     setPendingUndo(null);
+    const restoreStatus = undo.restore();
+    setStatus(restoreStatus ?? undo.restoreLabel);
   };
 
   const applyAcceptedPriceSet = (outcome: AcceptedPriceSetOutcome) => {
@@ -1585,10 +1846,109 @@ export function App() {
     setActiveTab("settings");
     setLocalStateReviewRequest((request) => request + 1);
   };
+  const navigateFromSettings = (intent: SettingsNavigationIntent) => {
+    if (intent.kind !== "review-price-data-in-economy") return;
+    setActiveTab("economy");
+    setEconomyReviewRequest((request) => request + 1);
+  };
   const reviewPriceData = () => {
     setPriceNotesOpen(true);
     setActiveTab("economy");
     window.requestAnimationFrame(() => priceNotesSummaryRef.current?.focus());
+  };
+
+  const exportWorkspace = () => {
+    workspaceFileTransfer.exportWorkspace({
+      gameData: context.gameData,
+      liveState: captureCurrentWorkspaceLiveState(),
+      storageAccess: browserStorageAccess
+    });
+  };
+
+  const dismissWorkspaceReview = (reviewId: number): void => {
+    if (!workspaceFileTransfer.dismissReview(reviewId)) return;
+    window.requestAnimationFrame(() => workspaceImportInputRef.current?.focus());
+  };
+
+  const registerWorkspaceUndo = (
+    outcome: Extract<WorkspaceRestoreApplyOutcome, { status: "applied" }>
+  ) => {
+    setUndoableStatus(outcome.message, "Restored pre-Workspace state", () => {
+      const execution = workspaceExecutionRef.current;
+      if (!execution) return "Workspace Undo is no longer available.";
+      const undo = workspaceFileTransfer.undoRestore(execution);
+      if (undo.status === "session-only-available") {
+        setPendingUndo({
+          id: localUndoId(),
+          label: undo.message,
+          restoreLabel: "Restored prior Workspace values for this session",
+          createdAt: Date.now(),
+          restore: () => {
+            const currentExecution = workspaceExecutionRef.current;
+            if (!currentExecution) return "Session-only Workspace Undo is no longer available.";
+            return workspaceFileTransfer.undoRestoreForSession(currentExecution).message;
+          }
+        });
+      }
+      return undo.message;
+    });
+  };
+
+  const applyWorkspaceRestore = async (
+    reviewId: number,
+    mode: "durable" | "session-only"
+  ): Promise<void> => {
+    const execution = workspaceExecutionRef.current;
+    if (!execution) {
+      setStatus("Workspace restore context is no longer available. Review the file again.");
+      return;
+    }
+    const outcome = await (mode === "durable"
+      ? workspaceFileTransfer.applyRestore(reviewId, execution)
+      : workspaceFileTransfer.applyRestoreForSession(reviewId, execution));
+    if (outcome.status === "stale") {
+      setStatus("Workspace restore review is stale. Review the file again.");
+      return;
+    }
+    setStatus(outcome.message);
+    if (outcome.status === "applied") registerWorkspaceUndo(outcome);
+  };
+
+  const requestPriceItemReview = (requestedAction: PriceNoticeAction) => {
+    const editable = manualPricePresentation.itemOptions.some(
+      (option) => option.id === requestedAction.itemId
+    );
+    const exactNotice = viewModel.priceNotices.all.find(
+      (notice) => notice.noticeId === requestedAction.noticeId
+    );
+    const action: PriceNoticeAction =
+      requestedAction.kind === "correct-price" && !editable
+        ? {
+            ...requestedAction,
+            kind: "inspect-item",
+            label: "Inspect item"
+          }
+        : requestedAction;
+
+    if (action.kind === "correct-price") {
+      setManualPriceItemId(action.itemId);
+      setManualPriceDraft(
+        activePriceSet?.itemPrices[action.itemId] ?? basePriceSet?.itemPrices[action.itemId] ?? 0
+      );
+      setManualPriceClearPending(false);
+    } else {
+      setPriceNotesOpen(true);
+      if (!exactNotice) {
+        setMarketNotice({
+          tone: "neutral",
+          message: "That price note changed before review. Showing the current price data notes."
+        });
+      }
+    }
+    setActiveTab("economy");
+    const id = nextPriceItemReviewRequestRef.current + 1;
+    nextPriceItemReviewRequestRef.current = id;
+    setPriceItemReviewRequest({ id, action });
   };
 
   const reviewActiveAssumption = (tab: ActiveAssumptionReviewTarget) => {
@@ -2227,6 +2587,7 @@ export function App() {
   const selectedEconomyItem = createSelectedPriceItemPresentation({
     activePriceSet,
     itemId: economyHistory.effectiveTrendItemId,
+    itemLabels: priceHistoryItemLabels,
     freshnessNow: new Date(priceAgeNowMs)
   });
   const gameRevisionViewModel = createGameRevisionViewModel(context.gameData);
@@ -2247,6 +2608,14 @@ export function App() {
   const resetFallbackPriceSet = priceSetPresentation.reset.fallbackPriceSet;
   const resetFallbackOrigin = priceSetPresentation.reset.fallbackOrigin;
   const resetFallbackLabel = priceSetPresentation.reset.fallbackLabel;
+  const workspaceRestoreContext = resetFallbackPriceSet
+    ? {
+        gameData: context.gameData,
+        liveState: captureCurrentWorkspaceLiveState(),
+        allowedPool: plannerAllowedPool(form.combatStyle, context),
+        priceFallback: [resetFallbackPriceSet, resetFallbackOrigin] as const
+      }
+    : null;
   const commitManualPriceOverrides = (
     next: ManualPriceOverridesState,
     successMessage: string
@@ -2287,7 +2656,7 @@ export function App() {
       const next = removeManualPriceOverride(manualPriceOverrides, effectiveManualPriceItemId);
       commitManualPriceOverrides(
         next,
-        `Restored ${priceHistoryItemLabels[effectiveManualPriceItemId] ?? effectiveManualPriceItemId} to base price`
+        `Restored ${priceHistoryItemLabels[effectiveManualPriceItemId] ?? effectiveManualPriceItemId} to ${formatNumber(selectedManualBasePrice)} GP. Current results use the base PriceSet value.`
       );
       return;
     }
@@ -2305,15 +2674,21 @@ export function App() {
     );
     commitManualPriceOverrides(
       next,
-      `Applied manual price for ${priceHistoryItemLabels[effectiveManualPriceItemId] ?? effectiveManualPriceItemId}`
+      `Applied ${formatNumber(manualPriceInputValue)} GP manual price for ${priceHistoryItemLabels[effectiveManualPriceItemId] ?? effectiveManualPriceItemId}. Current results use this manual value.`
     );
   };
   const resetManualItemPrice = () => {
-    if (!effectiveManualPriceItemId || !selectedManualOverride) return;
+    if (
+      !effectiveManualPriceItemId ||
+      !selectedManualOverride ||
+      selectedManualBasePrice === null
+    ) {
+      return;
+    }
     const next = removeManualPriceOverride(manualPriceOverrides, effectiveManualPriceItemId);
     commitManualPriceOverrides(
       next,
-      `Reset manual price for ${priceHistoryItemLabels[effectiveManualPriceItemId] ?? effectiveManualPriceItemId}`
+      `Reset ${priceHistoryItemLabels[effectiveManualPriceItemId] ?? effectiveManualPriceItemId} to ${formatNumber(selectedManualBasePrice)} GP. Current results use the base PriceSet value.`
     );
     setManualPriceDraft(selectedManualBasePrice);
   };
@@ -2530,6 +2905,7 @@ export function App() {
             ),
           setManualOverride,
           reviewPriceData,
+          reviewPriceItem: requestPriceItemReview,
           reviewActiveAssumption,
           resetActiveAssumption
         }}
@@ -2645,7 +3021,8 @@ export function App() {
               setLootUiState((current) => ({
                 ...current,
                 nestedSort: nextLootNestedTableSortState(current.nestedSort, key)
-              }))
+              })),
+            reviewPriceItem: requestPriceItemReview
           }}
         />
 
@@ -2768,83 +3145,128 @@ export function App() {
             retry: retryPlanner
           }}
         />
-        <EconomySettingsPane
-          priceNotesSummaryRef={priceNotesSummaryRef}
-          model={{
-            mode:
-              activeTab === "economy"
-                ? "economy"
-                : activeTab === "settings"
-                  ? "settings"
-                  : "hidden",
-            prices: priceDataViewModel,
-            settings: settingsPaneViewModel,
-            priceNotices: viewModel.priceNotices,
-            priceNotesOpen,
-            marketNotice,
-            importNotice: priceSetTransfer.importNotice,
-            priceSetResetPending: priceSetTransfer.resetPending,
-            priceHistoryClearPending,
-            manualPriceClearPending,
-            recovery: {
-              visible: localStateRecovery.visible,
-              report: localStateRecovery.report,
-              notice: localStateRecovery.notice,
-              pendingClearId: localStateRecovery.pendingClearId
-            }
-          }}
-          actions={{
-            setPriceNotesOpen,
-            prices: {
-              importPriceSet: importPriceFile,
-              exportActivePriceSet,
-              requestReset: requestResetActivePriceSet,
-              confirmReset: resetActivePriceSetToFallback,
-              cancelReset: priceSetTransfer.cancelReset
-            },
-            history: {
-              saveLocalComparison: saveLocalPriceComparison,
-              requestClear: requestClearPriceHistory,
-              confirmClear: confirmClearPriceHistory,
-              cancelClear: () => setPriceHistoryClearPending(false),
-              setBaselineMode: setEconomyBaselineMode,
-              setSnapshotKey: setEconomySnapshotKey,
-              setItemFilter: setEconomyItemFilter,
-              setTrendItemId: setEconomyTrendItemId,
-              sortBy: updateEconomySort
-            },
-            manual: {
-              selectItem: (itemId) => {
-                setManualPriceItemId(itemId);
-                setManualPriceDraft(
-                  activePriceSet?.itemPrices[itemId] ?? basePriceSet?.itemPrices[itemId] ?? 0
-                );
+        <Suspense fallback={null}>
+          <EconomySettingsPane
+            priceNotesSummaryRef={priceNotesSummaryRef}
+            manualPriceInputRef={manualPriceInputRef}
+            workspaceImportInputRef={workspaceImportInputRef}
+            workspaceReviewHeadingRef={workspaceReviewHeadingRef}
+            setPriceNoticeActionRef={setPriceNoticeActionRef}
+            marketHeadingRef={marketHeadingRef}
+            model={{
+              mode:
+                activeTab === "economy"
+                  ? "economy"
+                  : activeTab === "settings"
+                    ? "settings"
+                    : "hidden",
+              prices: priceDataViewModel,
+              settings: settingsPaneViewModel,
+              priceNotices: viewModel.priceNotices,
+              priceNotesOpen,
+              marketNotice,
+              importNotice: priceSetTransfer.importNotice,
+              priceSetResetPending: priceSetTransfer.resetPending,
+              priceHistoryClearPending,
+              manualPriceClearPending,
+              recovery: {
+                visible: localStateRecovery.visible,
+                report: localStateRecovery.report,
+                notice: localStateRecovery.notice,
+                pendingClearId: localStateRecovery.pendingClearId
               },
-              setDraft: (value) => {
-                setManualPriceItemId(effectiveManualPriceItemId);
-                setManualPriceDraft(value);
+              workspace: {
+                phase: workspaceFileTransfer.phase,
+                includeLastHiscoresPlayer: workspaceFileTransfer.includeLastHiscoresPlayer,
+                notice: workspaceFileTransfer.notice,
+                review: workspaceFileTransfer.review,
+                selection: workspaceFileTransfer.selection,
+                restorePlan: workspaceFileTransfer.restorePlan,
+                restoreBusy: workspaceFileTransfer.restoreBusy,
+                sessionOnlyAvailable: workspaceFileTransfer.sessionOnlyAvailable,
+                recoveryRequired: workspaceFileTransfer.recoveryRequired,
+                currentRevisionLabel: gameRevisionViewModel.revisionLabel,
+                currentSnapshotLabel: gameRevisionViewModel.snapshotLabel,
+                currentSnapshotId: gameRevisionViewModel.snapshotId,
+                canIncludeLastHiscoresPlayer: lastHiscoresPlayerState !== null
+              }
+            }}
+            actions={{
+              setPriceNotesOpen,
+              reviewPriceItem: requestPriceItemReview,
+              navigate: navigateFromSettings,
+              prices: {
+                importPriceSet: importPriceFile,
+                exportActivePriceSet,
+                requestReset: requestResetActivePriceSet,
+                confirmReset: resetActivePriceSetToFallback,
+                cancelReset: priceSetTransfer.cancelReset
               },
-              apply: applyManualItemPrice,
-              resetItem: resetManualItemPrice,
-              requestClearAll: () => setManualPriceClearPending(true),
-              confirmClearAll: confirmClearAllManualPrices,
-              cancelClearAll: () => setManualPriceClearPending(false)
-            },
-            settings: {
-              setTierHidden: (tierId, hiddenTier) =>
-                setHiddenGearTiers((current) => setHiddenGearTier(current, tierId, hiddenTier)),
-              hideAllTiers: () => setHiddenGearTiers(hideAllGearTiers()),
-              showAllTiers: () => setHiddenGearTiers(DEFAULT_HIDDEN_GEAR_TIERS_STATE)
-            },
-            recovery: {
-              exportReport: localStateRecovery.exportReport,
-              beginClear: localStateRecovery.beginClear,
-              cancelClear: localStateRecovery.cancelClear,
-              confirmClearItem: confirmClearLocalStateItem,
-              confirmClearInvalid: confirmClearInvalidLocalState
-            }
-          }}
-        />
+              history: {
+                saveLocalComparison: saveLocalPriceComparison,
+                requestClear: requestClearPriceHistory,
+                confirmClear: confirmClearPriceHistory,
+                cancelClear: () => setPriceHistoryClearPending(false),
+                setBaselineMode: setEconomyBaselineMode,
+                setSnapshotKey: setEconomySnapshotKey,
+                setItemFilter: setEconomyItemFilter,
+                setTrendItemId: setEconomyTrendItemId,
+                sortBy: updateEconomySort
+              },
+              manual: {
+                selectItem: (itemId) => {
+                  setManualPriceItemId(itemId);
+                  setManualPriceDraft(
+                    activePriceSet?.itemPrices[itemId] ?? basePriceSet?.itemPrices[itemId] ?? 0
+                  );
+                },
+                setDraft: (value) => {
+                  setManualPriceItemId(effectiveManualPriceItemId);
+                  setManualPriceDraft(value);
+                },
+                apply: applyManualItemPrice,
+                resetItem: resetManualItemPrice,
+                requestClearAll: () => setManualPriceClearPending(true),
+                confirmClearAll: confirmClearAllManualPrices,
+                cancelClearAll: () => setManualPriceClearPending(false)
+              },
+              settings: {
+                setTierHidden: (tierId, hiddenTier) =>
+                  setHiddenGearTiers((current) => setHiddenGearTier(current, tierId, hiddenTier)),
+                hideAllTiers: () => setHiddenGearTiers(hideAllGearTiers()),
+                showAllTiers: () => setHiddenGearTiers(DEFAULT_HIDDEN_GEAR_TIERS_STATE)
+              },
+              recovery: {
+                exportReport: localStateRecovery.exportReport,
+                beginClear: localStateRecovery.beginClear,
+                cancelClear: localStateRecovery.cancelClear,
+                confirmClearItem: confirmClearLocalStateItem,
+                confirmClearInvalid: confirmClearInvalidLocalState
+              },
+              workspace: {
+                setIncludeLastHiscoresPlayer: workspaceFileTransfer.setIncludeLastHiscoresPlayer,
+                exportWorkspace,
+                dismissReview: dismissWorkspaceReview,
+                reviewRecovery: reviewLocalState,
+                restore: (intent) => {
+                  if (!workspaceRestoreContext) return;
+                  return intent.kind === "prepare"
+                    ? workspaceFileTransfer.prepareImport(intent.file, workspaceRestoreContext)
+                    : intent.kind === "plan"
+                      ? workspaceFileTransfer.updateRestorePlan(
+                          intent.reviewId,
+                          intent.action,
+                          workspaceRestoreContext
+                        )
+                      : applyWorkspaceRestore(
+                          intent.reviewId,
+                          intent.kind === "apply" ? "durable" : "session-only"
+                        );
+                }
+              }
+            }}
+          />
+        </Suspense>
 
         <ComparePane
           hidden={activeTab !== "compare"}

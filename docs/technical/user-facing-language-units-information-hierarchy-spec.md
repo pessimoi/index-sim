@@ -1,6 +1,6 @@
 # User-facing language, units and information hierarchy specification
 
-Status: specced, 2026-07-19. Implementation pending.
+Status: implemented, 2026-07-19.
 
 Decision context: this specification extends D-077 compact readability and
 D-102 PriceSet surface consolidation. It does not reopen either decision or
@@ -14,6 +14,30 @@ Primary dependencies:
 - Economy, Loot, MonsterCard and Settings presentation models;
 - Cannon, Trip, Loadout, Dense Compare and compact-shell semantic labels; and
 - current responsive contracts and reviewed visual baselines.
+
+## Implementation evidence
+
+- `src/app/view-models/presentation-language.ts` owns the focused typed
+  source-first entity-label, compact accessible-label and semantic-unit
+  contracts. Domain, generated-data and persistence schemas remain unchanged.
+- Loot, Economy and MonsterCard render source/snapshot names as primary copy and
+  keep exact Item ID, Monster ID, Loot row ID and Tag values in labelled native
+  disclosures with selectable `code` text. PriceSet/history-only ids receive a
+  classified deterministic fallback and remain searchable by exact id.
+- Shared fields, metric presenters and dense headers preserve accepted compact
+  visible tokens while exposing full semantic names. Source monster speed stays
+  in game ticks; player speed and Cannon/Trip respawn stay in seconds.
+- Settings renders one short active PriceSet summary. Economy alone renders the
+  detailed Market surface, and the typed review intent changes only the active
+  tab and post-render heading focus.
+- Focused and complete unit/component/browser coverage owns label precedence,
+  technical identity, units, compact semantics, Settings/Economy hierarchy and
+  unchanged price transactions. The reviewed Darwin update changed 15 expected
+  fixture screenshots; the following read-only matrix passes 20/20 across all
+  31 baselines with no clipping, widening, control loss or numeric change. The
+  complete functional Chromium matrix passes 98/98, and `npm run verify` passes
+  94 files / 935 tests plus 19 goldens, typecheck, architecture, build/artifact,
+  lint, formatting and diff checks.
 
 ## Purpose
 
@@ -58,9 +82,13 @@ diagnostic surface. The source names, typed timing fields, established Economy
 owner and visual baselines already exist, so the remaining work is bounded and
 can be verified without introducing a new data or architecture foundation.
 
-## Verified current gaps
+## Verified pre-implementation gaps
 
-The following behavior is present in the current production path:
+The implementation evidence above closes this snapshot. The bullets below are
+retained as the inspected before-state that motivated the bounded change, not
+as claims about the current production path.
+
+The following behavior was present in the inspected pre-implementation path:
 
 - `GameDataSnapshot.items[*].name` and `monsters[*].name` are required validated
   source fields, and `createPriceItemLabels()` already exposes item names.

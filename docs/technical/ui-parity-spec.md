@@ -75,6 +75,12 @@ Required order and behavior:
 | 11   | F/KL        | F/KL         | F/KL        | Food per kill or current trip food pressure. If the rewrite cannot yet write this directly, show the current model value read-only.                                                                             |
 | 12   | TARGET      | TARGET       | TARGET      | Monster select. Changing target updates the metric strip and highlights the table row.                                                                                                                          |
 
+Current implementation note: the accepted visible compact tokens stay at their
+original widths. A shared presentation-only map supplies full accessible names
+for HP, accuracy/damage/speed overrides, hit/max/DPS/TTK/rate/GP/XP metrics and
+food per kill without making the abbreviation and expansion announce twice.
+Full manual speed fields identify seconds explicitly.
+
 The legacy source renders these controls into a 13-column grid even though the named control set is effectively 12 slots. The rewrite can keep 12 named slots plus a reserved rhythm column, or preserve 13 physical grid columns, but labels and visual rhythm should match the old spreadsheet.
 
 D-077 keeps this strip dense without treating every slot as equally wide.
@@ -339,7 +345,9 @@ import paths. Dense XP/HR and NET GP/HR cells now include compact
 row-scale indicators derived from the currently visible rows after sort/filter;
 net GP/hr uses separate positive and negative relative scales so profitable and
 loss-making rows remain visually distinct while the numeric value remains the
-primary content.
+primary content. Every compact sort header also has a full accessible name,
+while canonical sort keys and visible dense tokens stay unchanged. TTK values
+use explicit second/minute spacing without changing value or precision.
 
 Mobile/tablet implementation note: Playwright now smokes Dense Compare at
 390px mobile and 768px tablet widths. The smoke verifies that the page itself
@@ -564,7 +572,10 @@ MonsterCard view-model for current target stats, active defence row from
 weapon/ammo/spell setup overview. Target search/select uses the same target
 switch path as SetupBar so custom setups restore consistently. Drop filtering
 shares the dense compare `dropFilter` state instead of creating a second filter
-truth. Full visual regression coverage remains outside this slice.
+truth. The validated snapshot monster name is primary, the exact monster id is
+available only in a labelled selectable `Technical details` disclosure, source
+attack speed is shown as `6 ticks`/`6 game ticks`, and the separately derived
+player speed remains seconds such as `2.4 s`.
 
 ### Stats
 
@@ -682,7 +693,7 @@ Required content:
 - Prayer XP from burying.
 - Loot value composition section.
 
-Current implementation note: the root rewrite UI exposes the full current-target loot workflow, meaningful action controls, per-monster settings, composition/nested/action-impact detail and price-history context from the same merged shared/local analysis used by Economy. The ordinary drop table keeps source order by default and exposes accessible ascending/descending sorting for drop, action, hourly delta, EV/kill, chance, quantity and price; Impacts and Details remain disclosure columns rather than sort keys. Expanded random-table contents keep their source order by default and can be sorted by child, weight, chance, quantity, price or EV share, with unavailable numeric values retained at the end. Both sorts are session-local presentation state and do not change loot preferences, simulation requests or persisted setup data. Composition, action-impact and conditional tables keep their semantic contribution, action-policy and source-completeness order. Generated high alch controls alch profitability. D-089 moves the D-072 conditional quest/clue rows out of the ordinary action table into one collapsed native disclosure; their source chance, sanitized eligibility and locked Skip remain visible on demand, and they still contribute no value or trip effect while exact player state is unavailable. D-090 lets Economy overlay and reset one validated browser-local item price while preserving the selected/scheduled/bundled base and generated high alch. Economy owns the read-only shared plus local comparison workflow; D-049 still keeps full legacy history migration out of V1, while root-variable and scheduled-run evidence remain operations work after the successful live dry-run.
+Current implementation note: the root rewrite UI exposes the full current-target loot workflow, meaningful action controls, per-monster settings, composition/nested/action-impact detail and price-history context from the same merged shared/local analysis used by Economy. Snapshot/source row names are primary throughout parent, nested and conditional rows; Item ID, Loot row ID and Tag remain separately selectable in labelled native technical disclosures rather than ordinary copy. The ordinary drop table keeps source order by default and exposes accessible ascending/descending sorting for drop, action, hourly delta, EV/kill, chance, quantity and price; Impacts and Details remain disclosure columns rather than sort keys. Expanded random-table contents keep their source order by default and can be sorted by child, weight, chance, quantity, price or EV share, with unavailable numeric values retained at the end. Both sorts are session-local presentation state and do not change loot preferences, simulation requests or persisted setup data. Composition, action-impact and conditional tables keep their semantic contribution, action-policy and source-completeness order, while visible GP/XP labels use the shared uppercase and spacing contract. Generated high alch controls alch profitability. D-089 moves the D-072 conditional quest/clue rows out of the ordinary action table into one collapsed native disclosure; their source chance, sanitized eligibility and locked Skip remain visible on demand, and they still contribute no value or trip effect while exact player state is unavailable. D-090 lets Economy overlay and reset one validated browser-local item price while preserving the selected/scheduled/bundled base and generated high alch. Economy owns the read-only shared plus local comparison workflow; D-049 still keeps full legacy history migration out of V1, while root-variable and scheduled-run evidence remain operations work after the successful live dry-run.
 
 D-101 removes the duplicated aggregate Loot price-warning block. Bounded notes
 now stay beside the supplying row or nested contributor; Bury, Skip and unused
@@ -953,7 +964,12 @@ both sources. `Save local comparison` records the active composed PriceSet;
 shared points remain visible. Selected local market prices still win over
 scheduled then bundled prices, while generated high alch wins in every source.
 Missing values and zero baselines remain finite. Backend/account history and
-live scheduled-run evidence remain separate boundaries.
+live scheduled-run evidence remain separate boundaries. Source-backed item
+names are primary in editors, movers, history and provenance;
+imported/history-only ids receive deterministic presentation-only fallback
+labels and retain exact ids in technical details and id-aware search. Economy
+is the sole detailed `Market price data` owner, including scheduled/active
+diagnostics, manual prices, D-102 advanced tools, notes and history.
 
 Economy also owns the complete current-result `Price data notes (N)` native
 disclosure. It starts collapsed during ordinary navigation, contains every
@@ -978,14 +994,14 @@ production market automation or full legacy storage migration.
 
 Required content:
 
-- Price and alch diagnostics inside Settings; full-PriceSet transfer belongs to
-  the shared Market section rather than a duplicate Settings action row.
+- One short Price data summary with the active PriceSet label, active source,
+  manual-override count when present, age/status and `Review in Economy`.
 - Gear-tier hiding controls.
-- Price/alch counts and active-source status.
-- Scheduled static price snapshot status following [live-integrations-spec.md](live-integrations-spec.md).
-- Service-aware scheduled/unavailable/fallback state for market prices. Production copy must not point users to `run_sim.py` or imply user-triggered upstream refresh.
+- Calculation context states only that setup transfers do not include prices.
+- No scheduled diagnostics, provenance/item/alch counts, history actions,
+  detailed Market section or full-PriceSet tools; those belong to Economy.
 
-Current implementation note: Settings Price data shows scheduled status and active PriceSet metadata without a duplicate transfer row. D-102 keeps one collapsed `Advanced PriceSet tools` workflow in the shared Market section, explains complete replacement/non-merge semantics and uses the validated parser, generated Revision 274 alch authority, selected persistence and local-comparison transaction. Reset clears only the selected key, preserves manual item prices plus shared/local history and returns to scheduled or bundled prices. Economy owns merged read-only shared plus local comparison analysis. Settings Gear controls remain separately backed by `index-sim:hidden-gear-tiers` and preserve current/None selections.
+Current implementation note: Settings renders exactly one short active-PriceSet summary and no detailed Market content. Its typed `Review in Economy` intent activates Economy and focuses the rendered Market heading without changing price state, disclosure state, URL or persistence. D-102 keeps the single collapsed `Advanced PriceSet tools` workflow in Economy, including validated replacement/non-merge, generated alch, selected persistence and local-history transactions. Reset still clears only the selected key and preserves manual prices plus shared/local history. Settings Gear controls remain separately backed by `index-sim:hidden-gear-tiers` and preserve current/None selections.
 
 ## Implementation Phases
 

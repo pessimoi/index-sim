@@ -1,4 +1,3 @@
-import { z } from "zod";
 import {
   loadPersisted,
   tryClearPersisted,
@@ -6,10 +5,10 @@ import {
   type LoadPersistedResult,
   type VersionedStorageOptions
 } from "@/adapters/storage";
-import { HiscoresPlayerNameSchema } from "@/data/schemas";
 import {
   HISCORES_LAST_PLAYER_STORAGE_KEY,
-  HISCORES_LAST_PLAYER_STORAGE_VERSION
+  HISCORES_LAST_PLAYER_STORAGE_VERSION,
+  LastHiscoresPlayerStateSchema
 } from "@/adapters/hiscores";
 import {
   DUEL_SNAPSHOTS_STORAGE_KEY,
@@ -164,12 +163,6 @@ function persistedDescriptor<T>(
     load: (storage) => loadPersisted({ ...options, storage })
   };
 }
-
-const LastHiscoresPlayerStateSchema = z
-  .object({
-    player: HiscoresPlayerNameSchema
-  })
-  .strict();
 
 export const LOCAL_STATE_HEALTH_DESCRIPTORS: readonly LocalStateHealthDescriptor[] = [
   persistedDescriptor("rewrite-setup", "Rewrite setup", {

@@ -35,6 +35,12 @@ import {
 } from "../state/price-history";
 import { formatNumber } from "./formatting";
 import type { CalculationWarningViewModel } from "./contracts";
+import {
+  createEntityDisplayLabel,
+  formatSemanticUnitValue,
+  type EntityDisplayLabel,
+  type SemanticUnitValue
+} from "./presentation-language";
 
 const MONEY_WARNING_CODES = new Set([
   "missing-price",
@@ -67,15 +73,25 @@ export function isMoneyWarningCode(code: string): boolean {
 }
 
 export interface PriceDataNotice {
+  noticeId: string;
   code: string;
   itemId?: string;
   itemLabel: string;
+  itemDisplayLabel: EntityDisplayLabel;
   level: "issue" | "note";
   consumer: "loot" | "supply" | "cannon";
   affectsCurrentResult: boolean;
   lootRowId?: string;
   summary: string;
   detail: string;
+  action?: PriceNoticeAction;
+}
+
+export interface PriceNoticeAction {
+  kind: "correct-price" | "inspect-item";
+  itemId: string;
+  noticeId: string;
+  label: "Correct price" | "Inspect item";
 }
 
 export interface CurrentPriceNoticePresentation {
@@ -83,11 +99,13 @@ export interface CurrentPriceNoticePresentation {
   notes: readonly PriceDataNotice[];
   all: readonly PriceDataNotice[];
   byLootRowId: Readonly<Record<string, readonly PriceDataNotice[]>>;
+  resultAction: PriceNoticeAction | null;
 }
 
 export interface PriceDataSelectOption {
   id: string;
   label: string;
+  displayLabel?: EntityDisplayLabel;
 }
 
 export const PRICE_HISTORY_BASELINE_OPTIONS: ReadonlyArray<{
@@ -117,6 +135,7 @@ export interface ActivePriceSetPresentation {
   source: string;
   createdAt: string;
   ageLabel: string;
+  ageAccessibleLabel: string;
   itemCount: number;
   alchCount: number;
   metadata: ItemPriceMetadataSummary;
@@ -131,6 +150,7 @@ export interface ScheduledPriceSetPresentation {
   label: string;
   createdAt: string;
   ageLabel: string;
+  ageAccessibleLabel: string;
   itemCount: number;
   alchCount: number;
   metadata: ItemPriceMetadataSummary;
@@ -153,6 +173,7 @@ export interface ManualPriceEditorPresentation {
   itemOptions: PriceDataSelectOption[];
   itemId: string;
   itemLabel: string;
+  itemDisplayLabel: EntityDisplayLabel;
   basePrice: number | null;
   activePrice: number | null;
   selectedOverride: ManualPriceOverride | null;
@@ -197,6 +218,7 @@ export interface EconomyHistoryAnalysisPresentation {
   effectiveTrendItemId: string;
   trend: PriceHistoryTrendAnalysis;
   lootHistoryByItem: Readonly<Record<string, ItemPriceHistoryContext>>;
+  itemDisplayLabels: Readonly<Record<string, EntityDisplayLabel>>;
 }
 
 export interface PriceHistorySources {
@@ -208,10 +230,12 @@ export interface PriceHistorySources {
 
 export interface PriceHistorySummaryPresentation extends PriceHistorySummary {
   latestAgeLabel: string;
+  latestAgeAccessibleLabel: string;
 }
 
 export interface SelectedPriceItemPresentation {
   itemId: string;
+  itemDisplayLabel: EntityDisplayLabel;
   price: number | null;
   metadata: ItemPriceMetadata | null;
   freshness: ItemPriceFreshnessDisplay;
@@ -227,12 +251,25 @@ export interface PriceDataViewModel extends PriceSetPresentation {
   history: EconomyHistoryPresentation;
 }
 
+export function formatPriceAgeValue(seconds: number | null): SemanticUnitValue {
+  if (seconds === null || !Number.isFinite(seconds) || seconds < 0) {
+    return { visible: "-", accessible: "-" };
+  }
+  if (seconds < 60) return { visible: "<1 min", accessible: "less than 1 minute" };
+  if (seconds < 3600) {
+    const minutes = Math.floor(seconds / 60);
+    return formatSemanticUnitValue(formatNumber(minutes), minutes, "minute");
+  }
+  if (seconds < 86400) {
+    const hours = Math.floor(seconds / 3600);
+    return formatSemanticUnitValue(formatNumber(hours), hours, "hour");
+  }
+  const days = Math.floor(seconds / 86400);
+  return formatSemanticUnitValue(formatNumber(days), days, "day");
+}
+
 export function formatPriceAge(seconds: number | null): string {
-  if (seconds === null || !Number.isFinite(seconds) || seconds < 0) return "-";
-  if (seconds < 60) return "<1m";
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
-  return `${Math.floor(seconds / 86400)}d`;
+  return formatPriceAgeValue(seconds).visible;
 }
 
 export function economyAriaSort(
@@ -255,11 +292,6 @@ export function createPriceItemLabels(
   return Object.fromEntries(
     Object.entries(gameData.items).map(([itemId, item]) => [itemId, item.name])
   );
-}
-
-function humanizePriceItemId(itemId: string): string {
-  const words = itemId.replace(/_/g, " ").trim();
-  return words ? words.charAt(0).toUpperCase() + words.slice(1) : "Price data";
 }
 
 function priceNoticeCopy(
@@ -331,10 +363,15 @@ function comparePriceNotices(left: PriceDataNotice, right: PriceDataNotice): num
   });
 }
 
+function priceNoticeId(...parts: string[]): string {
+  return parts.map((part) => encodeURIComponent(part)).join(":");
+}
+
 export function createCurrentPriceNoticePresentation(input: {
   warnings: readonly CalculationWarningViewModel[];
   gameData: Pick<GameDataSnapshot, "items">;
   lootBreakdown: readonly Pick<LootBreakdownEntry, "rowId" | "name">[];
+  editableItemIds?: ReadonlySet<string>;
 }): CurrentPriceNoticePresentation {
   const lootLabelByRowId = new Map(input.lootBreakdown.map((row) => [row.rowId, row.name]));
   const notices: PriceDataNotice[] = [];
@@ -343,29 +380,64 @@ export function createCurrentPriceNoticePresentation(input: {
   for (const warning of input.warnings) {
     if (!isMoneyWarningCode(warning.code)) continue;
     const context = warning.priceContext;
-    const itemLabel =
+    const rowSourceName =
       warning.code === "unidentified-herb-price-approximation"
         ? "Unidentified herbs"
-        : warning.itemId
-          ? (input.gameData.items[warning.itemId]?.name ?? humanizePriceItemId(warning.itemId))
-          : context?.lootRowId
-            ? (lootLabelByRowId.get(context.lootRowId) ?? "Price data")
+        : context?.lootRowId
+          ? (lootLabelByRowId.get(context.lootRowId) ?? null)
+          : warning.itemId
+            ? null
             : "Price data";
+    const itemDisplayLabel = createEntityDisplayLabel({
+      technicalId: warning.itemId ?? null,
+      gameDataName: warning.itemId ? input.gameData.items[warning.itemId]?.name : null,
+      rowSourceName
+    });
+    const itemLabel = itemDisplayLabel.name;
     const consumer = context?.consumer ?? "loot";
     const affectsCurrentResult = context?.affectsCurrentResult ?? true;
     const level = PRICE_ISSUE_CODES.has(warning.code) ? "issue" : "note";
     const copy = priceNoticeCopy(warning.code, itemLabel);
-    const key = `${warning.code}:${warning.itemId ?? itemLabel}:${consumer}:${context?.lootRowId ?? ""}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
+    const noticeId = priceNoticeId(
+      warning.code,
+      warning.itemId ?? itemLabel,
+      consumer,
+      context?.lootRowId ?? ""
+    );
+    if (seen.has(noticeId)) continue;
+    seen.add(noticeId);
+    const correctable =
+      warning.itemId !== undefined &&
+      warning.code !== "missing-alch-value" &&
+      input.editableItemIds?.has(warning.itemId) === true;
+    const action = warning.itemId
+      ? correctable
+        ? ({
+            kind: "correct-price",
+            itemId: warning.itemId,
+            noticeId,
+            label: "Correct price"
+          } satisfies PriceNoticeAction)
+        : affectsCurrentResult
+          ? ({
+              kind: "inspect-item",
+              itemId: warning.itemId,
+              noticeId,
+              label: "Inspect item"
+            } satisfies PriceNoticeAction)
+          : undefined
+      : undefined;
     notices.push({
+      noticeId,
       code: warning.code,
       ...(warning.itemId ? { itemId: warning.itemId } : {}),
       itemLabel,
+      itemDisplayLabel,
       level,
       consumer,
       affectsCurrentResult,
       ...(context?.lootRowId ? { lootRowId: context.lootRowId } : {}),
+      ...(action ? { action } : {}),
       ...copy
     });
   }
@@ -378,11 +450,25 @@ export function createCurrentPriceNoticePresentation(input: {
     (byLootRowId[notice.lootRowId] ??= []).push(notice);
   }
 
+  const issues = active.filter((notice) => notice.level === "issue");
+  const distinctIssueActions = new Map<string, PriceNoticeAction>();
+  for (const issue of issues) {
+    if (!issue.action) continue;
+    distinctIssueActions.set(
+      `${issue.action.kind}:${issue.action.itemId}:${issue.action.noticeId}`,
+      issue.action
+    );
+  }
+
   return {
-    issues: active.filter((notice) => notice.level === "issue"),
+    issues,
     notes: active.filter((notice) => notice.level === "note"),
     all: active,
-    byLootRowId
+    byLootRowId,
+    resultAction:
+      issues.length === 1 && distinctIssueActions.size === 1
+        ? (distinctIssueActions.values().next().value ?? null)
+        : null
   };
 }
 
@@ -447,6 +533,8 @@ export function createPriceSetPresentation(input: {
     : "bundled";
   const resetFallbackLabel =
     resetFallbackOrigin === "scheduled" ? "scheduled prices" : "bundled prices";
+  const activeAge = formatPriceAgeValue(ageSeconds(input.activePriceSet, input.ageNow));
+  const scheduledAge = formatPriceAgeValue(ageSeconds(scheduledPriceSet, input.ageNow));
 
   return {
     active: {
@@ -455,7 +543,8 @@ export function createPriceSetPresentation(input: {
       label: input.activePriceSet?.label ?? input.priceLabel,
       source: input.activePriceSet?.source ?? "-",
       createdAt: input.activePriceSet?.createdAt ?? "-",
-      ageLabel: formatPriceAge(ageSeconds(input.activePriceSet, input.ageNow)),
+      ageLabel: activeAge.visible,
+      ageAccessibleLabel: activeAge.accessible,
       itemCount: Object.keys(input.activePriceSet?.itemPrices ?? {}).length,
       alchCount: Object.keys(input.activePriceSet?.alchValues ?? {}).length,
       metadata: summarizeItemPriceMetadata(input.activePriceSet)
@@ -468,7 +557,8 @@ export function createPriceSetPresentation(input: {
       fallbackLabel: scheduledStatus.fallbackLabel,
       label: scheduledPriceSet?.label ?? "-",
       createdAt: scheduledPriceSet?.createdAt ?? "-",
-      ageLabel: formatPriceAge(ageSeconds(scheduledPriceSet, input.ageNow)),
+      ageLabel: scheduledAge.visible,
+      ageAccessibleLabel: scheduledAge.accessible,
       itemCount: Object.keys(scheduledPriceSet?.itemPrices ?? {}).length,
       alchCount: Object.keys(scheduledPriceSet?.alchValues ?? {}).length,
       metadata: summarizeItemPriceMetadata(scheduledPriceSet)
@@ -496,7 +586,13 @@ export function createManualPriceEditorPresentation(input: {
     ? activeManualPriceOverridesForPriceSet(input.manualPriceOverrides, input.basePriceSet)
     : DEFAULT_MANUAL_PRICE_OVERRIDES_STATE;
   const itemOptions = Object.keys(input.basePriceSet?.itemPrices ?? {})
-    .map((itemId) => ({ id: itemId, label: input.itemLabels[itemId] ?? itemId }))
+    .map((itemId) => {
+      const displayLabel = createEntityDisplayLabel({
+        technicalId: itemId,
+        gameDataName: input.itemLabels[itemId]
+      });
+      return { id: itemId, label: displayLabel.name, displayLabel };
+    })
     .sort((left, right) => left.label.localeCompare(right.label));
   const itemId = itemOptions.some((option) => option.id === input.selectedItemId)
     ? input.selectedItemId
@@ -511,11 +607,15 @@ export function createManualPriceEditorPresentation(input: {
     !canSetManualPriceOverride(input.manualPriceOverrides, itemId);
   const storedCount = Object.keys(input.manualPriceOverrides.items).length;
   const activeCount = Object.keys(activeOverrides.items).length;
+  const itemDisplayLabel =
+    itemOptions.find((option) => option.id === itemId)?.displayLabel ??
+    createEntityDisplayLabel({ technicalId: itemId || null });
 
   return {
     itemOptions,
     itemId,
-    itemLabel: (input.itemLabels[itemId] ?? itemId) || "-",
+    itemLabel: itemDisplayLabel.name,
+    itemDisplayLabel,
     basePrice,
     activePrice,
     selectedOverride,
@@ -571,18 +671,34 @@ export function createEconomyHistoryPresentation(input: {
   )
     ? input.controls.snapshotKey
     : (snapshotOptions[0]?.id ?? "");
+  const trendItemIds = new Set(
+    analysisState.snapshots.flatMap((snapshot) => Object.keys(snapshot.itemPrices))
+  );
+  const itemDisplayLabels = Object.fromEntries(
+    [...trendItemIds].map((itemId) => [
+      itemId,
+      createEntityDisplayLabel({
+        technicalId: itemId,
+        gameDataName: input.itemLabels[itemId]
+      })
+    ])
+  );
+  const resolvedItemLabels = Object.fromEntries(
+    Object.entries(itemDisplayLabels).map(([itemId, displayLabel]) => [itemId, displayLabel.name])
+  );
   const movers = analyzePriceHistoryMovers(analysisState, {
     baselineMode: input.controls.baselineMode,
     baselineSnapshotKey: effectiveSnapshotKey,
     itemFilter: input.controls.itemFilter,
-    itemLabels: { ...input.itemLabels },
+    itemLabels: resolvedItemLabels,
     sort: input.controls.sort
   });
-  const trendItemIds = new Set(
-    analysisState.snapshots.flatMap((snapshot) => Object.keys(snapshot.itemPrices))
-  );
   const trendItemOptions = [...trendItemIds]
-    .map((itemId) => ({ id: itemId, label: input.itemLabels[itemId] ?? itemId }))
+    .map((itemId) => ({
+      id: itemId,
+      label: itemDisplayLabels[itemId]!.name,
+      displayLabel: itemDisplayLabels[itemId]
+    }))
     .sort((left, right) => left.label.localeCompare(right.label));
   const effectiveTrendItemId = trendItemOptions.some(
     (option) => option.id === input.controls.trendItemId
@@ -590,12 +706,12 @@ export function createEconomyHistoryPresentation(input: {
     ? input.controls.trendItemId
     : (movers.rows[0]?.itemId ?? trendItemOptions[0]?.id ?? "");
   const trend = analyzePriceHistoryTrend(analysisState, effectiveTrendItemId, {
-    ...input.itemLabels
+    ...resolvedItemLabels
   });
   const lootMovers = analyzePriceHistoryMovers(analysisState, {
     baselineMode: input.controls.baselineMode,
     baselineSnapshotKey: effectiveSnapshotKey,
-    itemLabels: { ...input.itemLabels },
+    itemLabels: resolvedItemLabels,
     sort: { key: "item", direction: "asc" }
   });
   const latestLabel = lootMovers.latest?.label ?? null;
@@ -627,7 +743,8 @@ export function createEconomyHistoryPresentation(input: {
     trendItemOptions,
     effectiveTrendItemId,
     trend,
-    lootHistoryByItem
+    lootHistoryByItem,
+    itemDisplayLabels
   };
 }
 
@@ -641,12 +758,18 @@ export function createPriceHistorySummaryPresentation(input: {
     input.activePriceSet,
     input.evaluatedAt
   );
-  return { ...summary, latestAgeLabel: formatPriceAge(summary.latestAgeSeconds) };
+  const latestAge = formatPriceAgeValue(summary.latestAgeSeconds);
+  return {
+    ...summary,
+    latestAgeLabel: latestAge.visible,
+    latestAgeAccessibleLabel: latestAge.accessible
+  };
 }
 
 export function createSelectedPriceItemPresentation(input: {
   activePriceSet: PriceSet | null;
   itemId: string;
+  itemLabels?: Readonly<Record<string, string>>;
   freshnessNow: Date;
 }): SelectedPriceItemPresentation {
   const metadata = input.itemId
@@ -654,6 +777,10 @@ export function createSelectedPriceItemPresentation(input: {
     : null;
   return {
     itemId: input.itemId,
+    itemDisplayLabel: createEntityDisplayLabel({
+      technicalId: input.itemId || null,
+      gameDataName: input.itemLabels?.[input.itemId]
+    }),
     price: input.itemId ? (input.activePriceSet?.itemPrices[input.itemId] ?? null) : null,
     metadata,
     freshness: deriveItemPriceFreshness(metadata ?? undefined, input.freshnessNow)

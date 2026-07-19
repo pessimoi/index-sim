@@ -26,7 +26,7 @@ test("runs, invalidates and cancels modeled Risk analysis", async ({ page }) => 
     "Food runs out",
     "Kills / trip",
     "Trip cycle",
-    "10m net GP",
+    "10 min net GP",
     "Reach GP target",
     "Target drop"
   ]) {

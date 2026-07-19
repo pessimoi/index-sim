@@ -157,7 +157,7 @@ test("shows dense row markers for custom setup and per-monster loot settings", a
   const loot = page.locator('section[aria-label="Current monster loot"]');
   await loot.getByLabel("High alch").selectOption("disabled");
   await loot.getByLabel("Overhead", { exact: true }).selectOption("manual");
-  await loot.getByLabel("Overhead sec").fill("12.5");
+  await loot.getByLabel("Overhead (seconds)").fill("12.5");
 
   await tabs.getByRole("tab", { name: "Monsters" }).click();
   const table = page.getByRole("table", { name: "All monsters" });
@@ -249,7 +249,7 @@ test("matches browser-rendered dense numeric snapshots", async ({ page }) => {
   const cannon = page.locator('section[aria-label="Cannon"]');
   await cannon.getByLabel("Set up cannon").check();
   await cannon.getByLabel("Mobs at spot").fill("6");
-  await cannon.getByLabel("Respawn").fill("30");
+  await cannon.getByLabel("Respawn (seconds)").fill("30");
   const cannonOutput = await metricSnapshot(
     page.locator('[aria-label="Cannon output"]'),
     CANNON_NUMERIC_LABELS
@@ -283,7 +283,7 @@ test("matches browser-rendered dense numeric snapshots", async ({ page }) => {
       hit: "88.9%",
       max: "16.4",
       dps: "3.05",
-      ttk: "12.8s",
+      ttk: "12.8 s",
       killsPerHour: "235",
       xpPerHour: "21,573",
       gpPerKill: "524",
@@ -304,7 +304,7 @@ test("matches browser-rendered dense numeric snapshots", async ({ page }) => {
       hit: "70.6%",
       max: "10.0",
       dps: "1.96",
-      ttk: "45.6s",
+      ttk: "45.6 s",
       killsPerHour: "73",
       xpPerHour: "14,525",
       gpPerKill: "654",
@@ -325,7 +325,7 @@ test("matches browser-rendered dense numeric snapshots", async ({ page }) => {
       hit: "80.7%",
       max: "10.0",
       dps: "2.24",
-      ttk: "8.6s",
+      ttk: "8.6 s",
       killsPerHour: "325",
       xpPerHour: "37,083",
       gpPerKill: "95",
@@ -355,7 +355,7 @@ test("matches browser-rendered dense numeric snapshots", async ({ page }) => {
       "Ball cost/kill": "1,785",
       "Ball price": "400",
       "Cannonballs/trip": "69",
-      "Ball gp/trip": "27,743",
+      "Ball GP/trip": "27,743",
       "K/hr uplift": "214.6%"
     }
   });
@@ -393,7 +393,7 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
   const cannon = page.locator('section[aria-label="Cannon"]');
   await cannon.getByLabel("Set up cannon").check();
   await cannon.getByLabel("Mobs at spot").fill("6");
-  await cannon.getByLabel("Respawn").fill("30");
+  await cannon.getByLabel("Respawn (seconds)").fill("30");
   await tabs.getByRole("tab", { name: "Monsters" }).click();
   await expect(
     table
@@ -434,7 +434,7 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
   const loot = page.locator('section[aria-label="Current monster loot"]');
   await loot.getByLabel("High alch").selectOption("disabled");
   await loot.getByLabel("Overhead", { exact: true }).selectOption("manual");
-  await loot.getByLabel("Overhead sec").fill("12.5");
+  await loot.getByLabel("Overhead (seconds)").fill("12.5");
   await tabs.getByRole("tab", { name: "Monsters" }).click();
   const customLootRow = table.getByRole("row", { name: /Green Dragon/ });
   await expect(customLootRow.getByLabel("Custom setup for Green Dragon")).toBeVisible();
@@ -445,7 +445,7 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
   const customLootSettingsResults = await resultMetricSnapshot(page);
   await expectActiveDenseRow(table, /Green Dragon/);
 
-  await table.getByRole("button", { name: "NET GP/HR" }).click();
+  await table.getByRole("button", { name: "Sort by net gold pieces per hour" }).click();
   await page.getByLabel("Monster filter").fill("rock crab");
   const forcedTargetRow = table.getByRole("row", { name: /Green Dragon/ });
   await expect(forcedTargetRow).toBeVisible();
@@ -475,7 +475,7 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
       hit: "88.9%",
       max: "16.4",
       dps: "3.05",
-      ttk: "12.8s",
+      ttk: "12.8 s",
       killsPerHour: "235",
       xpPerHour: "21,573",
       gpPerKill: "524",
@@ -496,7 +496,7 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
       hit: "82.1%",
       max: "16.4",
       dps: "2.81",
-      ttk: "23.2s",
+      ttk: "23.2 s",
       killsPerHour: "140",
       xpPerHour: "18,290",
       gpPerKill: "497",
@@ -517,7 +517,7 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
       hit: "70.6%",
       max: "10.0",
       dps: "1.96",
-      ttk: "45.6s",
+      ttk: "45.6 s",
       killsPerHour: "73",
       xpPerHour: "14,525",
       gpPerKill: "654",
@@ -538,7 +538,7 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
       hit: "80.7%",
       max: "10.0",
       dps: "2.24",
-      ttk: "8.6s",
+      ttk: "8.6 s",
       killsPerHour: "325",
       xpPerHour: "37,083",
       gpPerKill: "95",
@@ -559,7 +559,7 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
       hit: "35.7%",
       max: "20.0",
       dps: "1.19",
-      ttk: "1:33",
+      ttk: "1 min 33 s",
       killsPerHour: "37",
       xpPerHour: "21,210",
       gpPerKill: "6,597",
@@ -580,7 +580,7 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
       hit: "72.4%",
       max: "22.9",
       dps: "1.97",
-      ttk: "40.9s",
+      ttk: "40.9 s",
       killsPerHour: "67",
       xpPerHour: "8,443",
       gpPerKill: "6,187",
