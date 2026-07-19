@@ -1,5 +1,5 @@
 import { loadBundledLegacyContext } from "../adapters/legacy-runtime";
-import { xpAt } from "../domain/planner";
+import { plannerXpBounds, xpAt } from "../domain/planner";
 import {
   DEFAULT_FORM_STATE,
   formToSimulationRequest,
@@ -14,7 +14,9 @@ import {
   createPlannerGearPoolEditorViewModel,
   createPlannerPanelViewModel,
   createPlannerDomainAdapter,
+  createPlannerSkillInputViewModels,
   createPlannerViewModel,
+  plannerProgressAdjustmentNotice,
   plannerAllowedPool
 } from "../app/view-models/planner";
 
@@ -62,10 +64,105 @@ describe("planner UI adapter", () => {
       strength: 64
     });
     expect(adapter.options.startXp).toMatchObject({
+      attack: xpAt(DEFAULT_FORM_STATE.levels.attack),
       strength: xpAt(DEFAULT_FORM_STATE.levels.strength) + 50
     });
     expect(adapter.state.gearPool.weapon).toEqual([weaponId]);
     expect(adapter.pool.weapon).toEqual([weaponId]);
+  });
+
+  it("builds visible Auto, explicit, locked and level-99 rows from effective adapter values", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const form: CombatSetupFormState = {
+      ...DEFAULT_FORM_STATE,
+      levels: { ...DEFAULT_FORM_STATE.levels, attack: 60, strength: 65, magic: 99 }
+    };
+    const strengthBounds = plannerXpBounds(65);
+    const plannerState = PlannerUiStateSchema.parse({
+      ...createDefaultPlannerUiState(form),
+      currentXp: {
+        ...DEFAULT_PLANNER_UI_STATE.currentXp,
+        strength: strengthBounds.max,
+        magic: 200_000_000
+      },
+      targetLevels: {
+        ...DEFAULT_PLANNER_UI_STATE.targetLevels,
+        attack: 70,
+        strength: 60,
+        magic: 98
+      },
+      skillLocks: {
+        ...DEFAULT_PLANNER_UI_STATE.skillLocks,
+        attack: true
+      }
+    });
+    const rows = createPlannerSkillInputViewModels(form, plannerState);
+    const adapter = createPlannerDomainAdapter(form, context, {}, plannerState);
+
+    expect(rows.find((row) => row.skill === "attack")).toMatchObject({
+      currentXp: null,
+      currentXpMode: "auto",
+      effectiveStartXp: xpAt(60),
+      storedTargetLevel: 70,
+      effectiveTargetLevel: 60,
+      targetDisabled: true,
+      targetDescription: "Locked at current level 60; saved target 70 is not used."
+    });
+    expect(rows.find((row) => row.skill === "strength")).toMatchObject({
+      currentXp: strengthBounds.max,
+      currentXpMode: "explicit",
+      effectiveStartXp: strengthBounds.max,
+      effectiveTargetLevel: 65
+    });
+    expect(rows.find((row) => row.skill === "magic")).toMatchObject({
+      currentXp: 200_000_000,
+      effectiveTargetLevel: 99,
+      targetDisabled: true,
+      targetDescription: "Already at maximum target level 99."
+    });
+    expect(adapter.options.startXp).toMatchObject({
+      attack: xpAt(60),
+      strength: strengthBounds.max,
+      magic: 200_000_000
+    });
+    expect(adapter.options.targets).toMatchObject({ attack: 60, strength: 65, magic: 99 });
+  });
+
+  it("bounds adjustment notice copy to three canonical changes", () => {
+    expect(
+      plannerProgressAdjustmentNotice([
+        {
+          skill: "attack",
+          field: "currentXp",
+          previous: 1,
+          next: 0,
+          reason: "xp-outside-current-level"
+        },
+        {
+          skill: "strength",
+          field: "targetLevel",
+          previous: 1,
+          next: 60,
+          reason: "target-below-current-level"
+        },
+        {
+          skill: "defence",
+          field: "targetLevel",
+          previous: 1,
+          next: 50,
+          reason: "target-below-current-level"
+        },
+        {
+          skill: "ranged",
+          field: "targetLevel",
+          previous: 1,
+          next: 50,
+          reason: "target-below-current-level"
+        }
+      ])
+    ).toBe(
+      "Planner inputs adjusted for current levels: Attack XP uses Auto; Strength target is now 60; Defence target is now 50; 1 more."
+    );
   });
 
   it("maps Planner avg-over-session independently from combat setup sustained mode", async () => {

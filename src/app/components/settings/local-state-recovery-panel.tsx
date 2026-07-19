@@ -6,6 +6,8 @@ import type {
 import type { LocalStateClearPendingId } from "../../controllers/local-state-recovery";
 import { formatNumber } from "../../view-models/formatting";
 
+export const LOCAL_STATE_RECOVERY_HEADING_ID = "local-state-recovery-heading";
+
 interface LocalStateRecoveryPanelProps {
   visible: boolean;
   report: LocalStateHealthReport;
@@ -85,7 +87,9 @@ export function LocalStateRecoveryPanel({
   return (
     <section className="service-group local-state-recovery-panel" aria-label="Local state recovery">
       <div className="section-title-row">
-        <h2>Local state recovery</h2>
+        <h2 id={LOCAL_STATE_RECOVERY_HEADING_ID} tabIndex={-1}>
+          Local state recovery
+        </h2>
         <span className={`status-pill ${report.hasAttention ? "warning" : "ready"}`}>
           {localStateRecoveryStatus(report)}
         </span>

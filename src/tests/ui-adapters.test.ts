@@ -290,6 +290,7 @@ describe("versioned rewrite persistence", () => {
   });
 
   it("exports, validates and safely merges Duel snapshot files", () => {
+    const { context } = createGeneratedRuntimeContext();
     const current = {
       snapshots: [createDuelSnapshot("snap-1", "Current", DEFAULT_FORM_STATE)]
     };
@@ -304,14 +305,21 @@ describe("versioned rewrite persistence", () => {
         createDuelSnapshot("snap-2", "Added", DEFAULT_FORM_STATE)
       ]
     };
-    const exported = createDuelSnapshotsExport(importedState, new Date("2026-07-10T12:00:00Z"));
+    const exported = createDuelSnapshotsExport(
+      importedState,
+      context.gameData,
+      new Date("2026-07-10T12:00:00Z")
+    );
     const parsed = parseDuelSnapshotsExportText(JSON.stringify(exported));
     const merged = mergeDuelSnapshots(current, parsed.data);
 
     expect(exported).toMatchObject({
+      kind: "index-sim-saved-setups",
       version: DUEL_SNAPSHOTS_VERSION,
-      exportedAt: "2026-07-10T12:00:00.000Z"
+      exportedAt: "2026-07-10T12:00:00.000Z",
+      context: { gameDataId: context.gameData.id, gameRevision: 274 }
     });
+    expect(parsed).toMatchObject({ format: "contextual-v1", context: exported.context });
     expect(merged).toMatchObject({ addedCount: 1, updatedCount: 1, skippedCount: 0 });
     expect(merged.state.snapshots.map((snapshot) => [snapshot.id, snapshot.name])).toEqual([
       ["snap-1", "Updated"],
@@ -324,16 +332,38 @@ describe("versioned rewrite persistence", () => {
     });
   });
 
+  it("accepts the prior saved-setup envelope as unknown context", () => {
+    const { context } = createGeneratedRuntimeContext();
+    const legacy = {
+      version: DUEL_SNAPSHOTS_VERSION,
+      exportedAt: "2026-07-10T12:00:00.000Z",
+      data: {
+        snapshots: [createDuelSnapshot("legacy-1", "Legacy", DEFAULT_FORM_STATE)]
+      }
+    };
+
+    expect(
+      parseDuelSnapshotsExportText(
+        JSON.stringify(legacy),
+        DUEL_SNAPSHOTS_IMPORT_MAX_BYTES,
+        context.gameData
+      )
+    ).toMatchObject({ format: "legacy-v1", context: null, data: legacy.data });
+  });
+
   it("rejects Duel snapshot entities unavailable in the current game revision", () => {
     const { context } = createGeneratedRuntimeContext();
-    const exported = createDuelSnapshotsExport({
-      snapshots: [
-        createDuelSnapshot("removed-entity", "Removed entity", {
-          ...DEFAULT_FORM_STATE,
-          monsterId: "removed_revision_monster"
-        })
-      ]
-    });
+    const exported = createDuelSnapshotsExport(
+      {
+        snapshots: [
+          createDuelSnapshot("removed-entity", "Removed entity", {
+            ...DEFAULT_FORM_STATE,
+            monsterId: "removed_revision_monster"
+          })
+        ]
+      },
+      context.gameData
+    );
 
     expect(() =>
       parseDuelSnapshotsExportText(
@@ -345,6 +375,7 @@ describe("versioned rewrite persistence", () => {
   });
 
   it("rejects unsafe Duel snapshot imports and preserves a full current list", () => {
+    const { context } = createGeneratedRuntimeContext();
     const full = {
       snapshots: Array.from({ length: MAX_DUEL_SNAPSHOTS }, (_, index) =>
         createDuelSnapshot(`current-${index}`, `Current ${index}`, DEFAULT_FORM_STATE)
@@ -362,7 +393,7 @@ describe("versioned rewrite persistence", () => {
       ["invalid_json", "{bad"],
       [
         "duplicate_keys",
-        JSON.stringify(createDuelSnapshotsExport(imported)).replace(
+        JSON.stringify(createDuelSnapshotsExport(imported, context.gameData)).replace(
           `"version":${DUEL_SNAPSHOTS_VERSION}`,
           `"version":${DUEL_SNAPSHOTS_VERSION},"version":${DUEL_SNAPSHOTS_VERSION}`
         )

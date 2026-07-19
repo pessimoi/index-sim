@@ -18,10 +18,23 @@ import {
   createSelectedPriceItemPresentation,
   type PriceDataViewModel
 } from "../app/view-models/price-data";
-import { createSettingsPaneViewModel } from "../app/view-models/settings";
+import {
+  createSettingsPaneViewModel,
+  type GameRevisionViewModel
+} from "../app/view-models/settings";
 import type { PriceSet } from "../domain/shared";
 
 const noOp = () => undefined;
+
+const revision: GameRevisionViewModel = {
+  revisionLabel: "Revision 274",
+  snapshotLabel: "LostCity fixture runtime",
+  snapshotId: "lostcity-376072662e78-runtime",
+  sourceLabel: "LostCityRS/Content",
+  sourceCommit: "376072662e78a314bf35bb18815be39521491a6b",
+  sourceCommitShort: "376072662e78",
+  generatedAt: "2026-07-09T00:00:00.000Z"
+};
 
 const defaultActions: EconomySettingsPaneActions = {
   setPriceNotesOpen: noOp,
@@ -132,7 +145,7 @@ function model(mode: EconomySettingsPaneMode): EconomySettingsPaneModel {
   return {
     mode,
     prices: priceData(),
-    settings: createSettingsPaneViewModel({ bronze: true }),
+    settings: createSettingsPaneViewModel({ bronze: true }, revision),
     priceNotices: { issues: [], notes: [], all: [], byLootRowId: {} },
     priceNotesOpen: false,
     marketNotice: null,
@@ -201,6 +214,8 @@ describe("Economy and Settings pane", () => {
       true
     );
     inOrder(markup, [
+      'aria-label="Calculation context"',
+      "Revision 274",
       'aria-label="Price data settings"',
       'aria-label="Active PriceSet summary"',
       'aria-label="Hidden gear tiers"',
@@ -210,6 +225,12 @@ describe("Economy and Settings pane", () => {
     ]);
     expect(markup).not.toContain('aria-label="Manual item price"');
     expect(markup).not.toContain('aria-label="Price history analysis"');
+    expect(markup).toContain("LostCity fixture runtime");
+    expect(markup).toContain("lostcity-376072662e78-runtime");
+    expect(markup).toContain("LostCityRS/Content · 376072662e78");
+    expect(markup).toContain("2026-07-09T00:00:00.000Z");
+    expect(markup).toContain("setup transfers do not include prices");
+    expect(markup).not.toContain(".sources");
   });
 
   it.each(["economy", "settings"] as const)(
@@ -334,6 +355,7 @@ describe("Economy and Settings pane", () => {
       createElement(EconomySettingsPane, { model: settingsModel, actions: defaultActions })
     );
     inOrder(settingsMarkup, [
+      'aria-label="Calculation context"',
       'aria-label="Local state recovery"',
       "Recovery fixture notice",
       'aria-label="Price data settings"',

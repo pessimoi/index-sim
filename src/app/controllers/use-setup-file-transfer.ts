@@ -1,43 +1,38 @@
 import { useState, useSyncExternalStore } from "react";
 import { downloadJsonFile, readBrowserFileText } from "@/adapters/browser";
 import type { GameDataSnapshot } from "@/domain/shared";
-import type { LocalStateHealthItemId } from "../state/local-state-health";
 import type { SavedSetupState } from "../state/ui-state";
 import {
   SetupFileTransferControllerCore,
+  type SetupImportCandidate,
   type SetupFileTransferDependencies,
   type SetupFileTransferSnapshot,
-  type SetupImportOutcome
+  type SetupPrepareOutcome
 } from "./setup-file-transfer";
 
 export interface UseSetupFileTransferInput {
-  persistSetup(setup: SavedSetupState): boolean;
-  unblockReplaced(ids: readonly LocalStateHealthItemId[]): void;
-  refreshLocalStateHealth(): void;
-  dependencies?: Pick<
-    SetupFileTransferDependencies<File>,
-    "readFileText" | "downloadJsonFile" | "now"
-  >;
+  dependencies?: SetupFileTransferDependencies<File>;
 }
 
 export interface SetupFileTransferController extends SetupFileTransferSnapshot {
-  importFile(file: File, gameData: GameDataSnapshot): Promise<SetupImportOutcome>;
-  exportSetup(setup: SavedSetupState): void;
+  prepareImport(file: File, gameData: GameDataSnapshot): Promise<SetupPrepareOutcome>;
+  dismissReview(reviewId: number): boolean;
+  consumeReview(reviewId: number): SetupImportCandidate | null;
+  exportSetup(setup: SavedSetupState, gameData: GameDataSnapshot): void;
 }
 
 export function useSetupFileTransfer(
-  input: UseSetupFileTransferInput
+  input: UseSetupFileTransferInput = {}
 ): SetupFileTransferController {
   const [controller] = useState(
     () =>
-      new SetupFileTransferControllerCore<File>({
-        readFileText: input.dependencies?.readFileText ?? readBrowserFileText,
-        persistSetup: input.persistSetup,
-        unblockReplaced: input.unblockReplaced,
-        refreshLocalStateHealth: input.refreshLocalStateHealth,
-        downloadJsonFile: input.dependencies?.downloadJsonFile ?? downloadJsonFile,
-        now: input.dependencies?.now ?? (() => new Date())
-      })
+      new SetupFileTransferControllerCore<File>(
+        input.dependencies ?? {
+          readFileText: readBrowserFileText,
+          downloadJsonFile,
+          now: () => new Date()
+        }
+      )
   );
   const snapshot = useSyncExternalStore(
     controller.subscribe,
@@ -47,7 +42,9 @@ export function useSetupFileTransfer(
 
   return {
     ...snapshot,
-    importFile: controller.importFile,
+    prepareImport: controller.prepareImport,
+    dismissReview: controller.dismissReview,
+    consumeReview: controller.consumeReview,
     exportSetup: controller.exportSetup
   };
 }

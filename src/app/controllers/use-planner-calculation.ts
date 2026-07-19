@@ -8,7 +8,12 @@ import {
 } from "../calculation-worker-client";
 import type { PlannerCalculationRequest } from "../calculation-task";
 import type { LootSettingsByMonsterState } from "../state/loot-settings";
-import { normalizePlannerUiState, type PlannerUiState } from "../state/planner";
+import {
+  normalizePlannerUiState,
+  reconcilePlannerProgressWithLevels,
+  type PlannerProgressAdjustment,
+  type PlannerUiState
+} from "../state/planner";
 import type { CombatSetupFormState } from "../state/ui-state";
 import {
   createPlannerGearPoolEditorViewModel,
@@ -36,6 +41,10 @@ export interface UsePlannerCalculationInput {
   form: CombatSetupFormState;
   context: SimulationContext | null;
   lootSettingsByMonster: LootSettingsByMonsterState;
+  onDraftReconciled?(
+    state: PlannerUiState,
+    adjustments: readonly PlannerProgressAdjustment[]
+  ): void;
 }
 
 export interface PlannerCalculationController {
@@ -91,19 +100,44 @@ export function usePlannerCalculation(
   input: UsePlannerCalculationInput,
   options: { startTask?: PlannerTaskStarter } = {}
 ): PlannerCalculationController {
-  const [computedState, setComputedState] = useState(() =>
-    normalizePlannerUiState(input.draftState)
+  const [computedState, setComputedState] = useState(
+    () =>
+      reconcilePlannerProgressWithLevels(
+        normalizePlannerUiState(input.draftState),
+        input.form.levels
+      ).state
   );
   const [build, setBuild] = useState<PlannerCalculationBuild | null>(null);
   const startTask = options.startTask ?? startPlannerTask;
-  const draftStateForCompute = useMemo(
-    () => normalizePlannerUiState(input.draftState),
-    [input.draftState]
+  const onDraftReconciled = input.onDraftReconciled;
+  const draftReconciliation = useMemo(
+    () =>
+      reconcilePlannerProgressWithLevels(
+        normalizePlannerUiState(input.draftState),
+        input.form.levels
+      ),
+    [input.draftState, input.form.levels]
+  );
+  const computedStateForLevels = useMemo(
+    () => reconcilePlannerProgressWithLevels(computedState, input.form.levels).state,
+    [computedState, input.form.levels]
   );
   const draftDirty = useMemo(
-    () => plannerDraftIsDirty(draftStateForCompute, computedState),
-    [computedState, draftStateForCompute]
+    () => plannerDraftIsDirty(draftReconciliation.state, computedStateForLevels),
+    [computedStateForLevels, draftReconciliation.state]
   );
+
+  useEffect(() => {
+    if (draftReconciliation.adjustments.length === 0) return;
+    onDraftReconciled?.(draftReconciliation.state, draftReconciliation.adjustments);
+  }, [draftReconciliation, onDraftReconciled]);
+
+  /* eslint-disable react-hooks/set-state-in-effect -- Live-level changes must permanently reconcile the last computed Planner snapshot before a replacement Worker source is created. */
+  useEffect(() => {
+    if (computedStateForLevels !== computedState) setComputedState(computedStateForLevels);
+  }, [computedState, computedStateForLevels]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
   const source = useMemo<PlannerCalculationSource | null>(
     () =>
       input.context
@@ -111,10 +145,10 @@ export function usePlannerCalculation(
             form: input.form,
             context: input.context,
             lootSettingsByMonster: input.lootSettingsByMonster,
-            plannerState: computedState
+            plannerState: computedStateForLevels
           }
         : null,
-    [computedState, input.context, input.form, input.lootSettingsByMonster]
+    [computedStateForLevels, input.context, input.form, input.lootSettingsByMonster]
   );
 
   useEffect(() => {
@@ -141,10 +175,12 @@ export function usePlannerCalculation(
         : null,
     [input.context, input.draftState, input.form]
   );
-  const recompute = useCallback(
-    () => setComputedState(draftStateForCompute),
-    [draftStateForCompute]
-  );
+  const recompute = useCallback(() => {
+    if (draftReconciliation.adjustments.length > 0) {
+      onDraftReconciled?.(draftReconciliation.state, draftReconciliation.adjustments);
+    }
+    setComputedState(draftReconciliation.state);
+  }, [draftReconciliation, onDraftReconciled]);
 
   return {
     panel,
@@ -153,7 +189,7 @@ export function usePlannerCalculation(
     pending,
     draftDirty,
     status: plannerStatusFor({ error, draftDirty, pending, panel }),
-    computedMetric: computedState.metric,
+    computedMetric: computedStateForLevels.metric,
     recompute
   };
 }

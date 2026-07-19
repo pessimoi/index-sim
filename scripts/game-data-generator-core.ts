@@ -7,6 +7,7 @@ import {
   NonNegativeNumberSchema,
   NumericSchema,
   ProbabilitySchema,
+  assertGameDataSourcePinAgreement,
   parseGameDataSnapshot
 } from "../src/data/schemas/game-data";
 import { createPriceSetFromLegacyRecords } from "../src/data/schemas/price-set";
@@ -40,7 +41,7 @@ import { createGeneratedRuntimePriceSet } from "../src/adapters/generated/price-
 import { createLostCityRawSnapshot } from "./lostcity-content-snapshot";
 import { LostCityContentSourceError } from "./lostcity-content-config";
 
-export const GAME_DATA_GENERATOR_VERSION = "raw-lostcity-runtime-catalog-4";
+export const GAME_DATA_GENERATOR_VERSION = "raw-lostcity-runtime-catalog-5";
 export const DEFAULT_GAME_DATA_SOURCE_DIR = ".sources/lostcity-content";
 export const FOUNDATION_SOURCE_MANIFEST_FILE = "generator-foundation.json";
 export const SOURCE_BACKED_SLICE_DIR = "index-sim-source-slice";
@@ -157,6 +158,7 @@ export interface GeneratedGameDataOutputTexts {
 
 export interface CreateGeneratedGameDataOutputOptions extends GameDataGenerationPlanOptions {
   generatedAt?: Date | string;
+  gameRevision?: number;
   command?: string;
   skipCalculationImpact?: boolean;
   impactCaseFilter?: string;
@@ -1765,7 +1767,7 @@ function commandForPlan(
   generatedAt: string,
   options: Pick<
     CreateGeneratedGameDataOutputOptions,
-    "skipCalculationImpact" | "impactCaseFilter" | "impactOutlierLimit"
+    "gameRevision" | "skipCalculationImpact" | "impactCaseFilter" | "impactOutlierLimit"
   > = {}
 ): string {
   const parts = [
@@ -1774,6 +1776,9 @@ function commandForPlan(
     `--output-root ${plan.outputRootLabel}`,
     `--generated-at ${generatedAt}`
   ];
+  if (options.gameRevision !== undefined) {
+    parts.push(`--game-revision ${options.gameRevision}`);
+  }
   if (options.skipCalculationImpact) {
     parts.push("--skip-calculation-impact");
   }
@@ -2998,7 +3003,25 @@ export function createGeneratedGameDataOutputs(
   const plan = createGameDataGenerationPlan(options);
   const generatedAt = isoTimestamp(options.generatedAt);
   const manifest = readManifest(plan.sourceDir);
-  const sourceCommit = manifest.source?.commit ?? readGitCommit(plan.sourceDir);
+  if (
+    options.gameRevision !== undefined &&
+    (!Number.isInteger(options.gameRevision) ||
+      options.gameRevision < 1 ||
+      options.gameRevision > 9_999)
+  ) {
+    throw new GameDataGeneratorError(
+      "invalid_argument",
+      "--game-revision must be an integer from 1 to 9999"
+    );
+  }
+  if (plan.parserStatus === "raw-lostcity" && options.gameRevision === undefined) {
+    throw new GameDataGeneratorError(
+      "invalid_argument",
+      "Raw LostCity generation requires --game-revision"
+    );
+  }
+  const sourceName = manifest.source?.name ?? "LostCityRS/Content";
+  const sourceCommit = (manifest.source?.commit ?? readGitCommit(plan.sourceDir))?.toLowerCase();
   const sourceRevision = manifest.source?.revision ?? sourceCommit ?? "unresolved-revision";
   const provenance = provenanceForPlan(plan, generatedAt, manifest);
   const baseGameData = manifest.snapshot
@@ -3007,7 +3030,7 @@ export function createGeneratedGameDataOutputs(
         provenance
       })
     : createEmptyFoundationSnapshot(provenance);
-  const gameData =
+  const generatedGameData =
     plan.parserStatus === "raw-lostcity"
       ? createRawLostCityGameData({
           sourceDir: plan.sourceDirLabel,
@@ -3023,13 +3046,29 @@ export function createGeneratedGameDataOutputs(
             provenance
           })
         : baseGameData;
+  const gameData =
+    options.gameRevision === undefined
+      ? generatedGameData
+      : parseGameDataSnapshot({
+          ...generatedGameData,
+          revisionContext: {
+            gameRevision: options.gameRevision,
+            sourceName,
+            ...(sourceCommit ? { sourceCommit } : {}),
+            generatedAt
+          }
+        });
 
   const sourcePin: GeneratedGameDataSourcePin = {
     schemaVersion: 1,
     source: {
-      name: manifest.source?.name ?? "LostCityRS/Content",
+      name: sourceName,
       path: plan.sourceDirLabel,
-      ...(manifest.source?.revision ? { revision: manifest.source.revision } : {}),
+      ...(options.gameRevision !== undefined
+        ? { revision: String(options.gameRevision) }
+        : manifest.source?.revision
+          ? { revision: manifest.source.revision }
+          : {}),
       ...(sourceCommit ? { commit: sourceCommit } : {})
     },
     generatedAt,
@@ -3039,6 +3078,7 @@ export function createGeneratedGameDataOutputs(
       command:
         options.command ??
         commandForPlan(plan, generatedAt, {
+          gameRevision: options.gameRevision,
           skipCalculationImpact: options.skipCalculationImpact,
           impactCaseFilter: options.impactCaseFilter,
           impactOutlierLimit: options.impactOutlierLimit
@@ -3087,6 +3127,17 @@ export function createGeneratedGameDataOutputs(
       ]
     }
   };
+
+  if (gameData.revisionContext) {
+    try {
+      assertGameDataSourcePinAgreement(gameData, sourcePin);
+    } catch {
+      throw new GameDataGeneratorError(
+        "output_validation_failed",
+        "Generated game-data revision context does not match source-pin.json."
+      );
+    }
+  }
 
   const gameDataText = stableJson(GameDataSnapshotSchema.parse(gameData));
   const sourcePinText = stableJson(sourcePin);

@@ -2,27 +2,31 @@
 
 ## Current state
 
-The latest complete production-preview Chromium gate passed 78/78 on
-2026-07-15 after the local startup reliability implementation. The current
-2026-07-17 `npm run verify` reaches 79 passing test files and 798 passing tests
-out of 80/799; only the independently stale legacy Planner parity baseline
-fails, with no D-100–D-102 Cannon, price-warning or PriceSet-import failure.
-Typecheck, the 125-source-module/110-client-reachable-module/eight-external-
-entrypoint zero-cycle architecture check, 19 explicit goldens, build/artifact
-budgets, lint, formatting and diff checks pass when run separately. The current
-10-file artifact entry is 736,565 raw / 213,862 gzip bytes and remains inside
-the D-098-rebased D-094 budgets; total bytes are 2,095,263 and SHA-256 is
-`1b6f6b11a9eb06ee663bf5bc0e3a894fb991648fbf79045fa22b88ab495722f2`.
-Earlier functional counts are superseded snapshots recorded in the linked
-evidence log. The latest read-only Darwin visual comparison passed 20/20 after
-the repository-wide dead-selector cleanup against the same 31 reviewed
-fixture-only snapshots. The dedicated visual suite's first sandboxed preview
-start returned `listen EPERM` on port 5174; the approved localhost-only
-read-only rerun passed without a baseline or configuration write. Baseline
-writes remain explicit and require image-diff and privacy review. The
-verification gate skipped dependency audit under its network-disabled policy;
-the separate current `npm audit --json` run covered 353 dependencies and
-reported zero known vulnerabilities.
+The current 2026-07-19 release-readiness integration gate passes `npm run
+verify`: 85 Vitest files / 852 tests, 19 explicit goldens, typecheck, the
+132-source-module/117-client-reachable-module/eight-external-entrypoint
+zero-cycle architecture check, build/artifact budgets, lint, formatting and
+diff checks are green. The 10-file/two-asset artifact has three JavaScript
+chunks, totals 2,124,449 bytes and has SHA-256
+`75e9a1f3c6933b0f699485142050ea8c7b9f3df99499ca0c2b7520d510337e54`;
+its direct entry is 760,289 raw / 221,237 gzip bytes and remains inside the
+D-098-rebased D-094 budgets. The complete production-preview Chromium gate
+passes 86/86 with one worker.
+
+The same source state's Darwin visual gate now passes 20/20 against 31 reviewed
+fixture-only snapshots. Before acceptance, the old set produced two tolerance
+passes and 29 significant snapshot mismatches; a complete ignored candidate
+and diff review attributed them to the integrated revision/context, numeric-
+field, Planner, Duel, price-fixture and ownership changes plus the 30 px desktop
+pane-width change, with no unexplained clipping, overlap, wrong pane, private
+data or raw diagnostic. After explicit human acceptance, the documented update
+command changed exactly those 29 PNGs, left Dense Compare tablet and Cannon
+desktop plus the comparator configuration untouched, and passed all 20
+scenarios. Two subsequent independent tracked-baseline read-only runs pass
+20/20 in 40.4 and 43.6 seconds. The first sandboxed preview start had returned
+`listen EPERM` on port 5174; approved localhost-only runs produced all visual
+evidence. The verification gate skipped dependency audit under its network-
+disabled policy; the dated separate audit evidence remains in the linked log.
 
 Detailed dated implementation, release and superseded failure snapshots live in [the testing evidence log](../project/testing-evidence.md); they are evidence, not current command truth.
 
@@ -84,7 +88,7 @@ Use [rewrite-parity-report.md](rewrite-parity-report.md) to interpret which user
 
 Accepted parity policy: legacy results are regression evidence, not the final truth source. Keep golden tests to catch accidental changes, but allow documented intentional deltas when the current accepted LostCityRS/Content revision or another accepted source shows the legacy app should be replaced.
 
-Game revision bumps are development changes, not scheduled data refreshes. The current generator exposes `npm run data:generate` for repository-local source/output-path validation, raw LostCity config/RuneScript parsing, schema-valid output writing and a committed revision-impact report. It writes one current source-backed snapshot at `src/data/generated/game-data.json`; git history and PR diffs provide the review baseline. D-059 makes that committed Revision 274 snapshot the root runtime through `src/adapters/generated`, with scheduled static prices first and generated item fallbacks second. The legacy-derived snapshots remain regression/reference inputs and are not the root bootstrap. Runtime readiness blocks missing expected identities, required simulator fields, monster combat/loot rows and PriceSet coverage; accepted source value changes belong to revision-impact evidence. The current snapshot is ready with zero blockers, the representative suite passes 11/11 cases under D-055/D-057/D-071/D-072, and the 189-evaluation informational scan records 22 advisory outliers. Snapshot validation rejects raw upstream dump shapes, historical snapshot archives and unused source-only content. The raw parser emits NPC size for 63/63 monsters, numeric Attack/Strength/Defence/Ranged/Magic requirements for 94 runtime items and 25 typed conditional loot rows. Planner/setup/quick-action consumers use generated requirements first and D-051 fallback only for legacy/missing rows. Conditional quest/clue rows stay visible but contribute no value, inventory, alch or prayer effect until a separately accepted exact player-state contract can activate them. Do not hand-edit generated source truth, infer quest completion state, activate conditional loot, remove the requirement fallback or refresh accepted calculation baselines without the corresponding evidence and decision.
+Game revision bumps are development changes, not scheduled data refreshes. The current generator exposes `npm run data:generate` for repository-local source/output-path validation, raw LostCity config/RuneScript parsing, schema-valid output writing and a committed revision-impact report. Raw production generation requires explicit bounded `--game-revision`; the current reviewed value is `274`. It writes one matching revision/source/commit/generated-at context to `src/data/generated/game-data.json` and `source-pin.json`, validates their agreement and records the input in the impact report command. Git history and PR diffs provide the review baseline. D-059 makes that committed Revision 274 snapshot the root runtime through `src/adapters/generated`, with scheduled static prices first and generated item fallbacks second. The legacy-derived snapshots remain regression/reference inputs and may omit context; they are not the root bootstrap. Runtime readiness blocks missing/invalid revision context, missing expected identities, required simulator fields, monster combat/loot rows and PriceSet coverage; the report script also blocks committed snapshot/source-pin disagreement. Accepted source value changes belong to revision-impact evidence. The current snapshot is ready with zero blockers, the representative suite passes 11/11 cases under D-055/D-057/D-071/D-072, and the refreshed 189-evaluation informational scan finds 38 advisory outliers with the configured first 25 shown. Snapshot validation rejects raw upstream dump shapes, historical snapshot archives and unused source-only content. The raw parser emits NPC size for 63/63 monsters, numeric Attack/Strength/Defence/Ranged/Magic requirements for 94 runtime items and 25 typed conditional loot rows. Planner/setup/quick-action consumers use generated requirements first and D-051 fallback only for legacy/missing rows. Conditional quest/clue rows stay visible but contribute no value, inventory, alch or prayer effect until a separately accepted exact player-state contract can activate them. Do not hand-edit generated source truth, infer quest completion state, activate conditional loot, remove the requirement fallback or refresh accepted calculation baselines without the corresponding evidence and decision.
 
 ## Rewrite scaffold commands
 
@@ -178,6 +182,9 @@ node -e "for (const f of ['prices.json','price-provenance.json','alch.json','pri
 - Documentation-only: `git diff --check`.
 - Architecture/module boundaries: `npm run typecheck`, `npm run architecture:check`, focused tests for moved imports, `npm run build` and `git diff --check`.
 - UI-only: `npm run typecheck`, focused UI/view-model tests, browser smoke when visible behavior changes and `git diff --check`.
+- Local-state attention surface: include `src/tests/local-state-attention.test.tsx`, `src/tests/local-state-recovery-controller.test.ts` and `src/tests/local-state-health.test.ts`, plus focused persistence/migration Playwright coverage. Prove healthy absence, structured stored-data/persistence/mixed copy, bounded labels, metadata privacy, Settings heading focus, clear resolution, runtime save failure and unsupported-envelope preservation.
+- Setup replacement review and Undo: include `src/tests/setup-file-transfer-controller.test.ts`, `src/tests/setup-import-review.test.tsx`, share/setup-state coverage and focused import plus saved-setup Playwright transactions. Prove preparation has no mutation authority, latest request wins, review output is resolved and bounded, Dismiss/stale consume are no-ops, Apply covers all six setup families, durable/session-only Undo restores the complete prior setup and saved-row Load preserves the saved collection and current target.
+- Shared numeric inputs: include `src/tests/numeric-field-core.test.ts`, `src/tests/numeric-field-components.test.tsx` and the focused `numeric input` Playwright workflow. Prove literal required/decimal drafts, no integer truncation or decimal rounding, inclusive bounds and step checks, optional commit/Reset semantics, Enter/Escape/invalid blur, accessible feedback, external focused-draft cancellation and narrow viewport containment. Run `npm run numeric:audit` and `npm run test:golden` because every main workflow consumes the shared fields.
 - Startup shell, entrypoint, Vite middleware or local-start orchestration: `npm run typecheck`, `npm run architecture:check`, `npm run test -- src/tests/startup-guard.test.ts src/tests/vite-config.test.ts src/tests/deployment-readiness.test.ts`, `npm run test:startup:dev`, `npm run build`, `npm run startup:measure -- --runs 5`, `npm run test:e2e -- --workers=1` and `git diff --check`.
 - Combat math: `npm run test` and `npm run test:golden`.
 - Combat/equipment domain changes: `npm run test`, including `src/tests/domain-core.test.ts`, and `npm run test:golden`. Run `src/tests/trip-loot-supply.test.ts` and `src/tests/xp-parity.test.ts` too when timing, DPS, prayer, recoil or incoming-damage outputs can affect trip or XP results.
@@ -186,8 +193,12 @@ node -e "for (const f of ['prices.json','price-provenance.json','alch.json','pri
 - Trip/loot/supply domain changes: `npm run test -- src/tests/trip-loot-supply.test.ts`, `npm run test`, and `npm run test:golden` when current-behavior parity can change. Include `src/tests/xp-parity.test.ts` when `effectiveKph`, recoil, poison or cannon behavior can affect XP/hr.
 - Risk/variability changes: `npm run test -- src/tests/risk-analysis.test.ts src/tests/calculation-task.test.ts src/tests/*-view-model.test.ts`, `npm run typecheck`, representative performance coverage and the focused `Risk` Playwright workflow. Run the full unit, golden, build and browser gates before delivery; stochastic tests use fixed seeds and analytic/property tolerances.
 - Data or prices: JSON parse, `npm run test -- src/tests/data-economy.test.ts`, and representative simulation fixtures when simulation behavior can change.
-- Generated runtime readiness: `npm run test -- src/tests/generated-runtime-adapter.test.ts`, `npm run runtime:readiness -- --example-limit 5`, `npm run runtime:coverage-plan -- --example-limit 5`, `npm run test -- src/tests/data-generator.test.ts src/tests/data-economy.test.ts src/tests/trip-loot-supply.test.ts`, `npm run test:golden`, `npm run typecheck` and `git diff --check`. The default readiness command is blocking and must stay green for the active snapshot. Use `--allow-not-ready` only for deliberate incomplete local candidates. Rerun full domain/golden/browser evidence for generated snapshot value or bootstrap changes.
+- Generated runtime readiness: `npm run test -- src/tests/generated-runtime-adapter.test.ts`, `npm run runtime:readiness -- --example-limit 5`, `npm run runtime:coverage-plan -- --example-limit 5`, `npm run test -- src/tests/data-generator.test.ts src/tests/data-economy.test.ts src/tests/trip-loot-supply.test.ts`, `npm run test:golden`, `npm run typecheck` and `git diff --check`. Prove explicit generator revision input, no-write failure when it is absent, snapshot/source-pin agreement, generic legacy omission support and root/readiness rejection of missing context. The default readiness command is blocking and must stay green for the active snapshot. Use `--allow-not-ready` only for deliberate incomplete local candidates. Rerun full domain/golden/browser evidence for generated snapshot value or bootstrap changes.
+- Game revision presentation: include `src/tests/settings-view-model.test.ts`, `src/tests/app-shell-components.test.tsx`, `src/tests/economy-settings-pane.test.ts` and the focused `Revision 274 context` production-preview path. Prove exact badge/accessibility text, full wrapping snapshot id, short-plus-full source commit, generated timestamp, active-PriceSet semantics, no source path/command leakage and narrow viewport containment.
+- Contextual setup transfers: include `src/tests/setup-transfer-context.test.ts`, `src/tests/setup-import.test.ts`, `src/tests/setup-file-transfer-controller.test.ts`, `src/tests/setup-import-review.test.tsx`, `src/tests/shareable-setup.test.ts`, `src/tests/ui-adapters.test.ts`, app-shell/Duel presentation suites and focused setup/saved-setup/share Playwright transactions. Prove exact/same-revision/different-revision/id-conflict/unknown comparison, strict bounded context, new setup-v1/saved-setup-v1/share-v2 output, setup-v3/saved-setup-v1/share-v1 reads, no mutation before Apply/Merge/Load, Dismiss and Undo behavior, current-recipient PriceSet/runtime ownership, active entity rejection for every class and exclusion of prices/player/computed/raw provenance. Browser persistence versions must remain setup v3 and Duel v1.
 - Planner: `npm run test -- src/tests/planner-domain.test.ts` for gear eligibility, scoring, stance selection and golden plan fixtures. Run full `npm run test` if planner changes interact with combat, trip, data or economy contracts.
+- Planner XP/target integrity: include `src/tests/planner-ui-state.test.ts`, `src/tests/planner-ui-adapter.test.ts`, `src/tests/planner-controller.test.ts` and `src/tests/planner-pane.test.ts`. Prove XP bounds at levels 1/98/99, Auto and explicit boundary semantics, deterministic reconciliation/no-op identity, locked-target preservation, effective adapter/row equality, last-computed reconciliation and stale-result rejection. Production-preview coverage must include manual and Hiscores level changes plus saved/imported/shared setup Load/Undo paths without weakening explicit Recompute.
+- Duel matrix lifecycle: include `src/tests/compare-duel-controllers.test.ts`, `src/tests/compare-duel-panes.test.ts` and `src/tests/calculation-task.test.ts`, plus the focused `Duel matrix failures` production-preview path. Prove exact idle/building/ready/stale/failed precedence over all six source references, duplicate-build blocking, previous-output retention and labelling, fixed failure privacy, Retry, obsolete-task cancellation, late-settlement rejection, zero-snapshot reset and unchanged filter/metric/sort behavior. Run goldens because the retained table still carries calculated combat, XP and economy output even though this contract changes no formula.
 - UI/view-model changes: `npm run test -- src/tests/*-view-model.test.ts`, `npm run test`, `npm run build` and `npm run test:e2e` when browser behavior changes.
 - Performance-sensitive UI/view-model changes: include `src/tests/ui-performance.test.ts` and browser smoke where possible; compare the level-input path and representative compare/planner workloads against the accepted performance budget.
 - Market/import logic: unit tests with mocked price sources and malformed data; include `src/tests/ui-adapters.test.ts` for rewrite price imports and `src/tests/market-ui-state.test.ts` for selected active `PriceSet` persistence, restore and failure behavior.

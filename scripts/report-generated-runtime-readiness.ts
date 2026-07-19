@@ -14,7 +14,10 @@ import {
   type LegacySnapshotInput
 } from "../src/data/legacy-adapter";
 import { parseJsonWithDuplicateKeyCheck } from "../src/data/reliability";
-import { parseGameDataSnapshot } from "../src/data/schemas/game-data";
+import {
+  assertGameDataSourcePinAgreement,
+  parseGameDataSnapshot
+} from "../src/data/schemas/game-data";
 import {
   ScheduledPriceProvenanceArtifactSchema,
   createPriceSetFromLegacyRecords,
@@ -191,6 +194,13 @@ function loadGeneratedCandidateContext(candidate: CliOptions["candidate"]): Simu
   }
 
   const gameData = parseGameDataSnapshot(readRepoJson("src/data/generated/game-data.json"));
+  try {
+    assertGameDataSourcePinAgreement(gameData, readRepoJson("src/data/generated/source-pin.json"));
+  } catch {
+    throw new Error(
+      "Generated snapshot revision context is missing or does not match source-pin.json."
+    );
+  }
   const priceProvenance = ScheduledPriceProvenanceArtifactSchema.parse(
     readRepoJson("price-provenance.json")
   );

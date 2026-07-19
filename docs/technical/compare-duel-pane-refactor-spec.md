@@ -2,6 +2,13 @@
 
 Status: implemented on 2026-07-13 as D-093 composition-root Phase 3C.
 
+Current extension: the later
+[game revision and setup-transfer context contract](game-revision-transfer-context-spec.md)
+keeps the browser snapshot state/version unchanged but gives external files a
+dedicated contextual version-1 envelope, legacy version-1 parsing and explicit
+review-before-Merge. The ownership-refactor baseline below remains historical
+evidence rather than the current external-file contract.
+
 ## Purpose
 
 Extract the Compare and Duel presentation families from `src/app/App.tsx`, move

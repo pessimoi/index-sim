@@ -7,6 +7,7 @@ import {
 import {
   SETUP_IMPORT_MAX_BYTES,
   SetupImportError,
+  createRewriteSetupTransferEnvelope,
   parseSavedSetupExportText
 } from "../app/state/setup-import";
 
@@ -36,7 +37,35 @@ describe("rewrite setup import boundary", () => {
     const parsed = parseSavedSetupExportText(setupExportText(), context.gameData);
 
     expect(parsed.version).toBe(REWRITE_SETUP_VERSION);
+    expect(parsed.format).toBe("legacy-storage-v3");
+    expect(parsed.context).toBeNull();
     expect(parsed.data.form.monsterId).toBe("giant");
+  });
+
+  it("round trips the dedicated contextual envelope without prices or provenance", () => {
+    const { context } = createGeneratedRuntimeContext();
+    const envelope = createRewriteSetupTransferEnvelope(
+      savedSetupFromForm(DEFAULT_FORM_STATE),
+      context.gameData,
+      new Date("2026-07-19T08:00:00.000Z")
+    );
+    const parsed = parseSavedSetupExportText(JSON.stringify(envelope), context.gameData);
+
+    expect(parsed).toMatchObject({
+      format: "contextual-v1",
+      version: 1,
+      exportedAt: "2026-07-19T08:00:00.000Z",
+      context: { gameDataId: context.gameData.id, gameRevision: 274 }
+    });
+    expect(JSON.stringify(envelope)).not.toMatch(
+      /priceSet|priceHistory|playerName|sourceCommit|generatedAt|provenance/i
+    );
+
+    const sameRevision = structuredClone(envelope);
+    sameRevision.context.gameDataId = "another-revision-274-snapshot";
+    expect(
+      parseSavedSetupExportText(JSON.stringify(sameRevision), context.gameData).context
+    ).toEqual({ gameDataId: "another-revision-274-snapshot", gameRevision: 274 });
   });
 
   it("rejects duplicate keys, malformed JSON, unsupported versions and oversized input", () => {
@@ -54,6 +83,10 @@ describe("rewrite setup import boundary", () => {
       "unsupported_version"
     );
     expectSetupImportError(setupExportText(), "body_too_large", 1);
+    expectSetupImportError(
+      JSON.stringify({ kind: "another-app", version: 1, exportedAt: "now", data: {} }),
+      "unsupported_version"
+    );
     expect(SETUP_IMPORT_MAX_BYTES).toBeGreaterThan(0);
   });
 

@@ -241,6 +241,47 @@ including detail snapshots owned by those scenarios. All other baselines must
 remain byte-identical. The targeted write changed only those nine owned PNGs;
 the following full read-only comparison passed 20/20 scenarios.
 
+## 2026-07-19 release-readiness candidate review
+
+The integrated release-readiness worktree has 31 committed Darwin snapshots.
+The normal read-only comparison reaches all 20 semantic scenarios: Dense
+Compare tablet and Cannon desktop pass, while the other 18 stop at their first
+snapshot mismatch. To expose the later captures without changing tracked
+baselines, G8 used a temporary ignored config whose only material overrides are
+the snapshot and output directories. It generated all 31 candidates under
+`.codex-tmp/`; the normal Playwright PNG comparator classifies 29 as mismatches
+and preserves the same two tolerance passes. Two independent read-only runs
+against the ignored candidate pass 20/20 in 42.6 and 49.2 seconds.
+
+Every candidate and generated diff was agent-reviewed. The user explicitly
+accepted the exact 29-snapshot candidate set after that review; the acceptance
+does not extend to unrelated visual, configuration or tolerance changes.
+
+| Surface          | Mismatching snapshots                                                                                                                                                                                            | Reviewed explanation and result                                                                                                                                                                                                                 |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Root and Compare | `root-shell-desktop`, `root-shell-compact-landscape`, `root-shell-mobile`, `dense-compare-desktop`                                                                                                               | Current header actions and Revision 274 badge, result/price ownership and fixture values are visible. The desktop center pane is 889 px rather than 859 px; mobile remains contained and compact landscape retains its three scroll owners.     |
+| Loadouts         | `loadout-melee-desktop`, `loadout-melee-details-desktop`, `loadout-ranged-desktop`, `loadout-ranged-details-desktop`, `loadout-magic-desktop`, `loadout-magic-details-desktop`, `stats-hit-distribution-desktop` | G3 shared numeric fields replace native number/spinner presentation, and the 30 px desktop width change reflows selectors and summaries. Top, detail, special-attack and hit-distribution coverage remains present without clipping or overlap. |
+| Stats and Trip   | `stats-desktop`, `stats-combat-roll-desktop`, `trip-desktop`, `trip-mobile`                                                                                                                                      | Current price-warning/assumption ownership, fixture result values and G3 input presentation explain the changes. Combat-roll, XP routing, banking, recommendation and complete mobile summary remain visible and contained.                     |
+| Loot             | `loot-desktop`, `loot-mobile`, `loot-action-impact-desktop`, `loot-nested-desktop`, `loot-nested-mobile`                                                                                                         | Current price-warning ownership and scheduled fixture values change composition, action-impact and nested-row dimensions. Tables remain readable; intended mobile horizontal overflow is retained and no row is accidentally hidden.            |
+| Economy          | `economy-desktop`, `economy-trend-desktop`                                                                                                                                                                       | The current scheduled/local price-history fixture changes snapshot counts, movers and chart points; the desktop width also changes. The selected Big bones trend, provenance copy and chart remain complete.                                    |
+| Planner          | `planner-desktop`, `planner-mobile`                                                                                                                                                                              | G4 exposes effective current XP, level-floor actions, target/lock explanations and reconciled rows. Desktop gear coverage and the full mobile plan/chart/timeline remain complete with no overflow defect.                                      |
+| Duel             | `duel-desktop`, `duel-mobile`                                                                                                                                                                                    | Current saved-setup count/context and G5 lifecycle ownership explain badge and size changes; the filtered four-row matrix and comparison columns remain legible.                                                                                |
+| Settings         | `settings-desktop`, `settings-price-data-desktop`, `settings-legacy-review-desktop`                                                                                                                              | G6 adds Calculation context and Revision 274, current price transfer ownership removes obsolete global actions, and recovery content shifts below them. Price data and the bounded fixture-only legacy review remain fully captured.            |
+
+The two within-tolerance snapshots are `dense-compare-tablet` and
+`cannon-desktop`; neither requires a tracked update. Review found no real
+player name, imported user file, browser profile data, secret, token, absolute
+path or raw parser diagnostic in any candidate. All content is deterministic
+repository fixture state. The retained candidate and diff directories are
+workspace-local ignored evidence, not version-controlled product artifacts.
+
+The documented `npm run test:e2e:visual:update` path then changed exactly those
+29 tracked PNGs. `dense-compare-tablet`, `cannon-desktop` and
+`playwright.visual.config.ts` remained unchanged. The update run completed
+20/20 scenarios, and two subsequent independent tracked-baseline read-only runs
+passed 20/20 in 40.4 and 43.6 seconds. The current 31-snapshot Darwin set is the
+accepted fixture-only baseline for this integrated source state.
+
 ## Diff policy
 
 Use Playwright `toHaveScreenshot` with:

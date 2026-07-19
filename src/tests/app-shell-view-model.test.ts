@@ -5,7 +5,12 @@ import {
   normalizeFormState
 } from "../app/state/ui-state";
 import { DEFAULT_MONSTER_LOOT_SETTINGS } from "../app/state/loot-settings";
-import { ShareableSetupError, buildShareableSetupEnvelope } from "../app/state/shareable-setup";
+import {
+  ShareableSetupError,
+  buildShareableSetupEnvelope,
+  reviewShareableSetup
+} from "../app/state/shareable-setup";
+import { createGeneratedRuntimeContext } from "../adapters/generated";
 import {
   WORKBENCH_TABS,
   createAppShellSetupViewModel,
@@ -107,17 +112,19 @@ describe("app shell view model", () => {
   });
 
   it("presents ready, warning and invalid shared setup reviews", () => {
+    const { context } = createGeneratedRuntimeContext();
     const envelope = buildShareableSetupEnvelope({
-      gameDataId: "revision-274",
+      gameData: context.gameData,
       form: DEFAULT_FORM_STATE,
       cannon: { ...DEFAULT_CANNON_SETTINGS, enabled: true },
       lootPreferences: { coins: "loot", bones: "bury" },
       lootSettings: DEFAULT_MONSTER_LOOT_SETTINGS
     });
+    envelope.context.gameDataId = "another-revision-274-snapshot";
     const warning = createSharedSetupReviewViewModel({
       inspection: {
         status: "ready",
-        review: { envelope, gameDataMismatch: true, droppedLootRowCount: 2 }
+        review: { ...reviewShareableSetup(envelope, context.gameData), droppedLootRowCount: 2 }
       },
       monsters: { [envelope.data.form.monsterId]: { name: "Fixture monster" } }
     });
@@ -131,10 +138,10 @@ describe("app shell view model", () => {
       tone: "warning",
       targetLine: `Fixture monster · ${envelope.data.form.combatStyle}`,
       cannonLabel: "Cannon on",
-      lootChoiceLabel: "2 loot choices"
+      lootChoiceLabel: "0 loot choices"
     });
     if (warning.status === "ready") {
-      expect(warning.gameDataWarning).toContain("Different game-data version");
+      expect(warning.contextMessage).toContain("another Revision 274 snapshot");
       expect(warning.droppedLootWarning).toBe("2 stale loot choices will be skipped.");
     }
     expect(invalid).toEqual({

@@ -5,7 +5,13 @@ import {
   type KeyValueStorage,
   type PersistedEnvelope
 } from "@/adapters/storage";
-import type { PlannerGearSlot, PlannerMetric, PlannerPool, PlannerSkill } from "@/domain/planner";
+import {
+  plannerXpBounds,
+  type PlannerGearSlot,
+  type PlannerMetric,
+  type PlannerPool,
+  type PlannerSkill
+} from "@/domain/planner";
 import type { CombatSetupFormState } from "./ui-state";
 
 export const PLANNER_UI_STORAGE_KEY = "index-sim:planner-ui";
@@ -165,6 +171,77 @@ export function createDefaultPlannerUiState(
 
 export function normalizePlannerUiState(value: unknown): PlannerUiState {
   return PlannerUiStateSchema.parse(value);
+}
+
+export interface PlannerProgressAdjustment {
+  skill: PlannerSkill;
+  field: "currentXp" | "targetLevel";
+  previous: number;
+  next: number;
+  reason: "xp-outside-current-level" | "target-below-current-level";
+}
+
+export interface PlannerProgressReconciliation {
+  state: PlannerUiState;
+  adjustments: readonly PlannerProgressAdjustment[];
+}
+
+export function effectivePlannerStartXp(level: number, storedXp: number): number {
+  const bounds = plannerXpBounds(level);
+  return storedXp > 0 && storedXp >= bounds.min && storedXp <= bounds.max ? storedXp : bounds.min;
+}
+
+export function effectivePlannerTarget(
+  level: number,
+  storedTarget: number,
+  locked: boolean
+): number {
+  const currentLevel = plannerXpBounds(level).level;
+  return locked ? currentLevel : Math.max(currentLevel, Math.min(99, storedTarget));
+}
+
+export function reconcilePlannerProgressWithLevels(
+  state: PlannerUiState,
+  levels: Readonly<Record<PlannerSkill, number>>
+): PlannerProgressReconciliation {
+  let currentXp = state.currentXp;
+  let targetLevels = state.targetLevels;
+  const adjustments: PlannerProgressAdjustment[] = [];
+
+  for (const skill of PLANNER_SKILLS) {
+    const bounds = plannerXpBounds(levels[skill]);
+    const storedXp = state.currentXp[skill];
+    if (storedXp !== 0 && (storedXp < bounds.min || storedXp > bounds.max)) {
+      if (currentXp === state.currentXp) currentXp = { ...state.currentXp };
+      currentXp[skill] = 0;
+      adjustments.push({
+        skill,
+        field: "currentXp",
+        previous: storedXp,
+        next: 0,
+        reason: "xp-outside-current-level"
+      });
+    }
+
+    const storedTarget = state.targetLevels[skill];
+    if (!state.skillLocks[skill] && storedTarget < bounds.level) {
+      if (targetLevels === state.targetLevels) targetLevels = { ...state.targetLevels };
+      targetLevels[skill] = bounds.level;
+      adjustments.push({
+        skill,
+        field: "targetLevel",
+        previous: storedTarget,
+        next: bounds.level,
+        reason: "target-below-current-level"
+      });
+    }
+  }
+
+  if (adjustments.length === 0) return { state, adjustments };
+  return {
+    state: normalizePlannerUiState({ ...state, currentXp, targetLevels }),
+    adjustments
+  };
 }
 
 export function cleanPlannerUiStateForPool(

@@ -2,6 +2,15 @@
 
 Status: implemented as composition-root Goal 8, 2026-07-13.
 
+Current extension: the implemented
+[game revision and setup-transfer context contract](game-revision-transfer-context-spec.md)
+supersedes only this document's external-file-version details. New exports use
+contextual kind/version 1, strict storage-shaped version 3 files remain legacy
+inputs, and browser persistence stays version 3. The later
+[Review/Undo contract](setup-replacement-review-undo-spec.md) keeps persistence
+and complete Apply/Undo authority in `App`; the original extraction evidence
+below remains historical refactor context.
+
 ## Purpose
 
 The rewrite setup schema, compatibility validation, versioned persistence and

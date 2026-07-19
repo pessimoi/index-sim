@@ -73,6 +73,93 @@ the three compact reset actions use a narrow labelled icon.
 | Hiscores                     | `Valmis`       | Hiscores is required for v1 replacement. Rewrite UI has player input, same-origin status/lookup calls, validated browser adapter, preview and Apply flow for Attack, Strength, Defence, Hitpoints, Prayer, Ranged and Magic, with service-aware disabled copy instead of `run_sim.py` instructions. Preview and Apply are scoped to the normalized current Player input: changing to a different player clears the preview, late lookup responses for an old input are ignored, Apply rechecks freshness before mutating levels and the preview names the returned player, source and fetchedAt metadata from the validated response. Disabled and unavailable service states keep the player input visible, disable Lookup and direct users to the Player level fields as the working manual fallback without clearing manual levels. Compatible legacy `sim_hiscore_player` can be imported into the rewrite-owned last-player key. The repo-owned Vite dev/preview API boundary now injects a strict first-party 2004Scape JSON provider under D-061, with fixed-origin, redirect, timeout, response-size, schema and sanitized-error guards. D-065 fixes the player-query logging and retention policy, and D-066 implements the root-path Cloudflare Worker runtime with observability and Logpush disabled; D-067 accepts the repository implementation as complete; a future adopter must verify its own deployed routing, privacy and live lookup before claiming that instance is publicly live.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | Legacy saved setup migration | `Valmis`       | The Legacy Migration V1 boundary is implemented in the rewrite UI. It detects known legacy browser storage keys, shows Import/Keep/Clear choices, displays a metadata-only outcome summary for importable/skipped/review-only areas and displays a per-key review table for every known legacy key with `migrate`, `review-only`, `intentional-reset` or `legacy-only` handling. Import keeps legacy data and stores only rewrite-owned dismissed/imported state; Keep dismisses without deletion; Clear removes only known legacy keys after explicit confirmation with the exact clear list shown. The import flow validates and imports compatible `sim_input_v3` active setup fields, nested `sim_input_v3.monsterSetups` into rewrite-owned monster-specific custom setup state, nested `sim_input_v3.cannonByMonster` into rewrite-owned per-monster cannon state, compatible nested `sim_input_v3.duelSetups` rows into rewrite-owned Duel snapshot state, `sim_hiscore_player`, current legacy price/alch maps as an explicit `PriceSet`, `sim_hidden_tiers_v1`, `sim_compare_sort_v1`/`sim_irrelevant_v1` and compatible `sim_loot_prefs_v1` drop-name preferences that resolve to unambiguous current monster row ids. Existing rewrite custom setup, cannon and Duel snapshot entries win over conflicting legacy rows. Invalid, oversized, unsafe map keys, unknown monster/item/gear ids and ambiguous names are skipped with visible sanitized reasons. D-048 keeps `sim_planner_v1` as intentional review-only/not-migrated V1 state, and D-049 keeps full legacy price-history payloads review-only/not migrated for V1; both are explicit V1 decisions, not ambiguous found-but-not-imported errors.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 
+### 2026-07-18 local-state attention completion note
+
+Existing browser-local setup, Planner, Loot, Duel, price and Hiscores workflows
+remain `Valmis`. One non-dismissible ready-shell notice now distinguishes saved
+data that could not load from changes that may not persist, exposes only the
+allowlisted health-report count and at most three labels, and moves Review focus
+to the detailed Settings recovery heading. Clear, replacement, blocking,
+current-session fallback and D-016/D-030 no-silent-migration behavior remain
+owned by the existing recovery controller.
+
+### 2026-07-18 setup replacement completion note
+
+Basic setup import/export and setup comparison remain `Valmis`. Selecting an
+external rewrite setup now prepares one validated in-memory candidate and
+shows resolved metadata before any write or live mutation; Dismiss leaves the
+current and persisted setup untouched. Explicit Apply replaces the active
+form, default form, setup mode, custom setups, Dense preferences and cannon
+settings together, and both imported Apply and saved-row Load now expose the
+existing one-step Undo over a complete prior rewrite setup. Undo persists when
+available and reports a session-only restore when it is not. The setup export,
+rewrite persistence and saved-setup collection schemas remain unchanged.
+
+### 2026-07-18 numeric input completion note
+
+Player, Trip, Cannon, Risk, Loot, Planner, manual-price and manual combat
+override workflows remain `Valmis`. Their shared numeric fields now keep the
+literal edit draft separate from the last accepted calculation value, reject
+malformed, out-of-range and off-step text visibly without clamping or rounding,
+and share Enter/blur, Escape, optional Reset and external-update behavior.
+Only accepted finite values or an explicitly committed optional empty value
+reach application state and persistence. Existing ranges, defaults, schemas,
+domain formulas and calculated outputs are unchanged.
+
+### 2026-07-19 Planner XP and target integrity completion note
+
+Planner remains `Valmis` with its version-1 storage and explicit
+`Recompute plan` boundary. Stored Current XP zero now appears as Auto at the
+canonical live-level floor instead of literal zero; an explicit value is valid
+only inside that level's inclusive XP interval, with level 99 accepting up to
+200,000,000. Manual, setup, share, saved-load, Hiscores and Undo level changes
+reconcile incompatible XP to Auto and raise unlocked lower targets, while a
+locked target remains a visible inactive saved preference. Every skill row
+states the next plan's effective start XP and target, and dirty output states
+that it still uses the last recomputed inputs. The XP curve, Planner search,
+scoring, gear, Trip policy, worker protocol and persistence schema are
+unchanged.
+
+### 2026-07-19 Duel matrix lifecycle completion note
+
+Setup comparison remains `Valmis` and its all-monster calculation stays
+explicitly on demand. The matrix now distinguishes not built, building,
+current, stale and failed states; a fixed visible failure offers Retry without
+exposing Worker details. The latest successful table remains available during
+rebuilds, source changes and failed refreshes only with an explicit previous-
+result label, while strict form, saved-setup, context, cannon and loot-source
+identity decides whether output is current. Obsolete tasks are cancelled,
+late results are ignored and removing the final saved setup clears the matrix
+session. Comparison formulas, filtering, sorting, Worker protocol and all
+persistence schemas are unchanged.
+
+### 2026-07-19 game revision presentation completion note
+
+Source-backed game data remains one accepted `Valmis` runtime rather than a
+revision-selection feature. The raw generator now requires an explicit bounded
+game revision and writes one matching revision/source/commit/generated-at
+context across the generated snapshot, source pin and impact evidence. Root
+bootstrap/readiness requires that context. Every ready shell identifies
+`Revision 274`, and Settings shows the sanitized snapshot/source detail plus
+the rule that active PriceSet pricing stays separate. Historical runtime
+loading, source fetching and revision switching remain excluded. Carrying this
+context through setup, saved-setup and share transfers is completed by the
+following transfer note.
+
+### 2026-07-19 contextual setup transfer completion note
+
+Basic setup import/export, setup comparison and setup sharing remain `Valmis`.
+New rewrite setup and saved-setup files use dedicated external envelopes with
+Revision 274 plus exact snapshot id, while their browser-local version 3 and
+version 1 states remain unchanged. Older supported files remain reviewable as
+context unknown. Saved-setup parsing shows add/update/limit effects before an
+explicit Merge, and setup replacement still uses the complete Apply/Undo
+transaction. New share links are version 2; version 1 links remain readable
+without inferring a revision from a different id. Every context class still
+runs active entity compatibility checks, uses the recipient's current runtime
+and PriceSet and excludes prices, player identity, computed output and raw
+source provenance.
+
 ### 2026-07-12 Loot and manual-price completion note
 
 `Loot/economy summary` and `Market price sync` remain `Valmis`. D-089 groups
@@ -123,9 +210,9 @@ Dragonfire and poison retain their existing separate Trip ownership.
 
 ## Planned extensions
 
-| Feature       | Rewrite status | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| ------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Setup sharing | `Valmis`       | The root rewrite now implements the static version 1 URL-fragment workflow in the [shareable setup permalink specification](../technical/shareable-setup-permalink-spec.md). `Share setup` creates a bounded base64url link from validated active form plus current-monster Cannon and loot choices; the recipient reviews before an explicit Load, may Dismiss, and gets one complete in-memory Undo after loading. Strict size/schema/duplicate-key/entity checks and sanitized errors protect the external fragment. Prices, player name, history, custom/Duel collections, computed output and raw provenance remain excluded, and clipboard failure keeps the URL selectable. No backend, account, database, provider or production domain is required. |
+| Feature       | Rewrite status | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Setup sharing | `Valmis`       | The root rewrite implements the static URL-fragment workflow in the [shareable setup permalink specification](../technical/shareable-setup-permalink-spec.md), extended by the contextual transfer contract. `Share setup` creates a bounded version 2 base64url link from validated Revision 274 context, active form and current-monster Cannon/loot choices; version 1 remains readable with exact-id or unknown-revision normalization. The recipient reviews context before explicit Load, may Dismiss and gets one complete in-memory Undo after loading. Strict size/schema/duplicate-key/entity checks and sanitized errors protect both versions. Prices, player name, history, custom/Duel collections, computed output and raw provenance remain excluded, and clipboard failure keeps the URL selectable. No backend, account, database, provider or production domain is required. |
 
 The implemented repository-local visual regression suite is tracked as
 test/release evidence in

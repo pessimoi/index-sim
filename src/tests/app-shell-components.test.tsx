@@ -28,6 +28,7 @@ describe("app shell components", () => {
   it("keeps skip link, header, Hiscores, setup actions and notices in order", () => {
     const markup = renderToStaticMarkup(
       <AppHeader
+        activeGameRevisionLabel="Revision 274"
         hiscores={{
           statusLabel: "disabled",
           available: false,
@@ -43,7 +44,9 @@ describe("app shell components", () => {
           onPreviewOpenChange: noOp,
           onApply: noOp
         }}
+        setupImportPhase="idle"
         setupImportNotice={{ tone: "success", message: "Setup fixture" }}
+        setupImportInputRef={null}
         shareCreateNotice="Share fixture"
         shareButtonRef={null}
         onImportSetup={asyncNoOp}
@@ -55,6 +58,7 @@ describe("app shell components", () => {
     inOrder(markup, [
       'class="skip-link"',
       'class="topbar"',
+      "Revision 274",
       'aria-label="Hiscores"',
       "Import setup",
       "Export setup",
@@ -63,8 +67,44 @@ describe("app shell components", () => {
       "Share fixture"
     ]);
     expect(markup).toContain('href="#workbench-active-panel"');
+    expect(markup).toContain('aria-label="Active game data: Revision 274"');
     expect(markup.match(/accept="application\/json,.json"/g)).toHaveLength(1);
     expect(markup).not.toContain("Import prices");
+  });
+
+  it("disables only setup file selection while a setup is being reviewed", () => {
+    const markup = renderToStaticMarkup(
+      <AppHeader
+        activeGameRevisionLabel="Revision 274"
+        hiscores={{
+          statusLabel: "disabled",
+          available: false,
+          player: "",
+          response: null,
+          busy: false,
+          previewOpen: false,
+          notice: null,
+          previewRows: [],
+          canApply: false,
+          onPlayerChange: noOp,
+          onLookup: asyncNoOp,
+          onPreviewOpenChange: noOp,
+          onApply: noOp
+        }}
+        setupImportPhase="reading"
+        setupImportNotice={null}
+        setupImportInputRef={null}
+        shareCreateNotice={null}
+        shareButtonRef={null}
+        onImportSetup={asyncNoOp}
+        onExportSetup={noOp}
+        onShareSetup={noOp}
+      />
+    );
+
+    expect(markup).toContain("Reviewing setup file…");
+    expect(markup).toContain('type="file" accept="application/json,.json" disabled=""');
+    expect(markup).not.toContain('<button type="button" disabled=""');
   });
 
   it("keeps shared ready and invalid review branches exact", () => {
@@ -75,7 +115,9 @@ describe("app shell components", () => {
       targetLine: "Goblin · melee",
       cannonLabel: "Cannon on",
       lootChoiceLabel: "2 loot choices",
-      gameDataWarning: "Different game-data version. Available ids were validated before loading.",
+      contextMessage:
+        "Created with another Revision 274 snapshot. Available ids are compatible, but results may differ.",
+      contextTone: "warning",
       droppedLootWarning: "2 stale loot choices will be skipped."
     };
     const readyMarkup = renderToStaticMarkup(

@@ -250,6 +250,53 @@ export function EconomySettingsPane({
       aria-label={economyVisible ? "Economy" : "Live services"}
       hidden={hidden}
     >
+      {settingsVisible && (
+        <section
+          className="service-group calculation-context-panel"
+          aria-label="Calculation context"
+        >
+          <div className="section-title-row">
+            <h2>Calculation context</h2>
+            <span className="status-pill ready">{model.settings.gameRevision.revisionLabel}</span>
+          </div>
+          <dl className="calculation-context-grid">
+            <div>
+              <dt>Game revision</dt>
+              <dd>{model.settings.gameRevision.revisionLabel}</dd>
+            </div>
+            <div>
+              <dt>Snapshot</dt>
+              <dd>{model.settings.gameRevision.snapshotLabel}</dd>
+            </div>
+            <div>
+              <dt>Snapshot id</dt>
+              <dd>
+                <code>{model.settings.gameRevision.snapshotId}</code>
+              </dd>
+            </div>
+            <div>
+              <dt>Source</dt>
+              <dd title={model.settings.gameRevision.sourceCommit ?? undefined}>
+                {model.settings.gameRevision.sourceLabel}
+                {model.settings.gameRevision.sourceCommitShort
+                  ? ` · ${model.settings.gameRevision.sourceCommitShort}`
+                  : ""}
+              </dd>
+            </div>
+            <div>
+              <dt>Generated</dt>
+              <dd>
+                <time dateTime={model.settings.gameRevision.generatedAt}>
+                  {model.settings.gameRevision.generatedAt}
+                </time>
+              </dd>
+            </div>
+          </dl>
+          <p className="inline-status neutral">
+            Uses the active PriceSet shown in Economy; setup transfers do not include prices.
+          </p>
+        </section>
+      )}
       <LocalStateRecoveryPanel
         visible={settingsVisible && model.recovery.visible}
         report={model.recovery.report}

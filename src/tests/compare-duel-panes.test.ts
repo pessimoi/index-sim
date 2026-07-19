@@ -38,6 +38,8 @@ const duelActions: DuelPaneActions = {
   snapshotCurrentSetup: noOp,
   exportDuelSnapshots: noOp,
   importDuelSnapshots: async () => undefined,
+  mergeDuelSnapshotsImport: noOp,
+  dismissDuelSnapshotsImport: noOp,
   commitDuelSnapshotName: () => true,
   loadDuelSnapshot: noOp,
   deleteDuelSnapshot: noOp,
@@ -127,11 +129,27 @@ describe("Compare and Duel panes", () => {
       expandedDuelDiffId: snapshot.id,
       duelMatrixMetric: "effectiveXpPerHour",
       duelMatrixFilter: "",
-      duelMatrix: null,
+      duelMatrixPresentation: {
+        status: "idle",
+        displayModel: null,
+        displayIsCurrent: false,
+        message: "Build the all-monster comparison for the current inputs.",
+        canBuild: true,
+        buildActionLabel: "Build comparison"
+      },
       filteredDuelMatrixRows: [],
       duelMatrixSort: DEFAULT_DUEL_MATRIX_SORT_STATE,
-      duelMatrixBusy: false,
-      duelImportNotice: { tone: "success", message: "Imported saved setups." }
+      duelImportNotice: { tone: "success", message: "Imported saved setups." },
+      duelImportReview: {
+        id: 4,
+        setupCount: 2,
+        addedCount: 1,
+        updatedCount: 1,
+        skippedCount: 0,
+        contextTone: "warning",
+        contextMessage:
+          "This older format does not record a game revision. It will use the current Revision 274 data."
+      }
     };
     const markup = renderToStaticMarkup(
       createElement(DuelPane, { hidden: true, model, actions: duelActions })
@@ -149,6 +167,9 @@ describe("Compare and Duel panes", () => {
       "Export setups",
       'aria-label="Setup comparison view"',
       'aria-label="Saved setup import notice"',
+      'aria-label="Saved setup import review"',
+      "Merge setups",
+      "Dismiss",
       'aria-label="Setup comparison table"',
       'aria-label="Saved ranged setup and impact diff"',
       'aria-label="Calculated impact"'
@@ -157,6 +178,7 @@ describe("Compare and Duel panes", () => {
     expect(markup).toContain('aria-sort="none"');
     expect(markup).toContain("Hide diff");
     expect(markup).toContain("Saved setup compared with live");
+    expect(markup).toContain("This older format does not record a game revision");
     expect(markup).toContain(comparison.snapshotRows[0]!.setupDiff!.sharedContextNote);
   });
 
@@ -212,11 +234,18 @@ describe("Compare and Duel panes", () => {
       expandedDuelDiffId: null,
       duelMatrixMetric: "effectiveXpPerHour",
       duelMatrixFilter: "rock",
-      duelMatrix: matrix,
+      duelMatrixPresentation: {
+        status: "ready",
+        displayModel: matrix,
+        displayIsCurrent: true,
+        message: "",
+        canBuild: true,
+        buildActionLabel: "Refresh comparison"
+      },
       filteredDuelMatrixRows: matrix.rows,
       duelMatrixSort: DEFAULT_DUEL_MATRIX_SORT_STATE,
-      duelMatrixBusy: false,
-      duelImportNotice: null
+      duelImportNotice: null,
+      duelImportReview: null
     };
     const markup = renderToStaticMarkup(
       createElement(DuelPane, { hidden: false, model, actions: duelActions })
@@ -238,12 +267,46 @@ describe("Compare and Duel panes", () => {
     const staleMarkup = renderToStaticMarkup(
       createElement(DuelPane, {
         hidden: false,
-        model: { ...model, duelMatrix: null, filteredDuelMatrixRows: [] },
+        model: {
+          ...model,
+          duelMatrixPresentation: {
+            status: "stale",
+            displayModel: matrix,
+            displayIsCurrent: false,
+            message: "Inputs changed. This table does not include the current inputs.",
+            canBuild: true,
+            buildActionLabel: "Refresh comparison"
+          }
+        },
         actions: duelActions
       })
     );
-    expect(staleMarkup).toContain('aria-label="Setup comparison across monsters status"');
-    expect(staleMarkup).toContain("Comparison inputs changed");
-    expect(staleMarkup).toContain("Build comparison");
+    expect(staleMarkup).toContain(
+      "Inputs changed. This table does not include the current inputs."
+    );
+    expect(staleMarkup).toContain("previous result");
+    expect(staleMarkup).toContain("Refresh comparison");
+    expect(staleMarkup).toContain('aria-label="Previous all-monster setup comparison"');
+
+    const failedMarkup = renderToStaticMarkup(
+      createElement(DuelPane, {
+        hidden: false,
+        model: {
+          ...model,
+          duelMatrixPresentation: {
+            status: "failed",
+            displayModel: matrix,
+            displayIsCurrent: false,
+            message: "Comparison could not be built. Showing the previous result.",
+            canBuild: true,
+            buildActionLabel: "Retry comparison"
+          }
+        },
+        actions: duelActions
+      })
+    );
+    expect(failedMarkup).toContain('role="alert"');
+    expect(failedMarkup).toContain("Comparison could not be built. Showing the previous result.");
+    expect(failedMarkup).toContain("Retry comparison");
   });
 });

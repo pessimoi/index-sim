@@ -1,9 +1,9 @@
 {
   "generatedAt": "2026-07-09T00:00:00.000Z",
   "generator": {
-    "command": "npm run data:generate -- --source-dir .sources/lostcity-content --output-root . --generated-at 2026-07-09T00:00:00.000Z --impact-outlier-limit 25",
+    "command": "npm run data:generate -- --source-dir .sources/lostcity-content --output-root . --generated-at 2026-07-09T00:00:00.000Z --game-revision 274 --impact-outlier-limit 25",
     "name": "index-sim-data-generator",
-    "version": "raw-lostcity-runtime-catalog-4"
+    "version": "raw-lostcity-runtime-catalog-5"
   },
   "outputs": {
     "gameData": "src/data/generated/game-data.json",
@@ -27,6 +27,7 @@
   "source": {
     "commit": "376072662e78a314bf35bb18815be39521491a6b",
     "name": "LostCityRS/Content",
-    "path": ".sources/lostcity-content"
+    "path": ".sources/lostcity-content",
+    "revision": "274"
   }
 }

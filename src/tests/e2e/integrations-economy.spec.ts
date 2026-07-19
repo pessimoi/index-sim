@@ -3,9 +3,42 @@ import {
   MANUAL_PRICE_OVERRIDES_STORAGE_KEY,
   chooseSearchableOption,
   expect,
+  expectPageWidthContained,
   searchableCombobox,
   test
 } from "./scaffold-fixture";
+
+test("shows the accepted Revision 274 context in the ready shell and Settings", async ({
+  page
+}) => {
+  await page.goto("/");
+  const revisionBadge = page.getByLabel("Active game data: Revision 274");
+  await expect(revisionBadge).toBeVisible();
+  await expect(revisionBadge).toHaveText("Revision 274");
+
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Settings" }).click();
+  const calculationContext = page.getByRole("region", { name: "Calculation context" });
+  await expect(calculationContext).toBeVisible();
+  await expect(calculationContext).toContainText("Game revisionRevision 274");
+  await expect(calculationContext).toContainText(
+    "SnapshotLostCity source-backed runtime 376072662e78"
+  );
+  await expect(calculationContext).toContainText("Snapshot idlostcity-376072662e78-runtime");
+  await expect(calculationContext.getByText("LostCityRS/Content · 376072662e78")).toHaveAttribute(
+    "title",
+    "376072662e78a314bf35bb18815be39521491a6b"
+  );
+  await expect(calculationContext).toContainText("Generated2026-07-09T00:00:00.000Z");
+  await expect(calculationContext).toContainText(
+    "Uses the active PriceSet shown in Economy; setup transfers do not include prices."
+  );
+  await expect(calculationContext).not.toContainText(".sources");
+  await expect(calculationContext).not.toContainText("data:generate");
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(revisionBadge).toBeVisible();
+  await expectPageWidthContained(page);
+});
 
 test("looks up hiscores through the same-origin API and applies previewed levels", async ({
   page
@@ -64,6 +97,15 @@ test("looks up hiscores through the same-origin API and applies previewed levels
   });
 
   await page.goto("/");
+  const workbenchTabs = page.getByLabel("Workbench tabs");
+  await workbenchTabs.getByRole("tab", { name: "Planner" }).click();
+  const plannerBeforeLookup = page.getByRole("region", { name: "Planner", exact: true });
+  const attackXpBeforeLookup = plannerBeforeLookup.getByLabel("Attack current XP");
+  const attackFloor = Number(
+    (await attackXpBeforeLookup.getAttribute("placeholder"))?.replace("Auto: ", "")
+  );
+  await attackXpBeforeLookup.fill(String(attackFloor + 10));
+  await workbenchTabs.getByRole("tab", { name: "Melee setup" }).click();
   const hiscores = page.getByRole("region", { name: "Hiscores" });
   await expect(page.getByRole("button", { name: "Lookup" })).toBeEnabled();
   await hiscores.getByLabel("Player", { exact: true }).fill("Fixture Player");
@@ -104,6 +146,14 @@ test("looks up hiscores through the same-origin API and applies previewed levels
   await expect(setup.getByLabel("ATT", { exact: true })).toHaveValue("71");
   await expect(setup.getByLabel("STR", { exact: true })).toHaveValue("74");
   await expect(setup.getByLabel("DEF", { exact: true })).toHaveValue("65");
+
+  await workbenchTabs.getByRole("tab", { name: "Planner" }).click();
+  const reconciledPlanner = page.getByRole("region", { name: "Planner", exact: true });
+  await expect(reconciledPlanner.getByLabel("Attack current XP")).toHaveValue("");
+  await expect(reconciledPlanner.getByLabel("Attack target")).toHaveValue("71");
+  await expect(reconciledPlanner).toContainText("Attack XP uses Auto");
+  await expect(reconciledPlanner).toContainText("Attack target is now 71");
+  await expect(reconciledPlanner).toContainText("the level 71 floor");
 });
 
 test("keeps market UI scheduled-only when the compatibility sync API exists", async ({ page }) => {

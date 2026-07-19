@@ -1,9 +1,43 @@
+import { z } from "zod";
 import type { GameDataSnapshot } from "@/domain/shared";
 import { DataReliabilityError, parseJsonWithDuplicateKeyCheck } from "@/data/reliability";
 import { REWRITE_SETUP_VERSION, SavedSetupEnvelopeSchema, type SavedSetupState } from "./ui-state";
 import { savedSetupCompatibilityIssues } from "./setup-compatibility";
+import {
+  SetupTransferContextV1Schema,
+  createSetupTransferContext,
+  type SetupTransferContextV1
+} from "./setup-transfer-context";
 
 export const SETUP_IMPORT_MAX_BYTES = 250_000;
+export const REWRITE_SETUP_TRANSFER_KIND = "index-sim-rewrite-setup";
+export const REWRITE_SETUP_TRANSFER_VERSION = 1;
+
+export interface RewriteSetupTransferEnvelopeV1 {
+  kind: typeof REWRITE_SETUP_TRANSFER_KIND;
+  version: typeof REWRITE_SETUP_TRANSFER_VERSION;
+  exportedAt: string;
+  context: SetupTransferContextV1;
+  data: SavedSetupState;
+}
+
+export interface ParsedRewriteSetupTransfer {
+  format: "contextual-v1" | "legacy-storage-v3";
+  version: number;
+  exportedAt: string;
+  context: SetupTransferContextV1 | null;
+  data: SavedSetupState;
+}
+
+export const RewriteSetupTransferEnvelopeV1Schema: z.ZodType<RewriteSetupTransferEnvelopeV1> = z
+  .object({
+    kind: z.literal(REWRITE_SETUP_TRANSFER_KIND),
+    version: z.literal(REWRITE_SETUP_TRANSFER_VERSION),
+    exportedAt: z.iso.datetime({ offset: true }).max(64),
+    context: SetupTransferContextV1Schema,
+    data: SavedSetupEnvelopeSchema.shape.data
+  })
+  .strict();
 
 export type SetupImportErrorCode =
   | "body_too_large"
@@ -35,7 +69,7 @@ export function parseSavedSetupExportText(
   text: string,
   gameData: GameDataSnapshot,
   maxBytes = SETUP_IMPORT_MAX_BYTES
-): { version: number; savedAt: string; data: SavedSetupState } {
+): ParsedRewriteSetupTransfer {
   if (byteLength(text) > maxBytes) throw new SetupImportError("body_too_large");
 
   let value: unknown;
@@ -48,16 +82,23 @@ export function parseSavedSetupExportText(
     throw new SetupImportError("invalid_json");
   }
 
+  const record = value !== null && typeof value === "object" ? value : null;
+  const contextual =
+    record !== null && "kind" in record && record.kind === REWRITE_SETUP_TRANSFER_KIND;
+  if (record !== null && "kind" in record && !contextual) {
+    throw new SetupImportError("unsupported_version");
+  }
   if (
-    value !== null &&
-    typeof value === "object" &&
-    "version" in value &&
-    value.version !== REWRITE_SETUP_VERSION
+    record !== null &&
+    "version" in record &&
+    record.version !== (contextual ? REWRITE_SETUP_TRANSFER_VERSION : REWRITE_SETUP_VERSION)
   ) {
     throw new SetupImportError("unsupported_version");
   }
 
-  const parsed = SavedSetupEnvelopeSchema.safeParse(value);
+  const parsed = contextual
+    ? RewriteSetupTransferEnvelopeV1Schema.safeParse(value)
+    : SavedSetupEnvelopeSchema.safeParse(value);
   if (!parsed.success) {
     throw new SetupImportError(
       "invalid_data",
@@ -68,5 +109,36 @@ export function parseSavedSetupExportText(
   if (compatibilityIssues.length) {
     throw new SetupImportError("incompatible_entities", compatibilityIssues.slice(0, 5));
   }
-  return parsed.data;
+  if (contextual) {
+    const envelope = parsed.data as RewriteSetupTransferEnvelopeV1;
+    return {
+      format: "contextual-v1",
+      version: envelope.version,
+      exportedAt: envelope.exportedAt,
+      context: envelope.context,
+      data: envelope.data
+    };
+  }
+  const envelope = parsed.data as z.infer<typeof SavedSetupEnvelopeSchema>;
+  return {
+    format: "legacy-storage-v3",
+    version: envelope.version,
+    exportedAt: envelope.savedAt,
+    context: null,
+    data: envelope.data
+  };
+}
+
+export function createRewriteSetupTransferEnvelope(
+  setup: SavedSetupState,
+  gameData: GameDataSnapshot,
+  now = new Date()
+): RewriteSetupTransferEnvelopeV1 {
+  return RewriteSetupTransferEnvelopeV1Schema.parse({
+    kind: REWRITE_SETUP_TRANSFER_KIND,
+    version: REWRITE_SETUP_TRANSFER_VERSION,
+    exportedAt: now.toISOString(),
+    context: createSetupTransferContext(gameData),
+    data: setup
+  });
 }

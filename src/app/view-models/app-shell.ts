@@ -101,7 +101,8 @@ export type SharedSetupReviewViewModel =
       targetLine: string;
       cannonLabel: "Cannon on" | "Cannon off";
       lootChoiceLabel: string;
-      gameDataWarning: string | null;
+      contextMessage: string;
+      contextTone: "ready" | "warning";
       droppedLootWarning: string | null;
     };
 
@@ -325,14 +326,13 @@ export function createSharedSetupReviewViewModel(input: {
   const droppedLootCount = review.droppedLootRowCount;
   return {
     status: "ready",
-    tone: review.gameDataMismatch || droppedLootCount > 0 ? "warning" : "ready",
+    tone: review.context.tone === "warning" || droppedLootCount > 0 ? "warning" : "ready",
     statusLabel: "Ready to load",
     targetLine: `${input.monsters[data.form.monsterId]?.name ?? data.form.monsterId} · ${data.form.combatStyle}`,
     cannonLabel: data.cannon.enabled ? "Cannon on" : "Cannon off",
     lootChoiceLabel: `${formatNumber(Object.keys(data.lootPreferences).length)} loot choices`,
-    gameDataWarning: review.gameDataMismatch
-      ? "Different game-data version. Available ids were validated before loading."
-      : null,
+    contextMessage: review.context.message,
+    contextTone: review.context.tone,
     droppedLootWarning:
       droppedLootCount > 0
         ? `${formatNumber(droppedLootCount)} stale loot choices will be skipped.`

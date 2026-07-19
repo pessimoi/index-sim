@@ -1,6 +1,7 @@
 import { Fragment } from "react";
 import { InlineImportNotice } from "../app-presenters";
 import type { InlineNoticeViewModel } from "../../view-models/contracts";
+import type { DuelMatrixPresentation } from "../../controllers/use-duel-pane";
 import { formatDelta, signedPercent } from "../presentation-formatters";
 import { formatNumber, signedDecimal } from "../../view-models/formatting";
 import type {
@@ -12,7 +13,6 @@ import type {
   DuelMatrixRowViewModel,
   DuelMatrixSortState,
   DuelMatrixSortTarget,
-  DuelMatrixViewModel,
   DuelViewMode
 } from "../../view-models/duel";
 
@@ -99,17 +99,27 @@ export interface DuelPaneModel {
   expandedDuelDiffId: string | null;
   duelMatrixMetric: DuelMatrixMetricId;
   duelMatrixFilter: string;
-  duelMatrix: DuelMatrixViewModel | null;
+  duelMatrixPresentation: DuelMatrixPresentation;
   filteredDuelMatrixRows: DuelMatrixRowViewModel[];
   duelMatrixSort: DuelMatrixSortState;
-  duelMatrixBusy: boolean;
   duelImportNotice: InlineNoticeViewModel | null;
+  duelImportReview: {
+    id: number;
+    setupCount: number;
+    addedCount: number;
+    updatedCount: number;
+    skippedCount: number;
+    contextTone: "ready" | "warning";
+    contextMessage: string;
+  } | null;
 }
 
 export interface DuelPaneActions {
   snapshotCurrentSetup(): void;
   exportDuelSnapshots(): void;
   importDuelSnapshots(file: File): Promise<void>;
+  mergeDuelSnapshotsImport(reviewId: number): void;
+  dismissDuelSnapshotsImport(reviewId: number): void;
   commitDuelSnapshotName(snapshotId: string, name: string): boolean;
   loadDuelSnapshot(snapshotId: string): void;
   deleteDuelSnapshot(snapshotId: string): void;
@@ -140,16 +150,20 @@ export function DuelPane({ hidden, model, actions }: DuelPaneProps) {
     expandedDuelDiffId,
     duelMatrixMetric,
     duelMatrixFilter,
-    duelMatrix,
+    duelMatrixPresentation,
     filteredDuelMatrixRows,
     duelMatrixSort,
-    duelMatrixBusy,
-    duelImportNotice
+    duelImportNotice,
+    duelImportReview
   } = model;
+  const duelMatrix = duelMatrixPresentation.displayModel;
+  const matrixBuilding = duelMatrixPresentation.status === "building";
   const {
     snapshotCurrentSetup,
     exportDuelSnapshots,
     importDuelSnapshots,
+    mergeDuelSnapshotsImport,
+    dismissDuelSnapshotsImport,
     commitDuelSnapshotName,
     loadDuelSnapshot,
     deleteDuelSnapshot,
@@ -228,7 +242,7 @@ export function DuelPane({ hidden, model, actions }: DuelPaneProps) {
           className={duelViewMode === "monster-matrix" ? "active" : undefined}
           aria-pressed={duelViewMode === "monster-matrix"}
           onClick={showDuelMonsterMatrix}
-          disabled={snapshotCount === 0 || duelMatrixBusy}
+          disabled={snapshotCount === 0 || matrixBuilding}
         >
           All monsters
         </button>
@@ -240,6 +254,52 @@ export function DuelPane({ hidden, model, actions }: DuelPaneProps) {
           ariaLabel="Saved setup import notice"
           className="duel-import-notice"
         />
+      )}
+
+      {duelImportReview && (
+        <section className="duel-import-review" aria-label="Saved setup import review">
+          <span className="visually-hidden" role="status" aria-live="polite">
+            Saved setups ready for review.
+          </span>
+          <div className="section-title-row">
+            <h3>Review saved setups</h3>
+            <span className="status-pill ready">Ready to merge</span>
+          </div>
+          <dl className="duel-import-review-summary">
+            <div>
+              <dt>Setups in file</dt>
+              <dd>{formatNumber(duelImportReview.setupCount)}</dd>
+            </div>
+            <div>
+              <dt>Add</dt>
+              <dd>{formatNumber(duelImportReview.addedCount)}</dd>
+            </div>
+            <div>
+              <dt>Update</dt>
+              <dd>{formatNumber(duelImportReview.updatedCount)}</dd>
+            </div>
+            <div>
+              <dt>Skip at limit</dt>
+              <dd>{formatNumber(duelImportReview.skippedCount)}</dd>
+            </div>
+          </dl>
+          <p className={`inline-status ${duelImportReview.contextTone}`} role="status">
+            {duelImportReview.contextMessage}
+          </p>
+          <p>Merging keeps unrelated saved setups. Matching ids are updated.</p>
+          <div className="duel-import-review-actions">
+            <button
+              type="button"
+              className="primary-action"
+              onClick={() => mergeDuelSnapshotsImport(duelImportReview.id)}
+            >
+              Merge setups
+            </button>
+            <button type="button" onClick={() => dismissDuelSnapshotsImport(duelImportReview.id)}>
+              Dismiss
+            </button>
+          </div>
+        </section>
       )}
 
       {duelViewMode === "current-target" ? (
@@ -489,21 +549,54 @@ export function DuelPane({ hidden, model, actions }: DuelPaneProps) {
                 </button>
               ))}
             </div>
-            <button type="button" onClick={buildDuelMatrix} disabled={duelMatrixBusy}>
-              Refresh comparison
+            <button
+              type="button"
+              onClick={buildDuelMatrix}
+              disabled={!duelMatrixPresentation.canBuild}
+            >
+              {duelMatrixPresentation.buildActionLabel}
             </button>
-            <span className={`status-pill ${duelMatrix ? "ready" : "pending"}`}>
-              {duelMatrix
+            <span
+              className={`status-pill ${duelMatrixPresentation.status === "ready" ? "ready" : "pending"}`}
+            >
+              {duelMatrixPresentation.status === "ready" && duelMatrix
                 ? `${duelMatrix.monsterCount} monsters - ${duelMatrix.setupCount} setups`
-                : duelMatrixBusy
+                : duelMatrixPresentation.status === "building"
                   ? "building"
-                  : "refresh required"}
+                  : duelMatrixPresentation.status === "stale"
+                    ? "previous result"
+                    : duelMatrixPresentation.status === "failed"
+                      ? "build failed"
+                      : "not built"}
             </span>
           </div>
 
+          {duelMatrixPresentation.status !== "ready" && (
+            <p
+              className={`duel-matrix-lifecycle ${duelMatrixPresentation.status}`}
+              role={duelMatrixPresentation.status === "failed" ? "alert" : "status"}
+            >
+              {duelMatrixPresentation.message}
+            </p>
+          )}
+
           {duelMatrix ? (
-            <div className="duel-table-wrap duel-matrix-wrap">
-              <table className="duel-matrix-table" aria-label="All-monster setup comparison">
+            <div
+              className="duel-table-wrap duel-matrix-wrap"
+              aria-label={
+                duelMatrixPresentation.displayIsCurrent
+                  ? undefined
+                  : "Previous all-monster setup comparison"
+              }
+            >
+              <table
+                className="duel-matrix-table"
+                aria-label={
+                  duelMatrixPresentation.displayIsCurrent
+                    ? "All-monster setup comparison"
+                    : "Previous all-monster setup comparison"
+                }
+              >
                 <thead>
                   <tr>
                     <th
@@ -594,16 +687,7 @@ export function DuelPane({ hidden, model, actions }: DuelPaneProps) {
                 </tbody>
               </table>
             </div>
-          ) : (
-            <div className="duel-matrix-empty" aria-label="Setup comparison across monsters status">
-              <span>{duelMatrixBusy ? "Building comparison" : "Comparison inputs changed"}</span>
-              {!duelMatrixBusy && (
-                <button type="button" onClick={buildDuelMatrix}>
-                  Build comparison
-                </button>
-              )}
-            </div>
-          )}
+          ) : null}
         </section>
       )}
     </section>

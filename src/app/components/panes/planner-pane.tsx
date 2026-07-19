@@ -1,23 +1,14 @@
-import {
-  SKILL_LABEL,
-  type PlannerGearSlot,
-  type PlannerMetric,
-  type PlannerSkill
-} from "@/domain/planner";
-import {
-  PLANNER_METRICS,
-  PLANNER_SKILLS,
-  plannerMetricLabel,
-  type PlannerUiState
-} from "../../state/planner";
+import type { PlannerGearSlot, PlannerMetric, PlannerSkill } from "@/domain/planner";
+import { PLANNER_METRICS, plannerMetricLabel, type PlannerUiState } from "../../state/planner";
 import {
   type PlannerGearPoolEditorViewModel,
   type PlannerPanelViewModel,
+  type PlannerSkillInputViewModel,
   type PlannerStatus
 } from "../../view-models/planner";
 import { formatNumber, signedDecimal } from "../../view-models/formatting";
 import { MetricList } from "../app-presenters";
-import { NumberField, ReadOnlyField, SelectField } from "../form-fields";
+import { NumberField, OptionalNumberField, ReadOnlyField, SelectField } from "../form-fields";
 import { formatDelta } from "../presentation-formatters";
 
 const PLANNER_METRIC_OPTIONS: Array<{ id: PlannerMetric; label: string }> = PLANNER_METRICS.map(
@@ -33,16 +24,18 @@ export interface PlannerPaneModel {
   gearPoolEditor: PlannerGearPoolEditorViewModel | null;
   error: string | null;
   pending: boolean;
+  draftDirty: boolean;
   status: PlannerStatus;
   computedMetric: PlannerMetric;
   combatStyleLabel: string;
   targetLabel: string;
-  currentLevels: Readonly<Record<PlannerSkill, number>>;
+  skillInputs: readonly PlannerSkillInputViewModel[];
+  adjustmentNotice: string | null;
 }
 
 export interface PlannerPaneActions {
   setMetric(metric: PlannerMetric): void;
-  setCurrentXp(skill: PlannerSkill, value: number): void;
+  setCurrentXp(skill: PlannerSkill, value: number | null): void;
   setTargetLevel(skill: PlannerSkill, value: number): void;
   setSkillLock(skill: PlannerSkill, locked: boolean): void;
   setOnlyCurrentGear(value: boolean): void;
@@ -83,6 +76,12 @@ export function PlannerPane({ hidden, model, actions }: PlannerPaneProps) {
         </span>
       </div>
 
+      {model.adjustmentNotice && (
+        <p className="inline-status planner-adjustment-notice" role="status" aria-live="polite">
+          {model.adjustmentNotice}
+        </p>
+      )}
+
       <div className="planner-controls" aria-label="Planner controls">
         <div className="planner-control-grid">
           <SelectField
@@ -122,34 +121,39 @@ export function PlannerPane({ hidden, model, actions }: PlannerPaneProps) {
         </div>
 
         <div className="planner-skill-grid" aria-label="Planner skill targets">
-          {PLANNER_SKILLS.map((skill) => (
-            <div className="planner-skill-row" key={skill}>
+          {model.skillInputs.map((row) => (
+            <div className="planner-skill-row" key={row.skill}>
               <div className="planner-skill-name">
-                <span>{SKILL_LABEL[skill]}</span>
-                <strong>{formatNumber(model.currentLevels[skill])}</strong>
+                <span>{row.label}</span>
+                <strong>{formatNumber(row.currentLevel)}</strong>
               </div>
-              <NumberField
-                label={`${SKILL_LABEL[skill]} current XP`}
-                value={model.draftState.currentXp[skill]}
-                min={0}
-                max={200_000_000}
-                onChange={(value) => actions.setCurrentXp(skill, value)}
+              <OptionalNumberField
+                label={`${row.label} current XP`}
+                value={row.currentXp}
+                min={row.currentXpMin}
+                max={row.currentXpMax}
+                placeholder={`Auto: ${row.effectiveStartXp}`}
+                resetLabel="Use level floor"
+                description={row.xpDescription}
+                onChange={(value) => actions.setCurrentXp(row.skill, value)}
               />
               <NumberField
-                label={`${SKILL_LABEL[skill]} target`}
-                value={model.draftState.targetLevels[skill]}
-                min={1}
+                label={`${row.label} target`}
+                value={row.effectiveTargetLevel}
+                min={row.targetMin}
                 max={99}
-                onChange={(value) => actions.setTargetLevel(skill, value)}
+                disabled={row.targetDisabled}
+                description={row.targetDescription}
+                onChange={(value) => actions.setTargetLevel(row.skill, value)}
               />
               <label className="toggle planner-lock">
                 <input
                   type="checkbox"
-                  checked={model.draftState.skillLocks[skill]}
-                  aria-label={`Lock ${SKILL_LABEL[skill]}`}
-                  onChange={(event) => actions.setSkillLock(skill, event.target.checked)}
+                  checked={row.locked}
+                  aria-label={`Lock ${row.label}`}
+                  onChange={(event) => actions.setSkillLock(row.skill, event.target.checked)}
                 />
-                <span>Lock {SKILL_LABEL[skill]}</span>
+                <span>Lock {row.label}</span>
               </label>
             </div>
           ))}
@@ -213,6 +217,11 @@ export function PlannerPane({ hidden, model, actions }: PlannerPaneProps) {
         </p>
       ) : model.panel ? (
         <div className="planner-output" aria-label="Planner output">
+          {model.draftDirty && (
+            <p className="inline-status planner-output-stale-note">
+              Current output uses the last recomputed inputs.
+            </p>
+          )}
           <div className="summary-strip planner-summary" aria-label="Planner summary">
             <MetricList
               items={[

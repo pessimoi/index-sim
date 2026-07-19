@@ -8,6 +8,11 @@ import {
 import { CombatSetupFormSchema, normalizeFormState, type CombatSetupFormState } from "./ui-state";
 import { duelSnapshotsCompatibilityIssues } from "./setup-compatibility";
 import type { GameDataSnapshot } from "@/domain/shared";
+import {
+  SetupTransferContextV1Schema,
+  createSetupTransferContext,
+  type SetupTransferContextV1
+} from "./setup-transfer-context";
 
 export const DUEL_SNAPSHOTS_STORAGE_KEY = "index-sim:duel-snapshots";
 export const DUEL_SNAPSHOTS_VERSION = 1;
@@ -15,6 +20,8 @@ export const MAX_DUEL_SNAPSHOTS = 12;
 export const DUEL_SNAPSHOT_NAME_MAX_LENGTH = 80;
 export const DUEL_SNAPSHOT_ID_MAX_LENGTH = 80;
 export const DUEL_SNAPSHOTS_IMPORT_MAX_BYTES = 250_000;
+export const DUEL_SNAPSHOTS_TRANSFER_KIND = "index-sim-saved-setups";
+export const DUEL_SNAPSHOTS_TRANSFER_VERSION = 1;
 
 export interface DuelSnapshotState {
   id: string;
@@ -26,9 +33,25 @@ export interface DuelSnapshotsState {
   snapshots: DuelSnapshotState[];
 }
 
-export interface DuelSnapshotsExportEnvelope {
+export interface DuelSnapshotsLegacyExportEnvelope {
   version: typeof DUEL_SNAPSHOTS_VERSION;
   exportedAt: string;
+  data: DuelSnapshotsState;
+}
+
+export interface DuelSnapshotsTransferEnvelopeV1 {
+  kind: typeof DUEL_SNAPSHOTS_TRANSFER_KIND;
+  version: typeof DUEL_SNAPSHOTS_TRANSFER_VERSION;
+  exportedAt: string;
+  context: SetupTransferContextV1;
+  data: DuelSnapshotsState;
+}
+
+export interface ParsedDuelSnapshotsTransfer {
+  format: "contextual-v1" | "legacy-v1";
+  version: number;
+  exportedAt: string;
+  context: SetupTransferContextV1 | null;
   data: DuelSnapshotsState;
 }
 
@@ -113,10 +136,24 @@ export const DuelSnapshotsStateSchema: z.ZodType<DuelSnapshotsState> = z
   .strict()
   .transform((state) => ({ snapshots: dedupeDuelSnapshots(state.snapshots) }));
 
-export const DuelSnapshotsExportEnvelopeSchema: z.ZodType<DuelSnapshotsExportEnvelope> = z
+export const DuelSnapshotsLegacyExportEnvelopeSchema: z.ZodType<DuelSnapshotsLegacyExportEnvelope> =
+  z
+    .object({
+      version: z.literal(DUEL_SNAPSHOTS_VERSION),
+      exportedAt: z.string().trim().min(1).max(64),
+      data: DuelSnapshotsStateSchema
+    })
+    .strict();
+
+// Retained as the explicit prior external-file parser and test fixture owner.
+export const DuelSnapshotsExportEnvelopeSchema = DuelSnapshotsLegacyExportEnvelopeSchema;
+
+export const DuelSnapshotsTransferEnvelopeV1Schema: z.ZodType<DuelSnapshotsTransferEnvelopeV1> = z
   .object({
-    version: z.literal(DUEL_SNAPSHOTS_VERSION),
-    exportedAt: z.string().trim().min(1).max(64),
+    kind: z.literal(DUEL_SNAPSHOTS_TRANSFER_KIND),
+    version: z.literal(DUEL_SNAPSHOTS_TRANSFER_VERSION),
+    exportedAt: z.iso.datetime({ offset: true }).max(64),
+    context: SetupTransferContextV1Schema,
     data: DuelSnapshotsStateSchema
   })
   .strict();
@@ -139,11 +176,14 @@ export function normalizeDuelSnapshotsState(state: DuelSnapshotsState): DuelSnap
 
 export function createDuelSnapshotsExport(
   state: DuelSnapshotsState,
+  gameData: GameDataSnapshot,
   now = new Date()
-): DuelSnapshotsExportEnvelope {
-  return DuelSnapshotsExportEnvelopeSchema.parse({
-    version: DUEL_SNAPSHOTS_VERSION,
+): DuelSnapshotsTransferEnvelopeV1 {
+  return DuelSnapshotsTransferEnvelopeV1Schema.parse({
+    kind: DUEL_SNAPSHOTS_TRANSFER_KIND,
+    version: DUEL_SNAPSHOTS_TRANSFER_VERSION,
     exportedAt: now.toISOString(),
+    context: createSetupTransferContext(gameData),
     data: normalizeDuelSnapshotsState(state)
   });
 }
@@ -152,7 +192,7 @@ export function parseDuelSnapshotsExportText(
   text: string,
   maxBytes = DUEL_SNAPSHOTS_IMPORT_MAX_BYTES,
   gameData?: GameDataSnapshot
-): DuelSnapshotsExportEnvelope {
+): ParsedDuelSnapshotsTransfer {
   if (new TextEncoder().encode(text).byteLength > maxBytes) {
     throw new DuelSnapshotsImportError("body_too_large");
   }
@@ -167,11 +207,16 @@ export function parseDuelSnapshotsExportText(
     throw new DuelSnapshotsImportError("invalid_json");
   }
 
+  const record = typeof value === "object" && value !== null ? value : null;
+  const contextual =
+    record !== null && "kind" in record && record.kind === DUEL_SNAPSHOTS_TRANSFER_KIND;
+  if (record !== null && "kind" in record && !contextual) {
+    throw new DuelSnapshotsImportError("unsupported_version");
+  }
   if (
-    typeof value === "object" &&
-    value !== null &&
-    "version" in value &&
-    value.version !== DUEL_SNAPSHOTS_VERSION
+    record !== null &&
+    "version" in record &&
+    record.version !== (contextual ? DUEL_SNAPSHOTS_TRANSFER_VERSION : DUEL_SNAPSHOTS_VERSION)
   ) {
     throw new DuelSnapshotsImportError("unsupported_version");
   }
@@ -199,12 +244,31 @@ export function parseDuelSnapshotsExportText(
     throw error;
   }
 
-  const parsed = DuelSnapshotsExportEnvelopeSchema.safeParse(value);
+  const parsed = contextual
+    ? DuelSnapshotsTransferEnvelopeV1Schema.safeParse(value)
+    : DuelSnapshotsLegacyExportEnvelopeSchema.safeParse(value);
   if (!parsed.success) throw new DuelSnapshotsImportError("invalid_data");
   if (gameData && duelSnapshotsCompatibilityIssues(parsed.data.data, gameData).length > 0) {
     throw new DuelSnapshotsImportError("incompatible_entities");
   }
-  return parsed.data;
+  if (contextual) {
+    const envelope = parsed.data as DuelSnapshotsTransferEnvelopeV1;
+    return {
+      format: "contextual-v1",
+      version: envelope.version,
+      exportedAt: envelope.exportedAt,
+      context: envelope.context,
+      data: envelope.data
+    };
+  }
+  const envelope = parsed.data as DuelSnapshotsLegacyExportEnvelope;
+  return {
+    format: "legacy-v1",
+    version: envelope.version,
+    exportedAt: envelope.exportedAt,
+    context: null,
+    data: envelope.data
+  };
 }
 
 export function mergeDuelSnapshots(

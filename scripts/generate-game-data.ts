@@ -6,6 +6,7 @@ export interface CliOptions {
   sourceDir?: string;
   outputRoot?: string;
   generatedAt?: string;
+  gameRevision?: number;
   skipCalculationImpact: boolean;
   impactCaseFilter?: string;
   impactOutlierLimit?: number;
@@ -14,12 +15,13 @@ export interface CliOptions {
 
 export function usage(): string {
   return [
-    "Usage: npm run data:generate -- [--source-dir <path>] [--output-root <path>] [--dry-run]",
+    "Usage: npm run data:generate -- [--source-dir <path>] [--output-root <path>] [--game-revision <integer>] [--dry-run]",
     "",
     "Options:",
     "  --source-dir <path>        Repository-local LostCityRS/Content checkout path.",
     "  --output-root <path>       Repository-local root for planned generated outputs.",
     "  --generated-at <iso>       Override generation timestamp for deterministic checks.",
+    "  --game-revision <integer>  Accepted game revision; required for raw generation.",
     "  --skip-calculation-impact  Skip the representative calculation-impact suite.",
     "  --impact-case-filter <id>  Run calculation-impact cases matching an id or tag.",
     "  --impact-outlier-limit <n> Limit informational all-monster scan rows in the report.",
@@ -63,6 +65,18 @@ export function parseArgs(argv: string[]): CliOptions {
       index += 1;
       continue;
     }
+    if (arg === "--game-revision") {
+      const value = Number(readOptionValue(argv, index, arg));
+      if (!Number.isInteger(value) || value < 1 || value > 9_999) {
+        throw new GameDataGeneratorError(
+          "invalid_argument",
+          "--game-revision must be an integer from 1 to 9999"
+        );
+      }
+      options.gameRevision = value;
+      index += 1;
+      continue;
+    }
     if (arg === "--skip-calculation-impact") {
       options.skipCalculationImpact = true;
       continue;
@@ -100,6 +114,7 @@ export function main(): void {
     sourceDir: options.sourceDir,
     outputRoot: options.outputRoot,
     generatedAt: options.generatedAt,
+    gameRevision: options.gameRevision,
     skipCalculationImpact: options.skipCalculationImpact,
     impactCaseFilter: options.impactCaseFilter,
     impactOutlierLimit: options.impactOutlierLimit,

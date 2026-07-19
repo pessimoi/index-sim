@@ -1,36 +1,53 @@
 import type { GameDataSnapshot } from "@/domain/shared";
-import type { LocalStateHealthItemId } from "../state/local-state-health";
 import {
   SETUP_IMPORT_MAX_BYTES,
   SetupImportError,
+  createRewriteSetupTransferEnvelope,
   parseSavedSetupExportText
 } from "../state/setup-import";
 import { REWRITE_SETUP_VERSION, type SavedSetupState } from "../state/ui-state";
+import {
+  compareSetupTransferContext,
+  type SetupTransferContextReview
+} from "../state/setup-transfer-context";
 
 export interface SetupFileTransferNotice {
-  tone: "success" | "error";
+  tone: "error";
   message: string;
   details?: string[];
 }
 
-export interface SetupFileTransferSnapshot {
-  notice: SetupFileTransferNotice | null;
+export interface SetupImportReview {
+  id: number;
+  setup: SavedSetupState;
+  context: SetupTransferContextReview;
+  summary: {
+    targetLabel: string;
+    combatStyle: SavedSetupState["form"]["combatStyle"];
+    setupMode: SavedSetupState["setupMode"];
+    customSetupCount: number;
+    cannonMonsterCount: number;
+    denseSort: SavedSetupState["denseCompare"]["sort"];
+    irrelevantMonsterCount: number;
+  };
 }
 
-export type SetupImportOutcome =
-  | {
-      status: "ready";
-      setup: SavedSetupState;
-      persisted: boolean;
-      appStatus: "Imported rewrite setup" | "Imported rewrite setup for this session";
-    }
-  | { status: "rejected" };
+export interface SetupImportCandidate {
+  setup: SavedSetupState;
+  context: SetupTransferContextReview;
+}
+
+export interface SetupFileTransferSnapshot {
+  phase: "idle" | "reading" | "review";
+  notice: SetupFileTransferNotice | null;
+  review: SetupImportReview | null;
+}
+
+export type SetupPrepareOutcome =
+  { status: "review"; reviewId: number } | { status: "rejected" } | { status: "stale" };
 
 export interface SetupFileTransferDependencies<TFile> {
   readFileText(file: TFile, maxBytes: number): Promise<string>;
-  persistSetup(setup: SavedSetupState): boolean;
-  unblockReplaced(ids: readonly LocalStateHealthItemId[]): void;
-  refreshLocalStateHealth(): void;
   downloadJsonFile(fileName: string, value: unknown): void;
   now(): Date;
 }
@@ -77,7 +94,7 @@ export function describeSetupFileTransferError(error: unknown): SetupFileTransfe
     if (error.code === "unsupported_version") {
       return {
         tone: "error",
-        message: `Setup import failed: this app only supports rewrite setup version ${REWRITE_SETUP_VERSION}. Export a fresh setup and try again.`
+        message: `Setup import failed: this app supports contextual setup file version 1 or legacy rewrite setup version ${REWRITE_SETUP_VERSION}. Export a fresh setup and try again.`
       };
     }
     if (error.code === "incompatible_entities") {
@@ -97,9 +114,36 @@ export function describeSetupFileTransferError(error: unknown): SetupFileTransfe
   return { tone: "error", message: "Setup import failed. Check the file and try again." };
 }
 
+function createSetupImportReview(
+  id: number,
+  setup: SavedSetupState,
+  gameData: GameDataSnapshot,
+  context: SetupTransferContextReview
+): SetupImportReview {
+  return {
+    id,
+    setup,
+    context,
+    summary: {
+      targetLabel: gameData.monsters[setup.form.monsterId]!.name,
+      combatStyle: setup.form.combatStyle,
+      setupMode: setup.setupMode,
+      customSetupCount: Object.keys(setup.customSetupsByMonster).length,
+      cannonMonsterCount: Object.keys(setup.cannonByMonster).length,
+      denseSort: setup.denseCompare.sort,
+      irrelevantMonsterCount: setup.denseCompare.irrelevantMonsterIds.length
+    }
+  };
+}
+
 export class SetupFileTransferControllerCore<TFile> {
   private readonly listeners = new Set<() => void>();
-  private snapshot: SetupFileTransferSnapshot = { notice: null };
+  private latestAttemptId = 0;
+  private snapshot: SetupFileTransferSnapshot = {
+    phase: "idle",
+    notice: null,
+    review: null
+  };
 
   constructor(private readonly dependencies: SetupFileTransferDependencies<TFile>) {}
 
@@ -110,41 +154,53 @@ export class SetupFileTransferControllerCore<TFile> {
 
   getSnapshot = (): SetupFileTransferSnapshot => this.snapshot;
 
-  private setNotice(notice: SetupFileTransferNotice | null): void {
-    if (this.snapshot.notice === notice) return;
-    this.snapshot = { notice };
+  private publish(snapshot: SetupFileTransferSnapshot): void {
+    this.snapshot = snapshot;
     for (const listener of this.listeners) listener();
   }
 
-  importFile = async (file: TFile, gameData: GameDataSnapshot): Promise<SetupImportOutcome> => {
-    this.setNotice(null);
+  prepareImport = async (file: TFile, gameData: GameDataSnapshot): Promise<SetupPrepareOutcome> => {
+    const attemptId = ++this.latestAttemptId;
+    this.publish({ phase: "reading", notice: null, review: null });
     try {
       const text = await this.dependencies.readFileText(file, SETUP_IMPORT_MAX_BYTES);
-      const setup = parseSavedSetupExportText(text, gameData, SETUP_IMPORT_MAX_BYTES).data;
-      const persisted = this.dependencies.persistSetup(setup);
-      this.dependencies.unblockReplaced(["rewrite-setup"]);
-      this.dependencies.refreshLocalStateHealth();
-      const appStatus = persisted
-        ? "Imported rewrite setup"
-        : "Imported rewrite setup for this session";
-      this.setNotice({
-        tone: "success",
-        message: persisted
-          ? "Imported rewrite setup."
-          : "Imported rewrite setup for this session. Local storage is unavailable, so changes may not persist after reload."
-      });
-      return { status: "ready", setup, persisted, appStatus };
+      const parsed = parseSavedSetupExportText(text, gameData, SETUP_IMPORT_MAX_BYTES);
+      if (attemptId !== this.latestAttemptId) return { status: "stale" };
+      const review = createSetupImportReview(
+        attemptId,
+        parsed.data,
+        gameData,
+        compareSetupTransferContext(parsed.context, gameData)
+      );
+      this.publish({ phase: "review", notice: null, review });
+      return { status: "review", reviewId: review.id };
     } catch (error) {
-      this.setNotice(describeSetupFileTransferError(error));
+      if (attemptId !== this.latestAttemptId) return { status: "stale" };
+      this.publish({ phase: "idle", notice: describeSetupFileTransferError(error), review: null });
       return { status: "rejected" };
     }
   };
 
-  exportSetup = (setup: SavedSetupState): void => {
-    this.dependencies.downloadJsonFile("index-sim-rewrite-setup.json", {
-      version: REWRITE_SETUP_VERSION,
-      savedAt: this.dependencies.now().toISOString(),
-      data: setup
-    });
+  dismissReview = (reviewId: number): boolean => {
+    if (this.snapshot.phase !== "review" || this.snapshot.review?.id !== reviewId) return false;
+    this.publish({ phase: "idle", notice: null, review: null });
+    return true;
+  };
+
+  consumeReview = (reviewId: number): SetupImportCandidate | null => {
+    if (this.snapshot.phase !== "review" || this.snapshot.review?.id !== reviewId) return null;
+    const candidate = {
+      setup: this.snapshot.review.setup,
+      context: this.snapshot.review.context
+    };
+    this.publish({ phase: "idle", notice: null, review: null });
+    return candidate;
+  };
+
+  exportSetup = (setup: SavedSetupState, gameData: GameDataSnapshot): void => {
+    this.dependencies.downloadJsonFile(
+      "index-sim-rewrite-setup.json",
+      createRewriteSetupTransferEnvelope(setup, gameData, this.dependencies.now())
+    );
   };
 }

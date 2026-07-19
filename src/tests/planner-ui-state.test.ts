@@ -1,6 +1,6 @@
 import { createMemoryStorage, loadPersisted } from "../adapters/storage";
 import { loadBundledLegacyContext } from "../adapters/legacy-runtime";
-import { defaultPool } from "../domain/planner";
+import { defaultPool, plannerXpBounds, xpAt } from "../domain/planner";
 import { DEFAULT_FORM_STATE } from "../app/state/ui-state";
 import {
   DEFAULT_PLANNER_UI_STATE,
@@ -10,7 +10,10 @@ import {
   cleanPlannerUiStateForPool,
   createDefaultPlannerUiState,
   effectivePlannerGearPool,
+  effectivePlannerStartXp,
+  effectivePlannerTarget,
   loadPlannerUiState,
+  reconcilePlannerProgressWithLevels,
   resetPlannerGearPoolSlot,
   savePlannerUiState,
   setPlannerGearPoolItem
@@ -64,6 +67,78 @@ describe("planner UI state", () => {
       savedAt: "2026-07-06T12:00:00.000Z"
     });
     expect(loaded).toEqual(state);
+  });
+
+  it("preserves Auto and inclusive explicit XP while returning the original no-op state", () => {
+    const bounds = plannerXpBounds(60);
+    const levels = { attack: 60, strength: 60, defence: 50, ranged: 50, magic: 50 };
+    const state = PlannerUiStateSchema.parse({
+      ...createDefaultPlannerUiState(DEFAULT_FORM_STATE),
+      currentXp: {
+        ...DEFAULT_PLANNER_UI_STATE.currentXp,
+        attack: bounds.min,
+        strength: bounds.max
+      }
+    });
+    const result = reconcilePlannerProgressWithLevels(state, levels);
+
+    expect(result.state).toBe(state);
+    expect(result.adjustments).toEqual([]);
+    expect(effectivePlannerStartXp(1, 0)).toBe(0);
+    expect(effectivePlannerStartXp(60, 0)).toBe(bounds.min);
+    expect(effectivePlannerStartXp(60, bounds.max)).toBe(bounds.max);
+  });
+
+  it("resets incompatible XP to Auto and raises only unlocked lower targets in canonical order", () => {
+    const levels = { attack: 61, strength: 65, defence: 50, ranged: 50, magic: 99 };
+    const state = PlannerUiStateSchema.parse({
+      ...createDefaultPlannerUiState(DEFAULT_FORM_STATE),
+      currentXp: {
+        ...DEFAULT_PLANNER_UI_STATE.currentXp,
+        attack: xpAt(60),
+        strength: xpAt(65),
+        magic: 200_000_000
+      },
+      targetLevels: {
+        ...DEFAULT_PLANNER_UI_STATE.targetLevels,
+        attack: 60,
+        strength: 60,
+        magic: 98
+      },
+      skillLocks: {
+        ...DEFAULT_PLANNER_UI_STATE.skillLocks,
+        strength: true
+      }
+    });
+    const result = reconcilePlannerProgressWithLevels(state, levels);
+
+    expect(result.state.currentXp.attack).toBe(0);
+    expect(result.state.currentXp.strength).toBe(xpAt(65));
+    expect(result.state.currentXp.magic).toBe(200_000_000);
+    expect(result.state.targetLevels.attack).toBe(61);
+    expect(result.state.targetLevels.strength).toBe(60);
+    expect(result.state.targetLevels.magic).toBe(99);
+    expect(
+      result.adjustments.map(({ skill, field, reason }) => ({ skill, field, reason }))
+    ).toEqual([
+      {
+        skill: "attack",
+        field: "currentXp",
+        reason: "xp-outside-current-level"
+      },
+      {
+        skill: "attack",
+        field: "targetLevel",
+        reason: "target-below-current-level"
+      },
+      {
+        skill: "magic",
+        field: "targetLevel",
+        reason: "target-below-current-level"
+      }
+    ]);
+    expect(effectivePlannerTarget(65, 60, true)).toBe(65);
+    expect(effectivePlannerTarget(65, 60, false)).toBe(65);
   });
 
   it("falls back to defaults for invalid JSON and mismatched planner UI state versions", () => {

@@ -39,9 +39,30 @@ export interface DuelMatrixSource {
   lootSettingsByMonster: LootSettingsByMonsterState;
 }
 
-interface DuelMatrixBuild {
+export interface DuelMatrixBuild {
   model: DuelMatrixViewModel;
   source: DuelMatrixSource;
+}
+
+export interface DuelMatrixFailure {
+  source: DuelMatrixSource;
+  message: "Comparison could not be built. Your inputs are unchanged.";
+}
+
+interface DuelMatrixPending {
+  task: RunningCalculationTask<DuelMatrixCalculationRequest>;
+  source: DuelMatrixSource;
+}
+
+export type DuelMatrixStatus = "idle" | "building" | "ready" | "stale" | "failed";
+
+export interface DuelMatrixPresentation {
+  status: DuelMatrixStatus;
+  displayModel: DuelMatrixViewModel | null;
+  displayIsCurrent: boolean;
+  message: string;
+  canBuild: boolean;
+  buildActionLabel: "Build comparison" | "Refresh comparison" | "Retry comparison" | "Building…";
 }
 
 export interface UseDuelPaneInput {
@@ -63,10 +84,9 @@ export interface DuelPaneController {
   expandedDiffId: string | null;
   matrixMetric: DuelMatrixMetricId;
   matrixFilter: string;
-  matrix: DuelMatrixViewModel | null;
+  matrixPresentation: DuelMatrixPresentation;
   filteredMatrixRows: DuelMatrixRowViewModel[];
   matrixSort: DuelMatrixSortState;
-  matrixBusy: boolean;
   showCurrentTarget(): void;
   showMonsterMatrix(): void;
   toggleDiff(snapshotId: string): void;
@@ -97,6 +117,92 @@ export function isDuelMatrixBuildFresh(
     build.source.lootPrefsByMonster === source.lootPrefsByMonster &&
     build.source.lootSettingsByMonster === source.lootSettingsByMonster
   );
+}
+
+export function isDuelMatrixSourceCurrent(
+  candidate: DuelMatrixSource | null,
+  source: DuelMatrixSource | null
+): boolean {
+  return (
+    candidate != null &&
+    source != null &&
+    candidate.form === source.form &&
+    candidate.snapshots === source.snapshots &&
+    candidate.context === source.context &&
+    candidate.cannonByMonster === source.cannonByMonster &&
+    candidate.lootPrefsByMonster === source.lootPrefsByMonster &&
+    candidate.lootSettingsByMonster === source.lootSettingsByMonster
+  );
+}
+
+export function deriveDuelMatrixPresentation(input: {
+  source: DuelMatrixSource | null;
+  lastSuccessfulBuild: DuelMatrixBuild | null;
+  failure: DuelMatrixFailure | null;
+  pendingSource: DuelMatrixSource | null;
+  hasSavedSetups: boolean;
+}): DuelMatrixPresentation {
+  const pendingIsCurrent = isDuelMatrixSourceCurrent(input.pendingSource, input.source);
+  const failureIsCurrent = isDuelMatrixSourceCurrent(input.failure?.source ?? null, input.source);
+  const successIsCurrent = isDuelMatrixSourceCurrent(
+    input.lastSuccessfulBuild?.source ?? null,
+    input.source
+  );
+  const displayModel = input.lastSuccessfulBuild?.model ?? null;
+  const buildPossible = input.source != null && input.hasSavedSetups;
+
+  if (pendingIsCurrent) {
+    return {
+      status: "building",
+      displayModel,
+      displayIsCurrent: false,
+      message: displayModel
+        ? "Building current comparison. Showing the previous result."
+        : "Building comparison for current inputs.",
+      canBuild: false,
+      buildActionLabel: "Building…"
+    };
+  }
+  if (failureIsCurrent) {
+    return {
+      status: "failed",
+      displayModel,
+      displayIsCurrent: false,
+      message: displayModel
+        ? "Comparison could not be built. Showing the previous result."
+        : input.failure!.message,
+      canBuild: buildPossible,
+      buildActionLabel: "Retry comparison"
+    };
+  }
+  if (successIsCurrent) {
+    return {
+      status: "ready",
+      displayModel,
+      displayIsCurrent: true,
+      message: "",
+      canBuild: buildPossible,
+      buildActionLabel: "Refresh comparison"
+    };
+  }
+  if (displayModel) {
+    return {
+      status: "stale",
+      displayModel,
+      displayIsCurrent: false,
+      message: "Inputs changed. This table does not include the current inputs.",
+      canBuild: buildPossible,
+      buildActionLabel: "Refresh comparison"
+    };
+  }
+  return {
+    status: "idle",
+    displayModel: null,
+    displayIsCurrent: false,
+    message: "Build the all-monster comparison for the current inputs.",
+    canBuild: buildPossible,
+    buildActionLabel: "Build comparison"
+  };
 }
 
 export function filterDuelMatrixRows(
@@ -135,15 +241,16 @@ export function useDuelPane(
   const [matrixMetric, setMatrixMetric] = useState<DuelMatrixMetricId>("effectiveXpPerHour");
   const [matrixFilter, setMatrixFilter] = useState("");
   const [matrixSort, setMatrixSort] = useState<DuelMatrixSortState>(DEFAULT_DUEL_MATRIX_SORT_STATE);
-  const [matrixBuild, setMatrixBuild] = useState<DuelMatrixBuild | null>(null);
-  const [matrixBusy, setMatrixBusy] = useState(false);
-  const taskRef = useRef<RunningCalculationTask<DuelMatrixCalculationRequest> | null>(null);
+  const [lastSuccessfulBuild, setLastSuccessfulBuild] = useState<DuelMatrixBuild | null>(null);
+  const [matrixFailure, setMatrixFailure] = useState<DuelMatrixFailure | null>(null);
+  const [matrixPending, setMatrixPending] = useState<DuelMatrixPending | null>(null);
+  const pendingRef = useRef<DuelMatrixPending | null>(null);
   const startTask = options.startTask ?? startDuelMatrixTask;
 
   useEffect(
     () => () => {
-      taskRef.current?.cancel();
-      taskRef.current = null;
+      pendingRef.current?.task.cancel();
+      pendingRef.current = null;
     },
     []
   );
@@ -180,45 +287,96 @@ export function useDuelPane(
         : null,
     [cannonByMonster, context, form, lootPrefsByMonster, lootSettingsByMonster, snapshots]
   );
-  const matrix = isDuelMatrixBuildFresh(matrixBuild, source) ? matrixBuild!.model : null;
+  const matrixPresentation = useMemo(
+    () =>
+      deriveDuelMatrixPresentation({
+        source,
+        lastSuccessfulBuild,
+        failure: matrixFailure,
+        pendingSource: matrixPending?.source ?? null,
+        hasSavedSetups: snapshots.snapshots.length > 0
+      }),
+    [lastSuccessfulBuild, matrixFailure, matrixPending?.source, snapshots.snapshots.length, source]
+  );
   const filteredMatrixRows = useMemo(
-    () => sortDuelMatrixRows(filterDuelMatrixRows(matrix, matrixFilter), matrixSort, matrixMetric),
-    [matrix, matrixFilter, matrixMetric, matrixSort]
+    () =>
+      sortDuelMatrixRows(
+        filterDuelMatrixRows(matrixPresentation.displayModel, matrixFilter),
+        matrixSort,
+        matrixMetric
+      ),
+    [matrixFilter, matrixMetric, matrixPresentation.displayModel, matrixSort]
   );
 
+  /* eslint-disable react-hooks/set-state-in-effect -- Source identity owns cancellation and the zero-snapshot matrix session reset. */
+  useEffect(() => {
+    const pending = pendingRef.current;
+    if (pending && !isDuelMatrixSourceCurrent(pending.source, source)) {
+      pending.task.cancel();
+      pendingRef.current = null;
+      setMatrixPending(null);
+    }
+    setMatrixFailure((current) =>
+      current && !isDuelMatrixSourceCurrent(current.source, source) ? null : current
+    );
+  }, [source]);
+
+  useEffect(() => {
+    if (snapshots.snapshots.length > 0) return;
+    pendingRef.current?.task.cancel();
+    pendingRef.current = null;
+    setMatrixPending(null);
+    setLastSuccessfulBuild(null);
+    setMatrixFailure(null);
+    setViewMode("current-target");
+  }, [snapshots.snapshots.length]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
   const buildMatrix = useCallback(() => {
-    if (matrixBusy || snapshots.snapshots.length === 0 || !source) return;
-    taskRef.current?.cancel();
+    if (snapshots.snapshots.length === 0 || !source) return;
+    const existing = pendingRef.current;
+    if (existing && isDuelMatrixSourceCurrent(existing.source, source)) return;
+    existing?.task.cancel();
     const task = startTask({ kind: "duel-matrix", ...source });
-    taskRef.current = task;
+    const pending = { task, source } satisfies DuelMatrixPending;
+    pendingRef.current = pending;
+    setMatrixPending(pending);
+    setMatrixFailure((current) =>
+      isDuelMatrixSourceCurrent(current?.source ?? null, source) ? null : current
+    );
     setViewMode("monster-matrix");
-    setMatrixBusy(true);
     onStatus("Building setup comparison across monsters");
     void task.promise
       .then((model) => {
-        if (taskRef.current !== task) return;
-        setMatrixBuild({ model, source });
+        if (pendingRef.current?.task !== task) return;
+        setLastSuccessfulBuild({ model, source });
+        setMatrixFailure((current) =>
+          isDuelMatrixSourceCurrent(current?.source ?? null, source) ? null : current
+        );
         onStatus(
           `Setup comparison ready: ${model.monsterCount} monsters, ${model.setupCount} setups`
         );
       })
       .catch((error: unknown) => {
         if (error instanceof CalculationTaskCancelledError) return;
-        if (taskRef.current !== task) return;
-        setMatrixBuild(null);
+        if (pendingRef.current?.task !== task) return;
+        setMatrixFailure({
+          source,
+          message: "Comparison could not be built. Your inputs are unchanged."
+        });
         onStatus("Setup comparison across monsters could not be built");
       })
       .finally(() => {
-        if (taskRef.current !== task) return;
-        taskRef.current = null;
-        setMatrixBusy(false);
+        if (pendingRef.current?.task !== task) return;
+        pendingRef.current = null;
+        setMatrixPending(null);
       });
-  }, [matrixBusy, onStatus, snapshots.snapshots.length, source, startTask]);
+  }, [onStatus, snapshots.snapshots.length, source, startTask]);
 
   const showMonsterMatrix = useCallback(() => {
-    if (matrix) setViewMode("monster-matrix");
-    else buildMatrix();
-  }, [buildMatrix, matrix]);
+    setViewMode("monster-matrix");
+    if (matrixPresentation.status === "idle") buildMatrix();
+  }, [buildMatrix, matrixPresentation.status]);
 
   return {
     comparison,
@@ -228,10 +386,9 @@ export function useDuelPane(
     expandedDiffId,
     matrixMetric,
     matrixFilter,
-    matrix,
+    matrixPresentation,
     filteredMatrixRows,
     matrixSort,
-    matrixBusy,
     showCurrentTarget: () => setViewMode("current-target"),
     showMonsterMatrix,
     toggleDiff: (snapshotId) =>

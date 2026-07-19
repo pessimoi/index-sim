@@ -7,6 +7,14 @@
 - Related current workflows: Basic combat setup, setup JSON export/import,
   per-monster Cannon and loot state, Duel snapshots
 
+Current extension: the implemented
+[game revision and setup-transfer context contract](game-revision-transfer-context-spec.md)
+supersedes only this document's external version/context details. New links use
+version 2 with the shared revision/snapshot stamp; version 1 remains readable
+with exact-id or unknown-revision normalization. Size, privacy, review,
+compatibility, Load/Dismiss/Undo and browser-adapter boundaries below remain
+current.
+
 ## Feature-inventory check
 
 Basic combat setup and Duel snapshots remain `Valmis`. This implementation does

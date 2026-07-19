@@ -5,6 +5,53 @@ It does not own current commands, required gates or test strategy; those remain 
 [the testing guide](../technical/testing.md). Counts and artifact hashes below
 apply only to the source state described by each entry.
 
+## 2026-07-19 release-readiness finishing integration
+
+The integrated G1-G7 source state passes the authoritative `npm run verify`
+gate. Typecheck and the architecture graph pass with 132 production source
+modules, 117 client-reachable modules, eight external entrypoints, no cycles
+and no exceptions. Vitest passes 85 files / 852 tests, the explicit golden gate
+passes 19/19, the production build transforms 229 modules, and lint, Prettier
+and `git diff --check` pass. Artifact validation reports 10 files, two assets,
+three JavaScript chunks, 2,124,449 total bytes and a direct entry of 760,289
+raw / 221,237 gzip bytes. Its SHA-256 is
+`75e9a1f3c6933b0f699485142050ea8c7b9f3df99499ca0c2b7520d510337e54`;
+12 prior artifact snapshots remain in history. Dependency audit was skipped by
+the verification script because this sandbox has network access disabled.
+
+The complete production-preview Chromium run passes 86/86 with one worker in
+1.8 minutes. This covers the integrated local-state attention, setup
+Review/Apply/Undo, shared numeric draft lifecycle, Planner reconciliation,
+Duel matrix lifecycle, generated Revision 274 presentation and contextual
+setup/saved-setup/share transfer paths in addition to the existing functional
+suite.
+
+The separate visual command first reached the expected managed-sandbox
+`listen EPERM 127.0.0.1:5174` boundary. Its approved localhost-only read-only
+rerun completed all 20 scenarios: Dense Compare tablet and Cannon desktop pass,
+while the other 18 stop at their first mismatch against the 31 committed Darwin
+snapshots. A temporary ignored-only config then generated all 31 current-state
+candidates without changing tracked baselines or visual configuration. The
+production Playwright comparator reports 29/31 mismatches; Cannon desktop and
+Dense Compare tablet remain within tolerance. All candidate/diff images were
+agent-reviewed. They show the integrated revision/context, shared numeric-
+field, Planner, Duel, price-fixture and ownership changes plus the already
+observed 30 px desktop pane-width drift, with no unexplained clipping, overlap,
+wrong pane, private player/import data, secret, local path or raw diagnostic.
+Two independent read-only comparisons against the ignored candidate pass 20/20
+in 42.6 and 49.2 seconds, establishing local determinism.
+
+The semantic setup steps and complete functional suite remain green, so the
+old tracked-baseline result was retained as review evidence rather than
+classified as a functional regression. The user then explicitly accepted the
+reviewed set. `npm run test:e2e:visual:update` changed exactly the 29 significant
+PNG mismatches, left Dense Compare tablet, Cannon desktop and the comparator
+configuration untouched, and completed 20/20 scenarios. Two subsequent
+independent `npm run test:e2e:visual` comparisons pass 20/20 in 40.4 and 43.6
+seconds. The current 31-snapshot Darwin baseline is therefore reviewed and
+green. The grouped review and exact snapshot set are recorded in [the visual
+regression specification](../technical/visual-regression-spec.md#2026-07-19-release-readiness-candidate-review).
+
 ## 2026-07-17 PriceSet import discoverability
 
 D-102 implementation validation confirms that full-PriceSet transfer now has

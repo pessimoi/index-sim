@@ -636,6 +636,9 @@ export function createGeneratedRuntimeReadinessReport(
     const blocker = blockerForSection(section);
     return blocker ? [blocker] : [];
   });
+  if (source === "generated-static-snapshot" && !input.candidate.gameData.revisionContext) {
+    blockers.unshift("Generated runtime candidate is missing required game revision context.");
+  }
   const dynamicLootDependencies = auditDynamicLootMarketDependencies(input.candidate.gameData);
 
   return {

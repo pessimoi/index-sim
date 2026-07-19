@@ -1,32 +1,9 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import type { SetupSelectionOption } from "../state/ui-state";
 import { formatNumber } from "../view-models/formatting";
+import { useNumericDraftField } from "./use-numeric-draft-field";
 
 export type SelectOption = { id: string; label: string; hint?: string };
-
-function numberValue(value: string, fallback: number, min = 1, max = 99): number {
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isFinite(parsed)) return fallback;
-  return Math.max(min, Math.min(max, parsed));
-}
-
-function decimalValue(value: string, fallback: number, min = 0, max = 999): number {
-  const parsed = Number.parseFloat(value);
-  if (!Number.isFinite(parsed)) return fallback;
-  return Math.max(min, Math.min(max, parsed));
-}
-
-function stepDecimalValue(
-  value: string,
-  fallback: number,
-  min: number,
-  max: number,
-  step: number
-): number {
-  const clamped = decimalValue(value, fallback, min, max);
-  if (!(step > 0)) return clamped;
-  return Number((Math.round(clamped / step) * step).toFixed(6));
-}
 
 export function SelectField({
   label,
@@ -364,7 +341,8 @@ export function NumberField({
   onChange,
   min = 1,
   max = 99,
-  disabled = false
+  disabled = false,
+  description
 }: {
   label: string;
   value: number;
@@ -372,20 +350,52 @@ export function NumberField({
   min?: number;
   max?: number;
   disabled?: boolean;
+  description?: string;
 }) {
   const id = useId();
+  const field = useNumericDraftField({
+    value,
+    onChange: (nextValue) => {
+      if (nextValue !== null) onChange(nextValue);
+    },
+    constraints: { kind: "integer", min, max, step: 1, optional: false },
+    disabled,
+    hasDescription: description != null
+  });
   return (
     <div className="field">
       <label htmlFor={id}>{label}</label>
       <input
         id={id}
-        type="number"
+        type="text"
+        inputMode={min < 0 ? "decimal" : "numeric"}
         min={min}
         max={max}
+        step={1}
         disabled={disabled}
-        value={value}
-        onChange={(event) => onChange(numberValue(event.target.value, value, min, max))}
+        value={field.draft}
+        aria-invalid={field.invalid || undefined}
+        aria-describedby={field.describedBy}
+        onChange={field.handleChange}
+        onFocus={field.handleFocus}
+        onBlur={field.handleBlur}
+        onKeyDown={field.handleKeyDown}
       />
+      {description && (
+        <p id={field.descriptionId} className="numeric-field-description">
+          {description}
+        </p>
+      )}
+      {field.feedback && (
+        <p
+          id={field.feedbackId}
+          className={`numeric-field-feedback ${field.feedback.kind}`}
+          role={field.feedback.kind === "external" ? "status" : undefined}
+          aria-live={field.feedback.kind === "external" ? "polite" : undefined}
+        >
+          {field.feedback.message}
+        </p>
+      )}
     </div>
   );
 }
@@ -397,7 +407,8 @@ export function DecimalField({
   min = 0,
   max = 999,
   step = 0.05,
-  disabled = false
+  disabled = false,
+  description
 }: {
   label: string;
   value: number;
@@ -406,21 +417,52 @@ export function DecimalField({
   max?: number;
   step?: number;
   disabled?: boolean;
+  description?: string;
 }) {
   const id = useId();
+  const field = useNumericDraftField({
+    value,
+    onChange: (nextValue) => {
+      if (nextValue !== null) onChange(nextValue);
+    },
+    constraints: { kind: "decimal", min, max, step, optional: false },
+    disabled,
+    hasDescription: description != null
+  });
   return (
     <div className="field">
       <label htmlFor={id}>{label}</label>
       <input
         id={id}
-        type="number"
+        type="text"
+        inputMode="decimal"
         min={min}
         max={max}
         step={step}
         disabled={disabled}
-        value={value}
-        onChange={(event) => onChange(stepDecimalValue(event.target.value, value, min, max, step))}
+        value={field.draft}
+        aria-invalid={field.invalid || undefined}
+        aria-describedby={field.describedBy}
+        onChange={field.handleChange}
+        onFocus={field.handleFocus}
+        onBlur={field.handleBlur}
+        onKeyDown={field.handleKeyDown}
       />
+      {description && (
+        <p id={field.descriptionId} className="numeric-field-description">
+          {description}
+        </p>
+      )}
+      {field.feedback && (
+        <p
+          id={field.feedbackId}
+          className={`numeric-field-feedback ${field.feedback.kind}`}
+          role={field.feedback.kind === "external" ? "status" : undefined}
+          aria-live={field.feedback.kind === "external" ? "polite" : undefined}
+        >
+          {field.feedback.message}
+        </p>
+      )}
     </div>
   );
 }
@@ -434,7 +476,9 @@ export function OptionalNumberField({
   step = 1,
   placeholder,
   resetLabel = "Reset",
-  compactReset = false
+  compactReset = false,
+  disabled = false,
+  description
 }: {
   label: string;
   value: number | null;
@@ -445,41 +489,70 @@ export function OptionalNumberField({
   placeholder?: string;
   resetLabel?: string;
   compactReset?: boolean;
+  disabled?: boolean;
+  description?: string;
 }) {
   const id = useId();
+  const field = useNumericDraftField({
+    value,
+    onChange,
+    constraints: {
+      kind: step === 1 ? "integer" : "decimal",
+      min,
+      max,
+      step,
+      optional: true
+    },
+    disabled,
+    hasDescription: description != null
+  });
   return (
     <div className={`field optional-number-field ${compactReset ? "compact" : ""}`.trim()}>
       <label htmlFor={id}>{label}</label>
       <div className="optional-number-control">
         <input
           id={id}
-          type="number"
+          type="text"
+          inputMode={step === 1 && min >= 0 ? "numeric" : "decimal"}
           min={min}
           max={max}
           step={step}
-          value={value ?? ""}
+          disabled={disabled}
+          value={field.draft}
           placeholder={placeholder}
-          onChange={(event) => {
-            const rawValue = event.target.value;
-            if (rawValue.trim() === "") {
-              onChange(null);
-              return;
-            }
-            const parsed =
-              step === 1 ? numberValue(rawValue, 0, min, max) : decimalValue(rawValue, 0, min, max);
-            onChange(parsed);
-          }}
+          aria-invalid={field.invalid || undefined}
+          aria-describedby={field.describedBy}
+          onChange={field.handleChange}
+          onFocus={field.handleFocus}
+          onBlur={field.handleBlur}
+          onKeyDown={field.handleKeyDown}
         />
         <button
           type="button"
           aria-label={compactReset ? `${resetLabel} ${label}` : undefined}
           title={compactReset ? `${resetLabel} ${label} to derived value` : undefined}
-          disabled={value == null}
-          onClick={() => onChange(null)}
+          disabled={disabled || value == null}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={field.resetOptional}
         >
           {compactReset ? "↺" : resetLabel}
         </button>
       </div>
+      {description && (
+        <p id={field.descriptionId} className="numeric-field-description">
+          {description}
+        </p>
+      )}
+      {field.feedback && (
+        <p
+          id={field.feedbackId}
+          className={`numeric-field-feedback ${field.feedback.kind}`}
+          role={field.feedback.kind === "external" ? "status" : undefined}
+          aria-live={field.feedback.kind === "external" ? "polite" : undefined}
+        >
+          {field.feedback.message}
+        </p>
+      )}
     </div>
   );
 }

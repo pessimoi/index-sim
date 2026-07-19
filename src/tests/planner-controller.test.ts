@@ -11,10 +11,11 @@ import {
   type PlannerCalculationController,
   type UsePlannerCalculationInput
 } from "../app/controllers/use-planner-calculation";
-import { createDefaultPlannerUiState } from "../app/state/planner";
+import { PlannerUiStateSchema, createDefaultPlannerUiState } from "../app/state/planner";
 import { DEFAULT_FORM_STATE } from "../app/state/ui-state";
 import type { PlannerPanelViewModel } from "../app/view-models/planner";
 import type { SimulationContext } from "../domain/shared";
+import { xpAt } from "../domain/planner";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT =
   true;
@@ -221,6 +222,75 @@ describe("Planner calculation controller", () => {
     expect(requests).toHaveLength(3);
     expect(requests[2]!.form).toBe(changedForm);
     expect(requests[2]!.plannerState.metric).toBe("dps");
+  });
+
+  it("reconciles live-level draft and computed XP before starting the replacement source", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const requests: PlannerCalculationRequest[] = [];
+    const resolvers: Array<(value: PlannerPanelViewModel) => void> = [];
+    const cancels: Array<ReturnType<typeof vi.fn>> = [];
+    const startTask = (request: PlannerCalculationRequest) => {
+      requests.push(request);
+      const cancel = vi.fn();
+      cancels.push(cancel);
+      return {
+        promise: new Promise<PlannerPanelViewModel>((resolve) => resolvers.push(resolve)),
+        cancel
+      } satisfies RunningCalculationTask<PlannerCalculationRequest>;
+    };
+    const oldForm = {
+      ...DEFAULT_FORM_STATE,
+      levels: { ...DEFAULT_FORM_STATE.levels, attack: 60 }
+    };
+    const draftState = PlannerUiStateSchema.parse({
+      ...createDefaultPlannerUiState(oldForm),
+      currentXp: {
+        ...createDefaultPlannerUiState(oldForm).currentXp,
+        attack: xpAt(60) + 10
+      },
+      targetLevels: {
+        ...createDefaultPlannerUiState(oldForm).targetLevels,
+        attack: 60
+      }
+    });
+    const onDraftReconciled = vi.fn();
+    let controller: PlannerCalculationController | null = null;
+    const render = async (input: UsePlannerCalculationInput) => {
+      await act(async () => {
+        root.render(
+          createElement(PlannerHarness, {
+            input,
+            startTask,
+            capture: (value) => {
+              controller = value;
+            }
+          })
+        );
+      });
+    };
+
+    const initial = plannerInput(context, { form: oldForm, draftState, onDraftReconciled });
+    await render(initial);
+    expect(requests).toHaveLength(1);
+    expect(requests[0]!.plannerState.currentXp.attack).toBe(xpAt(60) + 10);
+
+    const newForm = { ...oldForm, levels: { ...oldForm.levels, attack: 61 } };
+    await render({ ...initial, form: newForm });
+    expect(onDraftReconciled).toHaveBeenCalled();
+    expect(onDraftReconciled.mock.calls.at(-1)?.[0]).toMatchObject({
+      currentXp: { attack: 0 },
+      targetLevels: { attack: 61 }
+    });
+    expect(requests.at(-1)?.plannerState).toMatchObject({
+      currentXp: { attack: 0 },
+      targetLevels: { attack: 61 }
+    });
+    expect(cancels[0]).toHaveBeenCalledOnce();
+
+    await act(async () => resolvers[0]!(panelFixture()));
+    expect(controller!.panel).toBeNull();
+    await act(async () => resolvers.at(-1)!(panelFixture()));
+    expect(controller!.panel).not.toBeNull();
   });
 
   it("keeps status precedence and the fixed Planner error contract", async () => {

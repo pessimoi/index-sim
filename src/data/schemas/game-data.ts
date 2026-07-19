@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  type GameDataRevisionContext,
   type GameDataSnapshot,
   ITEM_REQUIREMENT_SKILLS,
   type ItemDefinition,
@@ -14,6 +15,32 @@ export const NumericSchema = z.number().finite();
 export const NonNegativeNumberSchema = NumericSchema.min(0);
 export const ProbabilitySchema = NonNegativeNumberSchema.max(1);
 export const EntityIdSchema = z.string().min(1);
+
+const GameDataSourceNameSchema = z.string().trim().min(1).max(120);
+const GameDataSourceCommitSchema = z.string().regex(/^[0-9a-f]{7,64}$/);
+const GeneratedAtSchema = z.iso.datetime({ offset: true }).max(64);
+
+export const GameDataRevisionContextSchema: z.ZodType<GameDataRevisionContext> = z
+  .object({
+    gameRevision: z.number().int().min(1).max(9_999),
+    sourceName: GameDataSourceNameSchema,
+    sourceCommit: GameDataSourceCommitSchema.optional(),
+    generatedAt: GeneratedAtSchema
+  })
+  .strict();
+
+export const GameDataSourcePinRevisionSchema = z
+  .object({
+    source: z
+      .object({
+        name: GameDataSourceNameSchema,
+        revision: z.string().regex(/^[1-9][0-9]{0,3}$/),
+        commit: GameDataSourceCommitSchema.optional()
+      })
+      .passthrough(),
+    generatedAt: GeneratedAtSchema
+  })
+  .passthrough();
 
 export const DataProvenanceSchema = z.object({
   source: z.enum(["generated", "manual", "scraped", "approximation", "hypothetical"]),
@@ -358,6 +385,7 @@ export const GameDataSnapshotSchema = z
   .object({
     id: EntityIdSchema,
     label: z.string().min(1),
+    revisionContext: GameDataRevisionContextSchema.optional(),
     items: z.record(EntityIdSchema, ItemDefinitionSchema),
     monsters: z.record(EntityIdSchema, MonsterDefinitionSchema),
     weapons: z.record(EntityIdSchema, WeaponDefinitionSchema),
@@ -407,4 +435,30 @@ export const GameDataSnapshotSchema = z
 
 export function parseGameDataSnapshot(input: unknown): GameDataSnapshot {
   return GameDataSnapshotSchema.parse(input) as GameDataSnapshot;
+}
+
+export function requireGameDataRevisionContext(
+  snapshot: GameDataSnapshot
+): GameDataRevisionContext {
+  if (!snapshot.revisionContext) {
+    throw new Error("Generated runtime game data is missing revision context.");
+  }
+  return snapshot.revisionContext;
+}
+
+export function assertGameDataSourcePinAgreement(
+  snapshot: GameDataSnapshot,
+  sourcePin: unknown
+): GameDataRevisionContext {
+  const context = requireGameDataRevisionContext(snapshot);
+  const pin = GameDataSourcePinRevisionSchema.parse(sourcePin);
+  const matches =
+    Number(pin.source.revision) === context.gameRevision &&
+    pin.source.name === context.sourceName &&
+    (pin.source.commit ?? null) === (context.sourceCommit ?? null) &&
+    pin.generatedAt === context.generatedAt;
+  if (!matches) {
+    throw new Error("Generated game-data revision context does not match source-pin.json.");
+  }
+  return context;
 }

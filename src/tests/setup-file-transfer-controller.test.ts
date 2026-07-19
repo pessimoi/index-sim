@@ -4,7 +4,13 @@ import {
   describeSetupFileTransferError,
   type SetupFileTransferDependencies
 } from "../app/controllers/setup-file-transfer";
-import { SETUP_IMPORT_MAX_BYTES, SetupImportError } from "../app/state/setup-import";
+import {
+  REWRITE_SETUP_TRANSFER_KIND,
+  REWRITE_SETUP_TRANSFER_VERSION,
+  SETUP_IMPORT_MAX_BYTES,
+  SetupImportError,
+  createRewriteSetupTransferEnvelope
+} from "../app/state/setup-import";
 import {
   DEFAULT_FORM_STATE,
   REWRITE_SETUP_VERSION,
@@ -20,11 +26,25 @@ interface TestFile {
 }
 
 function setupFixture(monsterId = "dagannoth"): SavedSetupState {
-  return savedSetupFromForm({
+  const form = {
     ...DEFAULT_FORM_STATE,
     monsterId,
     levels: { ...DEFAULT_FORM_STATE.levels, attack: 73, strength: 74 }
-  });
+  };
+  return savedSetupFromForm(
+    form,
+    {
+      sort: { key: "monsterName", direction: "asc" },
+      monsterFilter: "dragon",
+      dropFilter: "bones",
+      showIrrelevant: true,
+      irrelevantMonsterIds: ["rock_crab"]
+    },
+    { [monsterId]: { enabled: true, targets: 4, respawnSec: 45 } },
+    { [monsterId]: form },
+    form,
+    "custom"
+  );
 }
 
 function setupEnvelope(setup = setupFixture()): string {
@@ -46,129 +66,141 @@ function deferred<T>() {
 }
 
 function controller(overrides: Partial<SetupFileTransferDependencies<TestFile>> = {}) {
-  const events: string[] = [];
   const downloads: Array<{ fileName: string; value: unknown }> = [];
-  const readFileText = vi.fn(async (file: TestFile) => {
-    events.push(`read:${file.id}`);
-    return file.text;
-  });
-  const persistSetup = vi.fn(() => {
-    events.push("persist");
-    return true;
-  });
-  const unblockReplaced = vi.fn(() => events.push("unblock:rewrite-setup"));
-  const refreshLocalStateHealth = vi.fn(() => events.push("refresh"));
+  const readFileText = vi.fn(async (file: TestFile) => file.text);
   const downloadJsonFile = vi.fn((fileName: string, value: unknown) => {
     downloads.push({ fileName, value });
   });
   const core = new SetupFileTransferControllerCore<TestFile>({
     readFileText,
-    persistSetup,
-    unblockReplaced,
-    refreshLocalStateHealth,
     downloadJsonFile,
     now: () => FIXED_NOW,
     ...overrides
   });
-  return {
-    core,
-    events,
-    downloads,
-    readFileText,
-    persistSetup,
-    unblockReplaced,
-    refreshLocalStateHealth,
-    downloadJsonFile
-  };
+  return { core, downloads, readFileText, downloadJsonFile };
 }
 
 describe("rewrite setup file-transfer controller", () => {
-  it("starts without a notice and exports the supplied setup without side effects", () => {
+  it("starts idle and exports the supplied setup without changing import state", () => {
+    const { context } = createGeneratedRuntimeContext();
     const setup = setupFixture();
     const harness = controller();
 
-    expect(harness.core.getSnapshot()).toEqual({ notice: null });
+    expect(harness.core.getSnapshot()).toEqual({ phase: "idle", notice: null, review: null });
+    harness.core.exportSetup(setup, context.gameData);
 
-    harness.core.exportSetup(setup);
-
-    expect(harness.downloadJsonFile).toHaveBeenCalledTimes(1);
     expect(harness.downloads).toEqual([
       {
         fileName: "index-sim-rewrite-setup.json",
         value: {
-          version: REWRITE_SETUP_VERSION,
-          savedAt: FIXED_NOW.toISOString(),
+          kind: REWRITE_SETUP_TRANSFER_KIND,
+          version: REWRITE_SETUP_TRANSFER_VERSION,
+          exportedAt: FIXED_NOW.toISOString(),
+          context: {
+            gameDataId: context.gameData.id,
+            gameRevision: 274
+          },
           data: setup
         }
       }
     ]);
-    expect(harness.persistSetup).not.toHaveBeenCalled();
-    expect(harness.unblockReplaced).not.toHaveBeenCalled();
-    expect(harness.refreshLocalStateHealth).not.toHaveBeenCalled();
-    expect(harness.core.getSnapshot()).toEqual({ notice: null });
+    expect(harness.core.getSnapshot()).toEqual({ phase: "idle", notice: null, review: null });
   });
 
-  it("returns the exact validated setup and sequences persistence before recovery", async () => {
+  it("prepares one validated in-memory review with resolved bounded metadata", async () => {
     const { context } = createGeneratedRuntimeContext();
     const setup = setupFixture();
     const harness = controller();
     const listener = vi.fn();
-    const unsubscribe = harness.core.subscribe(listener);
+    harness.core.subscribe(listener);
 
-    const outcome = await harness.core.importFile(
+    const outcome = await harness.core.prepareImport(
       { id: "valid", text: setupEnvelope(setup) },
       context.gameData
     );
 
-    expect(outcome).toEqual({
-      status: "ready",
-      setup,
-      persisted: true,
-      appStatus: "Imported rewrite setup"
-    });
+    expect(outcome).toEqual({ status: "review", reviewId: 1 });
     expect(harness.readFileText).toHaveBeenCalledWith(
       expect.objectContaining({ id: "valid" }),
       SETUP_IMPORT_MAX_BYTES
     );
-    expect(harness.persistSetup).toHaveBeenCalledTimes(1);
-    expect(harness.persistSetup).toHaveBeenCalledWith(setup);
-    expect(harness.unblockReplaced).toHaveBeenCalledWith(["rewrite-setup"]);
-    expect(harness.refreshLocalStateHealth).toHaveBeenCalledTimes(1);
-    expect(harness.events).toEqual(["read:valid", "persist", "unblock:rewrite-setup", "refresh"]);
-    expect(harness.core.getSnapshot().notice).toEqual({
-      tone: "success",
-      message: "Imported rewrite setup."
+    expect(harness.core.getSnapshot()).toMatchObject({
+      phase: "review",
+      notice: null,
+      review: {
+        id: 1,
+        setup,
+        context: {
+          match: "unknown",
+          tone: "warning",
+          source: null
+        },
+        summary: {
+          targetLabel: context.gameData.monsters.dagannoth?.name,
+          combatStyle: "melee",
+          setupMode: "custom",
+          customSetupCount: 1,
+          cannonMonsterCount: 1,
+          denseSort: { key: "monsterName", direction: "asc" },
+          irrelevantMonsterCount: 1
+        }
+      }
     });
-    expect(listener).toHaveBeenCalledTimes(1);
-
-    unsubscribe();
+    expect(listener).toHaveBeenCalledTimes(2);
   });
 
-  it("keeps a valid import ready when persistence is unavailable", async () => {
+  it("carries exact and mismatched contextual files into review without applying them", async () => {
     const { context } = createGeneratedRuntimeContext();
-    const setup = setupFixture();
-    const persistSetup = vi.fn(() => false);
-    const harness = controller({ persistSetup });
+    const exact = createRewriteSetupTransferEnvelope(setupFixture(), context.gameData, FIXED_NOW);
+    const harness = controller();
 
-    const outcome = await harness.core.importFile(
-      { id: "session-only", text: setupEnvelope(setup) },
+    await harness.core.prepareImport(
+      { id: "exact", text: JSON.stringify(exact) },
       context.gameData
     );
+    expect(harness.core.getSnapshot().review?.context).toMatchObject({
+      match: "exact-snapshot",
+      tone: "ready"
+    });
 
-    expect(outcome).toEqual({
-      status: "ready",
-      setup,
-      persisted: false,
-      appStatus: "Imported rewrite setup for this session"
-    });
-    expect(persistSetup).toHaveBeenCalledOnce();
-    expect(harness.unblockReplaced).toHaveBeenCalledWith(["rewrite-setup"]);
-    expect(harness.refreshLocalStateHealth).toHaveBeenCalledOnce();
-    expect(harness.core.getSnapshot().notice).toEqual({
-      tone: "success",
+    const different = structuredClone(exact);
+    different.context.gameRevision = 273;
+    await harness.core.prepareImport(
+      { id: "different", text: JSON.stringify(different) },
+      context.gameData
+    );
+    expect(harness.core.getSnapshot().review?.context).toMatchObject({
+      match: "different-revision",
+      tone: "warning",
       message:
-        "Imported rewrite setup for this session. Local storage is unavailable, so changes may not persist after reload."
+        "Created for Revision 273; this app uses Revision 274. Available ids are compatible, but combat, loot and requirements may differ."
     });
+  });
+
+  it("dismisses or consumes only the current review and consumes it once", async () => {
+    const { context } = createGeneratedRuntimeContext();
+    const setup = setupFixture();
+    const harness = controller();
+
+    await harness.core.prepareImport(
+      { id: "dismiss", text: setupEnvelope(setup) },
+      context.gameData
+    );
+    expect(harness.core.dismissReview(999)).toBe(false);
+    expect(harness.core.dismissReview(1)).toBe(true);
+    expect(harness.core.consumeReview(1)).toBeNull();
+
+    await harness.core.prepareImport(
+      { id: "consume", text: setupEnvelope(setup) },
+      context.gameData
+    );
+    expect(harness.core.consumeReview(1)).toBeNull();
+    expect(harness.core.consumeReview(2)).toMatchObject({
+      setup,
+      context: { match: "unknown" }
+    });
+    expect(harness.core.consumeReview(2)).toBeNull();
+    expect(harness.core.getSnapshot()).toEqual({ phase: "idle", notice: null, review: null });
   });
 
   it("maps browser-reader and UTF-8 parser size failures to the same fixed copy", async () => {
@@ -178,14 +210,13 @@ describe("rewrite setup file-transfer controller", () => {
         throw new Error(`File exceeds ${SETUP_IMPORT_MAX_BYTES} bytes`);
       })
     });
-
-    await expect(
-      readerFailure.core.importFile({ id: "reader-large", text: "" }, context.gameData)
-    ).resolves.toEqual({ status: "rejected" });
-
     const parserFailure = controller();
+
     await expect(
-      parserFailure.core.importFile(
+      readerFailure.core.prepareImport({ id: "reader-large", text: "" }, context.gameData)
+    ).resolves.toEqual({ status: "rejected" });
+    await expect(
+      parserFailure.core.prepareImport(
         { id: "utf8-large", text: "é".repeat(SETUP_IMPORT_MAX_BYTES / 2 + 1) },
         context.gameData
       )
@@ -196,10 +227,16 @@ describe("rewrite setup file-transfer controller", () => {
       message:
         "Setup import failed: the file is too large. Choose an exported setup JSON under 250 KB."
     };
-    expect(readerFailure.core.getSnapshot().notice).toEqual(expectedNotice);
-    expect(parserFailure.core.getSnapshot().notice).toEqual(expectedNotice);
-    expect(readerFailure.persistSetup).not.toHaveBeenCalled();
-    expect(parserFailure.persistSetup).not.toHaveBeenCalled();
+    expect(readerFailure.core.getSnapshot()).toEqual({
+      phase: "idle",
+      notice: expectedNotice,
+      review: null
+    });
+    expect(parserFailure.core.getSnapshot()).toEqual({
+      phase: "idle",
+      notice: expectedNotice,
+      review: null
+    });
   });
 
   it.each([
@@ -223,13 +260,13 @@ describe("rewrite setup file-transfer controller", () => {
         `"version":${REWRITE_SETUP_VERSION + 1}`
       ),
       message:
-        "Setup import failed: this app only supports rewrite setup version 3. Export a fresh setup and try again."
+        "Setup import failed: this app supports contextual setup file version 1 or legacy rewrite setup version 3. Export a fresh setup and try again."
     },
     {
       label: "invalid data",
       text: JSON.stringify({
         version: REWRITE_SETUP_VERSION,
-        savedAt: "2026-07-12T00:00:00.000Z",
+        savedAt: FIXED_NOW.toISOString(),
         data: {}
       }),
       message: "Setup import failed: the file is not a valid rewrite setup export."
@@ -243,60 +280,37 @@ describe("rewrite setup file-transfer controller", () => {
       })(),
       message: "Setup import failed: the setup references data unavailable in this game version."
     }
-  ])("rejects $label without persistence or recovery", async ({ text, message }) => {
+  ])("rejects $label without creating a review", async ({ text, message }) => {
     const { context } = createGeneratedRuntimeContext();
     const harness = controller();
 
-    const outcome = await harness.core.importFile({ id: "invalid", text }, context.gameData);
-
-    expect(outcome).toEqual({ status: "rejected" });
-    expect(harness.core.getSnapshot().notice).toMatchObject({ tone: "error", message });
+    await expect(
+      harness.core.prepareImport({ id: "invalid", text }, context.gameData)
+    ).resolves.toEqual({ status: "rejected" });
+    expect(harness.core.getSnapshot()).toMatchObject({
+      phase: "idle",
+      notice: { tone: "error", message },
+      review: null
+    });
     expect(JSON.stringify(harness.core.getSnapshot())).not.toContain("private_missing_monster");
-    expect(harness.persistSetup).not.toHaveBeenCalled();
-    expect(harness.unblockReplaced).not.toHaveBeenCalled();
-    expect(harness.refreshLocalStateHealth).not.toHaveBeenCalled();
   });
 
-  it("sanitizes unexpected reader and persistence failures without mutation authority", async () => {
+  it("sanitizes unexpected reader failures and parser issue details", async () => {
     const { context } = createGeneratedRuntimeContext();
-    const readerFailure = controller({
+    const harness = controller({
       readFileText: vi.fn(async () => {
         throw new Error("private reader failure at /Users/person/secret.json");
       })
     });
-    const readerOutcome = await readerFailure.core.importFile(
-      { id: "reader-failure", text: "" },
-      context.gameData
-    );
-    expect(readerOutcome).toEqual({ status: "rejected" });
-    expect(readerFailure.core.getSnapshot().notice).toEqual({
-      tone: "error",
-      message: "Setup import failed. Check the file and try again."
-    });
-    expect(JSON.stringify(readerFailure.core.getSnapshot())).not.toContain("private reader");
 
-    const persistSetup = vi.fn(() => {
-      throw new Error("private persistence failure at C:\\Users\\person\\secret.json");
+    await harness.core.prepareImport({ id: "reader-failure", text: "" }, context.gameData);
+    expect(harness.core.getSnapshot()).toEqual({
+      phase: "idle",
+      notice: { tone: "error", message: "Setup import failed. Check the file and try again." },
+      review: null
     });
-    const persistenceFailure = controller({ persistSetup });
-    const persistenceOutcome = await persistenceFailure.core.importFile(
-      { id: "persist-failure", text: setupEnvelope() },
-      context.gameData
-    );
-    expect(persistenceOutcome).toEqual({ status: "rejected" });
-    expect(persistSetup).toHaveBeenCalledOnce();
-    expect(persistenceFailure.unblockReplaced).not.toHaveBeenCalled();
-    expect(persistenceFailure.refreshLocalStateHealth).not.toHaveBeenCalled();
-    expect(persistenceFailure.core.getSnapshot().notice).toEqual({
-      tone: "error",
-      message: "Setup import failed. Check the file and try again."
-    });
-    expect(JSON.stringify(persistenceFailure.core.getSnapshot())).not.toContain(
-      "private persistence"
-    );
-  });
+    expect(JSON.stringify(harness.core.getSnapshot())).not.toContain("private reader");
 
-  it("bounds, normalizes and path-sanitizes parser issue details", () => {
     const notice = describeSetupFileTransferError(
       new SetupImportError(
         "invalid_data",
@@ -307,11 +321,6 @@ describe("rewrite setup file-transfer controller", () => {
         )
       )
     );
-
-    expect(notice).toMatchObject({
-      tone: "error",
-      message: "Setup import failed: the file is not a valid rewrite setup export."
-    });
     expect(notice.details).toHaveLength(5);
     for (const detail of notice.details ?? []) {
       expect(detail.length).toBeLessThanOrEqual(180);
@@ -321,36 +330,42 @@ describe("rewrite setup file-transfer controller", () => {
     }
   });
 
-  it("preserves settlement order without hidden sequencing or cancellation", async () => {
+  it("keeps only the latest attempt when reads settle out of order", async () => {
     const { context } = createGeneratedRuntimeContext();
     const firstRead = deferred<string>();
     const secondRead = deferred<string>();
-    const persistedMonsterIds: string[] = [];
     const harness = controller({
-      readFileText: (file) => (file.id === "first" ? firstRead.promise : secondRead.promise),
-      persistSetup: (setup) => {
-        persistedMonsterIds.push(setup.form.monsterId);
-        return true;
-      }
+      readFileText: (file) => (file.id === "first" ? firstRead.promise : secondRead.promise)
     });
-    const firstSetup = setupFixture("dagannoth");
-    const secondSetup = setupFixture("rock_crab");
+    const firstOutcome = harness.core.prepareImport({ id: "first", text: "" }, context.gameData);
+    const secondOutcome = harness.core.prepareImport({ id: "second", text: "" }, context.gameData);
 
-    const firstOutcome = harness.core.importFile({ id: "first", text: "" }, context.gameData);
-    const secondOutcome = harness.core.importFile({ id: "second", text: "" }, context.gameData);
-
-    secondRead.resolve(setupEnvelope(secondSetup));
-    await expect(secondOutcome).resolves.toMatchObject({
-      status: "ready",
+    secondRead.resolve(setupEnvelope(setupFixture("rock_crab")));
+    await expect(secondOutcome).resolves.toEqual({ status: "review", reviewId: 2 });
+    firstRead.resolve(setupEnvelope(setupFixture("dagannoth")));
+    await expect(firstOutcome).resolves.toEqual({ status: "stale" });
+    expect(harness.core.getSnapshot().review).toMatchObject({
+      id: 2,
       setup: { form: { monsterId: "rock_crab" } }
     });
-    firstRead.resolve(setupEnvelope(firstSetup));
-    await expect(firstOutcome).resolves.toMatchObject({
-      status: "ready",
-      setup: { form: { monsterId: "dagannoth" } }
+  });
+
+  it("ignores a late error from an invalidated attempt", async () => {
+    const { context } = createGeneratedRuntimeContext();
+    const firstRead = deferred<string>();
+    const harness = controller({
+      readFileText: (file) =>
+        file.id === "first" ? firstRead.promise : Promise.resolve(setupEnvelope())
     });
-    expect(persistedMonsterIds).toEqual(["rock_crab", "dagannoth"]);
-    expect(harness.unblockReplaced).toHaveBeenCalledTimes(2);
-    expect(harness.refreshLocalStateHealth).toHaveBeenCalledTimes(2);
+    const firstOutcome = harness.core.prepareImport({ id: "first", text: "" }, context.gameData);
+    await harness.core.prepareImport({ id: "second", text: "" }, context.gameData);
+
+    firstRead.reject(new Error("private stale error"));
+    await expect(firstOutcome).resolves.toEqual({ status: "stale" });
+    expect(harness.core.getSnapshot()).toMatchObject({
+      phase: "review",
+      notice: null,
+      review: { id: 2 }
+    });
   });
 });

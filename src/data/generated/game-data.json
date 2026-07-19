@@ -24231,6 +24231,12 @@
       }
     }
   },
+  "revisionContext": {
+    "gameRevision": 274,
+    "generatedAt": "2026-07-09T00:00:00.000Z",
+    "sourceCommit": "376072662e78a314bf35bb18815be39521491a6b",
+    "sourceName": "LostCityRS/Content"
+  },
   "spells": {
     "claws_of_guthix": {
       "base": 20,

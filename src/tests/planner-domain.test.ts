@@ -10,9 +10,11 @@ import {
   defaultPool,
   equippable,
   evaluatePlannerCandidate,
+  plannerXpBounds,
   requirementForItem,
   reqLevel,
-  trainingStanceId
+  trainingStanceId,
+  xpAt
 } from "../domain/planner";
 import { sumEquipmentBonuses } from "../domain/equipment";
 import type { SimulationContext } from "../domain/shared";
@@ -56,6 +58,28 @@ function withGeneratedRequirement(
     }
   };
 }
+
+describe("planner XP bounds", () => {
+  it("uses the canonical inclusive interval at levels 1, 98 and 99", () => {
+    expect(plannerXpBounds(1)).toEqual({ level: 1, min: 0, max: xpAt(2) - 1 });
+    expect(plannerXpBounds(98)).toEqual({
+      level: 98,
+      min: xpAt(98),
+      max: xpAt(99) - 1
+    });
+    expect(plannerXpBounds(99)).toEqual({
+      level: 99,
+      min: xpAt(99),
+      max: 200_000_000
+    });
+  });
+
+  it("normalizes out-of-range and fractional levels before resolving bounds", () => {
+    expect(plannerXpBounds(0)).toEqual(plannerXpBounds(1));
+    expect(plannerXpBounds(60.9)).toEqual(plannerXpBounds(60));
+    expect(plannerXpBounds(120)).toEqual(plannerXpBounds(99));
+  });
+});
 
 describe("planner requirements and candidate pools", () => {
   it("keeps gear eligibility as explicit planner policy", () => {

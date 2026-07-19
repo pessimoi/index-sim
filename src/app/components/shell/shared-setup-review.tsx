@@ -28,11 +28,9 @@ export function SharedSetupReview({
             <span>{viewModel.lootChoiceLabel}</span>
             <span>Uses your current prices</span>
           </div>
-          {viewModel.gameDataWarning && (
-            <p className="inline-status warning" role="status">
-              {viewModel.gameDataWarning}
-            </p>
-          )}
+          <p className={`inline-status ${viewModel.contextTone}`} role="status">
+            {viewModel.contextMessage}
+          </p>
           {viewModel.droppedLootWarning && (
             <p className="inline-status warning" role="status">
               {viewModel.droppedLootWarning}

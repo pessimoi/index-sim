@@ -153,6 +153,18 @@ th {
   min-width: 13rem;
 }
 
+.game-revision-badge {
+  border: 1px solid #40526a;
+  border-radius: 999px;
+  color: #a9dfff;
+  display: inline-flex;
+  font-size: 0.68rem;
+  line-height: 1;
+  margin-top: 0.3rem;
+  padding: 0.25rem 0.45rem;
+  white-space: nowrap;
+}
+
 .topbar-hiscores {
   align-items: end;
   display: grid;
@@ -303,6 +315,134 @@ th {
 .pending-undo-strip button {
   min-height: 2rem;
   padding: 0.35rem 0.65rem;
+}
+
+.local-state-attention-banner {
+  align-items: center;
+  background: #282413;
+  border: 1px solid #826b24;
+  border-radius: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: space-between;
+  min-width: 0;
+  padding: 0.65rem 0.75rem;
+}
+
+.local-state-attention-banner.persistence,
+.local-state-attention-banner.mixed {
+  background: #2b2018;
+  border-color: #8c5c32;
+}
+
+.local-state-attention-copy {
+  display: grid;
+  flex: 1 1 24rem;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.local-state-attention-copy h2,
+.local-state-attention-copy p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.local-state-attention-copy h2 {
+  color: #fff0b8;
+  font-size: 0.88rem;
+}
+
+.local-state-attention-copy p {
+  color: #d8e2f0;
+  font-size: 0.78rem;
+}
+
+.local-state-attention-copy .local-state-attention-areas {
+  color: #c2ad75;
+  font-size: 0.72rem;
+}
+
+.local-state-attention-banner button {
+  flex: 0 0 auto;
+  min-height: 2.15rem;
+}
+
+.setup-import-review {
+  background: #171f24;
+  border: 1px solid #3b7868;
+  border-radius: 6px;
+  display: grid;
+  gap: 0.65rem;
+  min-width: 0;
+  padding: 0.75rem;
+}
+
+.setup-import-review-heading {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  justify-content: space-between;
+}
+
+.setup-import-review-heading h2,
+.setup-import-review p {
+  margin: 0;
+}
+
+.setup-import-review-heading h2 {
+  color: #eef2f7;
+  font-size: 0.9rem;
+}
+
+.setup-import-review-summary {
+  display: grid;
+  gap: 0.4rem;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  margin: 0;
+}
+
+.setup-import-review-summary div {
+  background: #141a20;
+  border: 1px solid #2a3544;
+  border-radius: 4px;
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+  padding: 0.45rem 0.55rem;
+}
+
+.setup-import-review-summary dt {
+  color: #8f9cac;
+  font-size: 0.68rem;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.setup-import-review-summary dd {
+  color: #eef2f7;
+  font-size: 0.8rem;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.setup-import-review > p {
+  color: #c5d0dd;
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+}
+
+.setup-import-review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.setup-import-review-actions .primary-action {
+  background: #184f40;
+  border-color: #42b993;
 }
 
 .share-setup-dialog {
@@ -3012,6 +3152,67 @@ th {
   margin: 0.5rem 0;
 }
 
+.duel-import-review {
+  background: #171f24;
+  border: 1px solid #3b7868;
+  border-radius: 6px;
+  display: grid;
+  gap: 0.6rem;
+  margin: 0.5rem 0;
+  min-width: 0;
+  padding: 0.7rem;
+}
+
+.duel-import-review h3,
+.duel-import-review p {
+  margin: 0;
+}
+
+.duel-import-review h3 {
+  color: #eef2f7;
+  font-size: 0.86rem;
+}
+
+.duel-import-review-summary {
+  display: grid;
+  gap: 0.4rem;
+  grid-template-columns: repeat(4, minmax(6.5rem, 1fr));
+  margin: 0;
+  min-width: 0;
+}
+
+.duel-import-review-summary div {
+  background: #141a20;
+  border: 1px solid #2a3544;
+  border-radius: 4px;
+  min-width: 0;
+  padding: 0.4rem 0.5rem;
+}
+
+.duel-import-review-summary dt {
+  color: #8f9cac;
+  font-size: 0.65rem;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.duel-import-review-summary dd {
+  color: #eef2f7;
+  font-size: 0.8rem;
+  margin: 0.15rem 0 0;
+}
+
+.duel-import-review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.duel-import-review-actions .primary-action {
+  background: #184f40;
+  border-color: #42b993;
+}
+
 .duel-view-toggle {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   margin: 0.35rem 0 0.5rem;
@@ -3242,7 +3443,7 @@ th {
 
 .duel-matrix-panel {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  gap: 0.65rem;
   min-height: 16rem;
   min-width: 0;
 }
@@ -3271,6 +3472,22 @@ th {
 .duel-matrix-metrics {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   margin: 0;
+}
+
+.duel-matrix-lifecycle {
+  background: #111821;
+  border: 1px solid #314052;
+  border-radius: 0.35rem;
+  color: #aeb9c8;
+  margin: 0;
+  overflow-wrap: anywhere;
+  padding: 0.55rem 0.65rem;
+}
+
+.duel-matrix-lifecycle.failed {
+  background: #241517;
+  border-color: #754047;
+  color: #ffb9b2;
 }
 
 .duel-matrix-wrap {
@@ -3943,6 +4160,46 @@ th {
   min-width: 0;
 }
 
+.calculation-context-panel {
+  border-bottom: 1px solid #26303d;
+  padding-bottom: 0.75rem;
+}
+
+.calculation-context-grid {
+  display: grid;
+  gap: 0.45rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  margin: 0.55rem 0 0;
+}
+
+.calculation-context-grid > div {
+  background: #111821;
+  border: 1px solid #2d3948;
+  border-radius: 4px;
+  min-width: 0;
+  padding: 0.45rem 0.55rem;
+}
+
+.calculation-context-grid dt {
+  color: #7f8b9a;
+  font-size: 0.64rem;
+  text-transform: uppercase;
+}
+
+.calculation-context-grid dd {
+  color: #d8dee8;
+  font-size: 0.76rem;
+  margin: 0.18rem 0 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.calculation-context-grid code {
+  color: inherit;
+  white-space: normal;
+  word-break: break-all;
+}
+
 .dense-table-panel {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
@@ -4284,6 +4541,31 @@ th {
   color: #6d7785;
   cursor: not-allowed;
   opacity: 0.75;
+}
+
+.field input[aria-invalid="true"] {
+  border-color: #db7167;
+  box-shadow: inset 0 0 0 1px #db7167;
+}
+
+.numeric-field-description,
+.numeric-field-feedback {
+  font-size: 0.68rem;
+  line-height: 1.3;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.numeric-field-description {
+  color: #8f9cac;
+}
+
+.numeric-field-feedback.error {
+  color: #ffb4a9;
+}
+
+.numeric-field-feedback.external {
+  color: #9bdcc8;
 }
 
 .readonly-field output {
@@ -5316,6 +5598,30 @@ th {
   .topbar {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .local-state-attention-banner {
+    align-items: stretch;
+  }
+
+  .local-state-attention-banner button {
+    width: 100%;
+  }
+
+  .setup-import-review-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .setup-import-review-actions button {
+    width: 100%;
+  }
+
+  .duel-import-review-summary {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .duel-import-review-actions button {
+    width: 100%;
   }
 
   .topbar-brand {

@@ -30,12 +30,18 @@
 - [metric-list-presenter-hygiene-spec.md](metric-list-presenter-hygiene-spec.md): implemented generic-presenter ownership and component-API cleanup completed before controller extraction.
 - [runtime-bootstrap-controller-spec.md](runtime-bootstrap-controller-spec.md): implemented generated-runtime lifecycle, compatibility and startup PriceSet resolution extraction preserving the D-094 chunk boundary.
 - [local-state-recovery-controller-spec.md](local-state-recovery-controller-spec.md): implemented browser-state health/block/persist/clear orchestration and pure Settings recovery panel boundary.
+- [local-state-attention-surface-spec.md](local-state-attention-surface-spec.md): implemented always-visible local-state attention notice and direct Settings recovery focus path without migration-policy changes.
 - [hiscores-lookup-controller-spec.md](hiscores-lookup-controller-spec.md): implemented request-race-safe Hiscores lifecycle extraction and topbar panel boundary.
 - [setup-file-transfer-controller-spec.md](setup-file-transfer-controller-spec.md): implemented bounded rewrite setup import/export orchestration and typed caller-owned Apply boundary.
+- [setup-replacement-review-undo-spec.md](setup-replacement-review-undo-spec.md): implemented review-before-Apply and persistence-aware Undo for setup file and saved-row replacement paths.
 - [price-set-transfer-controller-spec.md](price-set-transfer-controller-spec.md): implemented PriceSet import/acceptance/export/reset transaction extraction with typed caller-owned runtime application.
 - [price-set-import-discoverability-spec.md](price-set-import-discoverability-spec.md): implemented D-102 workflow with one advanced Market-owned full-PriceSet disclosure, explicit replacement/format guidance and no topbar/Settings duplicates.
 - [cannon-pane-extraction-spec.md](cannon-pane-extraction-spec.md): implemented first low-coupling feature-pane extraction with explicit calculated presentation and action props.
 - [cannon-finite-occupancy-spec.md](cannon-finite-occupancy-spec.md): implemented D-100 finite sparse occupancy, combined/player-only/cannon-only result separation, cannonball cost routing and aligned Cannon presentation.
+- [numeric-input-draft-validation-spec.md](numeric-input-draft-validation-spec.md): implemented shared draft, validation, keyboard and external-update contract for required, decimal and optional numeric fields.
+- [planner-xp-target-integrity-spec.md](planner-xp-target-integrity-spec.md): implemented Planner Auto-XP, live-level reconciliation and visible effective target/start-XP semantics.
+- [duel-matrix-failure-state-spec.md](duel-matrix-failure-state-spec.md): implemented explicit idle/building/ready/stale/failed Duel matrix lifecycle with visible Retry and retained, labelled previous output.
+- [game-revision-transfer-context-spec.md](game-revision-transfer-context-spec.md): implemented typed active revision plus contextual setup/saved-setup/share external contracts with legacy unknown-context support and unchanged browser persistence versions.
 - [startup-bundle-performance-spec.md](startup-bundle-performance-spec.md): measured cold/warm startup, deterministic entry-JavaScript budgets and generated-runtime bootstrap splitting.
 - [dev-startup-reliability-spec.md](dev-startup-reliability-spec.md): implemented non-empty pre-React startup shell, canonical readiness states, real Vite-dev first-navigation smoke and checked agent localhost handoff.
 - [calculation-worker-measurement-spec.md](calculation-worker-measurement-spec.md): measured production one-shot Worker construction, full-request posting, startup/delivery, execution and response phases; D-095 retains the cancellable lifecycle.

@@ -1,6 +1,9 @@
 import { createScheduledStaticPriceSnapshotStatus } from "../market";
 import generatedGameData from "../../data/generated/game-data.json";
-import { parseGameDataSnapshot } from "../../data/schemas/game-data";
+import {
+  parseGameDataSnapshot,
+  requireGameDataRevisionContext
+} from "../../data/schemas/game-data";
 import type { SimulationContext } from "../../domain/shared";
 import { createGeneratedRuntimePriceSet, generatedItemValues } from "./price-fallback";
 import priceHistoryText from "../../../price-history.json?raw";
@@ -37,6 +40,7 @@ export function createGeneratedRuntimeContext(
   options: GeneratedRuntimeContextOptions = {}
 ): GeneratedRuntimeBootstrapResult {
   const gameData = parseGameDataSnapshot(options.gameData ?? generatedGameData);
+  requireGameDataRevisionContext(gameData);
   const priceStatus = createScheduledStaticPriceSnapshotStatus(
     {
       pricesText: options.pricesText ?? pricesText,

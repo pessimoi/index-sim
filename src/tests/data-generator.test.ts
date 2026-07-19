@@ -261,6 +261,7 @@ describe("game data generator foundation", () => {
       sourceDir: RAW_FIXTURE_SOURCE,
       outputRoot: join(TEST_ROOT, "raw-output"),
       generatedAt: GENERATED_AT,
+      gameRevision: 274,
       skipCalculationImpact: true,
       rawReference: rawReferenceSnapshot()
     });
@@ -285,6 +286,29 @@ describe("game data generator foundation", () => {
     });
     expect(outputs.gameData.weapons.bronze_dart_w.accBonus).toBe(3);
     expect(outputs.gameData.spells.water_strike.baseXp).toBe(7.5);
+    expect(outputs.gameData.revisionContext).toEqual({
+      gameRevision: 274,
+      sourceName: "LostCityRS/Content",
+      generatedAt: GENERATED_AT
+    });
+  });
+
+  it("rejects raw generation without an explicit game revision before writing", () => {
+    const outputRoot = join(TEST_ROOT, "raw-missing-revision-output");
+    const error = expectGeneratorError(
+      () =>
+        writeGeneratedGameDataOutputs({
+          sourceDir: RAW_FIXTURE_SOURCE,
+          outputRoot,
+          generatedAt: GENERATED_AT,
+          skipCalculationImpact: true,
+          rawReference: rawReferenceSnapshot()
+        }),
+      "invalid_argument"
+    );
+
+    expect(error.message).toContain("--game-revision");
+    expect(existsSync(join(outputRoot, GENERATED_GAME_DATA_OUTPUT_PATHS.gameData))).toBe(false);
   });
 
   it("rejects a source path that exists but is not a directory", () => {
@@ -335,7 +359,7 @@ describe("game data generator foundation", () => {
     expect(sourcePin.generatedAt).toBe(GENERATED_AT);
     expect(sourcePin.generator).toMatchObject({
       name: "index-sim-data-generator",
-      version: "raw-lostcity-runtime-catalog-4"
+      version: "raw-lostcity-runtime-catalog-5"
     });
     expect(sourcePin.generator?.command).toContain("npm run data:generate");
     expect(sourcePin.scope).toMatchObject({
@@ -419,6 +443,32 @@ describe("game data generator foundation", () => {
       "cape",
       "ring"
     ]);
+  });
+
+  it("writes one matching explicit revision context to snapshot, source pin and report", () => {
+    const outputs = createGeneratedGameDataOutputs({
+      sourceDir: FIXTURE_SOURCE,
+      outputRoot: join(TEST_ROOT, "revision-context-output"),
+      generatedAt: GENERATED_AT,
+      gameRevision: 274,
+      skipCalculationImpact: true
+    });
+
+    expect(outputs.gameData.revisionContext).toEqual({
+      gameRevision: 274,
+      sourceName: "LostCityRS/Content fixture",
+      sourceCommit: "0000000000000000000000000000000000000274",
+      generatedAt: GENERATED_AT
+    });
+    expect(outputs.sourcePin.source).toMatchObject({
+      name: "LostCityRS/Content fixture",
+      revision: "274",
+      commit: "0000000000000000000000000000000000000274"
+    });
+    expect(outputs.sourcePin.generator.command).toContain("--game-revision 274");
+    expect(outputs.revisionImpactText).toContain(
+      "Source ref: LostCityRS/Content fixture / 274 / 0000000000000000000000000000000000000274"
+    );
   });
 
   it("extracts the source-backed fixture files into simulator game-data slices", () => {
@@ -1216,6 +1266,8 @@ describe("game data generator foundation", () => {
       parseArgs([
         "--source-dir",
         FIXTURE_SOURCE,
+        "--game-revision",
+        "274",
         "--skip-calculation-impact",
         "--impact-case-filter",
         "magic",
@@ -1225,6 +1277,7 @@ describe("game data generator foundation", () => {
       ])
     ).toMatchObject({
       sourceDir: FIXTURE_SOURCE,
+      gameRevision: 274,
       skipCalculationImpact: true,
       impactCaseFilter: "magic",
       impactOutlierLimit: 3,

@@ -45,6 +45,12 @@ describe("generated runtime adapter", () => {
 
     expect(result.source).toBe("generated-static-snapshot");
     expect(result.context.gameData.id).toBe("lostcity-376072662e78-runtime");
+    expect(result.context.gameData.revisionContext).toEqual({
+      gameRevision: 274,
+      sourceName: "LostCityRS/Content",
+      sourceCommit: "376072662e78a314bf35bb18815be39521491a6b",
+      generatedAt: "2026-07-09T00:00:00.000Z"
+    });
     expect(result.context.gameData.provenance?.source).toBe("generated");
     expect(Object.keys(result.context.gameData.monsters)).toContain("giant");
     expect(Object.keys(result.context.gameData.requirements ?? {})).toHaveLength(94);
@@ -82,6 +88,16 @@ describe("generated runtime adapter", () => {
     expect(result.context.priceSet.alchValues.adamant_spear).toBe(1248);
     expect(result.context.priceSet.provenance?.notes).toContain(
       "high-alch values are authoritative generated game data"
+    );
+  });
+
+  it("rejects a generated root candidate without revision context", () => {
+    const current = createGeneratedRuntimeContext();
+    const missingContext = structuredClone(current.context.gameData);
+    delete missingContext.revisionContext;
+
+    expect(() => createGeneratedRuntimeContext({ gameData: missingContext })).toThrow(
+      "missing revision context"
     );
   });
 
@@ -319,6 +335,18 @@ describe("generated runtime adapter", () => {
       exampleLimit: 3
     });
     expect(valueDeltaReport.ready).toBe(true);
+
+    const contextMissingCandidate = structuredClone(generated.context);
+    delete contextMissingCandidate.gameData.revisionContext;
+    const contextMissingReport = createGeneratedRuntimeReadinessReport({
+      reference: legacy.context,
+      candidate: contextMissingCandidate,
+      exampleLimit: 3
+    });
+    expect(contextMissingReport.ready).toBe(false);
+    expect(contextMissingReport.blockers).toContain(
+      "Generated runtime candidate is missing required game revision context."
+    );
 
     delete (candidate.gameData.weapons.rune_scimitar as unknown as Record<string, unknown>).speed;
     delete (candidate.gameData.items.rune_scimitar as unknown as Record<string, unknown>).price;

@@ -3,6 +3,7 @@ import {
   expect,
   expectPageWidthContained,
   expectSearchableSelection,
+  readDownloadText,
   selectCombatType,
   test
 } from "./scaffold-fixture";
@@ -54,6 +55,95 @@ test("recomputes the Planner tab workflow from visible planner controls", async 
       !saved.includes('"iron_scimitar"')
     );
   });
+});
+
+test("keeps Planner Auto XP and effective targets aligned with live levels", async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.goto("/");
+  const tabs = page.getByLabel("Workbench tabs");
+  await tabs.getByRole("tab", { name: "Setups" }).click();
+  const setups = page.getByRole("region", { name: "Setup comparison", exact: true });
+  await setups.getByRole("button", { name: "Save current setup" }).click();
+  await tabs.getByRole("tab", { name: "Planner" }).click();
+  const planner = page.getByRole("region", { name: "Planner", exact: true });
+  const player = page.getByRole("region", { name: "Player setup", exact: true });
+  const attackXp = planner.getByLabel("Attack current XP");
+  const attackTarget = planner.getByLabel("Attack target");
+
+  await expect(planner.getByText("ready")).toBeVisible({ timeout: 30_000 });
+  await expect(attackXp).toHaveValue("");
+  await expect(attackXp).toHaveAttribute("placeholder", /^Auto: \d+$/);
+  await expect(planner).toContainText("the level 60 floor");
+
+  const attackFloor = Number((await attackXp.getAttribute("placeholder"))?.replace("Auto: ", ""));
+  await attackXp.fill(String(attackFloor + 10));
+  await attackTarget.fill("65");
+  await expect(planner).toContainText("Current output uses the last recomputed inputs.");
+
+  await player.getByLabel("ATT", { exact: true }).fill("66");
+  await expect(attackXp).toHaveValue("");
+  await expect(attackTarget).toHaveValue("66");
+  await expect(planner).toContainText("Attack XP uses Auto");
+  await expect(planner).toContainText("Attack target is now 66");
+  await expect(planner).toContainText("the level 66 floor");
+
+  await attackTarget.fill("70");
+  await planner.getByLabel("Lock Attack").check();
+  await player.getByLabel("ATT", { exact: true }).fill("71");
+  await expect(attackTarget).toBeDisabled();
+  await expect(attackTarget).toHaveValue("71");
+  await expect(planner).toContainText("Locked at current level 71; saved target 70 is not used.");
+  await page.waitForFunction(() => {
+    const raw = window.localStorage.getItem("index-sim:planner-ui");
+    return raw !== null && JSON.parse(raw).data.targetLevels.attack === 70;
+  });
+
+  await planner.getByLabel("Lock Attack").uncheck();
+  await expect(attackTarget).toBeEnabled();
+  await expect(attackTarget).toHaveValue("71");
+  await expect(planner).toContainText("Attack target is now 71");
+
+  const nextAttackFloor = Number(
+    (await attackXp.getAttribute("placeholder"))?.replace("Auto: ", "")
+  );
+  await attackXp.fill(String(nextAttackFloor + 10));
+  await attackXp.locator("xpath=following-sibling::button").click();
+  await expect(attackXp).toHaveValue("");
+  await planner.getByRole("button", { name: "Recompute plan" }).click();
+  await expect(planner.getByText("ready")).toBeVisible({ timeout: 30_000 });
+  await expect(planner).not.toContainText("Current output uses the last recomputed inputs.");
+
+  await tabs.getByRole("tab", { name: "Setups" }).click();
+  await setups.getByRole("button", { name: "Load", exact: true }).click();
+  await expect(player.getByLabel("ATT", { exact: true })).toHaveValue("60");
+  await tabs.getByRole("tab", { name: "Planner" }).click();
+  await expect(attackXp).toHaveValue("");
+  await expect(attackTarget).toHaveValue("71");
+  await expect(planner).toContainText("the level 60 floor");
+  await page.getByLabel("Local state undo").getByRole("button", { name: "Undo" }).click();
+  await expect(player.getByLabel("ATT", { exact: true })).toHaveValue("71");
+  await expect(attackXp).toHaveValue("");
+  await expect(attackTarget).toHaveValue("71");
+  await expect(planner).toContainText("the level 71 floor");
+
+  await selectCombatType(page, "magic");
+  await player.getByLabel("MAG", { exact: true }).fill("99");
+  await tabs.getByRole("tab", { name: "Planner" }).click();
+  const magicXp = planner.getByLabel("Magic current XP");
+  const magicTarget = planner.getByLabel("Magic target");
+  await expect(magicTarget).toBeDisabled();
+  await expect(magicTarget).toHaveValue("99");
+  await expect(planner).toContainText("Already at maximum target level 99.");
+  await magicXp.fill("200000000");
+  await expect(magicXp).toHaveValue("200000000");
+
+  await page.reload();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Planner" }).click();
+  const reloadedPlanner = page.getByRole("region", { name: "Planner", exact: true });
+  await expect(reloadedPlanner.getByLabel("Attack current XP")).toHaveValue("");
+  await expect(reloadedPlanner.getByLabel("Attack target")).toHaveValue("71");
+  await expect(reloadedPlanner.getByLabel("Magic current XP")).toHaveValue("200000000");
+  await expect(reloadedPlanner.getByLabel("Magic target")).toBeDisabled();
 });
 
 test("uses saved setup comparison to import export rename load delete and persist setups", async ({
@@ -116,6 +206,15 @@ test("uses saved setup comparison to import export rename load delete and persis
   await duel.getByRole("button", { name: "Export setups" }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe("index-sim-saved-setups.json");
+  const exportedFile = JSON.parse(await readDownloadText(download));
+  expect(exportedFile).toMatchObject({
+    kind: "index-sim-saved-setups",
+    version: 1,
+    context: {
+      gameDataId: "lostcity-376072662e78-runtime",
+      gameRevision: 274
+    }
+  });
 
   await page.reload();
   await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Setups" }).click();
@@ -145,12 +244,35 @@ test("uses saved setup comparison to import export rename load delete and persis
   await expect(setupDiff).toContainText("current target, cannon, loot policy and active prices");
   await hideDiff.click();
   await expect(setupDiff).toHaveCount(0);
+  await page.waitForFunction(() => {
+    const raw = window.localStorage.getItem("index-sim:rewrite-setup");
+    if (!raw) return false;
+    const setup = JSON.parse(raw).data;
+    return setup?.form?.monsterId === "rock_crab" && setup?.form?.combatStyle === "ranged";
+  });
+  const setupBeforeSavedLoad = await page.evaluate(
+    () => JSON.parse(window.localStorage.getItem("index-sim:rewrite-setup") ?? "null").data
+  );
   await reloadedTable.getByRole("button", { name: "Load", exact: true }).click();
   await expect(combatType.getByRole("button", { name: "melee" })).toHaveAttribute(
     "aria-pressed",
     "true"
   );
   await expectSearchableSelection(page.getByLabel("Setup context"), "Monster", "rock_crab");
+  await expect(reloadedTable.getByLabel("Rename saved setup Melee saved")).toBeVisible();
+  const loadUndo = page.getByLabel("Local state undo");
+  await expect(loadUndo).toContainText("Loaded saved setup: Melee saved");
+  await loadUndo.getByRole("button", { name: "Undo" }).click();
+  await expect(combatType.getByRole("button", { name: "ranged" })).toHaveAttribute(
+    "aria-pressed",
+    "true"
+  );
+  await expectSearchableSelection(page.getByLabel("Setup context"), "Monster", "rock_crab");
+  await expect(page.getByLabel("Local state undo")).toHaveCount(0);
+  await page.waitForFunction((expectedSetup) => {
+    const raw = window.localStorage.getItem("index-sim:rewrite-setup");
+    return raw != null && JSON.stringify(JSON.parse(raw).data) === JSON.stringify(expectedSetup);
+  }, setupBeforeSavedLoad);
 
   await page.evaluate(() => window.localStorage.setItem("duel_unrelated_key", "keep"));
   await reloadedTable.getByRole("button", { name: "Delete" }).click();
@@ -185,13 +307,36 @@ test("uses saved setup comparison to import export rename load delete and persis
   });
 
   await reloadedDuel.getByText("Manage saved setups", { exact: true }).click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await reloadedDuel.getByLabel("Import setups").setInputFiles({
+    name: "contextual-duel-snapshots.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(exportedFile))
+  });
+  const exactImportReview = reloadedDuel.getByLabel("Saved setup import review");
+  await expect(exactImportReview).toContainText(
+    "Created with this exact Revision 274 data snapshot."
+  );
+  await expectPageWidthContained(page);
+  await expect(reloadedTable).toContainText("No saved setups");
+  await exactImportReview.getByRole("button", { name: "Dismiss" }).click();
+  await expect(reloadedTable).toContainText("No saved setups");
+
   await reloadedDuel.getByLabel("Import setups").setInputFiles({
     name: "duel-snapshots.json",
     mimeType: "application/json",
     buffer: Buffer.from(exportedSnapshotJson)
   });
+  const importReview = reloadedDuel.getByLabel("Saved setup import review");
+  await expect(importReview).toBeVisible();
+  await expect(importReview).toContainText("Setups in file1");
+  await expect(importReview).toContainText("Add1");
+  await expect(importReview).toContainText("Update0");
+  await expect(importReview).toContainText("older format does not record a game revision");
+  await expect(reloadedTable).toContainText("No saved setups");
+  await importReview.getByRole("button", { name: "Merge setups" }).click();
   await expect(reloadedDuel.getByLabel("Saved setup import notice")).toContainText(
-    "1 added, 0 updated"
+    "using current Revision 274 data: 1 added, 0 updated"
   );
   await expect(reloadedTable.getByLabel("Rename saved setup Melee saved")).toBeVisible();
   await page.waitForFunction(() => {
@@ -243,6 +388,86 @@ test("builds and filters the all-monster saved setup matrix on demand", async ({
   await duel.getByLabel("Find monster in setup comparison").fill("tribesman");
   await expect(matrix.locator("tbody tr")).toHaveCount(1);
   await expect(matrix.getByRole("row", { name: /Tribesman/ })).toBeVisible();
+  await expectPageWidthContained(page);
+});
+
+test("keeps Duel matrix failures recoverable without exposing worker details", async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.addInitScript(() => {
+    const browserWindow = window as unknown as { failNextDuelMatrix: boolean };
+    browserWindow.failNextDuelMatrix = true;
+    const postMessage = Worker.prototype.postMessage as (this: Worker, message: unknown) => void;
+    Worker.prototype.postMessage = function (message: unknown): void {
+      if (
+        browserWindow.failNextDuelMatrix &&
+        typeof message === "object" &&
+        message !== null &&
+        "kind" in message &&
+        message.kind === "duel-matrix"
+      ) {
+        browserWindow.failNextDuelMatrix = false;
+        queueMicrotask(() => {
+          this.onerror?.call(
+            this,
+            new ErrorEvent("error", { message: "private worker path /Users/example" })
+          );
+        });
+        return;
+      }
+      postMessage.call(this, message);
+    };
+  });
+  await page.goto("/");
+  const tabs = page.getByLabel("Workbench tabs");
+  await tabs.getByRole("tab", { name: "Setups" }).click();
+  const duel = page.getByRole("region", { name: "Setup comparison", exact: true });
+  await duel.getByRole("button", { name: "Save current setup" }).click();
+
+  await duel.getByRole("button", { name: "All monsters" }).click();
+  await expect(duel.getByRole("alert")).toHaveText(
+    "Comparison could not be built. Your inputs are unchanged."
+  );
+  await expect(duel.getByRole("button", { name: "Retry comparison" })).toBeEnabled();
+  await expect(duel.getByRole("table", { name: /all-monster setup comparison/i })).toHaveCount(0);
+  await expect(duel).not.toContainText("private worker path");
+
+  await duel.getByRole("button", { name: "Retry comparison" }).click();
+  const currentMatrix = duel.getByRole("table", { name: "All-monster setup comparison" });
+  await expect(currentMatrix).toBeVisible({ timeout: 30_000 });
+  await expect(duel.getByText(/monsters - 2 setups/)).toBeVisible();
+
+  await page.evaluate(() => {
+    (window as unknown as { failNextDuelMatrix: boolean }).failNextDuelMatrix = true;
+  });
+  await duel.getByRole("button", { name: "Refresh comparison" }).click();
+  await expect(duel.getByRole("alert")).toHaveText(
+    "Comparison could not be built. Showing the previous result."
+  );
+  const previousMatrix = duel.getByRole("table", {
+    name: "Previous all-monster setup comparison"
+  });
+  await expect(previousMatrix).toBeVisible();
+  await expect(duel.getByRole("button", { name: "Retry comparison" })).toBeEnabled();
+  await duel.getByLabel("Find monster in setup comparison").fill("tribesman");
+  await expect(previousMatrix.locator("tbody tr")).toHaveCount(1);
+  await expect(duel.getByRole("alert")).toBeVisible();
+  await expect(duel).not.toContainText("private worker path");
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expectPageWidthContained(page);
+  await page
+    .getByRole("region", { name: "Player setup", exact: true })
+    .getByLabel("ATT")
+    .fill("61");
+  await expect(
+    duel.getByText("Inputs changed. This table does not include the current inputs.")
+  ).toBeVisible();
+  await expect(duel.getByRole("alert")).toHaveCount(0);
+  await duel.getByRole("button", { name: "Refresh comparison" }).click();
+  await expect(duel.getByRole("table", { name: "All-monster setup comparison" })).toBeVisible({
+    timeout: 30_000
+  });
+  await expect(duel.getByText(/monsters - 2 setups/)).toBeVisible();
   await expectPageWidthContained(page);
 });
 

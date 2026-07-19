@@ -26,6 +26,7 @@ import {
   PriceSetValidationError,
   createPriceSetFromLegacyRecords,
   GameDataSnapshotSchema,
+  assertGameDataSourcePinAgreement,
   parsePriceSetJson
 } from "../data/schemas";
 import { createLegacyRuntime } from "./helpers/legacy-sim";
@@ -175,6 +176,12 @@ describe("validated game data snapshots", () => {
     );
 
     expect(generatedSnapshot.id).toBe("lostcity-376072662e78-runtime");
+    expect(generatedSnapshot.revisionContext).toEqual({
+      gameRevision: 274,
+      sourceName: "LostCityRS/Content",
+      sourceCommit: "376072662e78a314bf35bb18815be39521491a6b",
+      generatedAt: "2026-07-09T00:00:00.000Z"
+    });
     expect(generatedSnapshot.provenance?.source).toBe("generated");
     expect(generatedSnapshot.provenance?.notes).toMatch(/raw config/i);
     expect(generatedSnapshot.monsters.giant?.hp).toBe(35);
@@ -226,6 +233,42 @@ describe("validated game data snapshots", () => {
     );
     expect(generatedSnapshot).not.toHaveProperty("priceHistory");
     expect(generatedSnapshot).not.toHaveProperty("historicalSnapshots");
+  });
+
+  it("keeps revision context optional for legacy snapshots but strict and source-pin comparable", () => {
+    const runtime = createLegacyRuntime();
+    const legacy = createGameDataSnapshotFromLegacy({
+      gameData: runtime.GameData,
+      simEngine: runtime.SimEngine,
+      equipment: runtime.Equipment as unknown as LegacySnapshotInput["equipment"]
+    });
+    expect(GameDataSnapshotSchema.parse(legacy).revisionContext).toBeUndefined();
+
+    const generated = GameDataSnapshotSchema.parse(
+      readJsonFile("src/data/generated/game-data.json")
+    );
+    expect(
+      assertGameDataSourcePinAgreement(
+        generated,
+        readJsonFile("src/data/generated/source-pin.json")
+      )
+    ).toBe(generated.revisionContext);
+    expect(() =>
+      assertGameDataSourcePinAgreement(generated, {
+        ...(readJsonFile("src/data/generated/source-pin.json") as Record<string, unknown>),
+        source: { name: "LostCityRS/Content", revision: "273" }
+      })
+    ).toThrow("does not match");
+
+    const invalid = structuredClone(generated) as unknown as Record<string, unknown>;
+    invalid.revisionContext = {
+      gameRevision: 0,
+      sourceName: " ",
+      sourceCommit: "NOT-A-COMMIT",
+      generatedAt: "yesterday",
+      path: "/Users/example/private"
+    };
+    expect(GameDataSnapshotSchema.safeParse(invalid).success).toBe(false);
   });
 
   it("rejects mismatched record ids and unknown top-level snapshot payloads", () => {

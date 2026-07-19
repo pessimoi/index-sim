@@ -4,8 +4,11 @@ import { InlineImportNotice } from "../app-presenters";
 import { HiscoresPanel, type HiscoresPanelProps } from "../topbar/hiscores-panel";
 
 export interface AppHeaderProps {
+  activeGameRevisionLabel: string;
   hiscores: HiscoresPanelProps;
+  setupImportPhase: "idle" | "reading" | "review";
   setupImportNotice: InlineNoticeViewModel | null;
+  setupImportInputRef: Ref<HTMLInputElement>;
   shareCreateNotice: string | null;
   shareButtonRef: Ref<HTMLButtonElement>;
   onImportSetup(file: File): Promise<void>;
@@ -28,8 +31,11 @@ async function importSelectedFile(
 }
 
 export function AppHeader({
+  activeGameRevisionLabel,
   hiscores,
+  setupImportPhase,
   setupImportNotice,
+  setupImportInputRef,
   shareCreateNotice,
   shareButtonRef,
   onImportSetup,
@@ -51,14 +57,22 @@ export function AppHeader({
       <header className="topbar">
         <div className="topbar-brand">
           <h1>2004scape Combat Simulator</h1>
+          <span
+            className="game-revision-badge"
+            aria-label={`Active game data: ${activeGameRevisionLabel}`}
+          >
+            {activeGameRevisionLabel}
+          </span>
         </div>
         <HiscoresPanel {...hiscores} />
         <div className="actions">
           <label className="file-button">
             Import setup
             <input
+              ref={setupImportInputRef}
               type="file"
               accept="application/json,.json"
+              disabled={setupImportPhase === "reading"}
               onChange={(event) => void importSelectedFile(event, onImportSetup)}
             />
           </label>
@@ -68,6 +82,11 @@ export function AppHeader({
           <button ref={shareButtonRef} type="button" onClick={onShareSetup}>
             Share setup
           </button>
+          {setupImportPhase === "reading" && (
+            <div className="topbar-import-notice inline-status" role="status" aria-live="polite">
+              Reviewing setup file…
+            </div>
+          )}
           {setupImportNotice && (
             <InlineImportNotice
               notice={setupImportNotice}

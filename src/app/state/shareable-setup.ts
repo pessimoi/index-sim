@@ -18,9 +18,18 @@ import {
   type MonsterLootSettings
 } from "./loot-settings";
 import { combatSetupCompatibilityIssues } from "./setup-compatibility";
+import {
+  SetupTransferContextV1Schema,
+  compareLegacyGameDataId,
+  compareSetupTransferContext,
+  createSetupTransferContext,
+  type SetupTransferContextReview,
+  type SetupTransferContextV1
+} from "./setup-transfer-context";
 
 export const SHAREABLE_SETUP_KIND = "index-sim-setup";
-export const SHAREABLE_SETUP_VERSION = 1;
+export const SHAREABLE_SETUP_LEGACY_VERSION = 1;
+export const SHAREABLE_SETUP_VERSION = 2;
 export const SHAREABLE_SETUP_MAX_ENCODED_CHARS = 12_000;
 export const SHAREABLE_SETUP_MAX_JSON_BYTES = 8_192;
 
@@ -72,25 +81,36 @@ const ShareableLootPreferencesSchema = z
     }
   });
 
-const RawShareableSetupEnvelopeSchema = z
+const RawShareableSetupDataSchema = z
+  .object({
+    form: z.unknown(),
+    cannon: ShareableCannonSettingsSchema,
+    lootPreferences: ShareableLootPreferencesSchema,
+    lootSettings: ShareableMonsterLootSettingsSchema
+  })
+  .strict();
+
+const RawShareableSetupEnvelopeV1Schema = z
+  .object({
+    kind: z.literal(SHAREABLE_SETUP_KIND),
+    version: z.literal(SHAREABLE_SETUP_LEGACY_VERSION),
+    gameDataId: z.string().min(1).max(160),
+    data: RawShareableSetupDataSchema
+  })
+  .strict();
+
+const RawShareableSetupEnvelopeV2Schema = z
   .object({
     kind: z.literal(SHAREABLE_SETUP_KIND),
     version: z.literal(SHAREABLE_SETUP_VERSION),
-    gameDataId: z.string().min(1).max(160),
-    data: z
-      .object({
-        form: z.unknown(),
-        cannon: ShareableCannonSettingsSchema,
-        lootPreferences: ShareableLootPreferencesSchema,
-        lootSettings: ShareableMonsterLootSettingsSchema
-      })
-      .strict()
+    context: SetupTransferContextV1Schema,
+    data: RawShareableSetupDataSchema
   })
   .strict();
 
 export interface ShareableSetupEnvelopeV1 {
   kind: typeof SHAREABLE_SETUP_KIND;
-  version: typeof SHAREABLE_SETUP_VERSION;
+  version: typeof SHAREABLE_SETUP_LEGACY_VERSION;
   gameDataId: string;
   data: {
     form: CombatSetupFormState;
@@ -100,9 +120,18 @@ export interface ShareableSetupEnvelopeV1 {
   };
 }
 
+export interface ShareableSetupEnvelopeV2 {
+  kind: typeof SHAREABLE_SETUP_KIND;
+  version: typeof SHAREABLE_SETUP_VERSION;
+  context: SetupTransferContextV1;
+  data: ShareableSetupEnvelopeV1["data"];
+}
+
+export type ShareableSetupEnvelope = ShareableSetupEnvelopeV1 | ShareableSetupEnvelopeV2;
+
 export interface ShareableSetupReview {
-  envelope: ShareableSetupEnvelopeV1;
-  gameDataMismatch: boolean;
+  envelope: ShareableSetupEnvelope;
+  context: SetupTransferContextReview;
   droppedLootRowCount: number;
 }
 
@@ -149,21 +178,30 @@ function strictFormFromUnknown(value: unknown): CombatSetupFormState {
   return normalized;
 }
 
-function envelopeFromUnknown(value: unknown): ShareableSetupEnvelopeV1 {
+function envelopeFromUnknown(value: unknown): ShareableSetupEnvelope {
   if (!value || typeof value !== "object") {
     throw new ShareableSetupError("invalid_schema", "Shared setup envelope is invalid");
   }
   const record = value as Record<string, unknown>;
-  if (record.kind !== SHAREABLE_SETUP_KIND || record.version !== SHAREABLE_SETUP_VERSION) {
+  if (
+    record.kind !== SHAREABLE_SETUP_KIND ||
+    (record.version !== SHAREABLE_SETUP_LEGACY_VERSION &&
+      record.version !== SHAREABLE_SETUP_VERSION)
+  ) {
     throw new ShareableSetupError(
       "unsupported_version",
       "Shared setup kind or version is unsupported"
     );
   }
 
-  let parsed: z.infer<typeof RawShareableSetupEnvelopeSchema>;
+  let parsed:
+    | z.infer<typeof RawShareableSetupEnvelopeV1Schema>
+    | z.infer<typeof RawShareableSetupEnvelopeV2Schema>;
   try {
-    parsed = RawShareableSetupEnvelopeSchema.parse(value);
+    parsed =
+      record.version === SHAREABLE_SETUP_LEGACY_VERSION
+        ? RawShareableSetupEnvelopeV1Schema.parse(value)
+        : RawShareableSetupEnvelopeV2Schema.parse(value);
   } catch {
     throw new ShareableSetupError("invalid_schema", "Shared setup envelope is invalid");
   }
@@ -205,16 +243,16 @@ function decodeBase64Url(value: string): Uint8Array {
 }
 
 export function buildShareableSetupEnvelope(input: {
-  gameDataId: string;
+  gameData: GameDataSnapshot;
   form: CombatSetupFormState;
   cannon: CannonSettings;
   lootPreferences: Record<string, z.infer<typeof LootActionSchema>>;
   lootSettings: MonsterLootSettings;
-}): ShareableSetupEnvelopeV1 {
+}): ShareableSetupEnvelopeV2 {
   const candidate = {
     kind: SHAREABLE_SETUP_KIND,
     version: SHAREABLE_SETUP_VERSION,
-    gameDataId: input.gameDataId,
+    context: createSetupTransferContext(input.gameData),
     data: {
       form: normalizeFormState(input.form),
       cannon: { ...input.cannon },
@@ -222,10 +260,10 @@ export function buildShareableSetupEnvelope(input: {
       lootSettings: { ...input.lootSettings }
     }
   };
-  return envelopeFromUnknown(candidate);
+  return envelopeFromUnknown(candidate) as ShareableSetupEnvelopeV2;
 }
 
-export function encodeShareableSetupEnvelope(envelope: ShareableSetupEnvelopeV1): string {
+export function encodeShareableSetupEnvelope(envelope: ShareableSetupEnvelope): string {
   const validated = envelopeFromUnknown(envelope);
   const bytes = new TextEncoder().encode(canonicalJson(validated));
   if (bytes.byteLength > SHAREABLE_SETUP_MAX_JSON_BYTES) {
@@ -238,7 +276,7 @@ export function encodeShareableSetupEnvelope(envelope: ShareableSetupEnvelopeV1)
   return encoded;
 }
 
-export function decodeShareableSetupEnvelope(payload: string): ShareableSetupEnvelopeV1 {
+export function decodeShareableSetupEnvelope(payload: string): ShareableSetupEnvelope {
   const bytes = decodeBase64Url(payload);
   let jsonText: string;
   try {
@@ -263,7 +301,7 @@ export function decodeShareableSetupEnvelope(payload: string): ShareableSetupEnv
 }
 
 export function reviewShareableSetup(
-  envelope: ShareableSetupEnvelopeV1,
+  envelope: ShareableSetupEnvelope,
   gameData: GameDataSnapshot
 ): ShareableSetupReview {
   const form = envelope.data.form;
@@ -291,7 +329,10 @@ export function reviewShareableSetup(
         lootPreferences
       }
     },
-    gameDataMismatch: envelope.gameDataId !== gameData.id,
+    context:
+      envelope.version === SHAREABLE_SETUP_LEGACY_VERSION
+        ? compareLegacyGameDataId(envelope.gameDataId, gameData)
+        : compareSetupTransferContext(envelope.context, gameData),
     droppedLootRowCount
   };
 }

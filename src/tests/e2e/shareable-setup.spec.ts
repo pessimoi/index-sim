@@ -11,7 +11,13 @@ import {
   normalizeFormState,
   savedSetupFromForm
 } from "../../app/state/ui-state";
+import {
+  PLANNER_UI_STORAGE_KEY,
+  PLANNER_UI_VERSION,
+  createDefaultPlannerUiState
+} from "../../app/state/planner";
 import { parseGameDataSnapshot } from "../../data/schemas/game-data";
+import { xpAt } from "../../domain/planner";
 import { lootPreferenceKeysForMonster } from "../../domain/trip";
 
 const GAME_DATA = parseGameDataSnapshot(
@@ -22,21 +28,31 @@ function playerAttackField(page: Page) {
   return page.getByRole("region", { name: "Player setup" }).getByLabel("ATT", { exact: true });
 }
 
-function sharedPayload(options: { gameDataId?: string; attack?: number } = {}): string {
+function sharedPayload(
+  options: { gameDataId?: string; attack?: number; legacy?: boolean } = {}
+): string {
   const form = normalizeFormState({
     ...DEFAULT_FORM_STATE,
     levels: { ...DEFAULT_FORM_STATE.levels, attack: options.attack ?? 71 }
   });
   const firstLootRow = lootPreferenceKeysForMonster(GAME_DATA.monsters[form.monsterId])[0] ?? "";
-  return encodeShareableSetupEnvelope(
-    buildShareableSetupEnvelope({
+  const envelope = buildShareableSetupEnvelope({
+    gameData: GAME_DATA,
+    form,
+    cannon: { enabled: true, targets: 4, respawnSec: 18 },
+    lootPreferences: { [firstLootRow]: "bury" },
+    lootSettings: { highAlch: true, overheadSec: 3, talismanSpot: "overground" }
+  });
+  envelope.context.gameDataId = options.gameDataId ?? GAME_DATA.id;
+  if (options.legacy) {
+    return encodeShareableSetupEnvelope({
+      kind: "index-sim-setup",
+      version: 1,
       gameDataId: options.gameDataId ?? GAME_DATA.id,
-      form,
-      cannon: { enabled: true, targets: 4, respawnSec: 18 },
-      lootPreferences: { [firstLootRow]: "bury" },
-      lootSettings: { highAlch: true, overheadSec: 3, talismanSpot: "overground" }
-    })
-  );
+      data: envelope.data
+    });
+  }
+  return encodeShareableSetupEnvelope(envelope);
 }
 
 test("creates a selectable setup link and keeps clipboard failure recoverable", async ({
@@ -59,6 +75,7 @@ test("creates a selectable setup link and keeps clipboard failure recoverable", 
   await expect(dialog).toBeVisible();
   await expect(dialog).toContainText("Hill Giant");
   await expect(dialog).toContainText("Player levels included");
+  await expect(dialog).toContainText("Revision 274");
   const linkField = dialog.getByLabel("Setup link");
   await expect(linkField).toHaveValue(/#setup=[A-Za-z0-9_-]+$/);
 
@@ -90,12 +107,28 @@ test("reviews a shared setup before writing then loads and undoes all owned stat
     savedAt: "2026-07-10T12:00:00.000Z",
     data: savedSetupFromForm(initialForm)
   };
+  const initialPlannerState = createDefaultPlannerUiState(initialForm);
+  initialPlannerState.currentXp.attack = xpAt(60) + 10;
   await page.addInitScript(
-    ({ storageKey, setup }) => {
+    ({ storageKey, setup, plannerKey, plannerVersion, plannerState }) => {
       window.localStorage.setItem(storageKey, JSON.stringify(setup));
+      window.localStorage.setItem(
+        plannerKey,
+        JSON.stringify({
+          version: plannerVersion,
+          savedAt: "2026-07-10T12:00:00.000Z",
+          data: plannerState
+        })
+      );
       window.localStorage.setItem("unrelated-key", "keep-me");
     },
-    { storageKey: REWRITE_SETUP_STORAGE_KEY, setup: initialSetup }
+    {
+      storageKey: REWRITE_SETUP_STORAGE_KEY,
+      setup: initialSetup,
+      plannerKey: PLANNER_UI_STORAGE_KEY,
+      plannerVersion: PLANNER_UI_VERSION,
+      plannerState: initialPlannerState
+    }
   );
 
   await page.goto(`/#setup=${sharedPayload()}`);
@@ -103,6 +136,7 @@ test("reviews a shared setup before writing then loads and undoes all owned stat
   await expect(review).toBeVisible();
   await expect(review).toContainText("Hill Giant");
   await expect(review).toContainText("Uses your current prices");
+  await expect(review).toContainText("Created with this exact Revision 274 data snapshot.");
   await expect(page).toHaveURL(/\/$/);
   await expect(playerAttackField(page)).toHaveValue("60");
   expect(
@@ -145,6 +179,13 @@ test("reviews a shared setup before writing then loads and undoes all owned stat
     lootSettings: { highAlch: true, overheadSec: 3, talismanSpot: "overground" }
   });
 
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Planner" }).click();
+  const planner = page.getByRole("region", { name: "Planner", exact: true });
+  await expect(planner.getByLabel("Attack current XP")).toHaveValue("");
+  await expect(planner.getByLabel("Attack target")).toHaveValue("71");
+  await expect(planner).toContainText("Attack XP uses Auto");
+  await expect(planner).toContainText("Attack target is now 71");
+
   await page.getByRole("button", { name: "Undo" }).click();
   await expect(playerAttackField(page)).toHaveValue("60");
   await expect(page.getByRole("status").filter({ hasText: "Restored pre-share setup" })).toHaveText(
@@ -158,6 +199,10 @@ test("reviews a shared setup before writing then loads and undoes all owned stat
       }, REWRITE_SETUP_STORAGE_KEY)
     )
     .toBeNull();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Planner" }).click();
+  await expect(planner.getByLabel("Attack current XP")).toHaveValue("");
+  await expect(planner.getByLabel("Attack target")).toHaveValue("71");
+  await expect(planner).toContainText("the level 60 floor");
 });
 
 test("dismisses or rejects shared setup links without changing the active setup", async ({
@@ -165,10 +210,16 @@ test("dismisses or rejects shared setup links without changing the active setup"
 }) => {
   await page.goto(`/#setup=${sharedPayload({ gameDataId: "older-revision" })}`);
   const review = page.getByLabel("Shared setup review");
-  await expect(review).toContainText("Different game-data version");
+  await expect(review).toContainText("Created with another Revision 274 snapshot");
   await review.getByRole("button", { name: "Dismiss" }).click();
   await expect(review).toBeHidden();
   await expect(playerAttackField(page)).toHaveValue("60");
+
+  await page.goto("about:blank");
+  await page.goto(`/#setup=${sharedPayload({ gameDataId: "older-v1", legacy: true })}`);
+  const legacyReview = page.getByLabel("Shared setup review");
+  await expect(legacyReview).toContainText("older format does not record a game revision");
+  await legacyReview.getByRole("button", { name: "Dismiss" }).click();
 
   await page.goto("about:blank");
   await page.goto("/#setup=not_valid_%25_payload");

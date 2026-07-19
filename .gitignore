@@ -11,5 +11,6 @@ playwright-report
 test-results
 .vite
 .npm-cache
+.codex-tmp/
 .wrangler
 *.tsbuildinfo

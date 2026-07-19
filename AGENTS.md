@@ -52,7 +52,7 @@ The legacy `views.jsx` `ArchitectureBoard` is only a docs-link panel. Treat the 
 - Legacy planner domain logic: `planner-core.js`
 - Rewrite planner domain logic: `src/domain/planner`
 - Price snapshots and provenance: `prices.json`, `price-provenance.json`, `alch.json`, `price-history.json`
-- Generated game-data workflow: `scripts/generate-game-data.ts`, `scripts/game-data-generator-core.ts`, `src/data/generated/`, `docs/project/revision-impact/current.md`
+- Generated game-data workflow: `scripts/generate-game-data.ts`, `scripts/game-data-generator-core.ts`, explicit `--game-revision`, agreeing snapshot/source-pin revision context, `src/data/generated/`, `docs/project/revision-impact/current.md`
 - Raw LostCity source audit and candidate impact workflow: `scripts/lostcity-content-*.ts`, `scripts/report-lostcity-source-coverage.ts`, `scripts/report-lostcity-source-impact.ts`, `npm run data:source-audit`, `npm run data:source-impact`
 - Root runtime bootstrap: `src/adapters/generated`, using `src/data/generated/game-data.json` plus scheduled static prices and generated item fallbacks
 - Legacy runtime reference/bootstrap generator: `src/adapters/legacy-runtime`

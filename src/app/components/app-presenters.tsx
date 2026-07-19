@@ -11,6 +11,7 @@ export interface ShareSetupDialogState {
   combatStyle: CombatStyle;
   cannonEnabled: boolean;
   lootPreferenceCount: number;
+  revisionLabel: string;
   copyStatus: "idle" | "copied" | "failed";
 }
 
@@ -19,7 +20,7 @@ export interface PendingUndo {
   label: string;
   restoreLabel: string;
   createdAt: number;
-  restore: () => void;
+  restore: () => string | void;
 }
 
 export interface DisplayMetric {
@@ -137,6 +138,7 @@ export function ShareSetupDialog({
       <div className="share-setup-summary" aria-label="Shared setup contents">
         <span>Cannon {state.cannonEnabled ? "included" : "off"}</span>
         <span>{formatNumber(state.lootPreferenceCount)} loot choices</span>
+        <span>{state.revisionLabel}</span>
         <span>Uses recipient prices</span>
       </div>
       <div className="field share-setup-url-field">

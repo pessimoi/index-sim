@@ -8,6 +8,8 @@ import {
 import type { SelectOption } from "./components/form-fields";
 import { formatDelta } from "./components/presentation-formatters";
 import { AppHeader } from "./components/shell/app-header";
+import { LocalStateAttentionBanner } from "./components/shell/local-state-attention-banner";
+import { SetupImportReview } from "./components/shell/setup-import-review";
 import { SharedSetupReview } from "./components/shell/shared-setup-review";
 import { LegacyMigrationPanel } from "./components/shell/legacy-migration-panel";
 import { WorkbenchShell } from "./components/shell/workbench-shell";
@@ -22,6 +24,7 @@ import { StatsPane } from "./components/panes/stats-pane";
 import { LootPane } from "./components/panes/loot-pane";
 import { TripPane } from "./components/panes/trip-pane";
 import { EconomySettingsPane } from "./components/panes/economy-settings-pane";
+import { LOCAL_STATE_RECOVERY_HEADING_ID } from "./components/settings/local-state-recovery-panel";
 import {
   captureBrowserShareableSetupFragment,
   createBrowserShareableSetupUrl,
@@ -70,6 +73,8 @@ import { useLocalStateRecovery } from "./controllers/use-local-state-recovery";
 import { useSetupFileTransfer } from "./controllers/use-setup-file-transfer";
 import { usePriceSetTransfer } from "./controllers/use-price-set-transfer";
 import { formatRiskRange } from "./view-models/risk";
+import { buildLocalStateAttentionViewModel } from "./view-models/local-state-attention";
+import { buildSetupImportReviewViewModel } from "./view-models/setup-import-review";
 import type {
   AcceptedPriceSetOutcome,
   ResetPriceSetOutcome
@@ -106,6 +111,10 @@ import {
   renameDuelSnapshot,
   type DuelSnapshotsState
 } from "./state/duel-snapshots";
+import {
+  compareSetupTransferContext,
+  type SetupTransferContextReview
+} from "./state/setup-transfer-context";
 import {
   DEFAULT_LOOT_PREFS_STATE,
   LOOT_PREFS_STORAGE_KEY,
@@ -166,8 +175,10 @@ import {
   PlannerUiStateSchema,
   loadPlannerUiState,
   normalizePlannerUiState,
+  reconcilePlannerProgressWithLevels,
   resetPlannerGearPoolSlot,
   setPlannerGearPoolItem,
+  type PlannerProgressAdjustment,
   type PlannerUiState
 } from "./state/planner";
 import {
@@ -205,7 +216,11 @@ import {
   toggleDenseCompareMonsterIrrelevant,
   type DenseCompareUiState
 } from "./state/dense-compare";
-import { plannerAllowedPool } from "./view-models/planner";
+import {
+  createPlannerSkillInputViewModels,
+  plannerAllowedPool,
+  plannerProgressAdjustmentNotice
+} from "./view-models/planner";
 import { monsterOptions } from "./view-models/monster-card";
 import { createSimulationViewModel } from "./view-models/simulation";
 import {
@@ -229,7 +244,7 @@ import {
   createSelectedPriceItemPresentation,
   type ItemPriceHistoryContext
 } from "./view-models/price-data";
-import { createSettingsPaneViewModel } from "./view-models/settings";
+import { createGameRevisionViewModel, createSettingsPaneViewModel } from "./view-models/settings";
 import { createTripPaneViewModel } from "./view-models/trip";
 import type {
   ActiveAssumptionResetTarget,
@@ -434,6 +449,7 @@ export function App() {
     useState<ScheduledStaticPriceSnapshotStatus | null>(null);
   const [activePriceSetOrigin, setActivePriceSetOrigin] = useState<ActivePriceSetOrigin>("bundled");
   const [plannerState, setPlannerState] = useState<PlannerUiState>(loadInitialPlannerUiState);
+  const [plannerAdjustmentNotice, setPlannerAdjustmentNotice] = useState<string | null>(null);
   const [legacyMigrationDismissed, setLegacyMigrationDismissed] = useState(
     loadInitialLegacyMigrationDismissed
   );
@@ -450,15 +466,7 @@ export function App() {
   const persistLocalState = localStateRecovery.persist;
   const shouldSkipPersistLocalState = localStateRecovery.shouldSkipPersist;
   const blockedLocalStateIds = localStateRecovery.blockedIds;
-  const persistImportedSetup = useCallback(
-    (setup: SavedSetupState) => persistLocalState("rewrite-setup", setupStorageOptions, setup),
-    [persistLocalState]
-  );
-  const setupFileTransfer = useSetupFileTransfer({
-    persistSetup: persistImportedSetup,
-    unblockReplaced: localStateRecovery.unblockReplaced,
-    refreshLocalStateHealth: localStateRecovery.refresh
-  });
+  const setupFileTransfer = useSetupFileTransfer();
   const priceSetTransfer = usePriceSetTransfer({
     storage,
     storageUnavailable: localStorageAccessUnavailable,
@@ -480,7 +488,13 @@ export function App() {
   const [shareReviewDismissed, setShareReviewDismissed] = useState(false);
   const [shareDialog, setShareDialog] = useState<ShareSetupDialogState | null>(null);
   const [shareCreateNotice, setShareCreateNotice] = useState<string | null>(null);
+  const [setupImportNotice, setSetupImportNotice] = useState<InlineNoticeViewModel | null>(null);
   const [duelImportNotice, setDuelImportNotice] = useState<InlineNoticeViewModel | null>(null);
+  const [duelImportReview, setDuelImportReview] = useState<{
+    id: number;
+    data: DuelSnapshotsState;
+    context: SetupTransferContextReview;
+  } | null>(null);
   const [priceLabel, setPriceLabel] = useState(
     "Scheduled static prices + generated item fallbacks"
   );
@@ -490,6 +504,13 @@ export function App() {
   } | null>(null);
   const [economyBaselineMode, setEconomyBaselineMode] =
     useState<PriceHistoryBaselineMode>("previous");
+  const handlePlannerDraftReconciled = useCallback(
+    (nextState: PlannerUiState, adjustments: readonly PlannerProgressAdjustment[]) => {
+      setPlannerState(nextState);
+      setPlannerAdjustmentNotice(plannerProgressAdjustmentNotice(adjustments));
+    },
+    []
+  );
   const [economySnapshotKey, setEconomySnapshotKey] = useState("");
   const [economyItemFilter, setEconomyItemFilter] = useState("");
   const [economyTrendItemId, setEconomyTrendItemId] = useState("");
@@ -512,9 +533,38 @@ export function App() {
   const [pendingUndo, setPendingUndo] = useState<PendingUndo | null>(null);
   const [respectLoadoutRequirements, setRespectLoadoutRequirements] = useState(true);
   const [activeTab, setActiveTab] = useState<WorkbenchTabId>("compare");
+  const [localStateReviewRequest, setLocalStateReviewRequest] = useState(0);
   const [priceNotesOpen, setPriceNotesOpen] = useState(false);
   const shareSetupButtonRef = useRef<HTMLButtonElement>(null);
+  const setupImportInputRef = useRef<HTMLInputElement>(null);
+  const duelImportAttemptRef = useRef(0);
   const priceNotesSummaryRef = useRef<HTMLElement>(null);
+  const handledLocalStateReviewRequestRef = useRef(0);
+
+  useEffect(() => {
+    if (
+      localStateReviewRequest === 0 ||
+      localStateReviewRequest === handledLocalStateReviewRequestRef.current
+    ) {
+      return;
+    }
+    if (activeTab !== "settings" || !localStateRecovery.report.hasAttention) {
+      handledLocalStateReviewRequestRef.current = localStateReviewRequest;
+      return;
+    }
+    const frameId = window.requestAnimationFrame(() => {
+      const heading = document.getElementById(LOCAL_STATE_RECOVERY_HEADING_ID);
+      if (heading instanceof HTMLElement) {
+        heading.focus({ preventScroll: true });
+        const bounds = heading.getBoundingClientRect();
+        if (bounds.top < 0 || bounds.bottom > window.innerHeight) {
+          heading.scrollIntoView({ block: "nearest" });
+        }
+      }
+      handledLocalStateReviewRequestRef.current = localStateReviewRequest;
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }, [activeTab, localStateRecovery.report.hasAttention, localStateReviewRequest]);
 
   useEffect(() => {
     const timerId = window.setInterval(() => setPriceAgeNowMs(Date.now()), 60_000);
@@ -844,8 +894,13 @@ export function App() {
     draftState: plannerState,
     form,
     context,
-    lootSettingsByMonster
+    lootSettingsByMonster,
+    onDraftReconciled: handlePlannerDraftReconciled
   });
+  const plannerSkillInputs = useMemo(
+    () => createPlannerSkillInputViewModels(form, plannerState),
+    [form, plannerState]
+  );
   const riskAnalysis = useRiskAnalysis({
     form,
     context,
@@ -873,10 +928,9 @@ export function App() {
     expandedDiffId: expandedDuelDiffId,
     matrixMetric: duelMatrixMetric,
     matrixFilter: duelMatrixFilter,
-    matrix: duelMatrix,
+    matrixPresentation: duelMatrixPresentation,
     filteredMatrixRows: filteredDuelMatrixRows,
     matrixSort: duelMatrixSort,
-    matrixBusy: duelMatrixBusy,
     showCurrentTarget: showCurrentDuelTarget,
     showMonsterMatrix: showDuelMonsterMatrix,
     toggleDiff: toggleDuelDiff,
@@ -891,6 +945,7 @@ export function App() {
     gearPoolEditor: plannerGearPoolEditor,
     error: plannerError,
     pending: plannerPending,
+    draftDirty: plannerDraftDirty,
     status: plannerStatus,
     computedMetric: plannerComputedMetric,
     recompute: recomputePlanner
@@ -1050,6 +1105,33 @@ export function App() {
     }
   };
 
+  const captureCurrentRewriteSetup = (): SavedSetupState =>
+    savedSetupFromForm(
+      form,
+      denseCompare,
+      cannonByMonster,
+      customSetupsByMonster,
+      defaultForm,
+      setupMode
+    );
+
+  const applyRewriteSetupState = (setup: SavedSetupState): void => {
+    setForm(normalizeFormState(setup.form));
+    setDefaultForm(normalizeFormState(setup.defaultForm));
+    setSetupMode(setup.setupMode);
+    setCustomSetupsByMonster(setup.customSetupsByMonster);
+    setDenseCompare(setup.denseCompare);
+    setCannonByMonster(setup.cannonByMonster);
+  };
+
+  const persistAndApplyRewriteSetup = (setup: SavedSetupState): boolean => {
+    const persisted = persistLocalState("rewrite-setup", setupStorageOptions, setup);
+    applyRewriteSetupState(setup);
+    localStateRecovery.unblockReplaced(["rewrite-setup"]);
+    localStateRecovery.refresh();
+    return persisted;
+  };
+
   const setFormSafe = (updater: (current: CombatSetupFormState) => CombatSetupFormState) => {
     commitFormState(updater(form));
   };
@@ -1105,7 +1187,7 @@ export function App() {
     });
   };
 
-  const setUndoableStatus = (label: string, restoreLabel: string, restore: () => void) => {
+  const setUndoableStatus = (label: string, restoreLabel: string, restore: () => string | void) => {
     setPendingUndo({
       id: localUndoId(),
       label,
@@ -1152,8 +1234,8 @@ export function App() {
 
   const undoPendingAction = () => {
     if (!pendingUndo) return;
-    pendingUndo.restore();
-    setStatus(pendingUndo.restoreLabel);
+    const restoreStatus = pendingUndo.restore();
+    setStatus(restoreStatus ?? pendingUndo.restoreLabel);
     setPendingUndo(null);
   };
 
@@ -1194,19 +1276,46 @@ export function App() {
 
   const importSetupFile = async (file: File): Promise<void> => {
     if (!context) return;
-    const outcome = await setupFileTransfer.importFile(file, context.gameData);
-    if (outcome.status !== "ready") return;
-    setForm(normalizeFormState(outcome.setup.form));
-    setDefaultForm(normalizeFormState(outcome.setup.defaultForm));
-    setSetupMode(outcome.setup.setupMode);
-    setCustomSetupsByMonster(outcome.setup.customSetupsByMonster);
-    setDenseCompare(outcome.setup.denseCompare);
-    setCannonByMonster(outcome.setup.cannonByMonster);
-    setStatus(outcome.appStatus);
+    setSetupImportNotice(null);
+    setStatus("Reviewing setup file");
+    const outcome = await setupFileTransfer.prepareImport(file, context.gameData);
+    if (outcome.status === "review") setStatus("Setup ready for review");
+    if (outcome.status === "rejected") setStatus("Setup import failed");
+  };
+
+  const dismissSetupImportReview = (reviewId: number): void => {
+    if (!setupFileTransfer.dismissReview(reviewId)) return;
+    setStatus("Dismissed imported setup review");
+    window.queueMicrotask(() => setupImportInputRef.current?.focus());
+  };
+
+  const applySetupImportReview = (reviewId: number): void => {
+    const candidate = setupFileTransfer.consumeReview(reviewId);
+    if (!candidate) return;
+    const previousSetup = captureCurrentRewriteSetup();
+    const persisted = persistAndApplyRewriteSetup(candidate.setup);
+    const contextSuffix =
+      candidate.context.match === "exact-snapshot"
+        ? ""
+        : ` using current Revision ${candidate.context.current.gameRevision} data`;
+    const appliedLabel = persisted
+      ? `Imported rewrite setup${contextSuffix}.`
+      : `Imported rewrite setup${contextSuffix} for this session. Changes may not persist after reload.`;
+    const restoreLabel = "Restored setup from before import.";
+    setSetupImportNotice({ tone: "success", message: appliedLabel });
     setFatalError(null);
+    setUndoableStatus(appliedLabel, restoreLabel, () => {
+      const restored = persistAndApplyRewriteSetup(previousSetup);
+      const message = restored
+        ? restoreLabel
+        : "Restored setup from before import for this session. Changes may not persist after reload.";
+      setSetupImportNotice({ tone: "success", message });
+      return message;
+    });
   };
 
   const exportCurrentSetup = (): void => {
+    if (!context) return;
     setupFileTransfer.exportSetup(
       savedSetupFromForm(
         form,
@@ -1215,7 +1324,8 @@ export function App() {
         customSetupsByMonster,
         defaultForm,
         setupMode
-      )
+      ),
+      context.gameData
     );
   };
 
@@ -1473,6 +1583,10 @@ export function App() {
     setCombatStyle(combatStyle);
   };
   const activateWorkbenchTab = (tabId: WorkbenchTabId) => setActiveTab(tabId);
+  const reviewLocalState = () => {
+    setActiveTab("settings");
+    setLocalStateReviewRequest((request) => request + 1);
+  };
   const reviewPriceData = () => {
     setPriceNotesOpen(true);
     setActiveTab("economy");
@@ -1498,29 +1612,37 @@ export function App() {
   const updatePlannerMetric = (metric: PlannerMetric) =>
     setPlannerState((current) => normalizePlannerUiState({ ...current, metric }));
 
-  const updatePlannerTargetLevel = (skill: PlannerSkill, value: number) =>
+  const updatePlannerTargetLevel = (skill: PlannerSkill, value: number) => {
+    setPlannerAdjustmentNotice(null);
     setPlannerState((current) =>
       normalizePlannerUiState({
         ...current,
         targetLevels: { ...current.targetLevels, [skill]: value }
       })
     );
+  };
 
-  const updatePlannerCurrentXp = (skill: PlannerSkill, value: number) =>
+  const updatePlannerCurrentXp = (skill: PlannerSkill, value: number | null) => {
+    setPlannerAdjustmentNotice(null);
     setPlannerState((current) =>
       normalizePlannerUiState({
         ...current,
-        currentXp: { ...current.currentXp, [skill]: value }
+        currentXp: { ...current.currentXp, [skill]: value ?? 0 }
       })
     );
+  };
 
-  const updatePlannerSkillLock = (skill: PlannerSkill, locked: boolean) =>
-    setPlannerState((current) =>
-      normalizePlannerUiState({
-        ...current,
-        skillLocks: { ...current.skillLocks, [skill]: locked }
-      })
-    );
+  const updatePlannerSkillLock = (skill: PlannerSkill, locked: boolean) => {
+    const next = normalizePlannerUiState({
+      ...plannerState,
+      skillLocks: { ...plannerState.skillLocks, [skill]: locked }
+    });
+    const reconciliation = locked
+      ? { state: next, adjustments: [] }
+      : reconcilePlannerProgressWithLevels(next, form.levels);
+    setPlannerState(reconciliation.state);
+    setPlannerAdjustmentNotice(plannerProgressAdjustmentNotice(reconciliation.adjustments));
+  };
 
   const updatePlannerOnlyCurrentGear = (onlyCurrentGear: boolean) =>
     setPlannerState((current) => normalizePlannerUiState({ ...current, onlyCurrentGear }));
@@ -1538,6 +1660,11 @@ export function App() {
 
   const resetPlannerGearPool = (slot: PlannerGearSlot) =>
     setPlannerState((current) => resetPlannerGearPoolSlot(current, slot));
+
+  const recomputePlannerPlan = () => {
+    setPlannerAdjustmentNotice(null);
+    recomputePlanner();
+  };
 
   const setManualOverride = (
     key: keyof CombatSetupFormState["manualOverrides"],
@@ -1590,7 +1717,7 @@ export function App() {
   const exportDuelSnapshots = () => {
     downloadJsonFile(
       "index-sim-saved-setups.json",
-      createDuelSnapshotsExport(duelSnapshots, new Date())
+      createDuelSnapshotsExport(duelSnapshots, context.gameData, new Date())
     );
     setDuelImportNotice({
       tone: "success",
@@ -1599,25 +1726,47 @@ export function App() {
     setStatus("Exported saved setups");
   };
   const importDuelSnapshots = async (file: File): Promise<void> => {
+    const attemptId = ++duelImportAttemptRef.current;
     try {
       setDuelImportNotice(null);
+      setDuelImportReview(null);
       const imported = parseDuelSnapshotsExportText(
         await readBrowserFileText(file, DUEL_SNAPSHOTS_IMPORT_MAX_BYTES),
         DUEL_SNAPSHOTS_IMPORT_MAX_BYTES,
         context.gameData
       );
-      const merged = mergeDuelSnapshots(duelSnapshots, imported.data);
-      setDuelSnapshots(merged.state);
-      localStateRecovery.unblockReplaced(["duel-snapshots"]);
-      const skipped =
-        merged.skippedCount > 0 ? ` ${merged.skippedCount} skipped at the limit.` : "";
-      const message = `Imported saved setups: ${merged.addedCount} added, ${merged.updatedCount} updated.${skipped}`;
-      setDuelImportNotice({ tone: "success", message });
-      setStatus(message);
+      if (attemptId !== duelImportAttemptRef.current) return;
+      setDuelImportReview({
+        id: attemptId,
+        data: imported.data,
+        context: compareSetupTransferContext(imported.context, context.gameData)
+      });
+      setStatus("Saved setups ready for review");
     } catch (caught) {
+      if (attemptId !== duelImportAttemptRef.current) return;
       setDuelImportNotice(describeDuelSnapshotsImportError(caught));
       setStatus("Saved setup import failed");
     }
+  };
+  const dismissDuelSnapshotsImport = (reviewId: number): void => {
+    if (duelImportReview?.id !== reviewId) return;
+    setDuelImportReview(null);
+    setStatus("Dismissed saved setup import review");
+  };
+  const mergeDuelSnapshotsImport = (reviewId: number): void => {
+    if (duelImportReview?.id !== reviewId) return;
+    const merged = mergeDuelSnapshots(duelSnapshots, duelImportReview.data);
+    setDuelSnapshots(merged.state);
+    setDuelImportReview(null);
+    localStateRecovery.unblockReplaced(["duel-snapshots"]);
+    const skipped = merged.skippedCount > 0 ? ` ${merged.skippedCount} skipped at the limit.` : "";
+    const contextSuffix =
+      duelImportReview.context.match === "exact-snapshot"
+        ? ""
+        : ` using current Revision ${duelImportReview.context.current.gameRevision} data`;
+    const message = `Imported saved setups${contextSuffix}: ${merged.addedCount} added, ${merged.updatedCount} updated.${skipped}`;
+    setDuelImportNotice({ tone: "success", message });
+    setStatus(message);
   };
   const commitDuelSnapshotName = (snapshotId: string, name: string): boolean => {
     try {
@@ -1632,9 +1781,17 @@ export function App() {
   const loadDuelSnapshot = (snapshotId: string) => {
     const snapshot = duelSnapshots.snapshots.find((candidate) => candidate.id === snapshotId);
     if (!snapshot) return;
+    const previousSetup = captureCurrentRewriteSetup();
     const nextForm = normalizeFormState({ ...snapshot.form, monsterId: form.monsterId });
     commitFormState(nextForm);
-    setStatus(`Loaded saved setup: ${snapshot.name}`);
+    const loadedLabel = `Loaded saved setup: ${snapshot.name}`;
+    const restoreLabel = `Restored setup from before loading ${snapshot.name}`;
+    setUndoableStatus(loadedLabel, restoreLabel, () => {
+      const restored = persistAndApplyRewriteSetup(previousSetup);
+      return restored
+        ? restoreLabel
+        : `${restoreLabel} for this session. Changes may not persist after reload.`;
+    });
   };
   const deleteDuelSnapshot = (snapshotId: string) => {
     const snapshot = duelSnapshots.snapshots.find((candidate) => candidate.id === snapshotId);
@@ -1697,7 +1854,7 @@ export function App() {
   const openShareSetupDialog = () => {
     try {
       const envelope = buildShareableSetupEnvelope({
-        gameDataId: context.gameData.id,
+        gameData: context.gameData,
         form,
         cannon: currentCannon,
         lootPreferences: currentLootPrefs,
@@ -1711,6 +1868,7 @@ export function App() {
         combatStyle: form.combatStyle,
         cannonEnabled: currentCannon.enabled === true,
         lootPreferenceCount: Object.keys(currentLootPrefs).length,
+        revisionLabel: gameRevisionViewModel.revisionLabel,
         copyStatus: "idle"
       });
     } catch (error) {
@@ -1749,15 +1907,23 @@ export function App() {
     localStateRecovery.unblockReplaced(["rewrite-setup", "loot-prefs", "loot-settings"]);
     const monsterName =
       context.gameData.monsters[applied.state.form.monsterId]?.name ?? applied.state.form.monsterId;
-    setUndoableStatus(`Loaded shared setup for ${monsterName}`, "Restored pre-share setup", () => {
-      setForm(applied.undo.form);
-      setDefaultForm(previousDefaultForm);
-      setSetupMode(previousSetupMode);
-      setCannonByMonster(applied.undo.cannonByMonster);
-      setLootPrefsByMonster(applied.undo.lootPrefsByMonster);
-      setLootSettingsByMonster(applied.undo.lootSettingsByMonster);
-      setActiveTab(previousActiveTab);
-    });
+    const contextSuffix =
+      receivedShareableSetupInspection.review.context.match === "exact-snapshot"
+        ? ""
+        : ` using current Revision ${receivedShareableSetupInspection.review.context.current.gameRevision} data`;
+    setUndoableStatus(
+      `Loaded shared setup for ${monsterName}${contextSuffix}`,
+      "Restored pre-share setup",
+      () => {
+        setForm(applied.undo.form);
+        setDefaultForm(previousDefaultForm);
+        setSetupMode(previousSetupMode);
+        setCannonByMonster(applied.undo.cannonByMonster);
+        setLootPrefsByMonster(applied.undo.lootPrefsByMonster);
+        setLootSettingsByMonster(applied.undo.lootSettingsByMonster);
+        setActiveTab(previousActiveTab);
+      }
+    );
   };
   const currentCannonOutput = viewModel.trip.cannon;
   const cannonEnabled = currentCannon.enabled === true;
@@ -2021,7 +2187,8 @@ export function App() {
     itemId: economyHistory.effectiveTrendItemId,
     freshnessNow: new Date(priceAgeNowMs)
   });
-  const settingsPaneViewModel = createSettingsPaneViewModel(hiddenGearTiers);
+  const gameRevisionViewModel = createGameRevisionViewModel(context.gameData);
+  const settingsPaneViewModel = createSettingsPaneViewModel(hiddenGearTiers, gameRevisionViewModel);
   const priceDataViewModel = {
     ...priceSetPresentation,
     manual: manualPricePresentation,
@@ -2177,10 +2344,29 @@ export function App() {
         }
       : null
   });
+  const localStateAttentionViewModel = buildLocalStateAttentionViewModel(localStateRecovery.report);
+  const setupImportReviewViewModel = setupFileTransfer.review
+    ? buildSetupImportReviewViewModel(setupFileTransfer.review, captureCurrentRewriteSetup())
+    : null;
+  const duelImportReviewViewModel = duelImportReview
+    ? (() => {
+        const preview = mergeDuelSnapshots(duelSnapshots, duelImportReview.data);
+        return {
+          id: duelImportReview.id,
+          setupCount: duelImportReview.data.snapshots.length,
+          addedCount: preview.addedCount,
+          updatedCount: preview.updatedCount,
+          skippedCount: preview.skippedCount,
+          contextTone: duelImportReview.context.tone,
+          contextMessage: duelImportReview.context.message
+        };
+      })()
+    : null;
 
   return (
     <main className="app-shell" data-app-startup-state="ready">
       <AppHeader
+        activeGameRevisionLabel={gameRevisionViewModel.revisionLabel}
         hiscores={{
           statusLabel: hiscores.statusLabel,
           available: hiscores.available,
@@ -2196,12 +2382,25 @@ export function App() {
           onPreviewOpenChange: hiscores.setPreviewOpen,
           onApply: applyHiscoresPreview
         }}
-        setupImportNotice={setupFileTransfer.notice}
+        setupImportPhase={setupFileTransfer.phase}
+        setupImportNotice={setupFileTransfer.notice ?? setupImportNotice}
+        setupImportInputRef={setupImportInputRef}
         shareCreateNotice={shareCreateNotice}
         shareButtonRef={shareSetupButtonRef}
         onImportSetup={importSetupFile}
         onExportSetup={exportCurrentSetup}
         onShareSetup={openShareSetupDialog}
+      />
+      {setupImportReviewViewModel && (
+        <SetupImportReview
+          viewModel={setupImportReviewViewModel}
+          onApply={applySetupImportReview}
+          onDismiss={dismissSetupImportReview}
+        />
+      )}
+      <LocalStateAttentionBanner
+        viewModel={localStateAttentionViewModel}
+        onReview={reviewLocalState}
       />
       <span className="visually-hidden" role="status" aria-live="polite">
         {status}
@@ -2462,16 +2661,18 @@ export function App() {
             expandedDuelDiffId,
             duelMatrixMetric,
             duelMatrixFilter,
-            duelMatrix,
+            duelMatrixPresentation,
             filteredDuelMatrixRows,
             duelMatrixSort,
-            duelMatrixBusy,
-            duelImportNotice
+            duelImportNotice,
+            duelImportReview: duelImportReviewViewModel
           }}
           actions={{
             snapshotCurrentSetup,
             exportDuelSnapshots,
             importDuelSnapshots,
+            mergeDuelSnapshotsImport,
+            dismissDuelSnapshotsImport,
             commitDuelSnapshotName,
             loadDuelSnapshot,
             deleteDuelSnapshot,
@@ -2494,11 +2695,13 @@ export function App() {
             gearPoolEditor: plannerGearPoolEditor,
             error: plannerError,
             pending: plannerPending,
+            draftDirty: plannerDraftDirty,
             status: plannerStatus,
             computedMetric: plannerComputedMetric,
             combatStyleLabel: form.combatStyle,
             targetLabel: currentMonster?.name ?? form.monsterId,
-            currentLevels: form.levels
+            skillInputs: plannerSkillInputs,
+            adjustmentNotice: plannerAdjustmentNotice
           }}
           actions={{
             setMetric: updatePlannerMetric,
@@ -2509,7 +2712,7 @@ export function App() {
             setAverageOverSession: updatePlannerAverageOverSession,
             setGearPoolItem: updatePlannerGearPoolItem,
             resetGearPool: resetPlannerGearPool,
-            recompute: recomputePlanner
+            recompute: recomputePlannerPlan
           }}
         />
         <EconomySettingsPane

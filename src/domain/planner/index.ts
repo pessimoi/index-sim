@@ -422,6 +422,21 @@ export function xpAt(level: number): number {
   return XP[Math.max(1, Math.min(99, Math.floor(level)))] ?? 0;
 }
 
+export interface PlannerXpBounds {
+  level: number;
+  min: number;
+  max: number;
+}
+
+export function plannerXpBounds(level: number): PlannerXpBounds {
+  const normalizedLevel = Math.max(1, Math.min(99, Math.floor(level)));
+  return {
+    level: normalizedLevel,
+    min: xpAt(normalizedLevel),
+    max: normalizedLevel < 99 ? xpAt(normalizedLevel + 1) - 1 : 200_000_000
+  };
+}
+
 function fallbackRequirementWarning(itemId: EntityId): SimulationWarning {
   return {
     code: "manual-planner-requirement-fallback",
@@ -668,11 +683,12 @@ export function buildPlan(
   const progressXp: Record<PlannerSkill, number> = {} as Record<PlannerSkill, number>;
   for (const skill of allSkills) {
     const level = state[skill];
-    const lo = xpAt(level);
-    const hi = level < 99 ? xpAt(level + 1) - 1 : xpAt(99);
+    const bounds = plannerXpBounds(level);
     const supplied = startXp[skill];
     progressXp[skill] =
-      supplied != null && Number.isFinite(supplied) ? Math.max(lo, Math.min(hi, supplied)) : lo;
+      supplied != null && Number.isFinite(supplied)
+        ? Math.max(bounds.min, Math.min(bounds.max, supplied))
+        : bounds.min;
   }
 
   const thresholds = buildThresholds(
@@ -1059,11 +1075,12 @@ function startingXp(
 ): Partial<Record<PlannerSkill, number>> {
   const out: Partial<Record<PlannerSkill, number>> = {};
   for (const skill of skills) {
-    const level = levels[skill];
-    const lo = xpAt(level);
-    const hi = level < 99 ? xpAt(level + 1) - 1 : xpAt(99);
+    const bounds = plannerXpBounds(levels[skill]);
     const value = supplied?.[skill];
-    out[skill] = value != null && Number.isFinite(value) ? Math.max(lo, Math.min(hi, value)) : lo;
+    out[skill] =
+      value != null && Number.isFinite(value)
+        ? Math.max(bounds.min, Math.min(bounds.max, value))
+        : bounds.min;
   }
   return out;
 }

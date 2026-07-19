@@ -4,10 +4,10 @@ import {
   DUEL_SNAPSHOTS_VERSION,
   REWRITE_SETUP_STORAGE_KEY,
   REWRITE_SETUP_VERSION,
-  SavedSetupEnvelopeSchema,
   createDuelSnapshot,
   expect,
   expectAppStatus,
+  expectPageWidthContained,
   expectSearchableSelection,
   readDownloadText,
   resultMetricSnapshot,
@@ -16,6 +16,7 @@ import {
   test
 } from "./scaffold-fixture";
 import type { Locator } from "./scaffold-fixture";
+import { RewriteSetupTransferEnvelopeV1Schema } from "../../app/state/setup-import";
 
 test("reviews and imports compatible legacy setup data", async ({ page }) => {
   await page.addInitScript(() => {
@@ -408,12 +409,19 @@ test("surfaces and clears invalid rewrite local state in Settings", async ({ pag
   expect(migrationMetrics.overflowY).toBe("auto");
   expect(migrationMetrics.scrollHeight).toBeGreaterThan(migrationMetrics.clientHeight);
 
+  const attention = page.getByRole("complementary", { name: "Local data needs review" });
+  await expect(attention).toBeVisible();
+  await expect(attention).toContainText("1 saved area could not be loaded");
+  await expect(attention).toContainText("Affected: Hidden gear tiers");
+  await expect(attention).not.toContainText("index-sim:hidden-gear-tiers");
+
   const settingsTab = page.getByLabel("Workbench tabs").getByRole("tab", { name: "Settings" });
-  await settingsTab.focus();
-  await settingsTab.press("Enter");
+  await attention.getByRole("button", { name: "Review local data" }).click();
+  await expect(settingsTab).toHaveAttribute("aria-selected", "true");
 
   const recovery = page.getByLabel("Local state recovery");
   await expect(recovery).toBeVisible();
+  await expect(recovery.getByRole("heading", { name: "Local state recovery" })).toBeFocused();
   await expect(recovery).toContainText("Hidden gear tiers");
   await expect(recovery).toContainText("Saved data is not valid JSON");
   await expect(recovery).toContainText("Needs attention 1");
@@ -425,6 +433,7 @@ test("surfaces and clears invalid rewrite local state in Settings", async ({ pag
   await recovery.getByRole("button", { name: "Confirm clear Hidden gear tiers" }).click();
   await expect(recovery).toContainText("Cleared Hidden gear tiers");
   await expect(recovery).toContainText("Needs attention 0");
+  await expect(attention).toHaveCount(0);
 
   expect(
     await page.evaluate(
@@ -434,6 +443,48 @@ test("surfaces and clears invalid rewrite local state in Settings", async ({ pag
         window.localStorage.getItem("index-sim:unknown-test") === "keep"
     )
   ).toBe(true);
+});
+
+test("surfaces a version-mismatched saved setup without overwriting it", async ({ page }) => {
+  const original = JSON.stringify({
+    version: 999,
+    savedAt: "2026-07-18T00:00:00.000Z",
+    data: { privatePayload: "version-mismatch-sentinel" }
+  });
+  await page.addInitScript(({ key, value }) => window.localStorage.setItem(key, value), {
+    key: REWRITE_SETUP_STORAGE_KEY,
+    value: original
+  });
+
+  await page.goto("/");
+  const attention = page.getByRole("complementary", { name: "Local data needs review" });
+  await expect(attention).toContainText("Affected: Rewrite setup");
+  await expect(attention).toContainText("Safe defaults are active");
+  await expect(attention).not.toContainText("version-mismatch-sentinel");
+  await expect(page.getByLabel("TARGET", { exact: true })).toHaveValue(
+    DEFAULT_FORM_STATE.monsterId
+  );
+  const setupInput = page
+    .locator(".topbar")
+    .locator("label.file-button")
+    .filter({ hasText: "Import setup" })
+    .locator('input[type="file"]');
+  await setupInput.setInputFiles({
+    name: "dismissed-compatible-setup.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(
+      JSON.stringify({
+        version: REWRITE_SETUP_VERSION,
+        savedAt: "2026-07-18T01:00:00.000Z",
+        data: savedSetupFromForm(DEFAULT_FORM_STATE)
+      })
+    )
+  });
+  await page.getByLabel("Setup import review").getByRole("button", { name: "Dismiss" }).click();
+  await expect(attention).toBeVisible();
+  expect(
+    await page.evaluate((key) => window.localStorage.getItem(key), REWRITE_SETUP_STORAGE_KEY)
+  ).toBe(original);
 });
 
 test("falls back without overwriting a setup that references unavailable game data", async ({
@@ -658,7 +709,9 @@ test("does not overwrite an existing rewrite setup before import action", async 
   });
 });
 
-test("keeps global actions focused and completes setup export and import", async ({ page }) => {
+test("keeps global actions focused and completes setup export and Import setup review/Undo", async ({
+  page
+}) => {
   await page.goto("/");
   const topbarActions = page.locator(".topbar > .actions");
   await expect(topbarActions.getByRole("button", { name: "Export setup" })).toBeVisible();
@@ -672,9 +725,14 @@ test("keeps global actions focused and completes setup export and import", async
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe("index-sim-rewrite-setup.json");
   const exportedText = await readDownloadText(download);
-  const exported = SavedSetupEnvelopeSchema.parse(JSON.parse(exportedText));
-  expect(exported.version).toBe(REWRITE_SETUP_VERSION);
-  expect(Number.isNaN(Date.parse(exported.savedAt))).toBe(false);
+  const exported = RewriteSetupTransferEnvelopeV1Schema.parse(JSON.parse(exportedText));
+  expect(exported.kind).toBe("index-sim-rewrite-setup");
+  expect(exported.version).toBe(1);
+  expect(exported.context).toEqual({
+    gameDataId: "lostcity-376072662e78-runtime",
+    gameRevision: 274
+  });
+  expect(Number.isNaN(Date.parse(exported.exportedAt))).toBe(false);
   expect(Object.keys(exported.data).sort()).toEqual([
     "cannonByMonster",
     "customSetupsByMonster",
@@ -688,6 +746,17 @@ test("keeps global actions focused and completes setup export and import", async
   expect(exportedText).not.toContain("lootPrefsByMonster");
   expect(exportedText).not.toContain("plannerState");
   expect(exportedText).not.toContain("priceHistory");
+  await page.waitForFunction(() => window.localStorage.getItem("index-sim:rewrite-setup"));
+  const setupBeforeImport = await page.evaluate(
+    () => JSON.parse(window.localStorage.getItem("index-sim:rewrite-setup") ?? "null").data
+  );
+  const tabs = page.getByLabel("Workbench tabs");
+  await tabs.getByRole("tab", { name: "Planner" }).click();
+  const planner = page.getByRole("region", { name: "Planner", exact: true });
+  const attackXp = planner.getByLabel("Attack current XP");
+  const attackFloor = Number((await attackXp.getAttribute("placeholder"))?.replace("Auto: ", ""));
+  await attackXp.fill(String(attackFloor + 10));
+  await tabs.getByRole("tab", { name: "Melee setup" }).click();
 
   const defaultForm = savedSetupFromForm({
     ...DEFAULT_FORM_STATE,
@@ -717,7 +786,7 @@ test("keeps global actions focused and completes setup export and import", async
     .locator("label.file-button")
     .filter({ hasText: "Import setup" })
     .locator('input[type="file"]');
-  await setupInput.setInputFiles({
+  const importedFile = {
     name: "rewrite-setup.json",
     mimeType: "application/json",
     buffer: Buffer.from(
@@ -727,10 +796,44 @@ test("keeps global actions focused and completes setup export and import", async
         data: importedSetup
       })
     )
-  });
+  };
+  await setupInput.setInputFiles(importedFile);
+
+  const review = page.getByLabel("Setup import review");
+  await expect(review).toBeVisible();
+  await expect(review).toContainText("Hill Giant");
+  await expect(review).toContainText("Melee");
+  await expect(review).toContainText("Custom");
+  await expect(review).toContainText("Custom setups0 → 1");
+  await expect(review).toContainText("Cannon settings0 → 1");
+  await expect(review).toContainText("Monster, ascending");
+  await expect(review).toContainText("active form, default form, setup mode, custom setups");
+  await expect(review).toContainText("older format does not record a game revision");
+  await expect(review).not.toContainText("dragon_longsword");
+  await expect(page.getByLabel("Setup context")).toContainText("Default setup");
+  expect(
+    await page.evaluate(
+      () => JSON.parse(window.localStorage.getItem("index-sim:rewrite-setup") ?? "null").data
+    )
+  ).toEqual(setupBeforeImport);
+
+  await review.getByRole("button", { name: "Dismiss" }).click();
+  await expect(review).toHaveCount(0);
+  await expect(setupInput).toBeFocused();
+  expect(
+    await page.evaluate(
+      () => JSON.parse(window.localStorage.getItem("index-sim:rewrite-setup") ?? "null").data
+    )
+  ).toEqual(setupBeforeImport);
+
+  await setupInput.setInputFiles(importedFile);
+  await page
+    .getByLabel("Setup import review")
+    .getByRole("button", { name: "Apply imported setup" })
+    .click();
 
   const setupNotice = page.getByLabel("Setup import notice");
-  await expect(setupNotice).toHaveText("Imported rewrite setup.");
+  await expect(setupNotice).toHaveText("Imported rewrite setup using current Revision 274 data.");
   await expect(setupNotice).toHaveAttribute("role", "status");
   await expect(setupNotice).toHaveClass(/topbar-import-notice setup-import-notice/);
   expect(
@@ -740,12 +843,16 @@ test("keeps global actions focused and completes setup export and import", async
   ).toBe(3);
   await expect(setupInput).toHaveValue("");
   await expect(page.locator('span.visually-hidden[role="status"]')).toHaveText(
-    "Imported rewrite setup"
+    "Imported rewrite setup using current Revision 274 data."
   );
   await expect(page.getByLabel("TARGET", { exact: true })).toHaveValue("giant");
   await expect(page.getByLabel("Setup context")).toContainText("Custom setup");
 
-  const tabs = page.getByLabel("Workbench tabs");
+  await tabs.getByRole("tab", { name: "Planner" }).click();
+  await expect(planner.getByLabel("Attack current XP")).toHaveValue("");
+  await expect(planner.getByLabel("Attack target")).toHaveValue("77");
+  await expect(planner).toContainText("Attack XP uses Auto");
+  await expect(planner).toContainText("Attack target is now 77");
   await tabs.getByRole("tab", { name: "Melee setup" }).click();
   const loadout = page.getByRole("region", { name: "Equipment loadout", exact: true });
   await expectSearchableSelection(loadout, "Weapon", "dragon_longsword");
@@ -760,7 +867,7 @@ test("keeps global actions focused and completes setup export and import", async
   const cannon = page.getByLabel("Cannon", { exact: true });
   await expect(cannon.getByLabel("Set up cannon")).toBeChecked();
   await expect(cannon.getByLabel("Mobs at spot")).toHaveValue("4");
-  await expect(cannon.getByRole("spinbutton", { name: "Respawn", exact: true })).toHaveValue("45");
+  await expect(cannon.getByLabel("Respawn", { exact: true })).toHaveValue("45");
 
   await page.waitForFunction((expectedSetup) => {
     const raw = window.localStorage.getItem("index-sim:rewrite-setup");
@@ -773,6 +880,45 @@ test("keeps global actions focused and completes setup export and import", async
   expect(persisted.savedAt).not.toBe("2026-07-01T12:00:00.000Z");
   expect(persisted.data).toEqual(importedSetup);
 
+  const importUndo = page.getByLabel("Local state undo");
+  await expect(importUndo).toContainText("Imported rewrite setup using current Revision 274 data.");
+  await importUndo.getByRole("button", { name: "Undo" }).click();
+  await expect(page.getByLabel("Setup import notice")).toHaveText(
+    "Restored setup from before import."
+  );
+  await expect(page.getByLabel("Setup context")).toContainText("Default setup");
+  await expect(page.getByLabel("Combat setup").getByLabel("ATT", { exact: true })).toHaveValue(
+    "60"
+  );
+  await tabs.getByRole("tab", { name: "Planner" }).click();
+  await expect(planner.getByLabel("Attack current XP")).toHaveValue("");
+  await expect(planner.getByLabel("Attack target")).toHaveValue("77");
+  await expect(planner).toContainText("the level 60 floor");
+  await expect(cannon.getByLabel("Set up cannon")).not.toBeChecked();
+  await tabs.getByRole("tab", { name: "Monsters" }).click();
+  await expect(denseFilters.getByLabel("Monster filter")).toHaveValue("");
+  await expect(denseFilters.getByLabel("Drop filter")).toHaveValue("");
+  await expect(denseFilters.getByLabel("Show hidden / irrelevant")).not.toBeChecked();
+  await page.waitForFunction((expectedSetup) => {
+    const raw = window.localStorage.getItem("index-sim:rewrite-setup");
+    return raw != null && JSON.stringify(JSON.parse(raw).data) === JSON.stringify(expectedSetup);
+  }, setupBeforeImport);
+
+  await setupInput.setInputFiles({
+    name: "contextual-rewrite-setup.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(exportedText)
+  });
+  const exactReview = page.getByLabel("Setup import review");
+  await expect(exactReview).toContainText("Created with this exact Revision 274 data snapshot.");
+  await exactReview.getByRole("button", { name: "Dismiss" }).click();
+
+  await setupInput.setInputFiles(importedFile);
+  await page
+    .getByLabel("Setup import review")
+    .getByRole("button", { name: "Apply imported setup" })
+    .click();
+
   await tabs.getByRole("tab", { name: "Melee setup" }).click();
   await page
     .getByLabel("Setup context")
@@ -780,6 +926,67 @@ test("keeps global actions focused and completes setup export and import", async
     .click();
   await expect(page.getByLabel("Setup context")).toContainText("Default setup");
   await expectSearchableSelection(loadout, "Weapon", "rune_scimitar");
+});
+
+test("applies and undoes an imported setup for the session when persistence fails", async ({
+  page
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => {
+    const originalSetItem = Storage.prototype.setItem;
+    Storage.prototype.setItem = function patchedSetItem(key: string, value: string) {
+      if (key === "index-sim:rewrite-setup") throw new Error("private setup save failure");
+      return originalSetItem.call(this, key, value);
+    };
+  });
+  await page.goto("/");
+
+  const importedSetup = savedSetupFromForm({
+    ...DEFAULT_FORM_STATE,
+    monsterId: "dagannoth",
+    levels: { ...DEFAULT_FORM_STATE.levels, attack: 77 }
+  });
+  const setupInput = page
+    .locator(".topbar")
+    .locator("label.file-button")
+    .filter({ hasText: "Import setup" })
+    .locator('input[type="file"]');
+  await setupInput.setInputFiles({
+    name: "session-setup.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(
+      JSON.stringify({
+        version: REWRITE_SETUP_VERSION,
+        savedAt: "2026-07-18T00:00:00.000Z",
+        data: importedSetup
+      })
+    )
+  });
+  await expectPageWidthContained(page);
+  await page
+    .getByLabel("Setup import review")
+    .getByRole("button", { name: "Apply imported setup" })
+    .click();
+
+  await expect(page.getByLabel("Setup import notice")).toContainText(
+    "Imported rewrite setup using current Revision 274 data for this session"
+  );
+  await expect(page.getByLabel("TARGET", { exact: true })).toHaveValue("dagannoth");
+  await expect(page.getByLabel("Combat setup").getByLabel("ATT", { exact: true })).toHaveValue(
+    "77"
+  );
+  const undo = page.getByLabel("Local state undo");
+  await expect(undo).toContainText("Changes may not persist after reload");
+  await undo.getByRole("button", { name: "Undo" }).click();
+
+  await expect(page.getByLabel("TARGET", { exact: true })).toHaveValue("giant");
+  await expect(page.getByLabel("Combat setup").getByLabel("ATT", { exact: true })).toHaveValue(
+    "60"
+  );
+  await expect(page.getByLabel("Setup import notice")).toContainText(
+    "Restored setup from before import for this session"
+  );
+  await expect(page.getByRole("complementary", { name: "Changes may not persist" })).toBeVisible();
 });
 
 test("round-trips a full PriceSet through the one advanced Market workflow", async ({ page }) => {

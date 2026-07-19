@@ -15,7 +15,8 @@ import {
   decodeShareableSetupEnvelope,
   encodeShareableSetupEnvelope,
   reviewShareableSetup,
-  type ShareableSetupEnvelopeV1
+  type ShareableSetupEnvelopeV1,
+  type ShareableSetupEnvelopeV2
 } from "../app/state/shareable-setup";
 import {
   DEFAULT_CANNON_SETTINGS,
@@ -33,9 +34,9 @@ function encodeRawText(text: string): string {
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
 
-function fixtureEnvelope(gameDataId: string): ShareableSetupEnvelopeV1 {
+function fixtureEnvelope(gameData: SimulationContext["gameData"]): ShareableSetupEnvelopeV2 {
   return buildShareableSetupEnvelope({
-    gameDataId,
+    gameData,
     form: normalizeFormState(DEFAULT_FORM_STATE),
     cannon: DEFAULT_CANNON_SETTINGS,
     lootPreferences: {},
@@ -51,7 +52,7 @@ describe("shareable setup contract", () => {
   });
 
   it("round trips a deterministic versioned setup without local collections or prices", () => {
-    const envelope = fixtureEnvelope(context.gameData.id);
+    const envelope = fixtureEnvelope(context.gameData);
     const first = encodeShareableSetupEnvelope(envelope);
     const second = encodeShareableSetupEnvelope(envelope);
     const decoded = decodeShareableSetupEnvelope(first);
@@ -60,6 +61,10 @@ describe("shareable setup contract", () => {
     expect(first).toMatch(/^[A-Za-z0-9_-]+$/);
     expect(first).not.toContain("=");
     expect(decoded).toEqual(envelope);
+    expect(decoded).toMatchObject({
+      version: 2,
+      context: { gameDataId: context.gameData.id, gameRevision: 274 }
+    });
     expect(Object.keys(decoded.data).sort()).toEqual([
       "cannon",
       "form",
@@ -71,6 +76,23 @@ describe("shareable setup contract", () => {
     );
   });
 
+  it("continues to decode share v1 and normalizes its context during review", () => {
+    const current = fixtureEnvelope(context.gameData);
+    const legacy: ShareableSetupEnvelopeV1 = {
+      kind: "index-sim-setup",
+      version: 1,
+      gameDataId: "older-game-data",
+      data: structuredClone(current.data)
+    };
+
+    const decoded = decodeShareableSetupEnvelope(encodeShareableSetupEnvelope(legacy));
+    expect(decoded).toEqual(legacy);
+    expect(reviewShareableSetup(decoded, context.gameData).context).toMatchObject({
+      match: "unknown",
+      source: null
+    });
+  });
+
   it("rejects malformed encodings, duplicate keys, unsupported versions and implicit defaults", () => {
     expect(() => decodeShareableSetupEnvelope("%%%")).toThrowError(ShareableSetupError);
     expect(() =>
@@ -78,11 +100,11 @@ describe("shareable setup contract", () => {
     ).toThrowError(expect.objectContaining({ code: "duplicate_keys" }));
     expect(() =>
       decodeShareableSetupEnvelope(
-        encodeRawText(JSON.stringify({ ...fixtureEnvelope(context.gameData.id), version: 2 }))
+        encodeRawText(JSON.stringify({ ...fixtureEnvelope(context.gameData), version: 3 }))
       )
     ).toThrowError(expect.objectContaining({ code: "unsupported_version" }));
 
-    const missingHitpoints = fixtureEnvelope(context.gameData.id) as unknown as Record<
+    const missingHitpoints = fixtureEnvelope(context.gameData) as unknown as Record<
       string,
       unknown
     >;
@@ -100,7 +122,7 @@ describe("shareable setup contract", () => {
       decodeShareableSetupEnvelope("a".repeat(SHAREABLE_SETUP_MAX_ENCODED_CHARS + 1))
     ).toThrowError(expect.objectContaining({ code: "body_too_large" }));
 
-    const envelope = fixtureEnvelope(context.gameData.id);
+    const envelope = fixtureEnvelope(context.gameData);
     envelope.data.lootPreferences = Object.fromEntries(
       Array.from({ length: 120 }, (_, index) => [
         `${index}-${"x".repeat(100)}`,
@@ -116,13 +138,24 @@ describe("shareable setup contract", () => {
   });
 
   it("reports game-data mismatches, rejects unknown setup entities and drops stale loot rows", () => {
-    const envelope = fixtureEnvelope("older-game-data");
+    const envelope = fixtureEnvelope(context.gameData);
+    envelope.context.gameDataId = "older-game-data";
     envelope.data.lootPreferences = { "missing-row": "loot" };
     const review = reviewShareableSetup(envelope, context.gameData);
 
-    expect(review.gameDataMismatch).toBe(true);
+    expect(review.context.match).toBe("same-revision");
     expect(review.droppedLootRowCount).toBe(1);
     expect(review.envelope.data.lootPreferences).toEqual({});
+
+    const legacy: ShareableSetupEnvelopeV1 = {
+      kind: "index-sim-setup",
+      version: 1,
+      gameDataId: "older-game-data",
+      data: structuredClone(envelope.data)
+    };
+    expect(reviewShareableSetup(legacy, context.gameData).context.match).toBe("unknown");
+    legacy.gameDataId = context.gameData.id;
+    expect(reviewShareableSetup(legacy, context.gameData).context.match).toBe("exact-snapshot");
 
     const incompatible = structuredClone(envelope);
     incompatible.data.form.perStyleLoadouts.melee.weaponId = "missing_weapon";
@@ -132,7 +165,7 @@ describe("shareable setup contract", () => {
   });
 
   it("applies only the target setup state, preserves unrelated rows and returns a complete undo", () => {
-    const envelope = fixtureEnvelope(context.gameData.id);
+    const envelope = fixtureEnvelope(context.gameData);
     const lootRowId = lootPreferenceKeysForMonster(context.gameData.monsters.giant)[0] ?? "";
     expect(lootRowId).toBeTruthy();
     envelope.data.cannon = { enabled: true, targets: 4, respawnSec: 18 };
@@ -167,7 +200,7 @@ describe("shareable setup contract", () => {
   });
 
   it("removes explicit target entries when a shared setup uses effective defaults", () => {
-    const review = reviewShareableSetup(fixtureEnvelope(context.gameData.id), context.gameData);
+    const review = reviewShareableSetup(fixtureEnvelope(context.gameData), context.gameData);
     const result = applyShareableSetup(
       {
         form: normalizeFormState(DEFAULT_FORM_STATE),

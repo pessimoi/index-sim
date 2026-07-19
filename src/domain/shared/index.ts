@@ -230,9 +230,17 @@ export interface MonsterDefinition {
   provenance?: DataProvenance;
 }
 
+export interface GameDataRevisionContext {
+  gameRevision: number;
+  sourceName: string;
+  sourceCommit?: string;
+  generatedAt: string;
+}
+
 export interface GameDataSnapshot {
   id: EntityId;
   label: string;
+  revisionContext?: GameDataRevisionContext;
   items: Record<EntityId, ItemDefinition>;
   monsters: Record<EntityId, MonsterDefinition>;
   weapons: Record<EntityId, WeaponDefinition>;

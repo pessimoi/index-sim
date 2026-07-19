@@ -311,6 +311,9 @@ describe("local state recovery controller", () => {
 
     expect(initialMarkup).toContain("Clear Hidden gear tiers");
     expect(initialMarkup).toContain("Clear invalid local data");
+    expect(initialMarkup).toContain(
+      'id="local-state-recovery-heading" tabindex="-1">Local state recovery'
+    );
     expect(itemPendingMarkup).toContain("Confirm clear Hidden gear tiers");
     expect(itemPendingMarkup).toContain("Cancel");
     expect(allPendingMarkup).toContain("Confirm clear invalid local data");

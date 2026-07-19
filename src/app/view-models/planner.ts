@@ -1,6 +1,7 @@
 import {
   buildPlan,
   defaultPool,
+  plannerXpBounds,
   reqOf,
   SKILL_LABEL,
   SLOT_LABEL,
@@ -27,7 +28,10 @@ import {
   cleanPlannerUiStateForPool,
   createDefaultPlannerUiState,
   effectivePlannerGearPool,
+  effectivePlannerStartXp,
+  effectivePlannerTarget,
   normalizePlannerUiState,
+  type PlannerProgressAdjustment,
   type PlannerUiState
 } from "../state/planner";
 import {
@@ -35,6 +39,7 @@ import {
   formToTripPolicy,
   type CombatSetupFormState
 } from "../state/ui-state";
+import { formatNumber } from "./formatting";
 
 export type PlannerStatus = "error" | "pending" | "running" | "empty" | "ready" | "idle";
 
@@ -44,6 +49,24 @@ export interface PlannerDomainAdapterViewModel {
   state: PlannerUiState;
   defaultPool: PlannerPool;
   pool: PlannerPool;
+}
+
+export interface PlannerSkillInputViewModel {
+  skill: PlannerSkill;
+  label: string;
+  currentLevel: number;
+  currentXp: number | null;
+  currentXpMode: "auto" | "explicit";
+  currentXpMin: number;
+  currentXpMax: number;
+  effectiveStartXp: number;
+  storedTargetLevel: number;
+  effectiveTargetLevel: number;
+  targetMin: number;
+  targetDisabled: boolean;
+  locked: boolean;
+  xpDescription: string;
+  targetDescription: string;
 }
 
 export interface PlannerPanelSummaryViewModel {
@@ -242,11 +265,83 @@ function plannerTargetsForState(
 ): Record<PlannerSkill, number> {
   const targets = {} as Record<PlannerSkill, number>;
   for (const skill of PLANNER_SKILLS) {
-    targets[skill] = plannerState.skillLocks[skill]
-      ? form.levels[skill]
-      : Math.max(form.levels[skill], plannerState.targetLevels[skill]);
+    targets[skill] = effectivePlannerTarget(
+      form.levels[skill],
+      plannerState.targetLevels[skill],
+      plannerState.skillLocks[skill]
+    );
   }
   return targets;
+}
+
+function plannerStartXpForState(
+  form: CombatSetupFormState,
+  plannerState: PlannerUiState
+): Record<PlannerSkill, number> {
+  const startXp = {} as Record<PlannerSkill, number>;
+  for (const skill of PLANNER_SKILLS) {
+    startXp[skill] = effectivePlannerStartXp(form.levels[skill], plannerState.currentXp[skill]);
+  }
+  return startXp;
+}
+
+export function createPlannerSkillInputViewModels(
+  form: CombatSetupFormState,
+  plannerState: PlannerUiState
+): PlannerSkillInputViewModel[] {
+  return PLANNER_SKILLS.map((skill) => {
+    const bounds = plannerXpBounds(form.levels[skill]);
+    const storedXp = plannerState.currentXp[skill];
+    const explicitXp = storedXp > 0 && storedXp >= bounds.min && storedXp <= bounds.max;
+    const auto = !explicitXp;
+    const locked = plannerState.skillLocks[skill];
+    const effectiveStartXp = effectivePlannerStartXp(bounds.level, storedXp);
+    const effectiveTargetLevel = effectivePlannerTarget(
+      bounds.level,
+      plannerState.targetLevels[skill],
+      locked
+    );
+    const targetDisabled = locked || bounds.level === 99;
+    const targetDescription =
+      bounds.level === 99
+        ? "Already at maximum target level 99."
+        : locked
+          ? `Locked at current level ${bounds.level}; saved target ${plannerState.targetLevels[skill]} is not used.`
+          : `Next plan targets level ${effectiveTargetLevel}.`;
+    return {
+      skill,
+      label: SKILL_LABEL[skill],
+      currentLevel: bounds.level,
+      currentXp: explicitXp ? storedXp : null,
+      currentXpMode: auto ? "auto" : "explicit",
+      currentXpMin: bounds.min,
+      currentXpMax: bounds.max,
+      effectiveStartXp,
+      storedTargetLevel: plannerState.targetLevels[skill],
+      effectiveTargetLevel,
+      targetMin: bounds.level,
+      targetDisabled,
+      locked,
+      xpDescription: auto
+        ? `Next plan starts at ${formatNumber(effectiveStartXp)}, the level ${bounds.level} floor.`
+        : `Next plan starts at the entered XP within level ${bounds.level}.`,
+      targetDescription
+    };
+  });
+}
+
+export function plannerProgressAdjustmentNotice(
+  adjustments: readonly PlannerProgressAdjustment[]
+): string | null {
+  if (adjustments.length === 0) return null;
+  const changes = adjustments.slice(0, 3).map((adjustment) => {
+    const label = SKILL_LABEL[adjustment.skill];
+    return adjustment.field === "currentXp"
+      ? `${label} XP uses Auto`
+      : `${label} target is now ${adjustment.next}`;
+  });
+  const remaining = adjustments.length - changes.length;
+  return `Planner inputs adjusted for current levels: ${changes.join("; ")}${remaining > 0 ? `; ${remaining} more` : ""}.`;
 }
 
 export function createPlannerDomainAdapter(
@@ -277,7 +372,7 @@ export function createPlannerDomainAdapter(
     options: {
       metric: state.metric,
       targets: plannerTargetsForState(form, state),
-      startXp: state.currentXp,
+      startXp: plannerStartXpForState(form, state),
       pool,
       lockGear: state.onlyCurrentGear,
       sustained: state.averageOverSession,

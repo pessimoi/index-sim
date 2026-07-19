@@ -7,7 +7,10 @@ import {
 } from "../app/components/panes/planner-pane";
 import { createDefaultPlannerUiState } from "../app/state/planner";
 import { DEFAULT_FORM_STATE } from "../app/state/ui-state";
-import type { PlannerPanelViewModel } from "../app/view-models/planner";
+import {
+  createPlannerSkillInputViewModels,
+  type PlannerPanelViewModel
+} from "../app/view-models/planner";
 
 const noOp = () => undefined;
 
@@ -128,11 +131,16 @@ function model(overrides: Partial<PlannerPaneModel> = {}): PlannerPaneModel {
     },
     error: null,
     pending: false,
+    draftDirty: false,
     status: "ready",
     computedMetric: "balanced",
     combatStyleLabel: "melee",
     targetLabel: "Rock Crab",
-    currentLevels: DEFAULT_FORM_STATE.levels,
+    skillInputs: createPlannerSkillInputViewModels(
+      DEFAULT_FORM_STATE,
+      createDefaultPlannerUiState(DEFAULT_FORM_STATE)
+    ),
+    adjustmentNotice: null,
     ...overrides
   };
 }
@@ -174,8 +182,34 @@ describe("Planner pane", () => {
       'aria-label="Planner warnings"'
     ]);
     expect(markup).toContain('aria-label="Planner pool Rune scimitar"');
+    expect(markup).toContain("Next plan starts at");
+    expect(markup).toContain("Use level floor");
     expect(markup).toContain("+0.50");
     expect(markup).toContain("Fixture warning");
+  });
+
+  it("renders Auto XP, locked effective targets, adjustment status and dirty output copy", () => {
+    const state = createDefaultPlannerUiState(DEFAULT_FORM_STATE);
+    state.skillLocks.attack = true;
+    state.targetLevels.attack = 70;
+    const markup = renderToStaticMarkup(
+      createElement(PlannerPane, {
+        hidden: false,
+        model: model({
+          draftState: state,
+          draftDirty: true,
+          skillInputs: createPlannerSkillInputViewModels(DEFAULT_FORM_STATE, state),
+          adjustmentNotice: "Planner inputs adjusted for current levels: Strength XP uses Auto."
+        }),
+        actions
+      })
+    );
+
+    expect(markup).toContain('placeholder="Auto:');
+    expect(markup).toContain("Locked at current level 60; saved target 70 is not used.");
+    expect(markup).toContain("Planner inputs adjusted for current levels");
+    expect(markup).toContain("Current output uses the last recomputed inputs.");
+    expect(markup).toContain('aria-live="polite"');
   });
 
   it("keeps calculating and fixed-error presentation contracts", () => {
