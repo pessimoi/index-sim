@@ -1,4 +1,4 @@
-import { lazy, Suspense, useId, type Ref } from "react";
+import { lazy, Suspense, useId, type Ref, type RefObject } from "react";
 import type {
   LocalStateHealthItemId,
   LocalStateHealthReport
@@ -27,7 +27,14 @@ import {
   optionalPrice
 } from "../presentation-formatters";
 import { PriceTrendChart, PriceTrendSparkline } from "../price-history-charts";
+import { PriceTime, PriceTimeFactPair } from "../price-time";
+import type { PriceDateTimePresentation } from "../../view-models/price-time";
 import { LocalStateRecoveryPanel } from "../settings/local-state-recovery-panel";
+import {
+  MonsterSpecificChangesPanel,
+  type MonsterSpecificChangesPanelActions,
+  type MonsterSpecificChangesPanelModel
+} from "../settings/monster-specific-changes-panel";
 import type {
   WorkspaceBackupPanelActions,
   WorkspaceBackupPanelModel
@@ -49,12 +56,32 @@ export interface EconomySettingsPaneModel {
   priceSetResetPending: boolean;
   priceHistoryClearPending: boolean;
   manualPriceClearPending: boolean;
+  historyNotice: { tone: "neutral" | "success" | "warning" | "error"; message: string } | null;
+  historyReview:
+    | {
+        kind: "removal";
+        id: number;
+        occurrenceId: string;
+        label: string;
+        captureTime: PriceDateTimePresentation;
+        itemCount: number;
+      }
+    | {
+        kind: "replacement";
+        id: number;
+        activePriceSetLabel: string;
+        replacedLabel: string;
+        replacedCaptureTime: PriceDateTimePresentation;
+        replacedItemCount: number;
+      }
+    | null;
   recovery: {
     visible: boolean;
     report: LocalStateHealthReport;
     notice: string | null;
     pendingClearId: LocalStateClearPendingId;
   };
+  monsterChanges: MonsterSpecificChangesPanelModel;
   workspace: WorkspaceBackupPanelModel;
 }
 
@@ -79,6 +106,9 @@ export interface EconomySettingsPaneActions {
     setItemFilter(value: string): void;
     setTrendItemId(value: string): void;
     sortBy(key: PriceHistoryMoverSortKey): void;
+    reviewRemoval(occurrenceId: string): void;
+    cancelReview(): void;
+    confirmReview(): void;
   };
   manual: {
     selectItem(itemId: string): void;
@@ -101,6 +131,7 @@ export interface EconomySettingsPaneActions {
     confirmClearItem(id: LocalStateHealthItemId): void;
     confirmClearInvalid(): void;
   };
+  monsterChanges: MonsterSpecificChangesPanelActions;
   workspace: WorkspaceBackupPanelActions;
 }
 
@@ -113,6 +144,10 @@ export interface EconomySettingsPaneProps {
   workspaceReviewHeadingRef?: Ref<HTMLHeadingElement>;
   setPriceNoticeActionRef?(noticeId: string, element: HTMLButtonElement | null): void;
   marketHeadingRef?: Ref<HTMLHeadingElement>;
+  historyReviewReturnFocusRef?: RefObject<HTMLButtonElement | null>;
+  historyReviewHeadingRef?: Ref<HTMLHeadingElement>;
+  historyManagementSummaryRef?: Ref<HTMLElement>;
+  selectedPriceItemRef?: Ref<HTMLDivElement>;
 }
 
 function TechnicalDetails({
@@ -154,8 +189,11 @@ function ScheduledSnapshotSummary({ prices }: { prices: PriceDataViewModel }) {
         <span>Status {scheduled.statusLabel}</span>
         <span>Label {scheduled.label}</span>
         <span>Source scheduled static JSON</span>
-        <span>Created {scheduled.createdAt}</span>
-        <span aria-label={`Age ${scheduled.ageAccessibleLabel}`}>Age {scheduled.ageLabel}</span>
+        <PriceTimeFactPair
+          presentation={scheduled.time}
+          exactLabel={scheduled.timeLabel}
+          relativeLabel="Captured"
+        />
         <span>Item prices {formatNumber(scheduled.itemCount)}</span>
         <span>Observed high {formatNumber(scheduled.metadata.observedHigh)}</span>
         <span>Observed medium {formatNumber(scheduled.metadata.observedMedium)}</span>
@@ -288,13 +326,22 @@ export function EconomySettingsPane({
   workspaceImportInputRef,
   workspaceReviewHeadingRef,
   setPriceNoticeActionRef,
-  marketHeadingRef
+  marketHeadingRef,
+  historyReviewReturnFocusRef,
+  historyReviewHeadingRef,
+  historyManagementSummaryRef,
+  selectedPriceItemRef
 }: EconomySettingsPaneProps) {
   const economyVisible = model.mode === "economy";
   const settingsVisible = model.mode === "settings";
   const hidden = model.mode === "hidden";
   const { prices } = model;
   const { history, manual } = prices;
+  const cancelHistoryReview = () => {
+    const trigger = historyReviewReturnFocusRef?.current;
+    actions.history.cancelReview();
+    window.requestAnimationFrame(() => trigger?.focus());
+  };
 
   return (
     <section
@@ -348,6 +395,12 @@ export function EconomySettingsPane({
         </section>
       )}
       {settingsVisible && (
+        <MonsterSpecificChangesPanel
+          model={model.monsterChanges}
+          actions={actions.monsterChanges}
+        />
+      )}
+      {settingsVisible && (
         <Suspense
           fallback={
             <section className="service-group workspace-backup-panel" aria-label="Workspace tools">
@@ -387,8 +440,9 @@ export function EconomySettingsPane({
           <div className="price-history-summary" aria-label="Active PriceSet summary">
             <span>Label {prices.active.label}</span>
             <span>Active source {prices.active.sourceLabel}</span>
-            <span aria-label={`Age ${prices.active.ageAccessibleLabel}`}>
-              Age {prices.active.ageLabel}
+            <span>
+              {prices.active.timeLabel}{" "}
+              <PriceTime presentation={prices.active.time} display="relative" />
             </span>
           </div>
           <button
@@ -459,10 +513,11 @@ export function EconomySettingsPane({
             <span>Active source {prices.active.sourceLabel}</span>
             <span>Label {prices.active.label}</span>
             <span>Source {prices.active.source}</span>
-            <span>Created {prices.active.createdAt}</span>
-            <span aria-label={`Age ${prices.active.ageAccessibleLabel}`}>
-              Age {prices.active.ageLabel}
-            </span>
+            <PriceTimeFactPair
+              presentation={prices.active.time}
+              exactLabel={prices.active.timeLabel}
+              relativeLabel="Age"
+            />
             <span>Item prices {formatNumber(prices.active.itemCount)}</span>
             <span>Observed high {formatNumber(prices.active.metadata.observedHigh)}</span>
             <span>Observed medium {formatNumber(prices.active.metadata.observedMedium)}</span>
@@ -515,7 +570,9 @@ export function EconomySettingsPane({
               <span>Base {optionalPrice(manual.basePrice)}</span>
               <span>Active {optionalPrice(manual.activePrice)}</span>
               <span>Status {manual.selectedOverride ? "Manual" : "Base"}</span>
-              <span>Updated {manual.selectedOverride?.updatedAt ?? "-"}</span>
+              <span>
+                Manual price updated <PriceTime presentation={manual.updatedTime} display="full" />
+              </span>
               <span>
                 Stored {formatNumber(manual.storedCount)}/{formatNumber(manual.maxItems)}
               </span>
@@ -574,49 +631,6 @@ export function EconomySettingsPane({
               {model.marketNotice.message}
             </p>
           )}
-          <div className="market-sync-bar">
-            <button
-              type="button"
-              disabled={!prices.active.available}
-              onClick={actions.history.saveLocalComparison}
-            >
-              Save local comparison
-            </button>
-            {model.priceHistoryClearPending ? (
-              <>
-                <button type="button" onClick={actions.history.confirmClear}>
-                  Confirm clear local history
-                </button>
-                <button type="button" onClick={actions.history.cancelClear}>
-                  Cancel
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                disabled={history.localSnapshotCount === 0}
-                onClick={actions.history.requestClear}
-              >
-                Clear local history
-              </button>
-            )}
-          </div>
-          <div className="price-history-summary" aria-label="Price history summary">
-            <span>Snapshots {formatNumber(history.summary.snapshotCount)}</span>
-            <span>Shared {formatNumber(history.sharedSnapshotCount)}</span>
-            <span>Local {formatNumber(history.localSnapshotCount)}</span>
-            <span>Items {formatNumber(history.summary.trackedItemCount)}</span>
-            <span>Moved {formatNumber(history.movers.movedItemCount)}</span>
-            <span aria-label={`Latest age ${history.summary.latestAgeAccessibleLabel}`}>
-              Latest age {history.summary.latestAgeLabel}
-            </span>
-            <span>Active {history.summary.activeLabel}</span>
-            <span>
-              Latest {history.summary.latestLabel}
-              {history.summary.activeMatchesLatest ? " active" : ""}
-            </span>
-            <span>Baseline {history.movers.baselineLabel}</span>
-          </div>
           {model.priceNotices.all.length > 0 ? (
             <details
               className="price-data-notes"
@@ -681,6 +695,199 @@ export function EconomySettingsPane({
             <h2>Price history</h2>
             <span className="status-pill">{history.sourceStatus}</span>
           </div>
+          <div className="price-history-lifecycle" aria-label="Local price history lifecycle">
+            <div className="price-history-summary">
+              <span>
+                Local comparisons {formatNumber(history.localManagement.count)}/
+                {formatNumber(history.localManagement.maximum)}
+              </span>
+              <span>
+                {history.localManagement.atCapacity
+                  ? "History full"
+                  : `${formatNumber(history.localManagement.remaining)} spaces remaining`}
+              </span>
+            </div>
+            {history.localManagement.atCapacity ? (
+              <p className="inline-status neutral">
+                History is full. Saving another local comparison requires replacing the oldest
+                point.
+              </p>
+            ) : null}
+            <button
+              type="button"
+              disabled={!prices.active.available}
+              ref={(element) => {
+                if (historyReviewReturnFocusRef && model.historyReview?.kind === "replacement") {
+                  historyReviewReturnFocusRef.current = element;
+                }
+              }}
+              onClick={(event) => {
+                if (historyReviewReturnFocusRef) {
+                  historyReviewReturnFocusRef.current = event.currentTarget;
+                }
+                actions.history.saveLocalComparison();
+              }}
+            >
+              Save local comparison
+            </button>
+            <details className="local-history-management">
+              <summary ref={historyManagementSummaryRef}>
+                Manage local comparisons ({formatNumber(history.localManagement.count)}/
+                {formatNumber(history.localManagement.maximum)})
+              </summary>
+              <p>Scheduled shared history is read-only and is not listed here.</p>
+              <p>Local history is included in Workspace backup.</p>
+              {history.localManagement.rows.length === 0 ? (
+                <p className="inline-status neutral">No local comparisons saved.</p>
+              ) : (
+                <div className="local-history-list" aria-label="Local price comparisons">
+                  {history.localManagement.rows.map((row) => (
+                    <article className="local-history-row" key={row.occurrenceId}>
+                      <div className="local-history-row-heading">
+                        <h3>{row.label}</h3>
+                        <PriceTime presentation={row.captureTime} />
+                      </div>
+                      <div className="local-history-markers">
+                        <span>{formatNumber(row.itemCount)} tracked items</span>
+                        {row.newest ? <span>Newest</span> : null}
+                        {row.oldest ? <span>Oldest</span> : null}
+                        {row.nextReplacement ? <span>Next to be replaced</span> : null}
+                        {row.selectedAsBaseline ? <span>Selected baseline</span> : null}
+                      </div>
+                      <details className="technical-details">
+                        <summary>Technical details</summary>
+                        <dl>
+                          <div>
+                            <dt>PriceSet ID</dt>
+                            <dd>
+                              <code>{row.sourcePriceSetId}</code>
+                            </dd>
+                          </div>
+                          <div>
+                            <dt>Snapshot key</dt>
+                            <dd>
+                              <code>{row.snapshotKey}</code>
+                            </dd>
+                          </div>
+                        </dl>
+                      </details>
+                      <button
+                        type="button"
+                        aria-label={`Review removal for ${row.label} captured ${row.captureTime.exactAccessible}`}
+                        onClick={(event) => {
+                          if (historyReviewReturnFocusRef) {
+                            historyReviewReturnFocusRef.current = event.currentTarget;
+                          }
+                          actions.history.reviewRemoval(row.occurrenceId);
+                        }}
+                      >
+                        Review removal
+                      </button>
+                      {model.historyReview?.kind === "removal" &&
+                      model.historyReview.occurrenceId === row.occurrenceId ? (
+                        <section
+                          className="local-history-review"
+                          aria-label={`Remove local comparison ${row.label}`}
+                        >
+                          <h4 ref={historyReviewHeadingRef} tabIndex={-1}>
+                            Remove local comparison?
+                          </h4>
+                          <p>
+                            {model.historyReview.label} ·{" "}
+                            <PriceTime presentation={model.historyReview.captureTime} /> ·{" "}
+                            {formatNumber(model.historyReview.itemCount)} tracked items
+                          </p>
+                          <p>
+                            Only this browser-local point is removed. Shared scheduled history and
+                            the active PriceSet stay unchanged. Economy and Loot history context may
+                            select a new latest or baseline point. Undo will be available once.
+                          </p>
+                          <div className="market-sync-bar">
+                            <button type="button" onClick={actions.history.confirmReview}>
+                              Remove local comparison
+                            </button>
+                            <button type="button" onClick={cancelHistoryReview}>
+                              Cancel
+                            </button>
+                          </div>
+                        </section>
+                      ) : null}
+                    </article>
+                  ))}
+                </div>
+              )}
+              <div className="market-sync-bar">
+                {model.priceHistoryClearPending ? (
+                  <>
+                    <button type="button" onClick={actions.history.confirmClear}>
+                      Confirm clear local history
+                    </button>
+                    <button type="button" onClick={actions.history.cancelClear}>
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={history.localManagement.count === 0}
+                    onClick={actions.history.requestClear}
+                  >
+                    Clear local history
+                  </button>
+                )}
+              </div>
+            </details>
+            {model.historyReview?.kind === "replacement" ? (
+              <section
+                className="local-history-review"
+                aria-label="Replace oldest local comparison"
+              >
+                <h3 ref={historyReviewHeadingRef} tabIndex={-1}>
+                  Save and replace the oldest local comparison?
+                </h3>
+                <p>Capture active PriceSet: {model.historyReview.activePriceSetLabel}.</p>
+                <p>
+                  Replace {model.historyReview.replacedLabel} ·{" "}
+                  <PriceTime presentation={model.historyReview.replacedCaptureTime} /> ·{" "}
+                  {formatNumber(model.historyReview.replacedItemCount)} tracked items.
+                </p>
+                <p>Shared history and active prices do not change.</p>
+                <div className="market-sync-bar">
+                  <button type="button" onClick={actions.history.confirmReview}>
+                    Save and replace oldest
+                  </button>
+                  <button type="button" onClick={cancelHistoryReview}>
+                    Cancel
+                  </button>
+                </div>
+              </section>
+            ) : null}
+            {model.historyNotice ? (
+              <p
+                className={`inline-status ${model.historyNotice.tone}`}
+                role={model.historyNotice.tone === "error" ? "alert" : "status"}
+              >
+                {model.historyNotice.message}
+              </p>
+            ) : null}
+          </div>
+          <div className="price-history-summary" aria-label="Price history summary">
+            <span>Snapshots {formatNumber(history.summary.snapshotCount)}</span>
+            <span>Shared {formatNumber(history.sharedSnapshotCount)}</span>
+            <span>Local {formatNumber(history.localSnapshotCount)}</span>
+            <span>Items {formatNumber(history.summary.trackedItemCount)}</span>
+            <span>Moved {formatNumber(history.movers.movedItemCount)}</span>
+            <span>Active {history.summary.activeLabel}</span>
+            <PriceTimeFactPair
+              presentation={history.summary.latestTime}
+              exactLabel={`Latest ${history.latestSnapshotLabel}${history.summary.activeMatchesLatest ? " active" : ""} ·`}
+              relativeLabel="Latest age"
+            />
+            <span>
+              Baseline {history.baselineSnapshotLabel} ·{" "}
+              <PriceTime presentation={history.baselineCaptureTime} />
+            </span>
+          </div>
           <div className="economy-controls">
             <SelectField
               label="Baseline"
@@ -727,7 +934,12 @@ export function EconomySettingsPane({
               onChange={actions.history.setTrendItemId}
             />
           </div>
-          <div className="price-history-summary" aria-label="Selected item price provenance">
+          <div
+            className="price-history-summary"
+            aria-label="Selected item price provenance"
+            ref={selectedPriceItemRef}
+            tabIndex={-1}
+          >
             <span>Item {history.selectedItem.itemDisplayLabel.name}</span>
             <span>Price {optionalPrice(history.selectedItem.price)}</span>
             <span>Origin {itemPriceMetadataLabel(history.selectedItem.metadata?.valueOrigin)}</span>
@@ -736,8 +948,14 @@ export function EconomySettingsPane({
             </span>
             <span>Freshness {itemPriceMetadataLabel(history.selectedItem.freshness)}</span>
             <span>Quality {itemPriceMetadataLabel(history.selectedItem.metadata?.quality)}</span>
-            <span>Observed {history.selectedItem.metadata?.valueObservedAt ?? "-"}</span>
-            <span>Evaluated {history.selectedItem.metadata?.evaluatedAt ?? "-"}</span>
+            <span>
+              Value observed{" "}
+              <PriceTime presentation={history.selectedItem.observedTime} display="full" />
+            </span>
+            <span>
+              Last evaluated{" "}
+              <PriceTime presentation={history.selectedItem.evaluatedTime} display="full" />
+            </span>
             <span>Reason {itemPriceMetadataLabel(history.selectedItem.metadata?.reasonCode)}</span>
             <TechnicalDetails
               itemId={history.selectedItem.itemId || null}

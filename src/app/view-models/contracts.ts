@@ -15,7 +15,7 @@ export interface CalculationWarningViewModel {
 }
 
 export interface InlineNoticeViewModel {
-  tone: "success" | "error";
+  tone: "neutral" | "success" | "warning" | "error";
   message: string;
   details?: string[];
 }

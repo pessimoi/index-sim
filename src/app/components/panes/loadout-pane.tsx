@@ -1,3 +1,4 @@
+import type { Ref } from "react";
 import { EQUIPMENT_SLOTS, type EquipmentBonuses, type EquipmentSlot } from "@/domain/shared";
 import type { LoadoutPaneActions, LoadoutPaneViewModel } from "../../view-models/loadout";
 import { formatNumber } from "../../view-models/formatting";
@@ -56,17 +57,21 @@ export interface LoadoutPanePresentationModel extends LoadoutPaneViewModel {
 export function LoadoutPane({
   hidden,
   viewModel,
-  actions
+  actions,
+  weaponTriggerRef
 }: {
   hidden: boolean;
   viewModel: LoadoutPanePresentationModel;
   actions: LoadoutPaneActions;
+  weaponTriggerRef?: Ref<HTMLButtonElement>;
 }) {
   return (
     <>
       <section className="equipment-pane" aria-label="Equipment loadout" hidden={hidden}>
         <div className="section-title-row">
-          <h2>{viewModel.combatStyle} loadout</h2>
+          <h2 id="loadout-heading" tabIndex={-1}>
+            {viewModel.combatStyle} loadout
+          </h2>
           <span className={`status-pill ${viewModel.weaponName ? "ready" : ""}`}>
             {viewModel.weaponName || viewModel.weaponId}
           </span>
@@ -78,6 +83,7 @@ export function LoadoutPane({
             options={viewModel.weaponOptions}
             onChange={actions.setWeapon}
             searchPlaceholder="Search weapons"
+            triggerRef={weaponTriggerRef}
           />
           {viewModel.combatStyle === "ranged" && (
             <SearchableSelectField

@@ -6,6 +6,11 @@ import { useNumericDraftField } from "./use-numeric-draft-field";
 
 export type SelectOption = { id: string; label: string; hint?: string };
 
+function assignRef<T>(ref: Ref<T> | undefined, value: T | null): void {
+  if (typeof ref === "function") ref(value);
+  else if (ref) ref.current = value;
+}
+
 export function SelectField({
   label,
   value,
@@ -13,7 +18,8 @@ export function SelectField({
   onChange,
   disabled = false,
   className,
-  accessibleLabel
+  accessibleLabel,
+  selectRef
 }: {
   label: string;
   value: string;
@@ -22,6 +28,7 @@ export function SelectField({
   disabled?: boolean;
   className?: string;
   accessibleLabel?: string;
+  selectRef?: Ref<HTMLSelectElement>;
 }) {
   const id = useId();
   const selectedLabel = options.find((option) => option.id === value)?.label ?? value;
@@ -30,6 +37,7 @@ export function SelectField({
     <div className={`field ${className ?? ""}`.trim()}>
       <label htmlFor={id}>{label}</label>
       <select
+        ref={selectRef}
         id={id}
         value={value}
         title={selectedLabel}
@@ -141,7 +149,8 @@ export function SearchableSelectField({
   disabled = false,
   searchPlaceholder = "Search",
   className,
-  accessibleLabel
+  accessibleLabel,
+  triggerRef
 }: {
   label: string;
   value: string;
@@ -151,11 +160,12 @@ export function SearchableSelectField({
   searchPlaceholder?: string;
   className?: string;
   accessibleLabel?: string;
+  triggerRef?: Ref<HTMLButtonElement>;
 }) {
   const labelId = useId();
   const triggerId = useId();
   const listboxId = useId();
-  const triggerRef = useRef<HTMLButtonElement>(null);
+  const internalTriggerRef = useRef<HTMLButtonElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [expanded, setExpanded] = useState(false);
@@ -204,14 +214,14 @@ export function SearchableSelectField({
   const closeOptions = (restoreTriggerFocus = false) => {
     setExpanded(false);
     setQuery("");
-    if (restoreTriggerFocus) triggerRef.current?.focus();
+    if (restoreTriggerFocus) internalTriggerRef.current?.focus();
   };
 
   const commitOption = (option: SelectOption) => {
     onChange(option.id);
     setQuery("");
     setExpanded(false);
-    triggerRef.current?.focus();
+    internalTriggerRef.current?.focus();
   };
 
   const handleSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -255,7 +265,10 @@ export function SearchableSelectField({
     >
       <label id={labelId}>{label}</label>
       <button
-        ref={triggerRef}
+        ref={(element) => {
+          internalTriggerRef.current = element;
+          assignRef(triggerRef, element);
+        }}
         id={triggerId}
         type="button"
         role="combobox"

@@ -5,6 +5,7 @@ import {
   type PendingUndo,
   type ShareSetupDialogState
 } from "./components/app-presenters";
+import { globalStatusAnnouncement } from "./view-models/global-status";
 import type { SelectOption } from "./components/form-fields";
 import { formatDelta } from "./components/presentation-formatters";
 import { AppHeader } from "./components/shell/app-header";
@@ -18,15 +19,8 @@ import { SetupImportReview } from "./components/shell/setup-import-review";
 import { SharedSetupReview } from "./components/shell/shared-setup-review";
 import { LegacyMigrationPanel } from "./components/shell/legacy-migration-panel";
 import { WorkbenchShell } from "./components/shell/workbench-shell";
-import { CannonPane } from "./components/panes/cannon-pane";
-import { ComparePane } from "./components/panes/compare-pane";
-import { DuelPane } from "./components/panes/duel-pane";
 import { MonsterCardPanel } from "./components/panes/monster-card-panel";
-import { LoadoutPane } from "./components/panes/loadout-pane";
-import { PlannerPane } from "./components/panes/planner-pane";
 import { StatsPane } from "./components/panes/stats-pane";
-import { LootPane } from "./components/panes/loot-pane";
-import { TripPane } from "./components/panes/trip-pane";
 import { LOCAL_STATE_RECOVERY_HEADING_ID } from "./components/settings/local-state-recovery-panel";
 import {
   captureBrowserShareableSetupFragment,
@@ -73,7 +67,19 @@ import { useLocalStateRecovery } from "./controllers/use-local-state-recovery";
 import { useSetupFileTransfer } from "./controllers/use-setup-file-transfer";
 import { usePriceSetTransfer } from "./controllers/use-price-set-transfer";
 import { useWorkspaceFileTransfer } from "./controllers/use-workspace-file-transfer";
-import type { EconomyDataUndoScope } from "./controllers/economy-data-undo";
+import type { EconomyDataUndoRecord, EconomyDataUndoScope } from "./controllers/economy-data-undo";
+import {
+  MonsterSpecificChangesTransactionCore,
+  type MonsterSpecificApplyOutcome,
+  type MonsterSpecificExecutionInput,
+  type MonsterSpecificLiveOutcome
+} from "./controllers/monster-specific-changes-transaction";
+import {
+  SavedSetupChangesTransactionCore,
+  type SavedSetupChangeApplyOutcome,
+  type SavedSetupChangeRequest,
+  type SavedSetupChangesExecutionInput
+} from "./controllers/saved-setup-changes";
 import type {
   WorkspaceRestoreApplyOutcome,
   WorkspaceRestoreExecutionInput,
@@ -115,9 +121,17 @@ import {
   mergeDuelSnapshots,
   parseDuelSnapshotsExportText,
   removeDuelSnapshot,
-  renameDuelSnapshot,
+  renameDuelSnapshotSafely,
+  uniqueDuelSnapshotName,
   type DuelSnapshotsState
 } from "./state/duel-snapshots";
+import {
+  buildSavedSetupMergeCandidate,
+  createSavedSetupMergePlan,
+  setSavedSetupMergeDecision,
+  setSavedSetupMergeRecipientName,
+  type SavedSetupMergePlan
+} from "./state/saved-setup-merge";
 import {
   compareSetupTransferContext,
   type SetupTransferContextReview
@@ -157,6 +171,14 @@ import {
   type PriceHistoryMoverSortKey,
   type PriceHistoryMoverSortState
 } from "./state/price-history";
+import {
+  createFullHistoryReplacementCandidate,
+  createLocalPriceHistoryRemovalCandidate,
+  deriveFullHistoryReplacement,
+  deriveLocalPriceHistoryRemoval,
+  type FullHistoryReplacementCandidate,
+  type LocalPriceHistoryRemovalCandidate
+} from "./state/local-price-history-lifecycle";
 import {
   DEFAULT_MANUAL_PRICE_OVERRIDES_STATE,
   applyManualPriceOverrides,
@@ -236,7 +258,8 @@ import {
 import {
   createPlannerSkillInputViewModels,
   plannerAllowedPool,
-  plannerProgressAdjustmentNotice
+  plannerProgressAdjustmentNotice,
+  type PlannerNoticeAction
 } from "./view-models/planner";
 import { monsterOptions } from "./view-models/monster-card";
 import { createSimulationViewModel } from "./view-models/simulation";
@@ -262,6 +285,11 @@ import {
   type ItemPriceHistoryContext,
   type PriceNoticeAction
 } from "./view-models/price-data";
+import {
+  createPriceTimeContext,
+  presentPriceDateTime,
+  resolveBrowserPriceTimeZone
+} from "./view-models/price-time";
 import {
   createGameRevisionViewModel,
   createSettingsPaneViewModel,
@@ -295,13 +323,47 @@ import {
   type WorkbenchTabId
 } from "./view-models/app-shell";
 import { createLegacyMigrationViewModel } from "./view-models/legacy-migration";
-import { defaultDuelSnapshotName, describeDuelSnapshotsImportError } from "./view-models/duel";
+import {
+  createSavedSetupMergeReviewViewModel,
+  defaultDuelSnapshotName,
+  describeDuelSnapshotsImportError
+} from "./view-models/duel";
 import type { InlineNoticeViewModel } from "./view-models/contracts";
 import type { WorkspaceLiveState } from "./state/workspace-backup";
+import {
+  createMonsterSpecificRemovalCandidate,
+  type MonsterSpecificLiveState,
+  type MonsterSpecificRemovalCandidate
+} from "./state/monster-specific-changes";
+import {
+  createMonsterSpecificChangesViewModel,
+  type MonsterSpecificChangeKind
+} from "./view-models/monster-specific-changes";
 
 const loadEconomySettingsPane = () => import("./components/panes/economy-settings-lazy");
 const EconomySettingsPane = lazy(loadEconomySettingsPane);
 const RiskPane = lazy(() => import("./components/panes/risk-pane"));
+const DuelPane = lazy(() =>
+  import("./components/panes/duel-pane").then((module) => ({ default: module.DuelPane }))
+);
+const PlannerPane = lazy(() =>
+  import("./components/panes/planner-pane").then((module) => ({ default: module.PlannerPane }))
+);
+const LootPane = lazy(() =>
+  import("./components/panes/loot-pane").then((module) => ({ default: module.LootPane }))
+);
+const TripPane = lazy(() =>
+  import("./components/panes/trip-pane").then((module) => ({ default: module.TripPane }))
+);
+const LoadoutPane = lazy(() =>
+  import("./components/panes/loadout-pane").then((module) => ({ default: module.LoadoutPane }))
+);
+const CannonPane = lazy(() =>
+  import("./components/panes/cannon-pane").then((module) => ({ default: module.CannonPane }))
+);
+const ComparePane = lazy(() =>
+  import("./components/panes/compare-pane").then((module) => ({ default: module.ComparePane }))
+);
 
 const ECONOMY_UNDO_SCOPE_IDS: ReadonlySet<string> = new Set<EconomyDataUndoScope>([
   "price-history",
@@ -438,6 +500,12 @@ interface PriceItemReviewRequest {
   action: PriceNoticeAction;
 }
 
+interface MonsterSpecificReviewRequest {
+  id: number;
+  monsterId: string;
+  kind: MonsterSpecificChangeKind;
+}
+
 export function App() {
   const [context, setContext] = useState<SimulationContext | null>(null);
   const [initialSavedSetup] = useState(loadInitialSavedSetup);
@@ -486,6 +554,7 @@ export function App() {
   );
   const [legacyClearPending, setLegacyClearPending] = useState(false);
   const [priceAgeNowMs, setPriceAgeNowMs] = useState(() => Date.now());
+  const [priceTimeZone] = useState(resolveBrowserPriceTimeZone);
   const [readyToPersist, setReadyToPersist] = useState(false);
   const [status, setStatus] = useState("Loading source-backed runtime data");
   const localStateRecovery = useLocalStateRecovery({
@@ -540,9 +609,15 @@ export function App() {
   const [duelImportNotice, setDuelImportNotice] = useState<InlineNoticeViewModel | null>(null);
   const [duelImportReview, setDuelImportReview] = useState<{
     id: number;
-    data: DuelSnapshotsState;
+    plan: SavedSetupMergePlan;
     context: SetupTransferContextReview;
   } | null>(null);
+  const [duelSessionOnlyRequest, setDuelSessionOnlyRequest] = useState<{
+    request: SavedSetupChangeRequest;
+    kind: "merge" | "rename";
+    reviewId: number | null;
+  } | null>(null);
+  const [duelChangeRevision, setDuelChangeRevision] = useState(0);
   const [priceLabel, setPriceLabel] = useState(
     "Scheduled static prices + generated item fallbacks"
   );
@@ -567,6 +642,25 @@ export function App() {
     direction: "desc"
   });
   const [priceHistoryClearPending, setPriceHistoryClearPending] = useState(false);
+  const [priceHistoryReview, setPriceHistoryReview] = useState<
+    | { kind: "removal"; candidate: LocalPriceHistoryRemovalCandidate }
+    | { kind: "replacement"; candidate: FullHistoryReplacementCandidate }
+    | null
+  >(null);
+  const [priceHistoryNotice, setPriceHistoryNotice] = useState<{
+    tone: "neutral" | "success" | "warning" | "error";
+    message: string;
+  } | null>(null);
+  const [monsterRemovalCandidate, setMonsterRemovalCandidate] =
+    useState<MonsterSpecificRemovalCandidate | null>(null);
+  const [monsterChangesNotice, setMonsterChangesNotice] = useState<{
+    tone: "neutral" | "success" | "warning" | "error";
+    message: string;
+  } | null>(null);
+  const [monsterChangesSessionOnlyAvailable, setMonsterChangesSessionOnlyAvailable] =
+    useState(false);
+  const [monsterSpecificReviewRequest, setMonsterSpecificReviewRequest] =
+    useState<MonsterSpecificReviewRequest | null>(null);
   const [lootUiState, setLootUiState] = useState<{
     notice: string | null;
     sort: LootTableSortState;
@@ -591,10 +685,34 @@ export function App() {
   const setupImportInputRef = useRef<HTMLInputElement>(null);
   const workspaceImportInputRef = useRef<HTMLInputElement>(null);
   const workspaceReviewHeadingRef = useRef<HTMLHeadingElement>(null);
+  const monsterRemovalIdRef = useRef(0);
+  const priceHistoryReviewIdRef = useRef(0);
+  const handledPriceHistoryReviewIdRef = useRef(0);
+  const monsterReviewIdRef = useRef(0);
+  const handledMonsterRemovalIdRef = useRef(0);
+  const handledMonsterSpecificReviewRef = useRef(0);
+  const monsterChangesExecutionRef = useRef<MonsterSpecificExecutionInput | null>(null);
+  const monsterChangesTransactionRef = useRef<MonsterSpecificChangesTransactionCore | null>(null);
+  if (monsterChangesTransactionRef.current === null) {
+    monsterChangesTransactionRef.current = new MonsterSpecificChangesTransactionCore();
+  }
+  const savedSetupChangesExecutionRef = useRef<SavedSetupChangesExecutionInput | null>(null);
+  const savedSetupChangesTransactionRef = useRef<SavedSetupChangesTransactionCore | null>(null);
+  if (savedSetupChangesTransactionRef.current === null) {
+    savedSetupChangesTransactionRef.current = new SavedSetupChangesTransactionCore();
+  }
   const resetSetupButtonRef = useRef<HTMLButtonElement>(null);
   const duelImportAttemptRef = useRef(0);
   const priceNotesSummaryRef = useRef<HTMLElement>(null);
   const marketHeadingRef = useRef<HTMLHeadingElement>(null);
+  const selectedPriceItemRef = useRef<HTMLDivElement>(null);
+  const loadoutWeaponTriggerRef = useRef<HTMLButtonElement>(null);
+  const tripFoodPerKillOverrideRef = useRef<HTMLSelectElement>(null);
+  const plannerNoticeActionIdRef = useRef(0);
+  const priceHistoryReviewReturnFocusRef = useRef<HTMLButtonElement>(null);
+  const priceHistoryReviewHeadingRef = useRef<HTMLHeadingElement>(null);
+  const priceHistoryManagementSummaryRef = useRef<HTMLElement>(null);
+  const focusedPriceHistoryReviewIdRef = useRef(0);
   const manualPriceInputRef = useRef<HTMLInputElement>(null);
   const priceNoticeActionRefs = useRef(new Map<string, HTMLButtonElement>());
   const nextPriceItemReviewRequestRef = useRef(0);
@@ -692,6 +810,24 @@ export function App() {
     });
     return () => window.cancelAnimationFrame(frameId);
   }, [activeTab, economyReviewRequest]);
+
+  useEffect(() => {
+    const reviewId = priceHistoryReview?.candidate.id;
+    if (
+      activeTab !== "economy" ||
+      !reviewId ||
+      focusedPriceHistoryReviewIdRef.current === reviewId
+    ) {
+      return;
+    }
+    const frameId = window.requestAnimationFrame(() => {
+      const heading = priceHistoryReviewHeadingRef.current;
+      heading?.focus({ preventScroll: true });
+      heading?.scrollIntoView({ block: "nearest" });
+      if (heading) focusedPriceHistoryReviewIdRef.current = reviewId;
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }, [activeTab, priceHistoryReview]);
 
   useEffect(() => {
     if (!lastHiscoresPlayerState && workspaceIncludesLastHiscoresPlayer) {
@@ -982,7 +1118,8 @@ export function App() {
           itemFilter: economyItemFilter,
           trendItemId: economyTrendItemId,
           sort: economySort
-        }
+        },
+        timeZone: priceTimeZone
       }),
     [
       economyBaselineMode,
@@ -991,7 +1128,8 @@ export function App() {
       economySort,
       economyTrendItemId,
       priceHistoryItemLabels,
-      priceHistorySources
+      priceHistorySources,
+      priceTimeZone
     ]
   );
   const priceHistorySummary = useMemo(
@@ -999,9 +1137,17 @@ export function App() {
       createPriceHistorySummaryPresentation({
         analysisState: priceHistorySources.analysisState,
         activePriceSet: context?.priceSet ?? null,
-        evaluatedAt: new Date(priceAgeNowMs)
+        evaluatedAt: new Date(priceAgeNowMs),
+        timeZone: priceTimeZone,
+        latestExactTime: economyHistory.latestCaptureTime
       }),
-    [context?.priceSet, priceAgeNowMs, priceHistorySources.analysisState]
+    [
+      context?.priceSet,
+      economyHistory.latestCaptureTime,
+      priceAgeNowMs,
+      priceHistorySources.analysisState,
+      priceTimeZone
+    ]
   );
   const lootPriceHistoryByItem: Readonly<Record<string, ItemPriceHistoryContext>> =
     economyHistory.lootHistoryByItem;
@@ -1293,15 +1439,52 @@ export function App() {
     }
   };
 
-  const captureCurrentRewriteSetup = (): SavedSetupState =>
-    savedSetupFromForm(
-      form,
-      denseCompare,
-      cannonByMonster,
-      customSetupsByMonster,
-      defaultForm,
-      setupMode
-    );
+  const currentRewriteSetup = useMemo(
+    () =>
+      savedSetupFromForm(
+        form,
+        denseCompare,
+        cannonByMonster,
+        customSetupsByMonster,
+        defaultForm,
+        setupMode
+      ),
+    [cannonByMonster, customSetupsByMonster, defaultForm, denseCompare, form, setupMode]
+  );
+  const captureCurrentRewriteSetup = (): SavedSetupState => currentRewriteSetup;
+
+  const currentMonsterSpecificLiveState = useMemo<MonsterSpecificLiveState>(
+    () => ({
+      setup: currentRewriteSetup,
+      lootPrefs: lootPrefsForGameData,
+      lootSettings: lootSettingsByMonster
+    }),
+    [currentRewriteSetup, lootPrefsForGameData, lootSettingsByMonster]
+  );
+  const monsterSpecificChanges = useMemo(
+    () =>
+      context
+        ? createMonsterSpecificChangesViewModel({
+            gameData: context.gameData,
+            setup: currentRewriteSetup,
+            lootPrefs: lootPrefsForGameData,
+            lootSettings: lootSettingsByMonster,
+            activeMonsterId: form.monsterId
+          })
+        : {
+            monsterCount: 0,
+            categoryCount: 0,
+            countsByKind: {
+              "custom-setup": 0,
+              cannon: 0,
+              "loot-actions": 0,
+              "loot-settings": 0,
+              "compare-hidden": 0
+            },
+            rows: []
+          },
+    [context, currentRewriteSetup, form.monsterId, lootPrefsForGameData, lootSettingsByMonster]
+  );
 
   const captureCurrentWorkspaceLiveState = (): WorkspaceLiveState => ({
     "rewrite-setup": captureCurrentRewriteSetup(),
@@ -1325,6 +1508,99 @@ export function App() {
     setCannonByMonster(setup.cannonByMonster);
   };
 
+  const applyMonsterSpecificLiveState = (outcome: MonsterSpecificLiveOutcome): void => {
+    const selected = new Set(outcome.selectedIds);
+    if (selected.has("rewrite-setup")) applyRewriteSetupState(outcome.liveState.setup);
+    if (selected.has("loot-prefs")) setLootPrefsByMonster(outcome.liveState.lootPrefs);
+    if (selected.has("loot-settings")) setLootSettingsByMonster(outcome.liveState.lootSettings);
+    setFatalError(null);
+  };
+
+  useEffect(() => {
+    monsterChangesExecutionRef.current = {
+      storageAccess: browserStorageAccess,
+      persistenceUnavailable: localPersistenceUnavailable,
+      liveState: currentMonsterSpecificLiveState,
+      applyLiveState: applyMonsterSpecificLiveState,
+      recovery: {
+        prepareExternalApply: localStateRecovery.prepareExternalApply,
+        cancelExternalApply: localStateRecovery.cancelExternalApply,
+        completeExternalApply: localStateRecovery.completeExternalApply,
+        completeExternalUndo: localStateRecovery.completeExternalUndo,
+        recordExternalApplyFailure: localStateRecovery.recordExternalApplyFailure,
+        markPersistenceUnavailable: localStateRecovery.markPersistenceUnavailable
+      },
+      now: () => new Date()
+    };
+
+    savedSetupChangesExecutionRef.current = {
+      storageAccess: browserStorageAccess,
+      persistenceUnavailable: localPersistenceUnavailable,
+      persistenceBlocked: duelSnapshotsBlocked,
+      liveState: duelSnapshots,
+      applyLiveState: (next) => {
+        setDuelSnapshots(next);
+        setFatalError(null);
+      },
+      recovery: {
+        prepareExternalApply: localStateRecovery.prepareExternalApply,
+        cancelExternalApply: localStateRecovery.cancelExternalApply,
+        completeExternalApply: localStateRecovery.completeExternalApply,
+        completeExternalUndo: localStateRecovery.completeExternalUndo,
+        recordExternalApplyFailure: localStateRecovery.recordExternalApplyFailure,
+        markPersistenceUnavailable: localStateRecovery.markPersistenceUnavailable,
+        unblockReplaced: localStateRecovery.unblockReplaced
+      },
+      now: () => new Date()
+    };
+  });
+
+  useEffect(() => {
+    const request = monsterSpecificReviewRequest;
+    if (!request || request.id === handledMonsterSpecificReviewRef.current) return;
+    const destination: WorkbenchTabId =
+      request.kind === "custom-setup"
+        ? "loadout"
+        : request.kind === "cannon"
+          ? "cannon"
+          : request.kind === "loot-actions" || request.kind === "loot-settings"
+            ? "loot"
+            : "compare";
+    if (activeTab !== destination) return;
+    const stillPresent = monsterSpecificChanges.rows
+      .find((row) => row.monsterId === request.monsterId)
+      ?.categories.some((category) => category.kind === request.kind);
+    if (!stillPresent) {
+      handledMonsterSpecificReviewRef.current = request.id;
+      return;
+    }
+    let secondFrame = 0;
+    const firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => {
+        const target =
+          request.kind === "custom-setup"
+            ? document.getElementById("loadout-heading")
+            : request.kind === "cannon"
+              ? document.getElementById("cannon-heading")
+              : request.kind === "loot-actions"
+                ? document.getElementById("loot-actions-heading")
+                : request.kind === "loot-settings"
+                  ? document.getElementById("loot-settings-heading")
+                  : (Array.from(
+                      document.querySelectorAll<HTMLTableRowElement>("tr[data-monster-id]")
+                    ).find((element) => element.dataset.monsterId === request.monsterId) ?? null);
+        if (!target) return;
+        target.focus({ preventScroll: true });
+        target.scrollIntoView({ block: "nearest" });
+        handledMonsterSpecificReviewRef.current = request.id;
+      });
+    });
+    return () => {
+      window.cancelAnimationFrame(firstFrame);
+      if (secondFrame) window.cancelAnimationFrame(secondFrame);
+    };
+  }, [activeTab, denseCompareRows, monsterSpecificChanges.rows, monsterSpecificReviewRequest]);
+
   const applyWorkspaceLiveState = (outcome: WorkspaceRestoreLiveOutcome): void => {
     const selected = new Set(outcome.selectedIds);
     if (selected.has("rewrite-setup")) {
@@ -1339,6 +1615,9 @@ export function App() {
       setHiddenGearTiers(outcome.liveState["hidden-gear-tiers"]);
     }
     if (selected.has("duel-snapshots")) {
+      savedSetupChangesTransactionRef.current?.invalidateUndo();
+      setPendingUndo((current) => (current?.scope === "saved-setups" ? null : current));
+      setDuelSessionOnlyRequest(null);
       setDuelSnapshots(outcome.liveState["duel-snapshots"]);
     }
     if (selected.has("price-history")) setPriceHistory(outcome.liveState["price-history"]);
@@ -1490,6 +1769,104 @@ export function App() {
     setPendingUndo((current) => (current?.scope === "economy-data" ? null : current));
   };
 
+  const invalidateSavedSetupUndo = (): void => {
+    savedSetupChangesTransactionRef.current?.invalidateUndo();
+    setPendingUndo((current) => (current?.scope === "saved-setups" ? null : current));
+    setDuelSessionOnlyRequest(null);
+  };
+
+  const registerSavedSetupUndo = (
+    outcome: Extract<SavedSetupChangeApplyOutcome, { status: "applied" }>
+  ): void => {
+    setUndoableStatus(
+      outcome.message,
+      outcome.undoMessage,
+      () => {
+        const execution = savedSetupChangesExecutionRef.current;
+        const transaction = savedSetupChangesTransactionRef.current;
+        if (!execution || !transaction) return "Saved setup Undo is no longer available.";
+        const undo = transaction.undo(execution);
+        if (undo.status === "session-only-available") {
+          setPendingUndo({
+            id: localUndoId(),
+            label: undo.message,
+            restoreLabel: `${outcome.undoMessage} for this session`,
+            createdAt: Date.now(),
+            scope: "saved-setups",
+            restore: () => {
+              const currentExecution = savedSetupChangesExecutionRef.current;
+              const currentTransaction = savedSetupChangesTransactionRef.current;
+              if (!currentExecution || !currentTransaction) {
+                return "Session-only saved setup Undo is no longer available.";
+              }
+              const sessionUndo = currentTransaction.undoForSession(currentExecution);
+              setDuelImportNotice({
+                tone: sessionUndo.status === "undone" ? "success" : "warning",
+                message: sessionUndo.message
+              });
+              if (sessionUndo.status === "undone") {
+                setDuelChangeRevision((value) => value + 1);
+              }
+              return sessionUndo.message;
+            }
+          });
+        }
+        setDuelImportNotice({
+          tone:
+            undo.status === "undone" ? "success" : undo.status === "failed" ? "error" : "warning",
+          message: undo.message
+        });
+        if (undo.status === "undone") setDuelChangeRevision((value) => value + 1);
+        return undo.message;
+      },
+      "saved-setups"
+    );
+  };
+
+  const applySavedSetupChange = (
+    request: SavedSetupChangeRequest,
+    kind: "merge" | "rename",
+    reviewId: number | null,
+    mode: "durable" | "session-only"
+  ): SavedSetupChangeApplyOutcome => {
+    const execution = savedSetupChangesExecutionRef.current;
+    const transaction = savedSetupChangesTransactionRef.current;
+    if (!execution || !transaction) {
+      return {
+        status: "failed",
+        recoveryRequired: false,
+        message: "Saved setup change context is no longer available. Review the action again."
+      };
+    }
+    const outcome =
+      mode === "durable"
+        ? transaction.applyDurable(request, execution)
+        : transaction.applyForSession(request, execution);
+    if (outcome.status === "session-only-available") {
+      setDuelSessionOnlyRequest({ request, kind, reviewId });
+      setDuelImportNotice({ tone: "warning", message: outcome.message });
+      setStatus(outcome.message);
+      return outcome;
+    }
+    if (outcome.status === "applied") {
+      setDuelSessionOnlyRequest(null);
+      setDuelImportNotice({
+        tone: outcome.mode === "durable" ? "success" : "warning",
+        message: outcome.message
+      });
+      if (kind === "merge") setDuelImportReview(null);
+      setDuelChangeRevision((value) => value + 1);
+      registerSavedSetupUndo(outcome);
+      return outcome;
+    }
+    setDuelImportNotice({
+      tone: outcome.status === "failed" ? "error" : "neutral",
+      message: outcome.message
+    });
+    setStatus(outcome.message);
+    return outcome;
+  };
+
   const optimizeCurrentLoadout = () => {
     if (!context) return;
     const previousForm = form;
@@ -1532,16 +1909,122 @@ export function App() {
     setStatus(restoreStatus ?? undo.restoreLabel);
   };
 
+  const reconcilePriceHistorySelection = (next: BrowserPriceHistoryState): void => {
+    const nextSources = createPriceHistorySources({
+      scheduledSnapshotStatus,
+      localPriceHistory: next
+    });
+    setEconomySnapshotKey((current) =>
+      nextSources.analysisState.snapshots.some(
+        (snapshot) => `${snapshot.capturedAt}::${snapshot.sourcePriceSetId}` === current
+      )
+        ? current
+        : ""
+    );
+  };
+
+  const registerPriceHistoryUndo = (
+    record: EconomyDataUndoRecord<BrowserPriceHistoryState>,
+    actionStatus: string
+  ): void => {
+    setUndoableStatus(
+      actionStatus,
+      "Restored local price history",
+      () =>
+        record.restore({
+          applyLiveState: (previousHistory) => {
+            setPriceHistory(previousHistory);
+            reconcilePriceHistorySelection(previousHistory);
+            setPriceHistoryClearPending(false);
+            setPriceHistoryReview(null);
+          },
+          recovery: localStateRecovery,
+          onNotice: setPriceHistoryNotice,
+          restoredMessage: "Restored local price history"
+        }).message,
+      "economy-data"
+    );
+  };
+
+  const commitLocalPriceHistory = async (input: {
+    current: BrowserPriceHistoryState;
+    next: BrowserPriceHistoryState;
+    destructive: boolean;
+    durableMessage: string;
+    sessionMessage: string;
+    actionAt: Date;
+    publishStatus?: boolean;
+    invalidateUndo?: boolean;
+  }) => {
+    const { commitEconomyPriceHistory } = await loadEconomySettingsPane();
+    if (input.invalidateUndo !== false) invalidatePendingEconomyUndo();
+    const outcome = commitEconomyPriceHistory({
+      storage,
+      persistenceUnavailable: localPersistenceUnavailable,
+      persistenceBlocked: priceHistoryBlocked,
+      current: input.current,
+      next: input.next,
+      destructive: input.destructive,
+      durableMessage: input.durableMessage,
+      sessionMessage: input.sessionMessage,
+      recovery: localStateRecovery,
+      applyLiveState: (next) => {
+        setPriceHistory(next);
+        reconcilePriceHistorySelection(next);
+        if (priceHistoryBlocked || localPersistenceUnavailable || next.snapshots.length === 0) {
+          shouldSkipPersistLocalState("price-history");
+        }
+      },
+      now: () => input.actionAt
+    });
+    if (outcome.status === "invalid") {
+      setPriceHistoryNotice({ tone: "error", message: outcome.message });
+      if (input.publishStatus !== false) setStatus(outcome.message);
+      return outcome;
+    }
+    if (outcome.durability === "session-only") {
+      shouldSkipPersistLocalState("price-history");
+    }
+    setPriceHistoryNotice(outcome.notice);
+    if (input.publishStatus !== false) setStatus(outcome.actionStatus);
+    if (outcome.record) registerPriceHistoryUndo(outcome.record, outcome.actionStatus);
+    return outcome;
+  };
+
   const applyAcceptedPriceSet = (outcome: AcceptedPriceSetOutcome) => {
+    const priorHistory = priceHistory;
+    const historyCapture = outcome.priceHistoryCapture(priorHistory);
+    const nextHistory = historyCapture.history;
     setBasePriceSet(outcome.basePriceSet);
     setManualPriceDraft(null);
     setManualPriceClearPending(false);
     setContext((current) => (current ? { ...current, priceSet: outcome.activePriceSet } : current));
-    setPriceHistory(outcome.priceHistoryUpdate);
     setPriceLabel(outcome.activePriceSet.label);
     setActivePriceSetOrigin(outcome.activePriceSetOrigin);
     setStatus(outcome.appStatus);
-    setMarketNotice(outcome.marketNotice);
+    if (historyCapture.status === "full-skipped") {
+      setMarketNotice({
+        tone: outcome.marketNotice.tone,
+        message: `${outcome.marketNotice.message} ${historyCapture.guidance}`
+      });
+      setPriceHistoryNotice({
+        tone: "warning",
+        message: historyCapture.guidance
+      });
+    } else {
+      setMarketNotice(outcome.marketNotice);
+      void commitLocalPriceHistory({
+        current: priorHistory,
+        next: nextHistory,
+        destructive: false,
+        durableMessage: "Saved imported PriceSet as a local comparison",
+        sessionMessage:
+          "Saved imported PriceSet comparison for this session. Saved history was not changed.",
+        actionAt: new Date(),
+        publishStatus: false,
+        invalidateUndo: false
+      });
+    }
     setFatalError(null);
   };
 
@@ -1728,6 +2211,7 @@ export function App() {
       localStateRecovery.unblockReplaced(["loot-prefs"]);
     }
     if (legacyMigrationReport.duelSnapshots != null) {
+      invalidateSavedSetupUndo();
       const merged = mergeDuelSnapshots(duelSnapshots, legacyMigrationReport.duelSnapshots);
       localStateRecovery.persist("duel-snapshots", duelSnapshotsStorageOptions, merged.state);
       setDuelSnapshots(merged.state);
@@ -1816,52 +2300,114 @@ export function App() {
     );
   };
 
-  const saveLocalPriceComparison = () => {
+  const saveLocalPriceComparison = async (): Promise<void> => {
     if (!context) return;
     const capturedAt = new Date();
-    invalidatePendingEconomyUndo();
-    setPriceHistory((current) =>
-      appendAcceptedPriceSetToHistory(current, context.priceSet, capturedAt)
-    );
+    const next = appendAcceptedPriceSetToHistory(priceHistory, context.priceSet, capturedAt);
+    if (next === priceHistory) {
+      priceHistoryReviewIdRef.current += 1;
+      const candidate = createFullHistoryReplacementCandidate({
+        id: priceHistoryReviewIdRef.current,
+        history: priceHistory,
+        activePriceSet: context.priceSet,
+        capturedAt
+      });
+      if (!candidate) return;
+      setPriceHistoryReview({ kind: "replacement", candidate });
+      setPriceHistoryNotice(null);
+      return;
+    }
+    await commitLocalPriceHistory({
+      current: priceHistory,
+      next,
+      destructive: false,
+      durableMessage: "Saved local price comparison",
+      sessionMessage:
+        "Saved local price comparison for this session. Saved history was not changed.",
+      actionAt: capturedAt
+    });
     setPriceHistoryClearPending(false);
-    setStatus("Saved local price comparison");
-    setMarketNotice({ tone: "success", message: "Saved active prices as a local comparison" });
+  };
+
+  const reviewLocalPriceHistoryRemoval = (occurrenceId: string): void => {
+    priceHistoryReviewIdRef.current += 1;
+    const candidate = createLocalPriceHistoryRemovalCandidate({
+      id: priceHistoryReviewIdRef.current,
+      history: priceHistory,
+      occurrenceId
+    });
+    if (!candidate) return;
+    setPriceHistoryReview({ kind: "removal", candidate });
+    setPriceHistoryNotice(null);
+  };
+
+  const confirmLocalPriceHistoryReview = async (): Promise<void> => {
+    if (!priceHistoryReview || !context) return;
+    const candidateId = priceHistoryReview.candidate.id;
+    if (handledPriceHistoryReviewIdRef.current === candidateId) {
+      setPriceHistoryNotice({
+        tone: "neutral",
+        message: "This price-history review was already handled."
+      });
+      return;
+    }
+    const result =
+      priceHistoryReview.kind === "removal"
+        ? deriveLocalPriceHistoryRemoval(priceHistoryReview.candidate, priceHistory)
+        : deriveFullHistoryReplacement(
+            priceHistoryReview.candidate,
+            priceHistory,
+            context.priceSet
+          );
+    if (result.status !== "ready") {
+      setPriceHistoryReview(null);
+      setPriceHistoryNotice({ tone: "neutral", message: result.message });
+      setStatus(result.message);
+      window.requestAnimationFrame(() => {
+        priceHistoryManagementSummaryRef.current?.focus({ preventScroll: true });
+      });
+      return;
+    }
+    handledPriceHistoryReviewIdRef.current = candidateId;
+    const isRemoval = priceHistoryReview.kind === "removal";
+    const label = isRemoval
+      ? priceHistoryReview.candidate.target.snapshot.label
+      : priceHistoryReview.candidate.replacedOccurrence.snapshot.label;
+    const outcome = await commitLocalPriceHistory({
+      current: result.prior,
+      next: result.next,
+      destructive: true,
+      durableMessage: isRemoval
+        ? `Removed local comparison: ${label}`
+        : `Saved local comparison and replaced the oldest point: ${label}`,
+      sessionMessage: isRemoval
+        ? `Removed local comparison for this session: ${label}. Saved history was not changed.`
+        : "Updated local history for this session. Saved history was not changed.",
+      actionAt: new Date()
+    });
+    if (outcome.status === "applied") setPriceHistoryReview(null);
   };
 
   const requestClearPriceHistory = () => {
     setPriceHistoryClearPending(true);
-    setMarketNotice({ tone: "neutral", message: "Confirm clearing local comparison history" });
+    setPriceHistoryNotice({
+      tone: "neutral",
+      message: "Confirm clearing local comparison history"
+    });
   };
 
   const confirmClearPriceHistory = async (): Promise<void> => {
     if (priceHistory.snapshots.length === 0) return;
-    const { clearEconomyPriceHistory } = await loadEconomySettingsPane();
-    invalidatePendingEconomyUndo();
-    const outcome = clearEconomyPriceHistory({
-      storage,
-      persistenceUnavailable: localPersistenceUnavailable,
-      liveState: priceHistory,
-      recovery: localStateRecovery
+    const outcome = await commitLocalPriceHistory({
+      current: priceHistory,
+      next: DEFAULT_PRICE_HISTORY_STATE,
+      destructive: true,
+      durableMessage: "Cleared local comparison history",
+      sessionMessage:
+        "Cleared local comparison history for this session. Saved history was not changed.",
+      actionAt: new Date()
     });
-    setPriceHistory(DEFAULT_PRICE_HISTORY_STATE);
-    setPriceHistoryClearPending(false);
-    setStatus(outcome.actionStatus);
-    setMarketNotice(outcome.marketNotice);
-    setUndoableStatus(
-      outcome.actionStatus,
-      "Restored local price history",
-      () =>
-        outcome.record.restore({
-          applyLiveState: (previousHistory) => {
-            setPriceHistory(previousHistory);
-            setPriceHistoryClearPending(false);
-          },
-          recovery: localStateRecovery,
-          onNotice: setMarketNotice,
-          restoredMessage: "Restored local price history"
-        }).message,
-      "economy-data"
-    );
+    if (outcome.status === "applied") setPriceHistoryClearPending(false);
   };
 
   const updateEconomySort = (key: PriceHistoryMoverSortKey) => {
@@ -2009,6 +2555,73 @@ export function App() {
     setPriceItemReviewRequest({ id, action });
   };
 
+  const reviewPlannerNotice = (action: PlannerNoticeAction): void => {
+    plannerNoticeActionIdRef.current += 1;
+    const requestId = plannerNoticeActionIdRef.current;
+    const focusInNextFrame = (target: () => HTMLElement | null): void => {
+      window.requestAnimationFrame(() => {
+        if (plannerNoticeActionIdRef.current !== requestId) return;
+        const element = target();
+        element?.focus({ preventScroll: true });
+        if (!element) return;
+        const bounds = element.getBoundingClientRect();
+        if (bounds.top < 0 || bounds.bottom > window.innerHeight) {
+          element.scrollIntoView({ block: "nearest" });
+        }
+      });
+    };
+
+    if (action.kind === "review-loadout") {
+      setPriceItemReviewRequest(null);
+      setActiveTab("loadout");
+      focusInNextFrame(() => loadoutWeaponTriggerRef.current);
+      return;
+    }
+    if (action.kind === "review-trip") {
+      setPriceItemReviewRequest(null);
+      setActiveTab("trip");
+      focusInNextFrame(() => tripFoodPerKillOverrideRef.current);
+      return;
+    }
+    if (action.kind === "correct-price") {
+      const editable = manualPricePresentation.itemOptions.some(
+        (option) => option.id === action.itemId
+      );
+      if (editable) {
+        requestPriceItemReview({
+          kind: "correct-price",
+          itemId: action.itemId,
+          noticeId: `planner:${action.itemId}`,
+          label: "Correct price"
+        });
+        return;
+      }
+      setMarketNotice({
+        tone: "neutral",
+        message: "That Planner price item is no longer editable. Showing the current price data."
+      });
+    }
+    if (action.kind === "review-price-data" || action.kind === "correct-price") {
+      setPriceItemReviewRequest(null);
+      const itemId = action.itemId;
+      const itemAvailable = Boolean(
+        itemId && economyHistory.trendItemOptions.some((option) => option.id === itemId)
+      );
+      if (itemAvailable && itemId) {
+        setEconomyTrendItemId(itemId);
+      } else if (action.kind === "review-price-data") {
+        setMarketNotice({
+          tone: "neutral",
+          message: "That Planner price item is no longer available. Showing the current price data."
+        });
+      }
+      setActiveTab("economy");
+      focusInNextFrame(() =>
+        itemAvailable ? selectedPriceItemRef.current : marketHeadingRef.current
+      );
+    }
+  };
+
   const reviewActiveAssumption = (tab: ActiveAssumptionReviewTarget) => {
     if (tab === "melee" || tab === "ranged" || tab === "magic") {
       setCombatStyle(tab);
@@ -2092,13 +2705,147 @@ export function App() {
       })
     );
 
-  const resetManualOverrides = () =>
+  const resetManualOverrides = () => {
+    const previousManualOverrides = form.manualOverrides;
+    const changed = Object.keys(DEFAULT_MANUAL_OVERRIDES).some(
+      (key) =>
+        previousManualOverrides[key as keyof typeof DEFAULT_MANUAL_OVERRIDES] !==
+        DEFAULT_MANUAL_OVERRIDES[key as keyof typeof DEFAULT_MANUAL_OVERRIDES]
+    );
+    if (!changed) {
+      setStatus("Manual overrides already use defaults");
+      return;
+    }
     setFormSafe((current) => updateForm(current, { manualOverrides: DEFAULT_MANUAL_OVERRIDES }));
+    setUndoableStatus("Manual overrides reset", "Restored manual combat overrides", () => {
+      setFormSafe((current) => updateForm(current, { manualOverrides: previousManualOverrides }));
+    });
+  };
 
   const selectTarget = (monsterId: EntityId) => {
     const target = formForMonsterSetup(defaultForm, customSetupsByMonster, monsterId);
     setSetupMode(target.setupMode);
     setForm(target.form);
+  };
+
+  const reviewMonsterSpecificCategory = (
+    monsterId: string,
+    kind: MonsterSpecificChangeKind
+  ): void => {
+    const row = monsterSpecificChanges.rows.find((candidate) => candidate.monsterId === monsterId);
+    if (!row?.available || !row.categories.some((category) => category.kind === kind)) return;
+    selectTarget(monsterId);
+    if (kind === "compare-hidden") {
+      setDenseCompare((current) => ({
+        ...resetDenseCompareFilters(current),
+        showIrrelevant: true
+      }));
+    }
+    const destination: WorkbenchTabId =
+      kind === "custom-setup"
+        ? "loadout"
+        : kind === "cannon"
+          ? "cannon"
+          : kind === "loot-actions" || kind === "loot-settings"
+            ? "loot"
+            : "compare";
+    monsterReviewIdRef.current += 1;
+    setMonsterSpecificReviewRequest({ id: monsterReviewIdRef.current, monsterId, kind });
+    setActiveTab(destination);
+  };
+
+  const reviewMonsterSpecificRemoval = (monsterId: string): void => {
+    const row = monsterSpecificChanges.rows.find((candidate) => candidate.monsterId === monsterId);
+    if (!row) return;
+    monsterRemovalIdRef.current += 1;
+    const candidate = createMonsterSpecificRemovalCandidate({
+      id: monsterRemovalIdRef.current,
+      monsterId,
+      monsterName: row.monsterName,
+      live: currentMonsterSpecificLiveState
+    });
+    if (!candidate) {
+      setMonsterChangesNotice({
+        tone: "neutral",
+        message: `No changes remain for ${row.monsterName}`
+      });
+      return;
+    }
+    setMonsterRemovalCandidate(candidate);
+    setMonsterChangesSessionOnlyAvailable(false);
+    setMonsterChangesNotice(null);
+  };
+
+  const registerMonsterSpecificUndo = (
+    outcome: Extract<MonsterSpecificApplyOutcome, { status: "applied" }>,
+    candidate: MonsterSpecificRemovalCandidate
+  ): void => {
+    setUndoableStatus(outcome.message, `Restored changes for ${candidate.monsterName}`, () => {
+      const execution = monsterChangesExecutionRef.current;
+      const transaction = monsterChangesTransactionRef.current;
+      if (!execution || !transaction) return "Monster changes Undo is no longer available.";
+      const undo = transaction.undo(execution);
+      if (undo.status === "session-only-available") {
+        setPendingUndo({
+          id: localUndoId(),
+          label: undo.message,
+          restoreLabel: `Restored changes for ${candidate.monsterName} for this session`,
+          createdAt: Date.now(),
+          restore: () => {
+            const currentExecution = monsterChangesExecutionRef.current;
+            const currentTransaction = monsterChangesTransactionRef.current;
+            if (!currentExecution || !currentTransaction) {
+              return "Session-only monster changes Undo is no longer available.";
+            }
+            return currentTransaction.undoForSession(currentExecution).message;
+          }
+        });
+      }
+      setMonsterChangesNotice({
+        tone: undo.status === "undone" ? "success" : undo.status === "failed" ? "error" : "warning",
+        message: undo.message
+      });
+      return undo.message;
+    });
+  };
+
+  const confirmMonsterSpecificRemoval = (mode: "durable" | "session-only"): void => {
+    const candidate = monsterRemovalCandidate;
+    const execution = monsterChangesExecutionRef.current;
+    const transaction = monsterChangesTransactionRef.current;
+    if (!candidate || !execution || !transaction) return;
+    if (candidate.id === handledMonsterRemovalIdRef.current) {
+      setMonsterChangesNotice({ tone: "neutral", message: "This removal was already handled." });
+      return;
+    }
+    if (mode === "session-only" && !monsterChangesSessionOnlyAvailable) return;
+    const outcome =
+      mode === "durable"
+        ? transaction.applyDurable(candidate, execution)
+        : transaction.applyForSession(candidate, execution);
+    if (outcome.status === "session-only-available") {
+      setMonsterChangesSessionOnlyAvailable(true);
+      setMonsterChangesNotice({ tone: "warning", message: outcome.message });
+      setStatus(outcome.message);
+      return;
+    }
+    handledMonsterRemovalIdRef.current = candidate.id;
+    if (outcome.status === "applied") {
+      setMonsterRemovalCandidate(null);
+      setMonsterChangesSessionOnlyAvailable(false);
+      setMonsterChangesNotice({ tone: "success", message: outcome.message });
+      registerMonsterSpecificUndo(outcome, candidate);
+      return;
+    }
+    setMonsterChangesNotice({
+      tone: outcome.status === "failed" ? "error" : "neutral",
+      message: outcome.message
+    });
+    setStatus(outcome.message);
+    if (outcome.status === "stale" || outcome.status === "no-op") {
+      setMonsterRemovalCandidate(null);
+      setMonsterChangesSessionOnlyAvailable(false);
+    }
   };
 
   const setDenseMonsterFilter = (value: string) =>
@@ -2121,11 +2868,10 @@ export function App() {
   const hasCurrentCustomSetup = currentCustomSetup != null;
   const activeSetupIsCustom = setupMode === "custom" && hasCurrentCustomSetup;
   const snapshotCurrentSetup = () => {
-    const snapshot = createDuelSnapshot(
-      createDuelSnapshotId(),
-      defaultDuelSnapshotName(viewModel, duelSnapshots.snapshots.length),
-      form
-    );
+    invalidateSavedSetupUndo();
+    const baseName = defaultDuelSnapshotName(viewModel, duelSnapshots.snapshots.length);
+    const uniqueName = uniqueDuelSnapshotName(baseName, duelSnapshots);
+    const snapshot = createDuelSnapshot(createDuelSnapshotId(), uniqueName, form);
     setDuelSnapshots((current) => appendDuelSnapshot(current, snapshot));
     setDuelImportNotice(null);
     setStatus(`Saved setup: ${snapshot.name}`);
@@ -2152,11 +2898,17 @@ export function App() {
         context.gameData
       );
       if (attemptId !== duelImportAttemptRef.current) return;
+      const plan = createSavedSetupMergePlan({
+        reviewId: attemptId,
+        source: imported.data,
+        current: duelSnapshots
+      });
       setDuelImportReview({
         id: attemptId,
-        data: imported.data,
+        plan,
         context: compareSetupTransferContext(imported.context, context.gameData)
       });
+      setDuelSessionOnlyRequest(null);
       setStatus("Saved setups ready for review");
     } catch (caught) {
       if (attemptId !== duelImportAttemptRef.current) return;
@@ -2167,32 +2919,145 @@ export function App() {
   const dismissDuelSnapshotsImport = (reviewId: number): void => {
     if (duelImportReview?.id !== reviewId) return;
     setDuelImportReview(null);
+    setDuelSessionOnlyRequest((current) =>
+      current?.kind === "merge" && current.reviewId === reviewId ? null : current
+    );
     setStatus("Dismissed saved setup import review");
+  };
+  const setDuelSnapshotsImportDecision = (
+    reviewId: number,
+    snapshotId: string,
+    decision: "keep" | "replace" | "add" | "exclude"
+  ): void => {
+    setDuelImportReview((review) => {
+      if (!review || review.id !== reviewId) return review;
+      return {
+        ...review,
+        plan: setSavedSetupMergeDecision({
+          plan: review.plan,
+          current: duelSnapshots,
+          snapshotId,
+          decision
+        })
+      };
+    });
+    setDuelSessionOnlyRequest((current) => (current?.kind === "merge" ? null : current));
+  };
+  const setDuelSnapshotsImportName = (reviewId: number, snapshotId: string, name: string): void => {
+    setDuelImportReview((review) => {
+      if (!review || review.id !== reviewId) return review;
+      return {
+        ...review,
+        plan: setSavedSetupMergeRecipientName({
+          plan: review.plan,
+          current: duelSnapshots,
+          snapshotId,
+          name
+        })
+      };
+    });
+    setDuelSessionOnlyRequest((current) => (current?.kind === "merge" ? null : current));
+  };
+  const refreshDuelSnapshotsImport = (reviewId: number): void => {
+    if (!duelImportReview || duelImportReview.id !== reviewId) return;
+    const nextId = ++duelImportAttemptRef.current;
+    setDuelImportReview({
+      ...duelImportReview,
+      id: nextId,
+      plan: createSavedSetupMergePlan({
+        reviewId: nextId,
+        source: duelImportReview.plan.source,
+        current: duelSnapshots
+      })
+    });
+    setDuelSessionOnlyRequest((current) => (current?.kind === "merge" ? null : current));
+    setStatus("Refreshed saved setup merge review");
   };
   const mergeDuelSnapshotsImport = (reviewId: number): void => {
     if (duelImportReview?.id !== reviewId) return;
-    const merged = mergeDuelSnapshots(duelSnapshots, duelImportReview.data);
-    setDuelSnapshots(merged.state);
-    setDuelImportReview(null);
-    localStateRecovery.unblockReplaced(["duel-snapshots"]);
-    const skipped = merged.skippedCount > 0 ? ` ${merged.skippedCount} skipped at the limit.` : "";
+    const candidate = buildSavedSetupMergeCandidate(duelImportReview.plan, duelSnapshots);
+    if (candidate.status !== "ready") {
+      const message =
+        candidate.status === "stale"
+          ? "Saved setups changed. Refresh the merge review before applying it."
+          : candidate.status === "no-op"
+            ? "Select at least one setup to add or replace."
+            : "Resolve the highlighted setup names before merging.";
+      setDuelImportNotice({ tone: candidate.status === "stale" ? "warning" : "neutral", message });
+      setStatus(message);
+      return;
+    }
     const contextSuffix =
       duelImportReview.context.match === "exact-snapshot"
         ? ""
         : ` using current Revision ${duelImportReview.context.current.gameRevision} data`;
-    const message = `Imported saved setups${contextSuffix}: ${merged.addedCount} added, ${merged.updatedCount} updated.${skipped}`;
-    setDuelImportNotice({ tone: "success", message });
-    setStatus(message);
+    const message = `Merged saved setups${contextSuffix}: ${candidate.counts.selectedAddCount} added, ${candidate.counts.selectedReplaceCount} replaced, ${candidate.counts.notSelectedCount} not selected.`;
+    applySavedSetupChange(
+      {
+        current: duelSnapshots,
+        next: candidate.state,
+        actionMessage: message,
+        sessionActionMessage: `${message} Applied for this session only; changes may return after reload.`,
+        undoMessage: "Restored saved setups from before merge"
+      },
+      "merge",
+      reviewId,
+      "durable"
+    );
   };
-  const commitDuelSnapshotName = (snapshotId: string, name: string): boolean => {
-    try {
-      setDuelSnapshots((current) => renameDuelSnapshot(current, snapshotId, name));
-      setStatus("Renamed saved setup");
-      return true;
-    } catch {
-      setStatus("Saved setup name must not be empty");
-      return false;
+  const applyDuelSessionOnlyChange = (): void => {
+    const pending = duelSessionOnlyRequest;
+    if (!pending) return;
+    if (pending.kind === "merge" && pending.reviewId !== duelImportReview?.id) {
+      setDuelSessionOnlyRequest(null);
+      setStatus("Saved setup merge review changed. Review it again.");
+      return;
     }
+    applySavedSetupChange(pending.request, pending.kind, pending.reviewId, "session-only");
+  };
+  const commitDuelSnapshotName = (
+    snapshotId: string,
+    name: string
+  ):
+    | "renamed"
+    | "unchanged"
+    | "missing"
+    | "invalid"
+    | "duplicate"
+    | "session-only-available"
+    | "failed" => {
+    const renamed = renameDuelSnapshotSafely(duelSnapshots, snapshotId, name);
+    if (renamed.status !== "renamed") {
+      const messages = {
+        unchanged: "Saved setup name is unchanged.",
+        missing: "That saved setup is no longer available.",
+        invalid: "Enter a saved setup name between 1 and 80 characters.",
+        duplicate: "Choose a unique saved setup name."
+      } as const;
+      setDuelImportNotice({
+        tone: renamed.status === "unchanged" ? "neutral" : "warning",
+        message: messages[renamed.status]
+      });
+      setStatus(messages[renamed.status]);
+      return renamed.status;
+    }
+    const outcome = applySavedSetupChange(
+      {
+        current: duelSnapshots,
+        next: renamed.state,
+        actionMessage: `Renamed saved setup from ${renamed.oldName} to ${renamed.newName}`,
+        sessionActionMessage: `Renamed saved setup to ${renamed.newName} for this session. The prior name may return after reload.`,
+        undoMessage: `Restored saved setup name ${renamed.oldName}`
+      },
+      "rename",
+      null,
+      "durable"
+    );
+    return outcome.status === "applied"
+      ? "renamed"
+      : outcome.status === "session-only-available"
+        ? "session-only-available"
+        : "failed";
   };
   const loadDuelSnapshot = (snapshotId: string) => {
     const snapshot = duelSnapshots.snapshots.find((candidate) => candidate.id === snapshotId);
@@ -2210,6 +3075,7 @@ export function App() {
     });
   };
   const deleteDuelSnapshot = (snapshotId: string) => {
+    invalidateSavedSetupUndo();
     const snapshot = duelSnapshots.snapshots.find((candidate) => candidate.id === snapshotId);
     const previousDuelSnapshots = duelSnapshots;
     setDuelSnapshots((current) => removeDuelSnapshot(current, snapshotId));
@@ -2418,12 +3284,26 @@ export function App() {
     });
   };
   const resetCannonForCurrentMonster = () => {
+    const monsterId = form.monsterId;
+    const previousCannonByMonster = cannonByMonster;
+    if (!previousCannonByMonster[monsterId]) {
+      setStatus("Current monster cannon already uses defaults");
+      return;
+    }
+    const monsterName = currentMonster?.name ?? monsterId;
     setCannonByMonster((current) => {
-      if (!current[form.monsterId]) return current;
+      if (!current[monsterId]) return current;
       const next = { ...current };
-      delete next[form.monsterId];
+      delete next[monsterId];
       return next;
     });
+    setUndoableStatus(
+      "Current monster cannon reset",
+      `Restored cannon settings for ${monsterName}`,
+      () => {
+        setCannonByMonster(previousCannonByMonster);
+      }
+    );
   };
   const setTripSparseFromCannon = (linked: boolean) =>
     setFormSafe((current) =>
@@ -2476,9 +3356,14 @@ export function App() {
     setLootNotice(`${row.name}: ${lootActionLabel(action)}`);
   };
   const resetCurrentLootOverrides = () => {
+    const monsterId = form.monsterId;
     const monsterName = currentMonster?.name ?? form.monsterId;
     const previousLootPrefsByMonster = lootPrefsByMonster;
-    setLootPrefsByMonster((current) => resetLootPrefsForMonster(current, form.monsterId));
+    if (!previousLootPrefsByMonster[monsterId]) {
+      setStatus(`Loot overrides already use defaults for ${monsterName}`);
+      return;
+    }
+    setLootPrefsByMonster((current) => resetLootPrefsForMonster(current, monsterId));
     const label = `Reset loot overrides for ${monsterName}`;
     const restoreLabel = `Restored loot overrides for ${monsterName}`;
     setLootNotice(label);
@@ -2488,9 +3373,14 @@ export function App() {
     });
   };
   const resetCurrentLootSettings = () => {
+    const monsterId = form.monsterId;
     const monsterName = currentMonster?.name ?? form.monsterId;
     const previousLootSettingsByMonster = lootSettingsByMonster;
-    setLootSettingsByMonster((current) => resetLootSettingsForMonster(current, form.monsterId));
+    if (!previousLootSettingsByMonster[monsterId]) {
+      setStatus(`Loot settings already use defaults for ${monsterName}`);
+      return;
+    }
+    setLootSettingsByMonster((current) => resetLootSettingsForMonster(current, monsterId));
     const label = `Reset loot settings for ${monsterName}`;
     const restoreLabel = `Restored loot settings for ${monsterName}`;
     setLootNotice(label);
@@ -2499,7 +3389,9 @@ export function App() {
       setLootNotice(restoreLabel);
     });
   };
-  const resetTripSafespotOverride = () =>
+  const resetTripSafespotOverride = (): boolean => {
+    const previousSafespot = form.trip.safespot;
+    if (previousSafespot == null) return false;
     setFormSafe((current) =>
       updateForm(current, {
         trip: {
@@ -2508,7 +3400,16 @@ export function App() {
         }
       })
     );
-  const resetTripScarceSpot = () =>
+    setUndoableStatus("Safespot override reset to auto", "Restored safespot override", () => {
+      setFormSafe((current) =>
+        updateForm(current, { trip: { ...current.trip, safespot: previousSafespot } })
+      );
+    });
+    return true;
+  };
+  const resetTripScarceSpot = (): boolean => {
+    const previousScarceSpot = form.trip.scarceSpot;
+    if (!previousScarceSpot) return false;
     setFormSafe((current) =>
       updateForm(current, {
         trip: {
@@ -2517,7 +3418,30 @@ export function App() {
         }
       })
     );
-  const resetActiveAssumption = (target: ActiveAssumptionResetTarget, statusLabel: string) => {
+    setUndoableStatus(
+      "Scarce spot disabled; target and respawn values kept",
+      "Restored scarce spot setting",
+      () => {
+        setFormSafe((current) =>
+          updateForm(current, { trip: { ...current.trip, scarceSpot: previousScarceSpot } })
+        );
+      }
+    );
+    return true;
+  };
+  const showAllHiddenGearTiers = (): boolean => {
+    const previousHiddenGearTiers = hiddenGearTiers;
+    if (!Object.values(previousHiddenGearTiers).some(Boolean)) {
+      setStatus("All gear tiers are already shown");
+      return false;
+    }
+    setHiddenGearTiers(DEFAULT_HIDDEN_GEAR_TIERS_STATE);
+    setUndoableStatus("Hidden gear tiers shown", "Restored hidden gear tiers", () => {
+      setHiddenGearTiers(previousHiddenGearTiers);
+    });
+    return true;
+  };
+  const resetActiveAssumption = (target: ActiveAssumptionResetTarget) => {
     if (target === "manual-combat-overrides") {
       resetManualOverrides();
     } else if (target === "cannon-enabled") {
@@ -2527,13 +3451,12 @@ export function App() {
     } else if (target === "loot-action-overrides") {
       resetCurrentLootOverrides();
     } else if (target === "scarce-spot") {
-      resetTripScarceSpot();
+      if (!resetTripScarceSpot()) setStatus("Scarce spot is already disabled");
     } else if (target === "explicit-safespot") {
-      resetTripSafespotOverride();
+      if (!resetTripSafespotOverride()) setStatus("Safespot already uses auto detection");
     } else if (target === "hidden-gear-tiers") {
-      setHiddenGearTiers(DEFAULT_HIDDEN_GEAR_TIERS_STATE);
+      showAllHiddenGearTiers();
     }
-    setStatus(statusLabel);
   };
   const optimizeCurrentLoot = () => {
     const monsterName = currentMonster?.name ?? form.monsterId;
@@ -2625,13 +3548,15 @@ export function App() {
       })
     : null;
   const activePriceSet = context?.priceSet ?? null;
+  const priceTimeContext = createPriceTimeContext(new Date(priceAgeNowMs), priceTimeZone);
   const manualPricePresentation = createManualPriceEditorPresentation({
     activePriceSet,
     basePriceSet,
     itemLabels: priceHistoryItemLabels,
     manualPriceOverrides,
     selectedItemId: manualPriceItemId,
-    draft: manualPriceDraft
+    draft: manualPriceDraft,
+    timeContext: priceTimeContext
   });
   const priceSetPresentation = createPriceSetPresentation({
     activePriceSet,
@@ -2640,13 +3565,14 @@ export function App() {
     activePriceSetOrigin,
     priceLabel,
     activeManualPriceOverrideCount: manualPricePresentation.activeCount,
-    ageNow: new Date(priceAgeNowMs)
+    timeContext: priceTimeContext
   });
   const selectedEconomyItem = createSelectedPriceItemPresentation({
     activePriceSet,
     itemId: economyHistory.effectiveTrendItemId,
     itemLabels: priceHistoryItemLabels,
-    freshnessNow: new Date(priceAgeNowMs)
+    freshnessNow: new Date(priceAgeNowMs),
+    timeContext: priceTimeContext
   });
   const gameRevisionViewModel = createGameRevisionViewModel(context.gameData);
   const settingsPaneViewModel = createSettingsPaneViewModel(hiddenGearTiers, gameRevisionViewModel);
@@ -2659,6 +3585,16 @@ export function App() {
       selectedItem: selectedEconomyItem
     }
   };
+  const reviewedHistoryOccurrenceId =
+    priceHistoryReview?.kind === "removal"
+      ? priceHistoryReview.candidate.target.occurrenceId
+      : priceHistoryReview?.kind === "replacement"
+        ? priceHistoryReview.candidate.replacedOccurrence.occurrenceId
+        : null;
+  const reviewedHistoryCaptureTime =
+    economyHistory.localManagement.rows.find(
+      (row) => row.occurrenceId === reviewedHistoryOccurrenceId
+    )?.captureTime ?? presentPriceDateTime(null, priceTimeContext);
   const effectiveManualPriceItemId = manualPricePresentation.itemId;
   const selectedManualBasePrice = manualPricePresentation.basePrice;
   const selectedManualOverride = manualPricePresentation.selectedOverride;
@@ -2898,18 +3834,15 @@ export function App() {
     ? invalidateStaleActiveSetupReset(activeSetupReset, captureCurrentRewriteSetup())
     : activeSetupReset;
   const duelImportReviewViewModel = duelImportReview
-    ? (() => {
-        const preview = mergeDuelSnapshots(duelSnapshots, duelImportReview.data);
-        return {
-          id: duelImportReview.id,
-          setupCount: duelImportReview.data.snapshots.length,
-          addedCount: preview.addedCount,
-          updatedCount: preview.updatedCount,
-          skippedCount: preview.skippedCount,
-          contextTone: duelImportReview.context.tone,
-          contextMessage: duelImportReview.context.message
-        };
-      })()
+    ? {
+        ...createSavedSetupMergeReviewViewModel({
+          plan: duelImportReview.plan,
+          current: duelSnapshots,
+          context
+        }),
+        contextTone: duelImportReview.context.tone,
+        contextMessage: duelImportReview.context.message
+      }
     : null;
 
   return (
@@ -2953,7 +3886,7 @@ export function App() {
         onReview={reviewLocalState}
       />
       <span className="visually-hidden" role="status" aria-live="polite">
-        {status}
+        {globalStatusAnnouncement(status, pendingUndo)}
       </span>
 
       {shareDialog && (
@@ -3058,116 +3991,125 @@ export function App() {
           }}
         />
 
-        <LoadoutPane
-          hidden={activeTab !== "loadout"}
-          viewModel={{
-            ...loadoutPaneViewModel,
-            hitDistributionHitChanceLabel: viewModel.hitDistribution.hitChanceLabel,
-            hitDistributionComparison: viewModel.hitDistributionComparison
-          }}
-          actions={{
-            setWeapon: setWeaponSelection,
-            setAmmo: setAmmoSelection,
-            setSpell: setSpellSelection,
-            setStyle: (styleId) => setFormSafe((current) => updateForm(current, { styleId })),
-            setPrimaryPrayer: (prayer) =>
-              setFormSafe((current) =>
-                updateForm(current, {
-                  prayers: setPrimaryPrayerSelection(current.prayers, prayer)
-                })
-              ),
-            setPrimaryBoost: (boost) =>
-              setFormSafe((current) =>
-                updateForm(current, {
-                  boosts: setPrimaryBoostSelection(current.boosts, boost)
-                })
-              ),
-            togglePrayer: (prayer, selected) =>
-              setFormSafe((current) =>
-                updateForm(current, {
-                  prayers: togglePrayerSelection(current.prayers, prayer, selected)
-                })
-              ),
-            toggleBoost: (boost, selected) =>
-              setFormSafe((current) =>
-                updateForm(current, {
-                  boosts: toggleBoostSelection(current.boosts, boost, selected)
-                })
-              ),
-            setSustained: (sustained) =>
-              setFormSafe((current) =>
-                updateForm(current, {
-                  sustained,
-                  repotThreshold: sustained ? (current.repotThreshold ?? 65) : null
-                })
-              ),
-            setRepotThreshold: (repotThreshold) =>
-              setFormSafe((current) => updateForm(current, { repotThreshold })),
-            setRespectRequirements: setRespectLoadoutRequirements,
-            optimize: optimizeCurrentLoadout,
-            setManualOverride,
-            resetManualOverrides,
-            setGear: setGearSelection,
-            setSpecialWeapon: setSpecialAttackWeapon,
-            setSpecialAmmo: (ammoId) =>
-              setFormSafe((current) =>
-                updateForm(current, {
-                  specialAttack: { ...current.specialAttack, ammoId }
-                })
-              )
-          }}
-        />
+        <Suspense fallback={null}>
+          <LoadoutPane
+            hidden={activeTab !== "loadout"}
+            weaponTriggerRef={loadoutWeaponTriggerRef}
+            viewModel={{
+              ...loadoutPaneViewModel,
+              hitDistributionHitChanceLabel: viewModel.hitDistribution.hitChanceLabel,
+              hitDistributionComparison: viewModel.hitDistributionComparison
+            }}
+            actions={{
+              setWeapon: setWeaponSelection,
+              setAmmo: setAmmoSelection,
+              setSpell: setSpellSelection,
+              setStyle: (styleId) => setFormSafe((current) => updateForm(current, { styleId })),
+              setPrimaryPrayer: (prayer) =>
+                setFormSafe((current) =>
+                  updateForm(current, {
+                    prayers: setPrimaryPrayerSelection(current.prayers, prayer)
+                  })
+                ),
+              setPrimaryBoost: (boost) =>
+                setFormSafe((current) =>
+                  updateForm(current, {
+                    boosts: setPrimaryBoostSelection(current.boosts, boost)
+                  })
+                ),
+              togglePrayer: (prayer, selected) =>
+                setFormSafe((current) =>
+                  updateForm(current, {
+                    prayers: togglePrayerSelection(current.prayers, prayer, selected)
+                  })
+                ),
+              toggleBoost: (boost, selected) =>
+                setFormSafe((current) =>
+                  updateForm(current, {
+                    boosts: toggleBoostSelection(current.boosts, boost, selected)
+                  })
+                ),
+              setSustained: (sustained) =>
+                setFormSafe((current) =>
+                  updateForm(current, {
+                    sustained,
+                    repotThreshold: sustained ? (current.repotThreshold ?? 65) : null
+                  })
+                ),
+              setRepotThreshold: (repotThreshold) =>
+                setFormSafe((current) => updateForm(current, { repotThreshold })),
+              setRespectRequirements: setRespectLoadoutRequirements,
+              optimize: optimizeCurrentLoadout,
+              setManualOverride,
+              resetManualOverrides,
+              setGear: setGearSelection,
+              setSpecialWeapon: setSpecialAttackWeapon,
+              setSpecialAmmo: (ammoId) =>
+                setFormSafe((current) =>
+                  updateForm(current, {
+                    specialAttack: { ...current.specialAttack, ammoId }
+                  })
+                )
+            }}
+          />
+        </Suspense>
 
-        <LootPane
-          hidden={activeTab !== "loot"}
-          model={{
-            presentation: viewModel.loot,
-            settings: currentLootSettings,
-            notice: lootUiState.notice,
-            gpPerKill: viewModel.trip.gpPerKill,
-            effectiveNetGpPerHour: viewModel.trip.effectiveNetGpPerHour,
-            sort: lootUiState.sort,
-            nestedSort: lootUiState.nestedSort
-          }}
-          actions={{
-            setHighAlch: (highAlch) => setLootSettingsForCurrentMonster({ highAlch }),
-            setOverheadMode: (mode) =>
-              setLootSettingsForCurrentMonster({
-                overheadSec: mode === "manual" ? viewModel.loot.overheadValue : null
-              }),
-            setOverheadSeconds: (overheadSec) => setLootSettingsForCurrentMonster({ overheadSec }),
-            setTalismanSpot: (talismanSpot) => setLootSettingsForCurrentMonster({ talismanSpot }),
-            setAction: setLootActionForCurrentMonster,
-            resetSettings: resetCurrentLootSettings,
-            resetOverrides: resetCurrentLootOverrides,
-            optimize: optimizeCurrentLoot,
-            sortBy: (key) =>
-              setLootUiState((current) => ({
-                ...current,
-                sort: nextLootTableSortState(current.sort, key)
-              })),
-            sortNestedBy: (key) =>
-              setLootUiState((current) => ({
-                ...current,
-                nestedSort: nextLootNestedTableSortState(current.nestedSort, key)
-              })),
-            reviewPriceItem: requestPriceItemReview
-          }}
-        />
+        <Suspense fallback={null}>
+          <LootPane
+            hidden={activeTab !== "loot"}
+            model={{
+              presentation: viewModel.loot,
+              settings: currentLootSettings,
+              notice: lootUiState.notice,
+              gpPerKill: viewModel.trip.gpPerKill,
+              effectiveNetGpPerHour: viewModel.trip.effectiveNetGpPerHour,
+              sort: lootUiState.sort,
+              nestedSort: lootUiState.nestedSort
+            }}
+            actions={{
+              setHighAlch: (highAlch) => setLootSettingsForCurrentMonster({ highAlch }),
+              setOverheadMode: (mode) =>
+                setLootSettingsForCurrentMonster({
+                  overheadSec: mode === "manual" ? viewModel.loot.overheadValue : null
+                }),
+              setOverheadSeconds: (overheadSec) =>
+                setLootSettingsForCurrentMonster({ overheadSec }),
+              setTalismanSpot: (talismanSpot) => setLootSettingsForCurrentMonster({ talismanSpot }),
+              setAction: setLootActionForCurrentMonster,
+              resetSettings: resetCurrentLootSettings,
+              resetOverrides: resetCurrentLootOverrides,
+              optimize: optimizeCurrentLoot,
+              sortBy: (key) =>
+                setLootUiState((current) => ({
+                  ...current,
+                  sort: nextLootTableSortState(current.sort, key)
+                })),
+              sortNestedBy: (key) =>
+                setLootUiState((current) => ({
+                  ...current,
+                  nestedSort: nextLootNestedTableSortState(current.nestedSort, key)
+                })),
+              reviewPriceItem: requestPriceItemReview
+            }}
+          />
+        </Suspense>
 
-        <TripPane
-          hidden={activeTab !== "trip"}
-          model={{
-            presentation: tripPanePresentation,
-            modeledKillsPerTripRange: freshRisk
-              ? formatRiskRange(freshRisk.result.killsPerTrip, 0)
-              : null
-          }}
-          actions={{
-            updateTrip,
-            openRisk: () => activateWorkbenchTab("risk")
-          }}
-        />
+        <Suspense fallback={null}>
+          <TripPane
+            hidden={activeTab !== "trip"}
+            foodPerKillOverrideRef={tripFoodPerKillOverrideRef}
+            model={{
+              presentation: tripPanePresentation,
+              modeledKillsPerTripRange: freshRisk
+                ? formatRiskRange(freshRisk.result.killsPerTrip, 0)
+                : null
+            }}
+            actions={{
+              updateTrip,
+              openRisk: () => activateWorkbenchTab("risk")
+            }}
+          />
+        </Suspense>
 
         <Suspense fallback={null}>
           <RiskPane
@@ -3190,92 +4132,107 @@ export function App() {
             }}
           />
         </Suspense>
-        <CannonPane
-          hidden={activeTab !== "cannon"}
-          enabled={cannonEnabled}
-          targets={cannonTargets}
-          respawnSeconds={cannonRespawn}
-          tripSparseLinked={cannonTripSparseLinked}
-          hasCustomSettings={cannonHasCustomSettings}
-          output={currentCannonOutput}
-          effectiveXpPerHour={viewModel.effectiveXpPerHour}
-          effectiveNetGpPerHour={viewModel.trip.effectiveNetGpPerHour}
-          hitChance={viewModel.combat.hitChance}
-          tripSparseEnabled={form.trip.scarceSpot}
-          tripSparseMaxKph={viewModel.trip.trip.scarce.maxKph}
-          cannonReserveActive={viewModel.trip.trip.slots.reserveParts.includes("cannon (4 parts)")}
-          onEnabledChange={(enabled) => setCannonForCurrentMonster({ enabled })}
-          onTargetsChange={setCannonTargetsForCurrentMonster}
-          onRespawnChange={setCannonRespawnForCurrentMonster}
-          onTripSparseLinkedChange={setTripSparseFromCannon}
-          onReset={resetCannonForCurrentMonster}
-        />
+        <Suspense fallback={null}>
+          <CannonPane
+            hidden={activeTab !== "cannon"}
+            enabled={cannonEnabled}
+            targets={cannonTargets}
+            respawnSeconds={cannonRespawn}
+            tripSparseLinked={cannonTripSparseLinked}
+            hasCustomSettings={cannonHasCustomSettings}
+            output={currentCannonOutput}
+            effectiveXpPerHour={viewModel.effectiveXpPerHour}
+            effectiveNetGpPerHour={viewModel.trip.effectiveNetGpPerHour}
+            hitChance={viewModel.combat.hitChance}
+            tripSparseEnabled={form.trip.scarceSpot}
+            tripSparseMaxKph={viewModel.trip.trip.scarce.maxKph}
+            cannonReserveActive={viewModel.trip.trip.slots.reserveParts.includes(
+              "cannon (4 parts)"
+            )}
+            onEnabledChange={(enabled) => setCannonForCurrentMonster({ enabled })}
+            onTargetsChange={setCannonTargetsForCurrentMonster}
+            onRespawnChange={setCannonRespawnForCurrentMonster}
+            onTripSparseLinkedChange={setTripSparseFromCannon}
+            onReset={resetCannonForCurrentMonster}
+          />
+        </Suspense>
 
-        <DuelPane
-          hidden={activeTab !== "duel"}
-          model={{
-            targetLabel: currentMonster?.name ?? form.monsterId,
-            snapshotCount: duelSnapshots.snapshots.length,
-            duelComparison,
-            duelComparisonRows,
-            duelComparisonSort,
-            duelViewMode,
-            expandedDuelDiffId,
-            duelMatrixMetric,
-            duelMatrixFilter,
-            duelMatrixPresentation,
-            filteredDuelMatrixRows,
-            duelMatrixSort,
-            duelImportNotice,
-            duelImportReview: duelImportReviewViewModel
-          }}
-          actions={{
-            snapshotCurrentSetup,
-            exportDuelSnapshots,
-            importDuelSnapshots,
-            mergeDuelSnapshotsImport,
-            dismissDuelSnapshotsImport,
-            commitDuelSnapshotName,
-            loadDuelSnapshot,
-            deleteDuelSnapshot,
-            showCurrentDuelTarget,
-            showDuelMonsterMatrix,
-            toggleDuelDiff,
-            sortDuelComparisonBy,
-            setDuelMatrixFilter,
-            setDuelMatrixMetric,
-            sortDuelMatrixBy,
-            buildDuelMatrix
-          }}
-        />
+        <Suspense fallback={null}>
+          <DuelPane
+            hidden={activeTab !== "duel"}
+            model={{
+              targetLabel: currentMonster?.name ?? form.monsterId,
+              snapshotCount: duelSnapshots.snapshots.length,
+              duelComparison,
+              duelComparisonRows,
+              duelComparisonSort,
+              duelViewMode,
+              expandedDuelDiffId,
+              duelMatrixMetric,
+              duelMatrixFilter,
+              duelMatrixPresentation,
+              filteredDuelMatrixRows,
+              duelMatrixSort,
+              duelImportNotice,
+              duelImportReview: duelImportReviewViewModel,
+              duelSessionOnlyAvailable: duelSessionOnlyRequest !== null,
+              duelChangeRevision
+            }}
+            actions={{
+              snapshotCurrentSetup,
+              exportDuelSnapshots,
+              importDuelSnapshots,
+              mergeDuelSnapshotsImport,
+              dismissDuelSnapshotsImport,
+              setDuelSnapshotsImportDecision,
+              setDuelSnapshotsImportName,
+              refreshDuelSnapshotsImport,
+              applyDuelSessionOnlyChange,
+              commitDuelSnapshotName,
+              loadDuelSnapshot,
+              deleteDuelSnapshot,
+              showCurrentDuelTarget,
+              showDuelMonsterMatrix,
+              toggleDuelDiff,
+              sortDuelComparisonBy,
+              setDuelMatrixFilter,
+              setDuelMatrixMetric,
+              sortDuelMatrixBy,
+              buildDuelMatrix
+            }}
+          />
+        </Suspense>
 
-        <PlannerPane
-          hidden={activeTab !== "planner"}
-          model={{
-            draftState: plannerState,
-            panel: plannerPanel,
-            gearPoolEditor: plannerGearPoolEditor,
-            draftDirty: plannerDraftDirty,
-            presentation: plannerPresentation,
-            computedMetric: plannerComputedMetric,
-            combatStyleLabel: form.combatStyle,
-            targetLabel: currentMonster?.name ?? form.monsterId,
-            skillInputs: plannerSkillInputs,
-            adjustmentNotice: plannerAdjustmentNotice
-          }}
-          actions={{
-            setMetric: updatePlannerMetric,
-            setCurrentXp: updatePlannerCurrentXp,
-            setTargetLevel: updatePlannerTargetLevel,
-            setSkillLock: updatePlannerSkillLock,
-            setOnlyCurrentGear: updatePlannerOnlyCurrentGear,
-            setAverageOverSession: updatePlannerAverageOverSession,
-            setGearPoolItem: updatePlannerGearPoolItem,
-            resetGearPool: resetPlannerGearPool,
-            recompute: recomputePlannerPlan,
-            retry: retryPlanner
-          }}
-        />
+        <Suspense fallback={null}>
+          <PlannerPane
+            hidden={activeTab !== "planner"}
+            model={{
+              draftState: plannerState,
+              panel: plannerPanel,
+              gearPoolEditor: plannerGearPoolEditor,
+              draftDirty: plannerDraftDirty,
+              presentation: plannerPresentation,
+              computedMetric: plannerComputedMetric,
+              combatStyleLabel: form.combatStyle,
+              targetLabel: currentMonster?.name ?? form.monsterId,
+              skillInputs: plannerSkillInputs,
+              adjustmentNotice: plannerAdjustmentNotice
+            }}
+            actions={{
+              setMetric: updatePlannerMetric,
+              setCurrentXp: updatePlannerCurrentXp,
+              setTargetLevel: updatePlannerTargetLevel,
+              setSkillLock: updatePlannerSkillLock,
+              setOnlyCurrentGear: updatePlannerOnlyCurrentGear,
+              setAverageOverSession: updatePlannerAverageOverSession,
+              setGearPoolItem: updatePlannerGearPoolItem,
+              resetGearPool: resetPlannerGearPool,
+              recompute: recomputePlannerPlan,
+              retry: retryPlanner,
+              reviewNotice: reviewPlannerNotice
+            }}
+          />
+        </Suspense>
         <Suspense fallback={null}>
           <EconomySettingsPane
             priceNotesSummaryRef={priceNotesSummaryRef}
@@ -3284,6 +4241,10 @@ export function App() {
             workspaceReviewHeadingRef={workspaceReviewHeadingRef}
             setPriceNoticeActionRef={setPriceNoticeActionRef}
             marketHeadingRef={marketHeadingRef}
+            historyReviewReturnFocusRef={priceHistoryReviewReturnFocusRef}
+            historyReviewHeadingRef={priceHistoryReviewHeadingRef}
+            historyManagementSummaryRef={priceHistoryManagementSummaryRef}
+            selectedPriceItemRef={selectedPriceItemRef}
             model={{
               mode:
                 activeTab === "economy"
@@ -3300,11 +4261,44 @@ export function App() {
               priceSetResetPending: priceSetTransfer.resetPending,
               priceHistoryClearPending,
               manualPriceClearPending,
+              historyNotice: priceHistoryNotice,
+              historyReview:
+                priceHistoryReview?.kind === "removal"
+                  ? {
+                      kind: "removal",
+                      id: priceHistoryReview.candidate.id,
+                      occurrenceId: priceHistoryReview.candidate.target.occurrenceId,
+                      label: priceHistoryReview.candidate.target.snapshot.label,
+                      captureTime: reviewedHistoryCaptureTime,
+                      itemCount: Object.keys(
+                        priceHistoryReview.candidate.target.snapshot.itemPrices
+                      ).length
+                    }
+                  : priceHistoryReview?.kind === "replacement"
+                    ? {
+                        kind: "replacement",
+                        id: priceHistoryReview.candidate.id,
+                        activePriceSetLabel:
+                          priceHistoryReview.candidate.sourceActivePriceSet.label,
+                        replacedLabel:
+                          priceHistoryReview.candidate.replacedOccurrence.snapshot.label,
+                        replacedCaptureTime: reviewedHistoryCaptureTime,
+                        replacedItemCount: Object.keys(
+                          priceHistoryReview.candidate.replacedOccurrence.snapshot.itemPrices
+                        ).length
+                      }
+                    : null,
               recovery: {
                 visible: localStateRecovery.visible,
                 report: localStateRecovery.report,
                 notice: localStateRecovery.notice,
                 pendingClearId: localStateRecovery.pendingClearId
+              },
+              monsterChanges: {
+                inventory: monsterSpecificChanges,
+                removalCandidate: monsterRemovalCandidate,
+                notice: monsterChangesNotice,
+                sessionOnlyAvailable: monsterChangesSessionOnlyAvailable
               },
               workspace: {
                 phase: workspaceFileTransfer.phase,
@@ -3338,6 +4332,9 @@ export function App() {
                 requestClear: requestClearPriceHistory,
                 confirmClear: confirmClearPriceHistory,
                 cancelClear: () => setPriceHistoryClearPending(false),
+                reviewRemoval: reviewLocalPriceHistoryRemoval,
+                cancelReview: () => setPriceHistoryReview(null),
+                confirmReview: confirmLocalPriceHistoryReview,
                 setBaselineMode: setEconomyBaselineMode,
                 setSnapshotKey: setEconomySnapshotKey,
                 setItemFilter: setEconomyItemFilter,
@@ -3365,7 +4362,7 @@ export function App() {
                 setTierHidden: (tierId, hiddenTier) =>
                   setHiddenGearTiers((current) => setHiddenGearTier(current, tierId, hiddenTier)),
                 hideAllTiers: () => setHiddenGearTiers(hideAllGearTiers()),
-                showAllTiers: () => setHiddenGearTiers(DEFAULT_HIDDEN_GEAR_TIERS_STATE)
+                showAllTiers: showAllHiddenGearTiers
               },
               recovery: {
                 exportReport: localStateRecovery.exportReport,
@@ -3373,6 +4370,16 @@ export function App() {
                 cancelClear: localStateRecovery.cancelClear,
                 confirmClearItem: confirmClearLocalStateItem,
                 confirmClearInvalid: confirmClearInvalidLocalState
+              },
+              monsterChanges: {
+                reviewCategory: reviewMonsterSpecificCategory,
+                reviewRemoval: reviewMonsterSpecificRemoval,
+                cancelRemoval: () => {
+                  setMonsterRemovalCandidate(null);
+                  setMonsterChangesSessionOnlyAvailable(false);
+                  setMonsterChangesNotice(null);
+                },
+                confirmRemoval: confirmMonsterSpecificRemoval
               },
               workspace: {
                 setIncludeLastHiscoresPlayer: workspaceFileTransfer.setIncludeLastHiscoresPlayer,
@@ -3399,31 +4406,33 @@ export function App() {
           />
         </Suspense>
 
-        <ComparePane
-          hidden={activeTab !== "compare"}
-          model={{
-            denseCompare,
-            denseCompareRows,
-            denseCompareScale,
-            denseCompareTotalRows,
-            denseComparePresentation,
-            selectedMonsterId: form.monsterId
-          }}
-          actions={{
-            setDenseMonsterFilter,
-            setDenseDropFilter,
-            setDenseShowIrrelevant,
-            resetDenseFilters,
-            sortBy: (key) =>
-              setDenseCompare((current) => ({
-                ...current,
-                sort: nextDenseCompareSortState(current.sort, key)
-              })),
-            selectTarget,
-            toggleDenseIrrelevant,
-            retryDenseCompare
-          }}
-        />
+        <Suspense fallback={null}>
+          <ComparePane
+            hidden={activeTab !== "compare"}
+            model={{
+              denseCompare,
+              denseCompareRows,
+              denseCompareScale,
+              denseCompareTotalRows,
+              denseComparePresentation,
+              selectedMonsterId: form.monsterId
+            }}
+            actions={{
+              setDenseMonsterFilter,
+              setDenseDropFilter,
+              setDenseShowIrrelevant,
+              resetDenseFilters,
+              sortBy: (key) =>
+                setDenseCompare((current) => ({
+                  ...current,
+                  sort: nextDenseCompareSortState(current.sort, key)
+                })),
+              selectTarget,
+              toggleDenseIrrelevant,
+              retryDenseCompare
+            }}
+          />
+        </Suspense>
       </WorkbenchShell>
     </main>
   );

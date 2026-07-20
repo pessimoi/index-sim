@@ -285,10 +285,11 @@ export function appendAcceptedPriceSetToHistory(
   capturedAt: Date = new Date()
 ): BrowserPriceHistoryState {
   const validatedCurrent = BrowserPriceHistoryStateSchema.parse(current);
+  if (validatedCurrent.snapshots.length >= PRICE_HISTORY_MAX_SNAPSHOTS) return current;
   const snapshot = createPriceHistorySnapshot(priceSet, capturedAt);
 
   return {
-    snapshots: [snapshot, ...validatedCurrent.snapshots].slice(0, PRICE_HISTORY_MAX_SNAPSHOTS)
+    snapshots: [snapshot, ...validatedCurrent.snapshots]
   };
 }
 

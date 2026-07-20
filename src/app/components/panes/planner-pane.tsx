@@ -1,7 +1,9 @@
+import { useEffect, useRef, useState } from "react";
 import type { PlannerGearSlot, PlannerMetric, PlannerSkill } from "@/domain/planner";
 import { PLANNER_METRICS, plannerMetricLabel, type PlannerUiState } from "../../state/planner";
 import {
   type PlannerGearPoolEditorViewModel,
+  type PlannerNoticeAction,
   type PlannerPanelViewModel,
   type PlannerSkillInputViewModel
 } from "../../view-models/planner";
@@ -42,6 +44,7 @@ export interface PlannerPaneActions {
   resetGearPool(slot: PlannerGearSlot): void;
   recompute(): void;
   retry(): void;
+  reviewNotice(action: PlannerNoticeAction): void;
 }
 
 export interface PlannerPaneProps {
@@ -66,6 +69,71 @@ function plannerMetricDeltaValue(model: PlannerPaneModel): string {
 }
 
 export function PlannerPane({ hidden, model, actions }: PlannerPaneProps) {
+  const noticeSetId = model.panel?.notices.warningSetId ?? "";
+  const defaultNoticeOpen = (model.panel?.notices.issueCount ?? 0) > 0;
+  const [noticeDisclosure, setNoticeDisclosure] = useState(() => ({
+    warningSetId: noticeSetId,
+    open: defaultNoticeOpen
+  }));
+  const [gearEditorOpen, setGearEditorOpen] = useState(false);
+  const [noticeNavigationFeedback, setNoticeNavigationFeedback] = useState<string | null>(null);
+  const [noticeAnnouncement, setNoticeAnnouncement] = useState("");
+  const announcedWarningSetIdRef = useRef("");
+  const noticeFocusRequestRef = useRef(0);
+  const plannerControlsRef = useRef<HTMLDivElement>(null);
+  const plannerTargetsRef = useRef<HTMLDivElement>(null);
+  const gearEditorSummaryRef = useRef<HTMLElement>(null);
+  const gearOptionRefs = useRef(new Map<string, HTMLInputElement>());
+  const noticeOpen =
+    noticeDisclosure.warningSetId === noticeSetId ? noticeDisclosure.open : defaultNoticeOpen;
+
+  useEffect(() => {
+    const notices = model.panel?.notices;
+    if (!notices?.rows.length || announcedWarningSetIdRef.current === notices.warningSetId) return;
+    announcedWarningSetIdRef.current = notices.warningSetId;
+    setNoticeAnnouncement(
+      `Planner found ${notices.issueCount} ${notices.issueCount === 1 ? "issue" : "issues"} and ${notices.noteCount} ${notices.noteCount === 1 ? "note" : "notes"}.`
+    );
+  }, [model.panel?.notices]);
+
+  const focusNearest = (target: HTMLElement | null): void => {
+    target?.focus({ preventScroll: true });
+    if (!target) return;
+    const bounds = target.getBoundingClientRect();
+    if (bounds.top < 0 || bounds.bottom > window.innerHeight) {
+      target.scrollIntoView({ block: "nearest" });
+    }
+  };
+
+  const reviewNotice = (action: PlannerNoticeAction): void => {
+    setNoticeNavigationFeedback(null);
+    noticeFocusRequestRef.current += 1;
+    const requestId = noticeFocusRequestRef.current;
+    if (action.kind === "review-targets") {
+      focusNearest(plannerTargetsRef.current);
+      return;
+    }
+    if (action.kind === "review-planner-inputs") {
+      focusNearest(plannerControlsRef.current);
+      return;
+    }
+    if (action.kind === "review-gear") {
+      setGearEditorOpen(true);
+      window.requestAnimationFrame(() => {
+        if (noticeFocusRequestRef.current !== requestId) return;
+        const exact = action.itemId ? gearOptionRefs.current.get(action.itemId) : null;
+        if (exact) {
+          focusNearest(exact);
+          return;
+        }
+        focusNearest(gearEditorSummaryRef.current);
+        setNoticeNavigationFeedback("That item is not available in the current Planner gear pool.");
+      });
+      return;
+    }
+    actions.reviewNotice(action);
+  };
+
   return (
     <section className="planner-pane" aria-label="Planner" hidden={hidden}>
       <div className="section-title-row">
@@ -89,7 +157,12 @@ export function PlannerPane({ hidden, model, actions }: PlannerPaneProps) {
         </p>
       )}
 
-      <div className="planner-controls" aria-label="Planner controls">
+      <div
+        className="planner-controls"
+        aria-label="Planner controls"
+        ref={plannerControlsRef}
+        tabIndex={-1}
+      >
         <div className="planner-control-grid">
           <SelectField
             label="Optimize metric"
@@ -127,7 +200,12 @@ export function PlannerPane({ hidden, model, actions }: PlannerPaneProps) {
           </label>
         </div>
 
-        <div className="planner-skill-grid" aria-label="Planner skill targets">
+        <div
+          className="planner-skill-grid"
+          aria-label="Planner skill targets"
+          ref={plannerTargetsRef}
+          tabIndex={-1}
+        >
           {model.skillInputs.map((row) => (
             <div className="planner-skill-row" key={row.skill}>
               <div className="planner-skill-name">
@@ -369,21 +447,103 @@ export function PlannerPane({ hidden, model, actions }: PlannerPaneProps) {
             </section>
           </div>
 
-          {model.panel.warnings.length > 0 ? (
-            <div className="planner-warnings" role="status" aria-label="Planner warnings">
-              {model.panel.warnings.slice(0, 4).map((warning) => (
-                <span key={warning}>{warning}</span>
-              ))}
-            </div>
+          {model.panel.notices.rows.length > 0 ? (
+            <details
+              className="planner-notices"
+              data-warning-set-id={model.panel.notices.warningSetId}
+              aria-label={
+                model.presentation.displayIsCurrent ? "Plan notices" : "Previous plan notices"
+              }
+              open={noticeOpen}
+              onToggle={(event) => {
+                if (event.currentTarget.open === noticeOpen) return;
+                setNoticeDisclosure({
+                  warningSetId: model.panel!.notices.warningSetId,
+                  open: event.currentTarget.open
+                });
+              }}
+            >
+              <summary>
+                {model.presentation.displayIsCurrent ? "Plan notices" : "Previous plan notices"} ·{" "}
+                {formatNumber(model.panel.notices.issueCount)}{" "}
+                {model.panel.notices.issueCount === 1 ? "issue" : "issues"} ·{" "}
+                {formatNumber(model.panel.notices.noteCount)}{" "}
+                {model.panel.notices.noteCount === 1 ? "note" : "notes"}
+              </summary>
+              <ul className="planner-notice-list">
+                {model.panel.notices.rows.map((notice) => {
+                  const severityLabel = notice.severity === "info" ? "Note" : "Issue";
+                  const actionContext = notice.itemDisplayLabel?.name ?? notice.detail;
+                  return (
+                    <li
+                      className={`planner-notice-row ${notice.severity}`}
+                      data-notice-category={notice.category}
+                      data-notice-code={notice.code}
+                      key={notice.id}
+                    >
+                      <div className="planner-notice-heading">
+                        <span>{severityLabel}</span>
+                        <strong>{notice.title}</strong>
+                      </div>
+                      <p>{notice.detail}</p>
+                      {notice.itemDisplayLabel ? (
+                        <div className="planner-notice-item">
+                          <span>{notice.itemDisplayLabel.name}</span>
+                          <details className="technical-details">
+                            <summary>Technical details</summary>
+                            <dl>
+                              <div>
+                                <dt>Item ID</dt>
+                                <dd>
+                                  <code>{notice.itemDisplayLabel.technicalId}</code>
+                                </dd>
+                              </div>
+                            </dl>
+                          </details>
+                        </div>
+                      ) : null}
+                      <div className="planner-notice-occurrences">
+                        {notice.occurrences.visibleLabels.map((label) => (
+                          <span key={label}>{label}</span>
+                        ))}
+                        {notice.occurrences.hiddenCount > 0 ? (
+                          <span>
+                            {formatNumber(notice.occurrences.hiddenCount)} more occurrences
+                          </span>
+                        ) : null}
+                      </div>
+                      <button
+                        type="button"
+                        aria-label={`${notice.action.label}: ${actionContext}`}
+                        onClick={() => reviewNotice(notice.action)}
+                      >
+                        {notice.action.label}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </details>
           ) : null}
+          <p className="visually-hidden" role="status" aria-live="polite">
+            {noticeAnnouncement}
+          </p>
         </div>
       ) : model.presentation.status === "idle" && !model.gearPoolEditor ? (
         <p className="empty-state">Planner is available after bundled data loads.</p>
       ) : null}
 
       {model.gearPoolEditor && (
-        <details className="planner-gear-editor">
-          <summary>
+        <details
+          className="planner-gear-editor"
+          open={gearEditorOpen}
+          onToggle={(event) => {
+            if (event.currentTarget.open !== gearEditorOpen) {
+              setGearEditorOpen(event.currentTarget.open);
+            }
+          }}
+        >
+          <summary ref={gearEditorSummaryRef}>
             Advanced gear pool · {formatNumber(model.gearPoolEditor.totalSelectedCount)}/
             {formatNumber(model.gearPoolEditor.totalOptionCount)}
           </summary>
@@ -409,6 +569,10 @@ export function PlannerPane({ hidden, model, actions }: PlannerPaneProps) {
                       <label className="planner-gear-option" key={option.id}>
                         <input
                           type="checkbox"
+                          ref={(element) => {
+                            if (element) gearOptionRefs.current.set(option.id, element);
+                            else gearOptionRefs.current.delete(option.id);
+                          }}
                           checked={option.selected}
                           aria-label={`Planner pool ${option.label}`}
                           onChange={(event) =>
@@ -426,6 +590,11 @@ export function PlannerPane({ hidden, model, actions }: PlannerPaneProps) {
           </div>
         </details>
       )}
+      {noticeNavigationFeedback ? (
+        <p className="inline-status neutral planner-notice-navigation" role="status">
+          {noticeNavigationFeedback}
+        </p>
+      ) : null}
     </section>
   );
 }

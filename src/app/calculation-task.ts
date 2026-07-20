@@ -93,7 +93,8 @@ export function executeCalculationTask<T extends CalculationRequest>(
         request.context,
         request.lootSettingsByMonster,
         request.plannerState
-      )
+      ),
+      request.context
     ) as CalculationResult<T>;
   }
   if (request.kind === "risk-analysis") {

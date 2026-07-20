@@ -55,6 +55,11 @@ import {
 } from "../state/workspace-backup";
 import type { WorkspacePrepareImportContext } from "./workspace-file-transfer-review";
 import {
+  executeLocalStateBatch,
+  restoreLocalStateBatch,
+  type LocalStateBatchOperation
+} from "./local-state-batch";
+import {
   composeWorkspaceRestorePrices,
   type WorkspaceRestorePlan,
   type WorkspaceRestorePriceComposition,
@@ -143,29 +148,7 @@ export const WORKSPACE_RESTORE_STORAGE_TARGETS: readonly WorkspaceStorageTarget[
   { id: "hiscores-last-player", key: HISCORES_LAST_PLAYER_STORAGE_KEY }
 ];
 
-interface RawOperation extends WorkspaceStorageTarget {
-  intent: "write" | "clear";
-  targetRaw: string | null;
-}
-
-interface RawBatchSuccess {
-  status: "written";
-  preimages: Map<string, string | null>;
-}
-
-interface RawBatchUnavailable {
-  status: "unavailable";
-}
-
-interface RawBatchFailure {
-  status: "failed";
-  failedOperation: RawOperation;
-  affectedOperations: readonly RawOperation[];
-  rollbackFailedOperations: readonly RawOperation[];
-  preimages: Map<string, string | null>;
-}
-
-type RawBatchResult = RawBatchSuccess | RawBatchUnavailable | RawBatchFailure;
+type RawOperation = LocalStateBatchOperation<WorkspaceTransferAreaId>;
 
 interface PreparedRestore {
   selectedIds: readonly WorkspaceTransferAreaId[];
@@ -291,55 +274,6 @@ function serializeArea(
       break;
   }
   return { ...target, intent: "write", targetRaw };
-}
-
-function restoreRawOperations(
-  storage: BrowserStorageAccess["storage"],
-  operations: readonly RawOperation[],
-  preimages: ReadonlyMap<string, string | null>
-): readonly RawOperation[] {
-  const failures: RawOperation[] = [];
-  for (const operation of [...operations].reverse()) {
-    try {
-      const raw = preimages.get(operation.key) ?? null;
-      if (raw === null) storage.removeItem(operation.key);
-      else storage.setItem(operation.key, raw);
-    } catch {
-      failures.push(operation);
-    }
-  }
-  return failures;
-}
-
-function executeRawBatch(
-  storage: BrowserStorageAccess["storage"],
-  operations: readonly RawOperation[]
-): RawBatchResult {
-  const preimages = new Map<string, string | null>();
-  try {
-    for (const operation of operations)
-      preimages.set(operation.key, storage.getItem(operation.key));
-  } catch {
-    return { status: "unavailable" };
-  }
-
-  const affected: RawOperation[] = [];
-  for (const operation of operations) {
-    affected.push(operation);
-    try {
-      if (operation.targetRaw === null) storage.removeItem(operation.key);
-      else storage.setItem(operation.key, operation.targetRaw);
-    } catch {
-      return {
-        status: "failed",
-        failedOperation: operation,
-        affectedOperations: affected,
-        rollbackFailedOperations: restoreRawOperations(storage, affected, preimages),
-        preimages
-      };
-    }
-  }
-  return { status: "written", preimages };
 }
 
 function storageFailure(operation: RawOperation): LocalStateStorageFailure {
@@ -470,7 +404,7 @@ export class WorkspaceRestoreExecutorCore {
       };
     }
 
-    const batch = executeRawBatch(input.storageAccess.storage, prepared.operations);
+    const batch = executeLocalStateBatch(input.storageAccess.storage, prepared.operations);
     if (batch.status === "unavailable") {
       input.recovery.markPersistenceUnavailable();
       return {
@@ -501,7 +435,7 @@ export class WorkspaceRestoreExecutorCore {
     try {
       input.applyLiveState(prepared.targetLiveOutcome);
     } catch {
-      const rollbackFailures = restoreRawOperations(
+      const rollbackFailures = restoreLocalStateBatch(
         input.storageAccess.storage,
         prepared.operations,
         batch.preimages
@@ -606,7 +540,7 @@ export class WorkspaceRestoreExecutorCore {
       };
     }
     const operations = rawUndoOperations(record);
-    const batch = executeRawBatch(input.storageAccess.storage, operations);
+    const batch = executeLocalStateBatch(input.storageAccess.storage, operations);
     if (batch.status === "unavailable") {
       record.sessionOnlyAvailable = true;
       input.recovery.markPersistenceUnavailable();
@@ -650,7 +584,7 @@ export class WorkspaceRestoreExecutorCore {
     try {
       input.applyLiveState(targetLiveOutcome);
     } catch {
-      const rollbackFailures = restoreRawOperations(
+      const rollbackFailures = restoreLocalStateBatch(
         input.storageAccess.storage,
         operations,
         batch.preimages

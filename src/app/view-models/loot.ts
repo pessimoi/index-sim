@@ -16,6 +16,7 @@ import {
 } from "../state/ui-state";
 import { formatNumber } from "./formatting";
 import type { ItemPriceHistoryContext, PriceDataNotice } from "./price-data";
+import type { PriceDateTimePresentation } from "./price-time";
 import { createEntityDisplayLabel, type EntityDisplayLabel } from "./presentation-language";
 import { createFullSimulationInput } from "./simulation-input";
 
@@ -84,6 +85,8 @@ export interface LootPriceHistoryContextViewModel {
   percentDelta: number | null;
   latestLabel: string | null;
   baselineLabel: string | null;
+  latestCaptureTime: PriceDateTimePresentation | null;
+  baselineCaptureTime: PriceDateTimePresentation | null;
   statusLabel: string;
   emptyMessage: string;
 }
@@ -482,6 +485,8 @@ function lootPriceHistoryContext(
       percentDelta: null,
       latestLabel: null,
       baselineLabel: null,
+      latestCaptureTime: null,
+      baselineCaptureTime: null,
       statusLabel: "Component-derived",
       emptyMessage: "Opened contents EV uses component prices; parent casket history is not used."
     };
@@ -498,6 +503,8 @@ function lootPriceHistoryContext(
       percentDelta: null,
       latestLabel: null,
       baselineLabel: null,
+      latestCaptureTime: null,
+      baselineCaptureTime: null,
       statusLabel: "No item key",
       emptyMessage: "This parent row has no item key."
     };
@@ -515,8 +522,10 @@ function lootPriceHistoryContext(
       percentDelta: null,
       latestLabel: null,
       baselineLabel: null,
+      latestCaptureTime: null,
+      baselineCaptureTime: null,
       statusLabel: "No history",
-      emptyMessage: `${drop.name} is not in local history.`
+      emptyMessage: `${drop.name} is not in price history.`
     };
   }
 
@@ -530,6 +539,8 @@ function lootPriceHistoryContext(
     percentDelta: cleanNullableNumber(history.percentDelta),
     latestLabel: history.latestLabel,
     baselineLabel: history.baselineLabel,
+    latestCaptureTime: history.latestCaptureTime,
+    baselineCaptureTime: history.baselineCaptureTime,
     statusLabel: "Tracked",
     emptyMessage: ""
   };

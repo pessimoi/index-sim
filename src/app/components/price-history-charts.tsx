@@ -1,13 +1,28 @@
-import type { PriceHistoryMoverRow, PriceHistoryTrendAnalysis } from "../state/price-history";
 import { formatNumber } from "../view-models/formatting";
+import type {
+  PriceHistoryMoverRowPresentation,
+  PriceHistoryTrendPresentation
+} from "../view-models/price-data";
 import {
   itemPriceMetadataLabel,
   optionalDelta,
   optionalPercent,
   optionalPrice
 } from "./presentation-formatters";
+import { PriceTime } from "./price-time";
 
-export function PriceTrendChart({ trend }: { trend: PriceHistoryTrendAnalysis }) {
+function trendPointTimeDetail(point: PriceHistoryTrendPresentation["points"][number]): string {
+  const clauses = [`Snapshot captured ${point.captureTime.exactAccessible}`];
+  if (point.observedTime.precision === "instant" || point.observedTime.precision === "date") {
+    clauses.push(`value observed ${point.observedTime.exactAccessible}`);
+  }
+  if (point.evaluatedTime.precision === "instant" || point.evaluatedTime.precision === "date") {
+    clauses.push(`last evaluated ${point.evaluatedTime.exactAccessible}`);
+  }
+  return clauses.join("; ");
+}
+
+export function PriceTrendChart({ trend }: { trend: PriceHistoryTrendPresentation }) {
   if (trend.points.length === 0) {
     return (
       <div className="economy-trend empty" aria-label="Item price trend">
@@ -97,17 +112,29 @@ export function PriceTrendChart({ trend }: { trend: PriceHistoryTrendAnalysis })
             cy={point.y}
             r="4"
           >
-            <title>{`${point.capturedAt}: ${formatNumber(point.price)} (${itemPriceMetadataLabel(point.priceStatus)})`}</title>
+            <title>{`${trendPointTimeDetail(point)}: ${formatNumber(point.price)} (${itemPriceMetadataLabel(point.priceStatus)})`}</title>
           </circle>
         ))}
       </svg>
       <ol className="economy-trend-points" aria-label={`Price points for ${trend.itemLabel}`}>
         {trend.points.map((point, index) => (
           <li key={`${point.snapshotKey}-${index}`}>
-            <time dateTime={point.capturedAt}>{point.capturedAt.slice(0, 10)}</time>
+            <PriceTime presentation={point.captureTime} />
             <strong>{formatNumber(point.price)}</strong>
             <span>{optionalDelta(point.gpDeltaFromPrevious)}</span>
             <span>{itemPriceMetadataLabel(point.priceStatus)}</span>
+            {(point.observedTime.precision === "instant" ||
+              point.observedTime.precision === "date") && (
+              <small>
+                Value observed <PriceTime presentation={point.observedTime} />
+              </small>
+            )}
+            {(point.evaluatedTime.precision === "instant" ||
+              point.evaluatedTime.precision === "date") && (
+              <small>
+                Last evaluated <PriceTime presentation={point.evaluatedTime} />
+              </small>
+            )}
           </li>
         ))}
       </ol>
@@ -115,7 +142,7 @@ export function PriceTrendChart({ trend }: { trend: PriceHistoryTrendAnalysis })
   );
 }
 
-export function PriceTrendSparkline({ row }: { row: PriceHistoryMoverRow }) {
+export function PriceTrendSparkline({ row }: { row: PriceHistoryMoverRowPresentation }) {
   const width = 96;
   const height = 28;
   const padding = 3;
@@ -136,7 +163,7 @@ export function PriceTrendSparkline({ row }: { row: PriceHistoryMoverRow }) {
       className="economy-sparkline"
       viewBox={`0 0 ${width} ${height}`}
       role="img"
-      aria-label={`${row.itemLabel} price trend, ${row.trendPrices.map(formatNumber).join(" to ")}`}
+      aria-label={`${row.itemLabel} price trend from ${row.firstCaptureTime?.exactAccessible ?? "an unavailable date"} to ${row.latestCaptureTime?.exactAccessible ?? "an unavailable date"}, ${row.trendPrices.map(formatNumber).join(" to ")}`}
     >
       <polyline points={points.map((point) => `${point.x},${point.y}`).join(" ")} />
       {points.map((point, index) => (

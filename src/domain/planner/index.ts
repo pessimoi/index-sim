@@ -441,6 +441,7 @@ function fallbackRequirementWarning(itemId: EntityId): SimulationWarning {
   return {
     code: "manual-planner-requirement-fallback",
     severity: "info",
+    itemId,
     message: `Planner used manual requirement fallback because generated requirement data is missing for ${itemId}.`
   };
 }
@@ -793,7 +794,7 @@ export function buildPlan(
     truncated: steps.length >= maxLevels && remaining().length > 0,
     skills,
     targets,
-    warnings: [...warnings, ...collectEvaluationWarnings(startCfg, steps)]
+    warnings: [...warnings, ...collectPlannerEvaluationWarnings(startCfg, steps)]
   };
 }
 
@@ -1290,18 +1291,7 @@ function requirementFallbackWarningsForPlanner(
   const fallbackItemIds = [...itemIds]
     .filter((itemId) => requirementForItem(context.gameData, itemId).source === "manual-fallback")
     .sort();
-  if (fallbackItemIds.length === 0) return [];
-
-  const shownItems = fallbackItemIds.slice(0, 5).join(", ");
-  const hiddenCount = fallbackItemIds.length - 5;
-  const suffix = hiddenCount > 0 ? `, and ${hiddenCount} more` : "";
-  return [
-    {
-      code: "manual-planner-requirement-fallback",
-      severity: "info",
-      message: `Planner used manual requirement fallback because generated requirement data is missing for ${shownItems}${suffix}.`
-    }
-  ];
+  return fallbackItemIds.map(fallbackRequirementWarning);
 }
 
 function plannerPoolWarnings(pool: PlannerPool, context: SimulationContext): SimulationWarning[] {
@@ -1311,6 +1301,7 @@ function plannerPoolWarnings(pool: PlannerPool, context: SimulationContext): Sim
       warnings.push({
         code: "missing-planner-weapon",
         severity: "warning",
+        itemId: weaponId,
         message: `Planner weapon candidate is not present in the GameDataSnapshot: ${weaponId}`
       });
     }
@@ -1321,6 +1312,7 @@ function plannerPoolWarnings(pool: PlannerPool, context: SimulationContext): Sim
         warnings.push({
           code: "missing-planner-equipment",
           severity: "warning",
+          itemId,
           message: `Planner ${slot} candidate is not present in the GameDataSnapshot: ${itemId}`
         });
       }
@@ -1329,6 +1321,7 @@ function plannerPoolWarnings(pool: PlannerPool, context: SimulationContext): Sim
         warnings.push({
           code: "hypothetical-planner-equipment",
           severity: "warning",
+          itemId,
           message: `Planner ${slot} candidate is marked hypothetical and needs an explicit product decision: ${itemId}`
         });
       }
@@ -1337,21 +1330,38 @@ function plannerPoolWarnings(pool: PlannerPool, context: SimulationContext): Sim
   return warnings;
 }
 
-function collectEvaluationWarnings(
+export function collectPlannerEvaluationWarnings(
   startCfg: PlannerEvaluation,
   steps: PlannerStep[]
 ): SimulationWarning[] {
-  const seen = new Set<string>();
-  const out: SimulationWarning[] = [];
-  for (const warning of [startCfg, ...steps.map((step) => step.cfg)].flatMap(
-    (cfg) => cfg.warnings
-  )) {
-    const key = `${warning.code}|${warning.message}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(warning);
+  const byIdentity = new Map<string, SimulationWarning>();
+  const evaluations = [startCfg, ...steps.flatMap((step) => [step.cfg, step.trainingCfg])];
+  for (const warning of evaluations.flatMap((evaluation) => evaluation.warnings)) {
+    const message = warning.message.replace(/\s+/g, " ").trim().slice(0, 240);
+    const key = [
+      warning.code,
+      warning.severity,
+      warning.itemId ? `item:${warning.itemId}` : `message:${message}`,
+      warning.priceContext?.consumer ?? "",
+      warning.priceContext?.lootRowId ?? ""
+    ].join("|");
+    const existing = byIdentity.get(key);
+    if (existing) {
+      if (
+        warning.priceContext?.affectsCurrentResult &&
+        existing.priceContext &&
+        !existing.priceContext.affectsCurrentResult
+      ) {
+        byIdentity.set(key, {
+          ...existing,
+          priceContext: { ...existing.priceContext, affectsCurrentResult: true }
+        });
+      }
+      continue;
+    }
+    byIdentity.set(key, { ...warning, message });
   }
-  return out;
+  return [...byIdentity.values()];
 }
 
 function levelsFromRequest(levels: PlayerLevels): PlannerLevels {

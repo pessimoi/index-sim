@@ -88,6 +88,83 @@ export function normalizeDuelSnapshotName(name: string): string {
   return name.trim().replace(/\s+/g, " ");
 }
 
+export function normalizeDuelSnapshotNameKey(name: string): string {
+  return normalizeDuelSnapshotName(name).normalize("NFKC").toLowerCase();
+}
+
+export type DuelSnapshotNameValidation =
+  | { status: "valid"; name: string; key: string }
+  | { status: "invalid"; reason: "empty" | "too-long" }
+  | { status: "duplicate"; name: string; key: string };
+
+export function validateDuelSnapshotName(
+  name: string,
+  state: DuelSnapshotsState,
+  excludedSnapshotId?: string
+): DuelSnapshotNameValidation {
+  const normalized = normalizeDuelSnapshotName(name);
+  if (!normalized) return { status: "invalid", reason: "empty" };
+  if (normalized.length > DUEL_SNAPSHOT_NAME_MAX_LENGTH) {
+    return { status: "invalid", reason: "too-long" };
+  }
+  const key = normalizeDuelSnapshotNameKey(normalized);
+  const duplicate = normalizeDuelSnapshotsState(state).snapshots.some(
+    (snapshot) =>
+      snapshot.id !== excludedSnapshotId && normalizeDuelSnapshotNameKey(snapshot.name) === key
+  );
+  return duplicate
+    ? { status: "duplicate", name: normalized, key }
+    : { status: "valid", name: normalized, key };
+}
+
+export function uniqueDuelSnapshotName(baseName: string, state: DuelSnapshotsState): string {
+  const keys = new Set(
+    normalizeDuelSnapshotsState(state).snapshots.map((snapshot) =>
+      normalizeDuelSnapshotNameKey(snapshot.name)
+    )
+  );
+  const normalizedBase = normalizeDuelSnapshotName(baseName) || "Setup";
+  for (let suffix = 1; suffix <= MAX_DUEL_SNAPSHOTS + 1; suffix += 1) {
+    const suffixText = suffix === 1 ? "" : ` (${suffix})`;
+    const maxBaseLength = DUEL_SNAPSHOT_NAME_MAX_LENGTH - suffixText.length;
+    const candidate = `${normalizedBase.slice(0, maxBaseLength).trimEnd()}${suffixText}`;
+    if (!keys.has(normalizeDuelSnapshotNameKey(candidate))) return candidate;
+  }
+  return "Setup";
+}
+
+export function fingerprintDuelSnapshots(state: DuelSnapshotsState): string {
+  return JSON.stringify(normalizeDuelSnapshotsState(state));
+}
+
+export interface DuelSnapshotNameOccurrence {
+  snapshotId: string;
+  count: number;
+  ordinal: number;
+}
+
+export function duelSnapshotNameOccurrences(
+  state: DuelSnapshotsState
+): ReadonlyMap<string, DuelSnapshotNameOccurrence> {
+  const normalized = normalizeDuelSnapshotsState(state).snapshots;
+  const groups = new Map<string, DuelSnapshotState[]>();
+  for (const snapshot of normalized) {
+    const key = normalizeDuelSnapshotNameKey(snapshot.name);
+    groups.set(key, [...(groups.get(key) ?? []), snapshot]);
+  }
+  const result = new Map<string, DuelSnapshotNameOccurrence>();
+  for (const group of groups.values()) {
+    group.forEach((snapshot, index) => {
+      result.set(snapshot.id, {
+        snapshotId: snapshot.id,
+        count: group.length,
+        ordinal: index + 1
+      });
+    });
+  }
+  return result;
+}
+
 const DuelSnapshotIdSchema = z
   .string()
   .trim()
@@ -323,6 +400,35 @@ export function renameDuelSnapshot(
     snapshots: normalizeDuelSnapshotsState(state).snapshots.map((snapshot) =>
       snapshot.id === snapshotId ? { ...snapshot, name: normalizedName } : snapshot
     )
+  };
+}
+
+export function renameDuelSnapshotSafely(
+  state: DuelSnapshotsState,
+  snapshotId: string,
+  name: string
+):
+  | { status: "renamed"; state: DuelSnapshotsState; oldName: string; newName: string }
+  | { status: "unchanged"; state: DuelSnapshotsState; name: string }
+  | { status: "missing" | "invalid" | "duplicate"; state: DuelSnapshotsState } {
+  const normalized = normalizeDuelSnapshotsState(state);
+  const current = normalized.snapshots.find((snapshot) => snapshot.id === snapshotId);
+  if (!current) return { status: "missing", state: normalized };
+  const validation = validateDuelSnapshotName(name, normalized, snapshotId);
+  if (validation.status === "invalid") return { status: "invalid", state: normalized };
+  if (validation.status === "duplicate") return { status: "duplicate", state: normalized };
+  if (validation.name === current.name) {
+    return { status: "unchanged", state: normalized, name: current.name };
+  }
+  return {
+    status: "renamed",
+    state: {
+      snapshots: normalized.snapshots.map((snapshot) =>
+        snapshot.id === snapshotId ? { ...snapshot, name: validation.name } : snapshot
+      )
+    },
+    oldName: current.name,
+    newName: validation.name
   };
 }
 

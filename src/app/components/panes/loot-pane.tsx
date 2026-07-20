@@ -22,6 +22,7 @@ import {
   optionalPercent,
   optionalPrice
 } from "../presentation-formatters";
+import { PriceTime } from "../price-time";
 
 const HIGH_ALCH_OPTIONS = [
   { id: "enabled", label: "Enabled" },
@@ -178,7 +179,9 @@ export function LootPane({ hidden, model, actions }: LootPaneProps) {
   return (
     <section className="loot-strip" aria-label="Current monster loot" hidden={hidden}>
       <div className="section-title-row">
-        <h2>Loot actions</h2>
+        <h2 id="loot-actions-heading" tabIndex={-1}>
+          Loot actions
+        </h2>
         <span className="status-pill">
           {formatNumber(actionableRows.length)} drops
           {conditionalRows.length > 0
@@ -186,6 +189,9 @@ export function LootPane({ hidden, model, actions }: LootPaneProps) {
             : ""}
         </span>
       </div>
+      <h3 id="loot-settings-heading" className="loot-settings-heading" tabIndex={-1}>
+        Loot settings
+      </h3>
       <div className="loot-toolbar">
         <SelectField
           label="High alch"
@@ -520,18 +526,36 @@ export function LootPane({ hidden, model, actions }: LootPaneProps) {
                           aria-label={`Price history for ${row.name}`}
                         >
                           <div className="loot-history-heading">
-                            <strong>Local history</strong>
+                            <strong>Price history</strong>
                             <span>{row.historyContext.statusLabel}</span>
                           </div>
                           {row.historyContext.tracked ? (
                             <dl className="loot-history-facts">
                               <div>
                                 <dt>Latest</dt>
-                                <dd>{optionalPrice(row.historyContext.latestPrice)}</dd>
+                                <dd>
+                                  {optionalPrice(row.historyContext.latestPrice)} ·{" "}
+                                  {row.historyContext.latestCaptureTime ? (
+                                    <PriceTime
+                                      presentation={row.historyContext.latestCaptureTime}
+                                    />
+                                  ) : (
+                                    "Unavailable"
+                                  )}
+                                </dd>
                               </div>
                               <div>
                                 <dt>Baseline</dt>
-                                <dd>{optionalPrice(row.historyContext.baselinePrice)}</dd>
+                                <dd>
+                                  {optionalPrice(row.historyContext.baselinePrice)} ·{" "}
+                                  {row.historyContext.baselineCaptureTime ? (
+                                    <PriceTime
+                                      presentation={row.historyContext.baselineCaptureTime}
+                                    />
+                                  ) : (
+                                    "Unavailable"
+                                  )}
+                                </dd>
                               </div>
                               <div>
                                 <dt>Delta</dt>

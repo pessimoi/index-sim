@@ -74,7 +74,9 @@ export function CannonPane({
   return (
     <section className="cannon-strip" aria-label="Cannon" hidden={hidden}>
       <div className="section-title-row">
-        <h2>Dwarf multicannon</h2>
+        <h2 id="cannon-heading" tabIndex={-1}>
+          Dwarf multicannon
+        </h2>
         <span className={`status-pill ${enabled && !output?.idle ? "ready" : ""}`}>{status}</span>
       </div>
       <div className="cannon-body">

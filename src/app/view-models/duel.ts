@@ -6,9 +6,17 @@ import {
   DUEL_SNAPSHOTS_VERSION,
   DuelSnapshotsImportError,
   MAX_DUEL_SNAPSHOTS,
+  duelSnapshotNameOccurrences,
   normalizeDuelSnapshotsState,
   type DuelSnapshotsState
 } from "../state/duel-snapshots";
+import {
+  savedSetupMergePlanIsFresh,
+  type SavedSetupMergeClassification,
+  type SavedSetupMergeDecision,
+  type SavedSetupMergeNameStatus,
+  type SavedSetupMergePlan
+} from "../state/saved-setup-merge";
 import type { LootSettingsByMonsterState } from "../state/loot-settings";
 import {
   BOOST_SELECTION_OPTIONS,
@@ -122,6 +130,8 @@ export interface DuelComparisonRowViewModel {
   snapshotId: EntityId | null;
   source: DuelComparisonRowSource;
   name: string;
+  displayName: string;
+  duplicateName: boolean;
   monsterId: EntityId;
   monsterName: string;
   combatStyle: CombatStyle;
@@ -193,6 +203,7 @@ export interface DuelMatrixSetupViewModel {
   snapshotId: EntityId | null;
   source: DuelComparisonRowSource;
   name: string;
+  displayName: string;
   combatStyle: CombatStyle;
   loadoutLabel: string;
 }
@@ -387,6 +398,8 @@ function duelBaseRowFromSimulation(
     snapshotId,
     source,
     name,
+    displayName: name,
+    duplicateName: false,
     monsterId: result.request.monsterId,
     monsterName: vm.monsterCard.monsterName,
     combatStyle: result.request.combatStyle,
@@ -493,7 +506,7 @@ function duelGearLabel(context: SimulationContext, slot: EquipmentSlot, itemId: 
   return context.gameData.equipment[slot]?.[itemId]?.name ?? duelHumanizeId(itemId);
 }
 
-function createDuelSetupDiffViewModel(
+export function createDuelSetupDiffViewModel(
   liveForm: CombatSetupFormState,
   snapshotForm: CombatSetupFormState,
   context: SimulationContext
@@ -703,6 +716,102 @@ function createDuelSetupDiffViewModel(
   };
 }
 
+export interface SavedSetupMergeReviewRowViewModel {
+  snapshotId: string;
+  sourceName: string;
+  sourceDisplayName: string;
+  currentName: string | null;
+  currentDisplayName: string | null;
+  classification: SavedSetupMergeClassification;
+  classificationLabel: string;
+  decision: SavedSetupMergeDecision;
+  recipientName: string;
+  nameStatus: SavedSetupMergeNameStatus;
+  nameMessage: string | null;
+  setupDiff: DuelSetupDiffViewModel | null;
+}
+
+export interface SavedSetupMergeReviewViewModel {
+  id: number;
+  stale: boolean;
+  canMerge: boolean;
+  setupCount: number;
+  selectedAddCount: number;
+  selectedReplaceCount: number;
+  keepCount: number;
+  identicalCount: number;
+  notSelectedCount: number;
+  availableSlots: number;
+  rows: SavedSetupMergeReviewRowViewModel[];
+}
+
+const SAVED_SETUP_CLASSIFICATION_LABELS: Record<SavedSetupMergeClassification, string> = {
+  unchanged: "Identical",
+  "replacement-candidate": "Matching ID",
+  "addition-candidate": "New setup",
+  "capacity-excluded": "Not selected at limit"
+};
+
+function savedSetupOccurrenceDisplayName(
+  name: string,
+  snapshotId: string,
+  occurrences: ReturnType<typeof duelSnapshotNameOccurrences>
+): string {
+  const occurrence = occurrences.get(snapshotId);
+  return occurrence && occurrence.count > 1
+    ? `${name} (${occurrence.ordinal} of ${occurrence.count})`
+    : name;
+}
+
+function savedSetupNameMessage(status: SavedSetupMergeNameStatus): string | null {
+  if (status === "conflict") return "Choose a unique name before merging this setup.";
+  if (status === "invalid") return "Enter a name between 1 and 80 characters.";
+  return null;
+}
+
+export function createSavedSetupMergeReviewViewModel(input: {
+  plan: SavedSetupMergePlan;
+  current: DuelSnapshotsState;
+  context: SimulationContext;
+}): SavedSetupMergeReviewViewModel {
+  const sourceOccurrences = duelSnapshotNameOccurrences(input.plan.source);
+  const currentOccurrences = duelSnapshotNameOccurrences(input.plan.current);
+  return {
+    id: input.plan.reviewId,
+    stale: !savedSetupMergePlanIsFresh(input.plan, input.current),
+    canMerge: input.plan.canMerge,
+    setupCount: input.plan.counts.setupCount,
+    selectedAddCount: input.plan.counts.selectedAddCount,
+    selectedReplaceCount: input.plan.counts.selectedReplaceCount,
+    keepCount: input.plan.counts.keepCount,
+    identicalCount: input.plan.counts.identicalCount,
+    notSelectedCount: input.plan.counts.notSelectedCount,
+    availableSlots: input.plan.counts.availableSlots,
+    rows: input.plan.rows.map((row) => ({
+      snapshotId: row.source.id,
+      sourceName: row.source.name,
+      sourceDisplayName: savedSetupOccurrenceDisplayName(
+        row.source.name,
+        row.source.id,
+        sourceOccurrences
+      ),
+      currentName: row.current?.name ?? null,
+      currentDisplayName: row.current
+        ? savedSetupOccurrenceDisplayName(row.current.name, row.current.id, currentOccurrences)
+        : null,
+      classification: row.classification,
+      classificationLabel: SAVED_SETUP_CLASSIFICATION_LABELS[row.classification],
+      decision: row.decision,
+      recipientName: row.recipientName,
+      nameStatus: row.nameStatus,
+      nameMessage: savedSetupNameMessage(row.nameStatus),
+      setupDiff: row.current
+        ? createDuelSetupDiffViewModel(row.current.form, row.source.form, input.context)
+        : null
+    }))
+  };
+}
+
 function finiteBest(values: ReadonlyArray<number | null>): number | null {
   const finiteValues = values.filter((value): value is number => value != null && isFinite(value));
   if (!finiteValues.length) return null;
@@ -730,6 +839,7 @@ export function createDuelComparisonViewModel(
   const currentMonsterId = currentForm.monsterId;
   const currentLootPrefs = lootPrefsByMonster[currentMonsterId] ?? {};
   const normalizedSnapshots = normalizeDuelSnapshotsState(duelSnapshots).snapshots;
+  const nameOccurrences = duelSnapshotNameOccurrences({ snapshots: normalizedSnapshots });
   const liveVm = createSimulationViewModel(
     currentForm,
     context,
@@ -740,6 +850,7 @@ export function createDuelComparisonViewModel(
   );
   const liveBaseRow = duelBaseRowFromSimulation("duel-live", "live", null, "Live loadout", liveVm);
   const snapshotEntries = normalizedSnapshots.map((snapshot) => {
+    const nameOccurrence = nameOccurrences.get(snapshot.id);
     const snapshotForm = normalizeFormState({
       ...snapshot.form,
       monsterId: currentMonsterId
@@ -753,13 +864,17 @@ export function createDuelComparisonViewModel(
       { includeLootRows: false, includeHitDistributionAnalysis: false }
     );
     return {
-      row: duelBaseRowFromSimulation(
-        `duel-snapshot:${snapshot.id}`,
-        "snapshot",
-        snapshot.id,
-        snapshot.name,
-        vm
-      ),
+      row: {
+        ...duelBaseRowFromSimulation(
+          `duel-snapshot:${snapshot.id}`,
+          "snapshot",
+          snapshot.id,
+          snapshot.name,
+          vm
+        ),
+        displayName: savedSetupOccurrenceDisplayName(snapshot.name, snapshot.id, nameOccurrences),
+        duplicateName: (nameOccurrence?.count ?? 0) > 1
+      },
       setupDiff: createDuelSetupDiffViewModel(currentForm, snapshotForm, context)
     };
   });
@@ -825,12 +940,14 @@ export function createDuelMatrixViewModel(
 ): DuelMatrixViewModel {
   const currentForm = normalizeFormState(form);
   const normalizedSnapshots = normalizeDuelSnapshotsState(duelSnapshots).snapshots;
+  const nameOccurrences = duelSnapshotNameOccurrences({ snapshots: normalizedSnapshots });
   const setupDefinitions = [
     {
       id: "duel-live",
       snapshotId: null,
       source: "live" as const,
       name: "Live setup",
+      displayName: "Live setup",
       form: currentForm
     },
     ...normalizedSnapshots.map((snapshot) => ({
@@ -838,6 +955,7 @@ export function createDuelMatrixViewModel(
       snapshotId: snapshot.id,
       source: "snapshot" as const,
       name: snapshot.name,
+      displayName: savedSetupOccurrenceDisplayName(snapshot.name, snapshot.id, nameOccurrences),
       form: normalizeFormState(snapshot.form)
     }))
   ];
@@ -868,6 +986,7 @@ export function createDuelMatrixViewModel(
         snapshotId: setup.snapshotId,
         source: setup.source,
         name: setup.name,
+        displayName: setup.displayName,
         combatStyle: setup.form.combatStyle,
         loadoutLabel: duelLoadoutLabel(metadataVm)
       } satisfies DuelMatrixSetupViewModel,

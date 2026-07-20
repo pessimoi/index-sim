@@ -22,6 +22,7 @@ import {
   analyzePriceHistoryTrend,
   createSharedPriceHistoryAnalysis,
   mergePriceHistoryForAnalysis,
+  PRICE_HISTORY_MAX_SNAPSHOTS,
   priceHistorySnapshotKey,
   summarizePriceHistory,
   type BrowserPriceHistoryState,
@@ -30,47 +31,33 @@ import {
   type PriceHistoryMoverSortKey,
   type PriceHistoryMoverSortState,
   type PriceHistoryMoversAnalysis,
+  type PriceHistoryMoverRow,
   type PriceHistorySummary,
-  type PriceHistoryTrendAnalysis
+  type PriceHistoryTrendAnalysis,
+  type PriceHistoryTrendPoint
 } from "../state/price-history";
+import {
+  localPriceHistoryOccurrences,
+  type LocalPriceHistoryOccurrence
+} from "../state/local-price-history-lifecycle";
 import { formatNumber } from "./formatting";
 import type { CalculationWarningViewModel } from "./contracts";
+import { createEntityDisplayLabel, type EntityDisplayLabel } from "./presentation-language";
 import {
-  createEntityDisplayLabel,
-  formatSemanticUnitValue,
-  type EntityDisplayLabel,
-  type SemanticUnitValue
-} from "./presentation-language";
+  createPriceTimeContext,
+  presentPriceDateTime,
+  presentPriceDateTimeOccurrences,
+  type PriceDateTimePresentation,
+  type PriceTimeContext
+} from "./price-time";
+import {
+  PRICE_WARNING_PRIORITY,
+  friendlyPriceWarningCopy,
+  isMoneyWarningCode,
+  isPriceIssueWarningCode
+} from "./warning-presentation";
 
-const MONEY_WARNING_CODES = new Set([
-  "missing-price",
-  "missing-alch-value",
-  "price-alias-used",
-  "price-fallback-used",
-  "price-generated-fallback",
-  "price-market-retained",
-  "price-freshness-unknown",
-  "approximate-data-source",
-  "unidentified-herb-price-approximation"
-]);
-
-const PRICE_ISSUE_CODES = new Set(["missing-price", "missing-alch-value", "price-fallback-used"]);
-
-const PRICE_NOTICE_PRIORITY: Readonly<Record<string, number>> = {
-  "missing-price": 0,
-  "missing-alch-value": 1,
-  "price-fallback-used": 2,
-  "price-generated-fallback": 3,
-  "price-market-retained": 4,
-  "price-freshness-unknown": 5,
-  "price-alias-used": 6,
-  "approximate-data-source": 7,
-  "unidentified-herb-price-approximation": 8
-};
-
-export function isMoneyWarningCode(code: string): boolean {
-  return MONEY_WARNING_CODES.has(code);
-}
+export { isMoneyWarningCode } from "./warning-presentation";
 
 export interface PriceDataNotice {
   noticeId: string;
@@ -133,9 +120,12 @@ export interface ActivePriceSetPresentation {
   sourceLabel: string;
   label: string;
   source: string;
-  createdAt: string;
-  ageLabel: string;
-  ageAccessibleLabel: string;
+  timeLabel:
+    | "Active prices updated"
+    | "Active snapshot captured"
+    | "Bundled price set created"
+    | "Selected price set created";
+  time: PriceDateTimePresentation;
   itemCount: number;
   alchCount: number;
   metadata: ItemPriceMetadataSummary;
@@ -148,9 +138,8 @@ export interface ScheduledPriceSetPresentation {
   message: string;
   fallbackLabel: string;
   label: string;
-  createdAt: string;
-  ageLabel: string;
-  ageAccessibleLabel: string;
+  timeLabel: "Snapshot captured";
+  time: PriceDateTimePresentation;
   itemCount: number;
   alchCount: number;
   metadata: ItemPriceMetadataSummary;
@@ -177,6 +166,7 @@ export interface ManualPriceEditorPresentation {
   basePrice: number | null;
   activePrice: number | null;
   selectedOverride: ManualPriceOverride | null;
+  updatedTime: PriceDateTimePresentation;
   inputValue: number;
   atCapacity: boolean;
   canApply: boolean;
@@ -203,6 +193,34 @@ export interface ItemPriceHistoryContext {
   percentDelta: number | null;
   latestLabel: string | null;
   baselineLabel: string | null;
+  latestCaptureTime: PriceDateTimePresentation | null;
+  baselineCaptureTime: PriceDateTimePresentation | null;
+}
+
+export interface PriceHistoryMoverRowPresentation extends PriceHistoryMoverRow {
+  firstCaptureTime: PriceDateTimePresentation | null;
+  latestCaptureTime: PriceDateTimePresentation | null;
+}
+
+export interface PriceHistoryMoversPresentation extends Omit<
+  PriceHistoryMoversAnalysis,
+  "rows" | "topGainers" | "topFallers"
+> {
+  rows: PriceHistoryMoverRowPresentation[];
+  topGainers: PriceHistoryMoverRowPresentation[];
+  topFallers: PriceHistoryMoverRowPresentation[];
+}
+
+export interface PriceHistoryTrendPointPresentation extends PriceHistoryTrendPoint {
+  captureTime: PriceDateTimePresentation;
+  observedTime: PriceDateTimePresentation;
+  evaluatedTime: PriceDateTimePresentation;
+}
+
+export interface PriceHistoryTrendPresentation extends Omit<PriceHistoryTrendAnalysis, "points"> {
+  points: PriceHistoryTrendPointPresentation[];
+  firstCaptureTime: PriceDateTimePresentation | null;
+  latestCaptureTime: PriceDateTimePresentation | null;
 }
 
 export interface EconomyHistoryAnalysisPresentation {
@@ -213,24 +231,53 @@ export interface EconomyHistoryAnalysisPresentation {
   sourceStatus: "shared + local" | "shared" | "local" | "empty";
   snapshotOptions: PriceDataSelectOption[];
   effectiveSnapshotKey: string;
-  movers: PriceHistoryMoversAnalysis;
+  movers: PriceHistoryMoversPresentation;
   trendItemOptions: PriceDataSelectOption[];
   effectiveTrendItemId: string;
-  trend: PriceHistoryTrendAnalysis;
+  trend: PriceHistoryTrendPresentation;
+  latestSnapshotLabel: string;
+  baselineSnapshotLabel: string;
+  latestCaptureTime: PriceDateTimePresentation;
+  baselineCaptureTime: PriceDateTimePresentation;
   lootHistoryByItem: Readonly<Record<string, ItemPriceHistoryContext>>;
   itemDisplayLabels: Readonly<Record<string, EntityDisplayLabel>>;
+  localManagement: LocalPriceHistoryManagementViewModel;
+}
+
+export interface LocalPriceHistoryRowViewModel {
+  occurrenceId: string;
+  sourceIndex: number;
+  snapshotKey: string;
+  label: string;
+  capturedAt: string;
+  captureTime: PriceDateTimePresentation;
+  sourcePriceSetId: string;
+  itemCount: number;
+  newest: boolean;
+  oldest: boolean;
+  nextReplacement: boolean;
+  selectedAsBaseline: boolean;
+}
+
+export interface LocalPriceHistoryManagementViewModel {
+  count: number;
+  maximum: number;
+  remaining: number;
+  atCapacity: boolean;
+  rows: readonly LocalPriceHistoryRowViewModel[];
 }
 
 export interface PriceHistorySources {
   analysisState: PriceHistoryAnalysisState;
+  sharedHistory: PriceHistoryAnalysisState;
+  localPriceHistory: BrowserPriceHistoryState;
   sharedSnapshotCount: number;
   localSnapshotCount: number;
   sourceStatus: "shared + local" | "shared" | "local" | "empty";
 }
 
 export interface PriceHistorySummaryPresentation extends PriceHistorySummary {
-  latestAgeLabel: string;
-  latestAgeAccessibleLabel: string;
+  latestTime: PriceDateTimePresentation;
 }
 
 export interface SelectedPriceItemPresentation {
@@ -239,6 +286,8 @@ export interface SelectedPriceItemPresentation {
   price: number | null;
   metadata: ItemPriceMetadata | null;
   freshness: ItemPriceFreshnessDisplay;
+  observedTime: PriceDateTimePresentation;
+  evaluatedTime: PriceDateTimePresentation;
 }
 
 export interface EconomyHistoryPresentation extends EconomyHistoryAnalysisPresentation {
@@ -249,27 +298,6 @@ export interface EconomyHistoryPresentation extends EconomyHistoryAnalysisPresen
 export interface PriceDataViewModel extends PriceSetPresentation {
   manual: ManualPriceEditorPresentation;
   history: EconomyHistoryPresentation;
-}
-
-export function formatPriceAgeValue(seconds: number | null): SemanticUnitValue {
-  if (seconds === null || !Number.isFinite(seconds) || seconds < 0) {
-    return { visible: "-", accessible: "-" };
-  }
-  if (seconds < 60) return { visible: "<1 min", accessible: "less than 1 minute" };
-  if (seconds < 3600) {
-    const minutes = Math.floor(seconds / 60);
-    return formatSemanticUnitValue(formatNumber(minutes), minutes, "minute");
-  }
-  if (seconds < 86400) {
-    const hours = Math.floor(seconds / 3600);
-    return formatSemanticUnitValue(formatNumber(hours), hours, "hour");
-  }
-  const days = Math.floor(seconds / 86400);
-  return formatSemanticUnitValue(formatNumber(days), days, "day");
-}
-
-export function formatPriceAge(seconds: number | null): string {
-  return formatPriceAgeValue(seconds).visible;
 }
 
 export function economyAriaSort(
@@ -294,68 +322,10 @@ export function createPriceItemLabels(
   );
 }
 
-function priceNoticeCopy(
-  code: string,
-  itemLabel: string
-): Pick<PriceDataNotice, "summary" | "detail"> {
-  if (code === "missing-price") {
-    return {
-      summary: "Missing price",
-      detail: `${itemLabel} has no usable price, so its active value is incomplete.`
-    };
-  }
-  if (code === "missing-alch-value") {
-    return {
-      summary: "Missing alch value",
-      detail: `${itemLabel} has no usable alch value for the selected action.`
-    };
-  }
-  if (code === "price-fallback-used") {
-    return {
-      summary: "Fallback used",
-      detail: `${itemLabel} uses a fallback value in the current calculation.`
-    };
-  }
-  if (code === "price-generated-fallback") {
-    return {
-      summary: "Estimated price",
-      detail: `${itemLabel} uses a game-data estimate instead of an observed market price.`
-    };
-  }
-  if (code === "price-market-retained") {
-    return {
-      summary: "Previous price retained",
-      detail: `${itemLabel} keeps its previous accepted price because the latest evaluation could not replace it.`
-    };
-  }
-  if (code === "price-freshness-unknown") {
-    return {
-      summary: "Price date unknown",
-      detail: `${itemLabel} has a usable price but no verified market observation time.`
-    };
-  }
-  if (code === "price-alias-used") {
-    return {
-      summary: "Related item price",
-      detail: `${itemLabel} uses a compatible related-item price because its canonical price is missing.`
-    };
-  }
-  if (code === "unidentified-herb-price-approximation") {
-    return {
-      summary: "Estimated herb price",
-      detail: "Unidentified herbs use a shared proxy where species-specific prices are unavailable."
-    };
-  }
-  return {
-    summary: "Approximate source",
-    detail: `${itemLabel} uses approximate source data in the current valuation.`
-  };
-}
-
 function comparePriceNotices(left: PriceDataNotice, right: PriceDataNotice): number {
   const priority =
-    (PRICE_NOTICE_PRIORITY[left.code] ?? Number.MAX_SAFE_INTEGER) -
-    (PRICE_NOTICE_PRIORITY[right.code] ?? Number.MAX_SAFE_INTEGER);
+    (PRICE_WARNING_PRIORITY[left.code] ?? Number.MAX_SAFE_INTEGER) -
+    (PRICE_WARNING_PRIORITY[right.code] ?? Number.MAX_SAFE_INTEGER);
   if (priority !== 0) return priority;
   return left.itemLabel.localeCompare(right.itemLabel, undefined, {
     numeric: true,
@@ -396,8 +366,8 @@ export function createCurrentPriceNoticePresentation(input: {
     const itemLabel = itemDisplayLabel.name;
     const consumer = context?.consumer ?? "loot";
     const affectsCurrentResult = context?.affectsCurrentResult ?? true;
-    const level = PRICE_ISSUE_CODES.has(warning.code) ? "issue" : "note";
-    const copy = priceNoticeCopy(warning.code, itemLabel);
+    const level = isPriceIssueWarningCode(warning.code) ? "issue" : "note";
+    const copy = friendlyPriceWarningCopy(warning.code, itemLabel);
     const noticeId = priceNoticeId(
       warning.code,
       warning.itemId ?? itemLabel,
@@ -500,13 +470,6 @@ export function summarizeItemPriceMetadata(priceSet: PriceSet | null): ItemPrice
   };
 }
 
-function ageSeconds(priceSet: PriceSet | null, ageNow: Date): number | null {
-  const createdAtMs = priceSet ? Date.parse(priceSet.createdAt) : NaN;
-  return priceSet && Number.isFinite(createdAtMs)
-    ? Math.max(0, Math.floor((ageNow.getTime() - createdAtMs) / 1000))
-    : null;
-}
-
 export function createPriceSetPresentation(input: {
   activePriceSet: PriceSet | null;
   bundledPriceSet: PriceSet | null;
@@ -514,8 +477,11 @@ export function createPriceSetPresentation(input: {
   activePriceSetOrigin: ActivePriceSetOrigin;
   priceLabel: string;
   activeManualPriceOverrideCount: number;
-  ageNow: Date;
+  timeContext?: PriceTimeContext;
+  ageNow?: Date;
 }): PriceSetPresentation {
+  const timeContext =
+    input.timeContext ?? createPriceTimeContext(input.ageNow ?? new Date(0), "UTC");
   const scheduledPriceSet = scheduledPriceSetFromStatus(input.scheduledSnapshotStatus);
   const scheduledStatus = createScheduledPriceSnapshotViewModel(
     input.scheduledSnapshotStatus,
@@ -533,8 +499,13 @@ export function createPriceSetPresentation(input: {
     : "bundled";
   const resetFallbackLabel =
     resetFallbackOrigin === "scheduled" ? "scheduled prices" : "bundled prices";
-  const activeAge = formatPriceAgeValue(ageSeconds(input.activePriceSet, input.ageNow));
-  const scheduledAge = formatPriceAgeValue(ageSeconds(scheduledPriceSet, input.ageNow));
+  const activeTimeLabel = input.activeManualPriceOverrideCount
+    ? "Active prices updated"
+    : input.activePriceSetOrigin === "scheduled"
+      ? "Active snapshot captured"
+      : input.activePriceSetOrigin === "selected"
+        ? "Selected price set created"
+        : "Bundled price set created";
 
   return {
     active: {
@@ -542,9 +513,8 @@ export function createPriceSetPresentation(input: {
       sourceLabel: activeSourceLabel,
       label: input.activePriceSet?.label ?? input.priceLabel,
       source: input.activePriceSet?.source ?? "-",
-      createdAt: input.activePriceSet?.createdAt ?? "-",
-      ageLabel: activeAge.visible,
-      ageAccessibleLabel: activeAge.accessible,
+      timeLabel: activeTimeLabel,
+      time: presentPriceDateTime(input.activePriceSet?.createdAt, timeContext),
       itemCount: Object.keys(input.activePriceSet?.itemPrices ?? {}).length,
       alchCount: Object.keys(input.activePriceSet?.alchValues ?? {}).length,
       metadata: summarizeItemPriceMetadata(input.activePriceSet)
@@ -556,9 +526,8 @@ export function createPriceSetPresentation(input: {
       message: scheduledMessage,
       fallbackLabel: scheduledStatus.fallbackLabel,
       label: scheduledPriceSet?.label ?? "-",
-      createdAt: scheduledPriceSet?.createdAt ?? "-",
-      ageLabel: scheduledAge.visible,
-      ageAccessibleLabel: scheduledAge.accessible,
+      timeLabel: "Snapshot captured",
+      time: presentPriceDateTime(scheduledPriceSet?.createdAt, timeContext),
       itemCount: Object.keys(scheduledPriceSet?.itemPrices ?? {}).length,
       alchCount: Object.keys(scheduledPriceSet?.alchValues ?? {}).length,
       metadata: summarizeItemPriceMetadata(scheduledPriceSet)
@@ -581,7 +550,9 @@ export function createManualPriceEditorPresentation(input: {
   manualPriceOverrides: ManualPriceOverridesState;
   selectedItemId: string;
   draft: number | null;
+  timeContext?: PriceTimeContext;
 }): ManualPriceEditorPresentation {
+  const timeContext = input.timeContext ?? createPriceTimeContext(new Date(0), "UTC");
   const activeOverrides = input.basePriceSet
     ? activeManualPriceOverridesForPriceSet(input.manualPriceOverrides, input.basePriceSet)
     : DEFAULT_MANUAL_PRICE_OVERRIDES_STATE;
@@ -619,6 +590,9 @@ export function createManualPriceEditorPresentation(input: {
     basePrice,
     activePrice,
     selectedOverride,
+    updatedTime: presentPriceDateTime(selectedOverride?.updatedAt, timeContext, {
+      missingText: "Not applicable"
+    }),
     inputValue,
     atCapacity,
     canApply: basePrice !== null && !atCapacity,
@@ -644,6 +618,8 @@ export function createPriceHistorySources(input: {
   const localSnapshotCount = input.localPriceHistory.snapshots.length;
   return {
     analysisState,
+    sharedHistory,
+    localPriceHistory: input.localPriceHistory,
     sharedSnapshotCount,
     localSnapshotCount,
     sourceStatus: sharedSnapshotCount
@@ -656,15 +632,90 @@ export function createPriceHistorySources(input: {
   };
 }
 
+function selectedLocalBaselineSourceIndex(input: {
+  sources: PriceHistorySources;
+  controls: EconomyPriceHistoryControls;
+  effectiveSnapshotKey: string;
+}): number | null {
+  const combined = [
+    ...input.sources.sharedHistory.snapshots.map((snapshot, sourceIndex) => ({
+      origin: "shared" as const,
+      sourceIndex,
+      snapshot
+    })),
+    ...input.sources.localPriceHistory.snapshots.map((snapshot, sourceIndex) => ({
+      origin: "local" as const,
+      sourceIndex,
+      snapshot
+    }))
+  ].sort(
+    (left, right) => Date.parse(right.snapshot.capturedAt) - Date.parse(left.snapshot.capturedAt)
+  );
+  const selected =
+    input.controls.baselineMode === "first"
+      ? (combined.at(-1) ?? null)
+      : input.controls.baselineMode === "snapshot"
+        ? (combined.find(
+            (entry) => priceHistorySnapshotKey(entry.snapshot) === input.effectiveSnapshotKey
+          ) ??
+          combined[1] ??
+          null)
+        : (combined[1] ?? null);
+  return selected?.origin === "local" ? selected.sourceIndex : null;
+}
+
+export function createLocalPriceHistoryManagementViewModel(input: {
+  sources: PriceHistorySources;
+  controls: EconomyPriceHistoryControls;
+  effectiveSnapshotKey: string;
+  timeContext?: PriceTimeContext;
+}): LocalPriceHistoryManagementViewModel {
+  const occurrences: readonly LocalPriceHistoryOccurrence[] = localPriceHistoryOccurrences(
+    input.sources.localPriceHistory
+  );
+  const selectedSourceIndex = selectedLocalBaselineSourceIndex(input);
+  const maximum = PRICE_HISTORY_MAX_SNAPSHOTS;
+  const captureTimes = presentPriceDateTimeOccurrences(
+    occurrences.map((occurrence) => occurrence.snapshot.capturedAt),
+    input.timeContext ?? createPriceTimeContext(new Date(0), "UTC")
+  );
+  return {
+    count: occurrences.length,
+    maximum,
+    remaining: Math.max(0, maximum - occurrences.length),
+    atCapacity: occurrences.length >= maximum,
+    rows: occurrences.map((occurrence, index) => ({
+      occurrenceId: occurrence.occurrenceId,
+      sourceIndex: occurrence.sourceIndex,
+      snapshotKey: occurrence.snapshotKey,
+      label: occurrence.snapshot.label,
+      capturedAt: occurrence.snapshot.capturedAt,
+      captureTime: captureTimes[index]!,
+      sourcePriceSetId: occurrence.snapshot.sourcePriceSetId,
+      itemCount: Object.keys(occurrence.snapshot.itemPrices).length,
+      newest: occurrence.newest,
+      oldest: occurrence.oldest,
+      nextReplacement: occurrence.nextReplacement,
+      selectedAsBaseline: occurrence.sourceIndex === selectedSourceIndex
+    }))
+  };
+}
+
 export function createEconomyHistoryPresentation(input: {
   sources: PriceHistorySources;
   itemLabels: Readonly<Record<string, string>>;
   controls: EconomyPriceHistoryControls;
+  timeZone?: string;
 }): EconomyHistoryAnalysisPresentation {
   const { analysisState } = input.sources;
-  const snapshotOptions = analysisState.snapshots.map((snapshot) => ({
+  const exactTimeContext = createPriceTimeContext(new Date(0), input.timeZone ?? "UTC");
+  const snapshotTimes = presentPriceDateTimeOccurrences(
+    analysisState.snapshots.map((snapshot) => snapshot.capturedAt),
+    exactTimeContext
+  );
+  const snapshotOptions = analysisState.snapshots.map((snapshot, index) => ({
     id: priceHistorySnapshotKey(snapshot),
-    label: `${snapshot.label} - ${snapshot.capturedAt}`
+    label: `${snapshot.label} · ${snapshotTimes[index]!.exactVisible}`
   }));
   const effectiveSnapshotKey = snapshotOptions.some(
     (option) => option.id === input.controls.snapshotKey
@@ -686,7 +737,7 @@ export function createEconomyHistoryPresentation(input: {
   const resolvedItemLabels = Object.fromEntries(
     Object.entries(itemDisplayLabels).map(([itemId, displayLabel]) => [itemId, displayLabel.name])
   );
-  const movers = analyzePriceHistoryMovers(analysisState, {
+  const moverAnalysis = analyzePriceHistoryMovers(analysisState, {
     baselineMode: input.controls.baselineMode,
     baselineSnapshotKey: effectiveSnapshotKey,
     itemFilter: input.controls.itemFilter,
@@ -704,10 +755,66 @@ export function createEconomyHistoryPresentation(input: {
     (option) => option.id === input.controls.trendItemId
   )
     ? input.controls.trendItemId
-    : (movers.rows[0]?.itemId ?? trendItemOptions[0]?.id ?? "");
-  const trend = analyzePriceHistoryTrend(analysisState, effectiveTrendItemId, {
+    : (moverAnalysis.rows[0]?.itemId ?? trendItemOptions[0]?.id ?? "");
+  const trendAnalysis = analyzePriceHistoryTrend(analysisState, effectiveTrendItemId, {
     ...resolvedItemLabels
   });
+  const moverRows = moverAnalysis.rows.map((row): PriceHistoryMoverRowPresentation => {
+    const pointIndexes = analysisState.snapshots.flatMap((snapshot, index) =>
+      Number.isFinite(snapshot.itemPrices[row.itemId]) ? [index] : []
+    );
+    return {
+      ...row,
+      firstCaptureTime:
+        pointIndexes.length > 0 ? (snapshotTimes[pointIndexes.at(-1)!] ?? null) : null,
+      latestCaptureTime: pointIndexes.length > 0 ? (snapshotTimes[pointIndexes[0]!] ?? null) : null
+    };
+  });
+  const moverRowByItemId = new Map(moverRows.map((row) => [row.itemId, row]));
+  const movers: PriceHistoryMoversPresentation = {
+    ...moverAnalysis,
+    rows: moverRows,
+    topGainers: moverAnalysis.topGainers.flatMap((row) => {
+      const presentation = moverRowByItemId.get(row.itemId);
+      return presentation ? [presentation] : [];
+    }),
+    topFallers: moverAnalysis.topFallers.flatMap((row) => {
+      const presentation = moverRowByItemId.get(row.itemId);
+      return presentation ? [presentation] : [];
+    })
+  };
+  const trendCaptureTimes = presentPriceDateTimeOccurrences(
+    trendAnalysis.points.map((point) => point.capturedAt),
+    exactTimeContext
+  );
+  const trendSourceSnapshots = [...analysisState.snapshots]
+    .reverse()
+    .filter((snapshot) => Number.isFinite(snapshot.itemPrices[effectiveTrendItemId]));
+  const trendPoints = trendAnalysis.points.map(
+    (point, index): PriceHistoryTrendPointPresentation => {
+      const metadata = trendSourceSnapshots[index]?.itemPriceMetadata?.[effectiveTrendItemId];
+      const observationMissingText =
+        metadata?.valueOrigin === "manual" || metadata?.valueOrigin === "generated-object-cost"
+          ? "Not applicable"
+          : "Not recorded";
+      return {
+        ...point,
+        captureTime: trendCaptureTimes[index]!,
+        observedTime: presentPriceDateTime(metadata?.valueObservedAt, exactTimeContext, {
+          missingText: observationMissingText
+        }),
+        evaluatedTime: presentPriceDateTime(metadata?.evaluatedAt, exactTimeContext, {
+          missingText: "Not evaluated"
+        })
+      };
+    }
+  );
+  const trend: PriceHistoryTrendPresentation = {
+    ...trendAnalysis,
+    points: trendPoints,
+    firstCaptureTime: trendPoints[0]?.captureTime ?? null,
+    latestCaptureTime: trendPoints.at(-1)?.captureTime ?? null
+  };
   const lootMovers = analyzePriceHistoryMovers(analysisState, {
     baselineMode: input.controls.baselineMode,
     baselineSnapshotKey: effectiveSnapshotKey,
@@ -716,6 +823,20 @@ export function createEconomyHistoryPresentation(input: {
   });
   const latestLabel = lootMovers.latest?.label ?? null;
   const baselineLabel = lootMovers.baseline?.label ?? null;
+  const latestIndex = lootMovers.latest
+    ? analysisState.snapshots.findIndex(
+        (snapshot) =>
+          priceHistorySnapshotKey(snapshot) === priceHistorySnapshotKey(lootMovers.latest!)
+      )
+    : -1;
+  const baselineIndex = lootMovers.baseline
+    ? analysisState.snapshots.findIndex(
+        (snapshot) =>
+          priceHistorySnapshotKey(snapshot) === priceHistorySnapshotKey(lootMovers.baseline!)
+      )
+    : -1;
+  const latestCaptureTime = latestIndex >= 0 ? (snapshotTimes[latestIndex] ?? null) : null;
+  const baselineCaptureTime = baselineIndex >= 0 ? (snapshotTimes[baselineIndex] ?? null) : null;
   const lootHistoryByItem = Object.fromEntries(
     lootMovers.rows.map((row) => [
       row.itemId,
@@ -727,7 +848,9 @@ export function createEconomyHistoryPresentation(input: {
         gpDelta: row.gpDelta,
         percentDelta: row.percentDelta,
         latestLabel,
-        baselineLabel
+        baselineLabel,
+        latestCaptureTime,
+        baselineCaptureTime
       }
     ])
   );
@@ -743,8 +866,18 @@ export function createEconomyHistoryPresentation(input: {
     trendItemOptions,
     effectiveTrendItemId,
     trend,
+    latestSnapshotLabel: latestLabel ?? "Unavailable",
+    baselineSnapshotLabel: baselineLabel ?? "Unavailable",
+    latestCaptureTime: latestCaptureTime ?? presentPriceDateTime(null, exactTimeContext),
+    baselineCaptureTime: baselineCaptureTime ?? presentPriceDateTime(null, exactTimeContext),
     lootHistoryByItem,
-    itemDisplayLabels
+    itemDisplayLabels,
+    localManagement: createLocalPriceHistoryManagementViewModel({
+      sources: input.sources,
+      controls: input.controls,
+      effectiveSnapshotKey,
+      timeContext: exactTimeContext
+    })
   };
 }
 
@@ -752,17 +885,27 @@ export function createPriceHistorySummaryPresentation(input: {
   analysisState: PriceHistoryAnalysisState;
   activePriceSet: PriceSet | null;
   evaluatedAt: Date;
+  timeZone?: string;
+  latestExactTime?: PriceDateTimePresentation;
 }): PriceHistorySummaryPresentation {
   const summary = summarizePriceHistory(
     input.analysisState,
     input.activePriceSet,
     input.evaluatedAt
   );
-  const latestAge = formatPriceAgeValue(summary.latestAgeSeconds);
+  const relativeTime = presentPriceDateTime(
+    input.analysisState.snapshots[0]?.capturedAt,
+    createPriceTimeContext(input.evaluatedAt, input.timeZone ?? "UTC")
+  );
   return {
     ...summary,
-    latestAgeLabel: latestAge.visible,
-    latestAgeAccessibleLabel: latestAge.accessible
+    latestTime: input.latestExactTime
+      ? {
+          ...input.latestExactTime,
+          relativeVisible: relativeTime.relativeVisible,
+          relativeAccessible: relativeTime.relativeAccessible
+        }
+      : relativeTime
   };
 }
 
@@ -771,10 +914,16 @@ export function createSelectedPriceItemPresentation(input: {
   itemId: string;
   itemLabels?: Readonly<Record<string, string>>;
   freshnessNow: Date;
+  timeContext?: PriceTimeContext;
 }): SelectedPriceItemPresentation {
   const metadata = input.itemId
     ? (input.activePriceSet?.itemPriceMetadata?.[input.itemId] ?? null)
     : null;
+  const observationMissingText =
+    metadata?.valueOrigin === "manual" || metadata?.valueOrigin === "generated-object-cost"
+      ? "Not applicable"
+      : "Not recorded";
+  const timeContext = input.timeContext ?? createPriceTimeContext(input.freshnessNow, "UTC");
   return {
     itemId: input.itemId,
     itemDisplayLabel: createEntityDisplayLabel({
@@ -783,6 +932,12 @@ export function createSelectedPriceItemPresentation(input: {
     }),
     price: input.itemId ? (input.activePriceSet?.itemPrices[input.itemId] ?? null) : null,
     metadata,
-    freshness: deriveItemPriceFreshness(metadata ?? undefined, input.freshnessNow)
+    freshness: deriveItemPriceFreshness(metadata ?? undefined, input.freshnessNow),
+    observedTime: presentPriceDateTime(metadata?.valueObservedAt, timeContext, {
+      missingText: observationMissingText
+    }),
+    evaluatedTime: presentPriceDateTime(metadata?.evaluatedAt, timeContext, {
+      missingText: "Not evaluated"
+    })
   };
 }

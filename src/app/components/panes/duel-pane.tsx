@@ -1,4 +1,4 @@
-import { Fragment } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { InlineImportNotice } from "../app-presenters";
 import type { InlineNoticeViewModel } from "../../view-models/contracts";
 import type { DuelMatrixPresentation } from "../../controllers/use-duel-pane";
@@ -13,7 +13,8 @@ import type {
   DuelMatrixRowViewModel,
   DuelMatrixSortState,
   DuelMatrixSortTarget,
-  DuelViewMode
+  DuelViewMode,
+  SavedSetupMergeReviewViewModel
 } from "../../view-models/duel";
 
 const DUEL_MATRIX_METRICS: ReadonlyArray<{ id: DuelMatrixMetricId; label: string }> = [
@@ -103,15 +104,14 @@ export interface DuelPaneModel {
   filteredDuelMatrixRows: DuelMatrixRowViewModel[];
   duelMatrixSort: DuelMatrixSortState;
   duelImportNotice: InlineNoticeViewModel | null;
-  duelImportReview: {
-    id: number;
-    setupCount: number;
-    addedCount: number;
-    updatedCount: number;
-    skippedCount: number;
-    contextTone: "ready" | "warning";
-    contextMessage: string;
-  } | null;
+  duelImportReview:
+    | (SavedSetupMergeReviewViewModel & {
+        contextTone: "ready" | "warning";
+        contextMessage: string;
+      })
+    | null;
+  duelSessionOnlyAvailable: boolean;
+  duelChangeRevision: number;
 }
 
 export interface DuelPaneActions {
@@ -120,7 +120,25 @@ export interface DuelPaneActions {
   importDuelSnapshots(file: File): Promise<void>;
   mergeDuelSnapshotsImport(reviewId: number): void;
   dismissDuelSnapshotsImport(reviewId: number): void;
-  commitDuelSnapshotName(snapshotId: string, name: string): boolean;
+  setDuelSnapshotsImportDecision(
+    reviewId: number,
+    snapshotId: string,
+    decision: "keep" | "replace" | "add" | "exclude"
+  ): void;
+  setDuelSnapshotsImportName(reviewId: number, snapshotId: string, name: string): void;
+  refreshDuelSnapshotsImport(reviewId: number): void;
+  applyDuelSessionOnlyChange(): void;
+  commitDuelSnapshotName(
+    snapshotId: string,
+    name: string
+  ):
+    | "renamed"
+    | "unchanged"
+    | "missing"
+    | "invalid"
+    | "duplicate"
+    | "session-only-available"
+    | "failed";
   loadDuelSnapshot(snapshotId: string): void;
   deleteDuelSnapshot(snapshotId: string): void;
   showCurrentDuelTarget(): void;
@@ -154,7 +172,9 @@ export function DuelPane({ hidden, model, actions }: DuelPaneProps) {
     filteredDuelMatrixRows,
     duelMatrixSort,
     duelImportNotice,
-    duelImportReview
+    duelImportReview,
+    duelSessionOnlyAvailable,
+    duelChangeRevision
   } = model;
   const duelMatrix = duelMatrixPresentation.displayModel;
   const matrixBuilding = duelMatrixPresentation.status === "building";
@@ -164,6 +184,10 @@ export function DuelPane({ hidden, model, actions }: DuelPaneProps) {
     importDuelSnapshots,
     mergeDuelSnapshotsImport,
     dismissDuelSnapshotsImport,
+    setDuelSnapshotsImportDecision,
+    setDuelSnapshotsImportName,
+    refreshDuelSnapshotsImport,
+    applyDuelSessionOnlyChange,
     commitDuelSnapshotName,
     loadDuelSnapshot,
     deleteDuelSnapshot,
@@ -176,6 +200,67 @@ export function DuelPane({ hidden, model, actions }: DuelPaneProps) {
     sortDuelMatrixBy,
     buildDuelMatrix
   } = actions;
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const reviewHeadingRef = useRef<HTMLHeadingElement>(null);
+  const handledReviewIdRef = useRef(0);
+  const renameInputRef = useRef<HTMLInputElement>(null);
+  const renameTriggersRef = useRef(new Map<string, HTMLButtonElement>());
+  const previousChangeRevisionRef = useRef(duelChangeRevision);
+  const [renameEditor, setRenameEditor] = useState<{
+    snapshotId: string;
+    displayName: string;
+    draft: string;
+    error: string | null;
+    revision: number;
+  } | null>(null);
+  const renameEditorSnapshotId = renameEditor?.snapshotId ?? null;
+
+  useEffect(() => {
+    if (hidden || !duelImportReview || handledReviewIdRef.current === duelImportReview.id) return;
+    const frameId = window.requestAnimationFrame(() => {
+      reviewHeadingRef.current?.focus({ preventScroll: true });
+      handledReviewIdRef.current = duelImportReview.id;
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }, [duelImportReview, hidden]);
+
+  useEffect(() => {
+    if (!renameEditorSnapshotId) return;
+    renameInputRef.current?.focus({ preventScroll: true });
+    renameInputRef.current?.select();
+  }, [renameEditorSnapshotId]);
+
+  useEffect(() => {
+    if (previousChangeRevisionRef.current === duelChangeRevision) return;
+    previousChangeRevisionRef.current = duelChangeRevision;
+    if (!renameEditor) return;
+    const snapshotId = renameEditor.snapshotId;
+    window.queueMicrotask(() => renameTriggersRef.current.get(snapshotId)?.focus());
+  }, [duelChangeRevision, renameEditor]);
+
+  const cancelRename = (): void => {
+    if (!renameEditor) return;
+    const snapshotId = renameEditor.snapshotId;
+    setRenameEditor(null);
+    window.queueMicrotask(() => renameTriggersRef.current.get(snapshotId)?.focus());
+  };
+
+  const saveRename = (): void => {
+    if (!renameEditor) return;
+    const result = commitDuelSnapshotName(renameEditor.snapshotId, renameEditor.draft);
+    if (result === "renamed" || result === "unchanged") {
+      cancelRename();
+      return;
+    }
+    const errors = {
+      missing: "That saved setup no longer exists.",
+      invalid: "Enter a name between 1 and 80 characters.",
+      duplicate: "Choose a unique saved setup name.",
+      "session-only-available": "Use the session-only action below to apply this rename.",
+      failed: "The name could not be saved. Review the notice and try again."
+    } as const;
+    setRenameEditor((current) => (current ? { ...current, error: errors[result] } : current));
+  };
 
   return (
     <section className="duel-pane" aria-label="Setup comparison" hidden={hidden}>
@@ -206,6 +291,7 @@ export function DuelPane({ hidden, model, actions }: DuelPaneProps) {
                 <label className="file-button">
                   Import setups
                   <input
+                    ref={importInputRef}
                     type="file"
                     accept="application/json,.json"
                     onChange={async (event) => {
@@ -256,14 +342,35 @@ export function DuelPane({ hidden, model, actions }: DuelPaneProps) {
         />
       )}
 
+      {duelSessionOnlyAvailable && (
+        <div className="duel-session-only-action">
+          <button type="button" onClick={applyDuelSessionOnlyChange}>
+            Apply saved setup change for this session
+          </button>
+          <span>Saved browser data will remain unchanged.</span>
+        </div>
+      )}
+
       {duelImportReview && (
         <section className="duel-import-review" aria-label="Saved setup import review">
           <span className="visually-hidden" role="status" aria-live="polite">
-            Saved setups ready for review.
+            {duelImportReview.stale
+              ? "Saved setup merge review is stale."
+              : `${duelImportReview.selectedAddCount} additions and ${duelImportReview.selectedReplaceCount} replacements selected.`}
           </span>
           <div className="section-title-row">
-            <h3>Review saved setups</h3>
-            <span className="status-pill ready">Ready to merge</span>
+            <h3 ref={reviewHeadingRef} tabIndex={-1}>
+              Review saved setups
+            </h3>
+            <span
+              className={`status-pill ${duelImportReview.stale ? "warning" : duelImportReview.canMerge ? "ready" : "neutral"}`}
+            >
+              {duelImportReview.stale
+                ? "Refresh required"
+                : duelImportReview.canMerge
+                  ? "Ready to merge"
+                  : "Review selections"}
+            </span>
           </div>
           <dl className="duel-import-review-summary">
             <div>
@@ -272,30 +379,188 @@ export function DuelPane({ hidden, model, actions }: DuelPaneProps) {
             </div>
             <div>
               <dt>Add</dt>
-              <dd>{formatNumber(duelImportReview.addedCount)}</dd>
+              <dd>{formatNumber(duelImportReview.selectedAddCount)}</dd>
             </div>
             <div>
-              <dt>Update</dt>
-              <dd>{formatNumber(duelImportReview.updatedCount)}</dd>
+              <dt>Replace</dt>
+              <dd>{formatNumber(duelImportReview.selectedReplaceCount)}</dd>
             </div>
             <div>
-              <dt>Skip at limit</dt>
-              <dd>{formatNumber(duelImportReview.skippedCount)}</dd>
+              <dt>Keep</dt>
+              <dd>{formatNumber(duelImportReview.keepCount)}</dd>
+            </div>
+            <div>
+              <dt>Identical</dt>
+              <dd>{formatNumber(duelImportReview.identicalCount)}</dd>
+            </div>
+            <div>
+              <dt>Not selected</dt>
+              <dd>{formatNumber(duelImportReview.notSelectedCount)}</dd>
             </div>
           </dl>
           <p className={`inline-status ${duelImportReview.contextTone}`} role="status">
             {duelImportReview.contextMessage}
           </p>
-          <p>Merging keeps unrelated saved setups. Matching ids are updated.</p>
+          <p>
+            Matching IDs are reviewed individually and default to Keep. New setups are selected only
+            while one of {formatNumber(duelImportReview.availableSlots)} available slots remains.
+            Unrelated saved setups are always kept.
+          </p>
+          {duelImportReview.stale && (
+            <div className="inline-status warning" role="alert">
+              <span>
+                Saved setups changed after this review was created. Refresh before merging.
+              </span>
+              <button type="button" onClick={() => refreshDuelSnapshotsImport(duelImportReview.id)}>
+                Refresh review
+              </button>
+            </div>
+          )}
+          <div className="duel-import-review-rows">
+            {duelImportReview.rows.map((row) => {
+              const selected = row.decision === "add" || row.decision === "replace";
+              const nameId = `duel-import-name-${duelImportReview.id}-${row.snapshotId}`;
+              return (
+                <article
+                  className={`duel-import-review-row ${row.nameStatus === "conflict" || row.nameStatus === "invalid" ? "has-error" : ""}`}
+                  key={row.snapshotId}
+                  data-merge-classification={row.classification}
+                >
+                  <div className="duel-import-review-row-heading">
+                    <div>
+                      <strong>{row.sourceDisplayName}</strong>
+                      <span>{row.classificationLabel}</span>
+                    </div>
+                    {row.currentDisplayName && (
+                      <small>Current setup: {row.currentDisplayName}</small>
+                    )}
+                  </div>
+
+                  {row.classification === "replacement-candidate" ? (
+                    <fieldset disabled={duelImportReview.stale}>
+                      <legend>Choose how to handle {row.sourceDisplayName}</legend>
+                      <label>
+                        <input
+                          type="radio"
+                          name={`duel-merge-${duelImportReview.id}-${row.snapshotId}`}
+                          checked={row.decision === "keep"}
+                          onChange={() =>
+                            setDuelSnapshotsImportDecision(
+                              duelImportReview.id,
+                              row.snapshotId,
+                              "keep"
+                            )
+                          }
+                        />
+                        Keep current setup
+                      </label>
+                      <label>
+                        <input
+                          type="radio"
+                          name={`duel-merge-${duelImportReview.id}-${row.snapshotId}`}
+                          checked={row.decision === "replace"}
+                          onChange={() =>
+                            setDuelSnapshotsImportDecision(
+                              duelImportReview.id,
+                              row.snapshotId,
+                              "replace"
+                            )
+                          }
+                        />
+                        Replace with imported setup
+                      </label>
+                    </fieldset>
+                  ) : row.classification === "addition-candidate" ||
+                    row.classification === "capacity-excluded" ? (
+                    <label className="duel-import-add-choice">
+                      <input
+                        type="checkbox"
+                        checked={row.decision === "add"}
+                        disabled={duelImportReview.stale}
+                        onChange={(event) =>
+                          setDuelSnapshotsImportDecision(
+                            duelImportReview.id,
+                            row.snapshotId,
+                            event.currentTarget.checked ? "add" : "exclude"
+                          )
+                        }
+                      />
+                      Add this setup
+                    </label>
+                  ) : (
+                    <p className="duel-import-identical">No changes; this setup is identical.</p>
+                  )}
+
+                  {selected && (
+                    <label className="duel-import-recipient-name" htmlFor={nameId}>
+                      Saved name
+                      <input
+                        id={nameId}
+                        value={row.recipientName}
+                        maxLength={80}
+                        disabled={duelImportReview.stale}
+                        aria-invalid={row.nameMessage ? true : undefined}
+                        aria-describedby={row.nameMessage ? `${nameId}-error` : undefined}
+                        onChange={(event) =>
+                          setDuelSnapshotsImportName(
+                            duelImportReview.id,
+                            row.snapshotId,
+                            event.currentTarget.value
+                          )
+                        }
+                      />
+                      {row.nameMessage && (
+                        <small id={`${nameId}-error`} className="field-error">
+                          {row.nameMessage}
+                        </small>
+                      )}
+                    </label>
+                  )}
+
+                  {row.setupDiff && row.setupDiff.changeCount > 0 && (
+                    <details className="duel-import-source-diff">
+                      <summary>
+                        Review source differences ({formatNumber(row.setupDiff.changeCount)})
+                      </summary>
+                      <p>These are stored setup fields only; no calculated impact is inferred.</p>
+                      {row.setupDiff.groups.map((group) => (
+                        <section key={group.id}>
+                          <h4>{group.label}</h4>
+                          <dl>
+                            {group.items.map((item) => (
+                              <div key={item.id}>
+                                <dt>{item.label}</dt>
+                                <dd>
+                                  <span>Current: {item.liveValue}</span>
+                                  <span>Imported: {item.snapshotValue}</span>
+                                </dd>
+                              </div>
+                            ))}
+                          </dl>
+                        </section>
+                      ))}
+                    </details>
+                  )}
+                </article>
+              );
+            })}
+          </div>
           <div className="duel-import-review-actions">
             <button
               type="button"
               className="primary-action"
               onClick={() => mergeDuelSnapshotsImport(duelImportReview.id)}
+              disabled={duelImportReview.stale || !duelImportReview.canMerge}
             >
-              Merge setups
+              Merge selected setups
             </button>
-            <button type="button" onClick={() => dismissDuelSnapshotsImport(duelImportReview.id)}>
+            <button
+              type="button"
+              onClick={() => {
+                dismissDuelSnapshotsImport(duelImportReview.id);
+                window.queueMicrotask(() => importInputRef.current?.focus());
+              }}
+            >
               Dismiss
             </button>
           </div>
@@ -342,27 +607,84 @@ export function DuelPane({ hidden, model, actions }: DuelPaneProps) {
                       <td className="duel-setup-cell">
                         {row.source === "live" ? (
                           <strong>Live setup</strong>
+                        ) : renameEditor?.snapshotId === row.snapshotId &&
+                          renameEditor.revision === duelChangeRevision ? (
+                          <div className="duel-rename-editor">
+                            <label>
+                              <span>Saved setup name</span>
+                              <input
+                                ref={renameInputRef}
+                                aria-label={`New name for saved setup ${renameEditor.displayName}`}
+                                value={renameEditor.draft}
+                                maxLength={80}
+                                aria-invalid={renameEditor.error ? true : undefined}
+                                aria-describedby={
+                                  renameEditor.error
+                                    ? `duel-rename-error-${row.snapshotId}`
+                                    : undefined
+                                }
+                                onChange={(event) => {
+                                  const draft = event.currentTarget.value;
+                                  setRenameEditor((current) =>
+                                    current ? { ...current, draft, error: null } : current
+                                  );
+                                }}
+                                onKeyDown={(event) => {
+                                  if (event.key === "Enter") {
+                                    event.preventDefault();
+                                    saveRename();
+                                  } else if (event.key === "Escape") {
+                                    event.preventDefault();
+                                    cancelRename();
+                                  }
+                                }}
+                              />
+                            </label>
+                            <div className="duel-rename-actions">
+                              <button type="button" onClick={saveRename}>
+                                Save
+                              </button>
+                              <button type="button" onClick={cancelRename}>
+                                Cancel
+                              </button>
+                            </div>
+                            {renameEditor.error && (
+                              <small
+                                id={`duel-rename-error-${row.snapshotId}`}
+                                className="field-error"
+                              >
+                                {renameEditor.error}
+                              </small>
+                            )}
+                          </div>
                         ) : (
-                          <input
-                            aria-label={`Rename saved setup ${row.name}`}
-                            defaultValue={row.name}
-                            maxLength={80}
-                            onBlur={(event) => {
-                              if (!row.snapshotId) return;
-                              const accepted = commitDuelSnapshotName(
-                                row.snapshotId,
-                                event.currentTarget.value
-                              );
-                              if (!accepted) event.currentTarget.value = row.name;
-                            }}
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter") event.currentTarget.blur();
-                              if (event.key === "Escape") {
-                                event.currentTarget.value = row.name;
-                                event.currentTarget.blur();
-                              }
-                            }}
-                          />
+                          <div className="duel-saved-name">
+                            <strong>{row.displayName}</strong>
+                            <button
+                              ref={(element) => {
+                                if (!row.snapshotId) return;
+                                if (element) renameTriggersRef.current.set(row.snapshotId, element);
+                                else renameTriggersRef.current.delete(row.snapshotId);
+                              }}
+                              type="button"
+                              aria-label={`Rename saved setup ${row.displayName}`}
+                              onClick={() => {
+                                if (!row.snapshotId) return;
+                                setRenameEditor({
+                                  snapshotId: row.snapshotId,
+                                  displayName: row.displayName,
+                                  draft: row.name,
+                                  error: null,
+                                  revision: duelChangeRevision
+                                });
+                              }}
+                            >
+                              Rename
+                            </button>
+                          </div>
+                        )}
+                        {row.source === "snapshot" && row.duplicateName && (
+                          <span className="duel-duplicate-name-note">Duplicate name</span>
                         )}
                         <span>{row.combatStyle}</span>
                       </td>
@@ -398,17 +720,23 @@ export function DuelPane({ hidden, model, actions }: DuelPaneProps) {
                           <div className="duel-row-actions">
                             <button
                               type="button"
+                              aria-label={`${diffExpanded ? "Hide" : "Review"} differences for ${row.displayName}`}
                               aria-expanded={diffExpanded}
                               aria-controls={diffId}
                               onClick={() => toggleDuelDiff(row.snapshotId!)}
                             >
                               {diffExpanded ? "Hide diff" : "Review diff"}
                             </button>
-                            <button type="button" onClick={() => loadDuelSnapshot(row.snapshotId!)}>
+                            <button
+                              type="button"
+                              aria-label={`Load saved setup ${row.displayName}`}
+                              onClick={() => loadDuelSnapshot(row.snapshotId!)}
+                            >
                               Load
                             </button>
                             <button
                               type="button"
+                              aria-label={`Delete saved setup ${row.displayName}`}
                               onClick={() => deleteDuelSnapshot(row.snapshotId!)}
                             >
                               Delete
@@ -425,7 +753,7 @@ export function DuelPane({ hidden, model, actions }: DuelPaneProps) {
                           <section
                             id={diffId}
                             className="duel-diff-panel"
-                            aria-label={`${row.name} setup and impact diff`}
+                            aria-label={`${row.displayName} setup and impact diff`}
                           >
                             <div className="duel-diff-heading">
                               <div>
@@ -635,7 +963,7 @@ export function DuelPane({ hidden, model, actions }: DuelPaneProps) {
                             className="sort-button duel-matrix-sort-button"
                             onClick={() => sortDuelMatrixBy(target)}
                           >
-                            <strong>{setup.name}</strong>
+                            <strong>{setup.displayName}</strong>
                             <span>{setup.combatStyle}</span>
                             <i aria-hidden="true">
                               {sortIndicator(active, duelMatrixSort.direction)}
@@ -669,7 +997,7 @@ export function DuelPane({ hidden, model, actions }: DuelPaneProps) {
                         return (
                           <td
                             className={`numeric ${isBest ? "best" : ""}`}
-                            aria-label={`${row.monsterName}, ${setup?.name ?? cell.setupId}, ${duelMatrixMetricLabel(duelMatrixMetric)}: ${displayValue}${isBest ? ", best" : ""}`}
+                            aria-label={`${row.monsterName}, ${setup?.displayName ?? cell.setupId}, ${duelMatrixMetricLabel(duelMatrixMetric)}: ${displayValue}${isBest ? ", best" : ""}`}
                             key={cell.setupId}
                           >
                             <span>{displayValue}</span>

@@ -1,10 +1,15 @@
-import { tryClearPersisted, type KeyValueStorage } from "@/adapters/storage";
+import { savePersisted, tryClearPersisted, type KeyValueStorage } from "@/adapters/storage";
 import {
   MANUAL_PRICE_OVERRIDES_STORAGE_KEY,
   saveManualPriceOverrides,
   type ManualPriceOverridesState
 } from "../state/manual-price-overrides";
-import { PRICE_HISTORY_STORAGE_KEY } from "../state/price-history";
+import {
+  BrowserPriceHistoryStateSchema,
+  PRICE_HISTORY_STORAGE_KEY,
+  PRICE_HISTORY_VERSION,
+  type BrowserPriceHistoryState
+} from "../state/price-history";
 import { SELECTED_PRICE_SET_STORAGE_KEY } from "../state/selected-price-set";
 
 export type EconomyDataUndoScope =
@@ -58,7 +63,7 @@ export interface EconomyDataUndoPreparation<TLiveState> {
   finish(actionPersisted: boolean): EconomyDataUndoRecord<TLiveState>;
 }
 
-interface EconomyDataRecoveryPort {
+export interface EconomyDataRecoveryPort {
   clearStorageFailures(ids: readonly EconomyDataUndoScope[]): void;
   completeExternalUndo(ids: readonly EconomyDataUndoScope[]): void;
   markPersistenceUnavailable(): void;
@@ -66,6 +71,89 @@ interface EconomyDataRecoveryPort {
   recordStorageFailure(id: EconomyDataUndoScope, reason: "save_failed" | "clear_failed"): void;
   refresh(): void;
   unblockReplaced(ids: readonly EconomyDataUndoScope[]): void;
+}
+
+export type EconomyPriceHistoryCommitOutcome =
+  | {
+      status: "applied";
+      durability: "durable" | "session-only";
+      record: EconomyDataUndoRecord<BrowserPriceHistoryState> | null;
+      actionStatus: string;
+      notice: { tone: "success" | "neutral"; message: string };
+    }
+  | { status: "invalid"; message: string };
+
+export function commitEconomyPriceHistory(input: {
+  storage: KeyValueStorage;
+  persistenceUnavailable: boolean;
+  persistenceBlocked: boolean;
+  current: BrowserPriceHistoryState;
+  next: BrowserPriceHistoryState;
+  destructive: boolean;
+  durableMessage: string;
+  sessionMessage: string;
+  recovery: EconomyDataRecoveryPort;
+  applyLiveState(next: BrowserPriceHistoryState): void;
+  now(): Date;
+}): EconomyPriceHistoryCommitOutcome {
+  let current: BrowserPriceHistoryState;
+  let next: BrowserPriceHistoryState;
+  try {
+    current = BrowserPriceHistoryStateSchema.parse(input.current);
+    next = BrowserPriceHistoryStateSchema.parse(input.next);
+  } catch {
+    return { status: "invalid", message: "Local price history could not be validated." };
+  }
+  const sessionOnlyBeforeStorage = input.persistenceUnavailable || input.persistenceBlocked;
+  const preparation = input.destructive
+    ? prepareEconomyDataUndo({
+        scope: "price-history",
+        storage: input.storage,
+        persistenceUnavailable: sessionOnlyBeforeStorage,
+        liveState: current
+      })
+    : null;
+  let persisted = false;
+  if (sessionOnlyBeforeStorage) {
+    if (input.persistenceUnavailable) input.recovery.markPersistenceUnavailable();
+  } else {
+    try {
+      if (next.snapshots.length === 0) {
+        input.storage.removeItem(PRICE_HISTORY_STORAGE_KEY);
+      } else {
+        savePersisted(
+          {
+            key: PRICE_HISTORY_STORAGE_KEY,
+            version: PRICE_HISTORY_VERSION,
+            schema: BrowserPriceHistoryStateSchema,
+            storage: input.storage,
+            now: input.now
+          },
+          next
+        );
+      }
+      persisted = true;
+      input.recovery.clearStorageFailures(["price-history"]);
+    } catch {
+      input.recovery.recordStorageFailure(
+        "price-history",
+        next.snapshots.length === 0 ? "clear_failed" : "save_failed"
+      );
+    }
+  }
+  input.recovery.prepareExternalApply(["price-history"]);
+  input.applyLiveState(next);
+  input.recovery.refresh();
+  return {
+    status: "applied",
+    durability: persisted ? "durable" : "session-only",
+    record: preparation?.finish(persisted) ?? null,
+    actionStatus: persisted ? input.durableMessage : input.sessionMessage,
+    notice: {
+      tone: persisted ? "success" : "neutral",
+      message: persisted ? input.durableMessage : input.sessionMessage
+    }
+  };
 }
 
 const ECONOMY_DATA_STORAGE_KEYS: Readonly<Record<EconomyDataUndoScope, string>> = {

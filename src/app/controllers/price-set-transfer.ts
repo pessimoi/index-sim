@@ -27,6 +27,17 @@ export interface PriceSetTransferSnapshot {
   resetPending: boolean;
 }
 
+export const PRICE_HISTORY_FULL_CAPTURE_GUIDANCE =
+  "Local history is full, so this PriceSet was not saved as a comparison. Review local history, then save it explicitly." as const;
+
+export type AcceptedPriceHistoryCaptureOutcome =
+  | { status: "added"; history: BrowserPriceHistoryState }
+  | {
+      status: "full-skipped";
+      history: BrowserPriceHistoryState;
+      guidance: typeof PRICE_HISTORY_FULL_CAPTURE_GUIDANCE;
+    };
+
 export interface AcceptPriceSetInput {
   priceSet: PriceSet;
   acceptedAt: Date;
@@ -40,6 +51,7 @@ export interface AcceptedPriceSetOutcome {
   basePriceSet: PriceSet;
   activePriceSet: PriceSet;
   priceHistoryUpdate(current: BrowserPriceHistoryState): BrowserPriceHistoryState;
+  priceHistoryCapture(current: BrowserPriceHistoryState): AcceptedPriceHistoryCaptureOutcome;
   activePriceSetOrigin: "selected";
   selectedPersisted: boolean;
   appStatus: string;
@@ -144,14 +156,24 @@ export class PriceSetTransferControllerCore<TFile> {
     const canonicalPriceSet = withGeneratedAlchAuthority(input.priceSet, input.gameData);
     const activePriceSet = applyManualPriceOverrides(canonicalPriceSet, input.manualPriceOverrides);
     const selectedPersisted = this.persistSelected(canonicalPriceSet, input.acceptedAt);
-    this.dependencies.unblockReplaced(["price-history", "selected-price-set"]);
+    this.dependencies.unblockReplaced(["selected-price-set"]);
+    const priceHistoryCapture = (current: BrowserPriceHistoryState) => {
+      const history = appendAcceptedPriceSetToHistory(current, canonicalPriceSet, input.acceptedAt);
+      return history === current
+        ? {
+            status: "full-skipped" as const,
+            history,
+            guidance: PRICE_HISTORY_FULL_CAPTURE_GUIDANCE
+          }
+        : { status: "added" as const, history };
+    };
 
     return {
       status: "ready",
       basePriceSet: canonicalPriceSet,
       activePriceSet,
-      priceHistoryUpdate: (current) =>
-        appendAcceptedPriceSetToHistory(current, canonicalPriceSet, input.acceptedAt),
+      priceHistoryUpdate: (current) => priceHistoryCapture(current).history,
+      priceHistoryCapture,
       activePriceSetOrigin: "selected",
       selectedPersisted,
       appStatus: input.nextStatus,

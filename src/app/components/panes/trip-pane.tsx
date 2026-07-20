@@ -1,3 +1,4 @@
+import type { Ref } from "react";
 import type { CombatSetupFormState } from "../../state/ui-state";
 import {
   TRIP_ALTAR_TIME_MODE_OPTIONS,
@@ -30,13 +31,14 @@ export interface TripPaneProps {
   hidden: boolean;
   model: TripPaneModel;
   actions: TripPaneActions;
+  foodPerKillOverrideRef?: Ref<HTMLSelectElement>;
 }
 
 function bounded(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-export function TripPane({ hidden, model, actions }: TripPaneProps) {
+export function TripPane({ hidden, model, actions, foodPerKillOverrideRef }: TripPaneProps) {
   const { presentation, modeledKillsPerTripRange } = model;
   const { controls, recommendation } = presentation;
   const trip = controls.trip;
@@ -316,6 +318,7 @@ export function TripPane({ hidden, model, actions }: TripPaneProps) {
         <SelectField
           label="F/KL override"
           accessibleLabel="Food per kill override"
+          selectRef={foodPerKillOverrideRef}
           value={controls.foodPerKillOverrideMode}
           options={TRIP_FOOD_PER_KILL_OVERRIDE_OPTIONS}
           onChange={(mode) =>

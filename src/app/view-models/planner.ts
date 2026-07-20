@@ -19,7 +19,8 @@ import type {
   EntityId,
   EquipmentSlot,
   GameDataSnapshot,
-  SimulationContext
+  SimulationContext,
+  SimulationWarning
 } from "@/domain/shared";
 import { lootSettingsForMonster, type LootSettingsByMonsterState } from "../state/loot-settings";
 import {
@@ -40,6 +41,13 @@ import {
   type CombatSetupFormState
 } from "../state/ui-state";
 import { formatNumber } from "./formatting";
+import { createEntityDisplayLabel, type EntityDisplayLabel } from "./presentation-language";
+import {
+  friendlyPriceWarningCopy,
+  isMoneyWarningCode,
+  isPriceIssueWarningCode,
+  normalizeWarningMessage
+} from "./warning-presentation";
 
 export interface PlannerDomainAdapterViewModel {
   input: PlannerInput;
@@ -157,9 +165,142 @@ export interface PlannerPanelViewModel {
   unlocks: PlannerUnlockRowViewModel[];
   timeline: PlannerTimelineEventViewModel[];
   chart: PlannerChartViewModel;
-  warnings: string[];
+  notices: PlannerNoticePresentation;
   isEmpty: boolean;
 }
+
+export type PlannerNoticeCategory =
+  "plan-limit" | "gear-data" | "price-data" | "combat-model" | "trip-model" | "other";
+
+export type PlannerNoticeAction =
+  | { kind: "review-targets"; label: "Review targets" }
+  | { kind: "review-gear"; label: "Review gear"; itemId?: EntityId }
+  | { kind: "review-loadout"; label: "Review loadout" }
+  | { kind: "correct-price"; label: "Correct price"; itemId: EntityId }
+  | { kind: "review-price-data"; label: "Review price data"; itemId?: EntityId }
+  | { kind: "review-trip"; label: "Review Trip assumptions" }
+  | { kind: "review-planner-inputs"; label: "Review Planner inputs" };
+
+export interface PlannerNoticeOccurrenceSummary {
+  totalCount: number;
+  visibleLabels: string[];
+  hiddenCount: number;
+}
+
+export interface PlannerNoticeViewModel {
+  id: string;
+  code: string;
+  severity: "info" | "warning" | "error";
+  category: PlannerNoticeCategory;
+  title: string;
+  detail: string;
+  itemDisplayLabel?: EntityDisplayLabel;
+  occurrences: PlannerNoticeOccurrenceSummary;
+  action: PlannerNoticeAction;
+  affectsCurrentResult: boolean;
+}
+
+export interface PlannerNoticePresentation {
+  warningSetId: string;
+  issueCount: number;
+  noteCount: number;
+  occurrenceCount: number;
+  rows: PlannerNoticeViewModel[];
+}
+
+interface PlannerNoticeRegistryEntry {
+  category: PlannerNoticeCategory;
+  title: string;
+  action: "review-targets" | "review-gear" | "review-loadout" | "review-price-data" | "review-trip";
+}
+
+export const PLANNER_NOTICE_CODE_REGISTRY = {
+  "planner-truncated": {
+    category: "plan-limit",
+    title: "Plan stopped at its level limit",
+    action: "review-targets"
+  },
+  "manual-planner-requirement-fallback": {
+    category: "gear-data",
+    title: "Requirement source is incomplete",
+    action: "review-gear"
+  },
+  "missing-planner-weapon": {
+    category: "gear-data",
+    title: "Planner weapon is unavailable",
+    action: "review-gear"
+  },
+  "missing-planner-equipment": {
+    category: "gear-data",
+    title: "Planner equipment is unavailable",
+    action: "review-gear"
+  },
+  "hypothetical-planner-equipment": {
+    category: "gear-data",
+    title: "Planner equipment needs review",
+    action: "review-gear"
+  },
+  "dragon-halberd-npc-size-fallback": {
+    category: "combat-model",
+    title: "Dragon halberd size behavior is approximate",
+    action: "review-loadout"
+  },
+  "missing-price": {
+    category: "price-data",
+    title: "Missing price",
+    action: "review-price-data"
+  },
+  "missing-alch-value": {
+    category: "price-data",
+    title: "Missing alch value",
+    action: "review-price-data"
+  },
+  "price-fallback-used": {
+    category: "price-data",
+    title: "Fallback used",
+    action: "review-price-data"
+  },
+  "price-generated-fallback": {
+    category: "price-data",
+    title: "Estimated price",
+    action: "review-price-data"
+  },
+  "price-market-retained": {
+    category: "price-data",
+    title: "Previous price retained",
+    action: "review-price-data"
+  },
+  "price-freshness-unknown": {
+    category: "price-data",
+    title: "Price date unknown",
+    action: "review-price-data"
+  },
+  "price-alias-used": {
+    category: "price-data",
+    title: "Related item price",
+    action: "review-price-data"
+  },
+  "approximate-data-source": {
+    category: "price-data",
+    title: "Approximate source",
+    action: "review-price-data"
+  },
+  "unidentified-herb-price-approximation": {
+    category: "price-data",
+    title: "Estimated herb price",
+    action: "review-price-data"
+  },
+  "incoming-attack-partial-model": {
+    category: "trip-model",
+    title: "Incoming damage uses a compatibility model",
+    action: "review-trip"
+  },
+  "incoming-attack-compatibility-fallback": {
+    category: "trip-model",
+    title: "Incoming damage uses a compatibility model",
+    action: "review-trip"
+  }
+} as const satisfies Readonly<Record<string, PlannerNoticeRegistryEntry>>;
 
 export interface PlannerGearPoolEditorViewModel {
   slots: PlannerGearPoolSlotViewModel[];
@@ -472,7 +613,240 @@ function createPlannerChartViewModel(plan: PlannerPlan): PlannerChartViewModel {
   };
 }
 
-export function createPlannerPanelViewModel(plan: PlannerPlan): PlannerPanelViewModel {
+function plannerWarningIdentity(warning: SimulationWarning): string {
+  return [
+    warning.code,
+    warning.severity,
+    warning.itemId
+      ? `item:${warning.itemId}`
+      : `message:${normalizeWarningMessage(warning.message)}`,
+    warning.priceContext?.consumer ?? "",
+    warning.priceContext?.lootRowId ?? ""
+  ].join("|");
+}
+
+function stableNoticeHash(value: string): string {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+interface IndexedPlannerWarning {
+  identity: string;
+  warning: SimulationWarning;
+  order: number;
+  occurrences: string[];
+}
+
+function indexPlannerWarnings(plan: PlannerPlan): IndexedPlannerWarning[] {
+  const indexed = new Map<string, IndexedPlannerWarning>();
+  let order = 0;
+
+  const add = (warning: SimulationWarning, occurrence?: string): void => {
+    const normalized: SimulationWarning = {
+      ...warning,
+      message: normalizeWarningMessage(warning.message)
+    };
+    const identity = plannerWarningIdentity(normalized);
+    const existing = indexed.get(identity);
+    if (existing) {
+      if (occurrence && !existing.occurrences.includes(occurrence)) {
+        existing.occurrences.push(occurrence);
+      }
+      if (
+        normalized.priceContext?.affectsCurrentResult &&
+        existing.warning.priceContext &&
+        !existing.warning.priceContext.affectsCurrentResult
+      ) {
+        existing.warning = {
+          ...existing.warning,
+          priceContext: {
+            ...existing.warning.priceContext,
+            affectsCurrentResult: true
+          }
+        };
+      }
+      return;
+    }
+    indexed.set(identity, {
+      identity,
+      warning: normalized,
+      order,
+      occurrences: occurrence ? [occurrence] : []
+    });
+    order += 1;
+  };
+
+  for (const warning of plan.warnings) add(warning);
+  for (const warning of plan.start.cfg.warnings) add(warning, "Plan start");
+  for (const step of plan.steps) {
+    const range = `${SKILL_LABEL[step.skill]} ${step.from}–${step.to}`;
+    for (const warning of step.cfg.warnings) add(warning, `${range} result`);
+    for (const warning of step.trainingCfg.warnings) {
+      add(warning, `${range} training stance`);
+    }
+  }
+  for (const entry of indexed.values()) {
+    if (entry.occurrences.length === 0) entry.occurrences.push("Planner setup");
+  }
+  return [...indexed.values()];
+}
+
+function plannerNoticeDetail(warning: SimulationWarning, itemLabel: string | null): string {
+  if (warning.code === "planner-truncated") {
+    return "The displayed plan reached its calculation limit before every target was completed. Reduce or lock targets, then recompute.";
+  }
+  if (warning.code === "manual-planner-requirement-fallback") {
+    return `${itemLabel ?? "This item"} uses the maintained fallback because generated requirement data is unavailable.`;
+  }
+  if (warning.code === "missing-planner-weapon") {
+    return `${itemLabel ?? "This weapon"} is no longer available in the current game-data snapshot.`;
+  }
+  if (warning.code === "missing-planner-equipment") {
+    return `${itemLabel ?? "This equipment"} is no longer available in the current game-data snapshot.`;
+  }
+  if (warning.code === "hypothetical-planner-equipment") {
+    return `${itemLabel ?? "This equipment"} is marked hypothetical and is excluded from the current Planner pool.`;
+  }
+  if (warning.code === "dragon-halberd-npc-size-fallback") {
+    return "The selected dragon-halberd path uses approximate target-size behavior. Review the current weapon without changing it automatically.";
+  }
+  if (isMoneyWarningCode(warning.code)) {
+    return friendlyPriceWarningCopy(warning.code, itemLabel ?? "Price data").detail;
+  }
+  if (
+    warning.code === "incoming-attack-partial-model" ||
+    warning.code === "incoming-attack-compatibility-fallback"
+  ) {
+    return "Incoming damage uses incomplete source coverage. A food-per-kill override is optional and does not repair the source model.";
+  }
+  return normalizeWarningMessage(warning.message);
+}
+
+function plannerNoticeAction(input: {
+  warning: SimulationWarning;
+  editablePriceItemIds: ReadonlySet<string>;
+}): PlannerNoticeAction {
+  const { warning } = input;
+  if (warning.code === "planner-truncated") {
+    return { kind: "review-targets", label: "Review targets" };
+  }
+  if (
+    warning.code === "manual-planner-requirement-fallback" ||
+    warning.code === "missing-planner-weapon" ||
+    warning.code === "missing-planner-equipment" ||
+    warning.code === "hypothetical-planner-equipment"
+  ) {
+    return {
+      kind: "review-gear",
+      label: "Review gear",
+      ...(warning.itemId ? { itemId: warning.itemId } : {})
+    };
+  }
+  if (warning.code === "dragon-halberd-npc-size-fallback") {
+    return { kind: "review-loadout", label: "Review loadout" };
+  }
+  if (isMoneyWarningCode(warning.code)) {
+    if (
+      isPriceIssueWarningCode(warning.code) &&
+      warning.itemId &&
+      input.editablePriceItemIds.has(warning.itemId)
+    ) {
+      return { kind: "correct-price", label: "Correct price", itemId: warning.itemId };
+    }
+    return {
+      kind: "review-price-data",
+      label: "Review price data",
+      ...(warning.itemId ? { itemId: warning.itemId } : {})
+    };
+  }
+  if (
+    warning.code === "incoming-attack-partial-model" ||
+    warning.code === "incoming-attack-compatibility-fallback"
+  ) {
+    return { kind: "review-trip", label: "Review Trip assumptions" };
+  }
+  return { kind: "review-planner-inputs", label: "Review Planner inputs" };
+}
+
+export function createPlannerNoticePresentation(
+  plan: PlannerPlan,
+  context?: Pick<SimulationContext, "gameData" | "priceSet">
+): PlannerNoticePresentation {
+  const indexed = indexPlannerWarnings(plan);
+  if (plan.truncated) {
+    indexed.unshift({
+      identity: "planner-truncated|warning|synthetic",
+      warning: {
+        code: "planner-truncated",
+        severity: "warning",
+        message:
+          "The displayed plan reached its calculation limit before every target was completed."
+      },
+      order: -1,
+      occurrences: ["Planner setup"]
+    });
+  }
+  const editablePriceItemIds = new Set(Object.keys(context?.priceSet.itemPrices ?? {}));
+  const severityOrder = { error: 0, warning: 1, info: 2 } as const;
+  indexed.sort(
+    (left, right) =>
+      severityOrder[left.warning.severity] - severityOrder[right.warning.severity] ||
+      left.order - right.order ||
+      left.identity.localeCompare(right.identity)
+  );
+  const rows = indexed.map((entry): PlannerNoticeViewModel => {
+    const registry =
+      PLANNER_NOTICE_CODE_REGISTRY[entry.warning.code as keyof typeof PLANNER_NOTICE_CODE_REGISTRY];
+    const itemDisplayLabel = entry.warning.itemId
+      ? createEntityDisplayLabel({
+          technicalId: entry.warning.itemId,
+          gameDataName: context?.gameData.items[entry.warning.itemId]?.name
+        })
+      : undefined;
+    const priceCopy = isMoneyWarningCode(entry.warning.code)
+      ? friendlyPriceWarningCopy(entry.warning.code, itemDisplayLabel?.name ?? "Price data")
+      : null;
+    const visibleLabels = entry.occurrences.slice(0, 3);
+    return {
+      id: `planner-notice-${entry.warning.code.replace(/[^a-z0-9-]+/gi, "-")}-${stableNoticeHash(entry.identity)}`,
+      code: entry.warning.code,
+      severity: entry.warning.severity,
+      category: registry?.category ?? "other",
+      title: priceCopy?.summary ?? registry?.title ?? "Planner notice",
+      detail: plannerNoticeDetail(entry.warning, itemDisplayLabel?.name ?? null),
+      ...(itemDisplayLabel ? { itemDisplayLabel } : {}),
+      occurrences: {
+        totalCount: entry.occurrences.length,
+        visibleLabels,
+        hiddenCount: Math.max(0, entry.occurrences.length - visibleLabels.length)
+      },
+      action: plannerNoticeAction({ warning: entry.warning, editablePriceItemIds }),
+      affectsCurrentResult: entry.warning.priceContext?.affectsCurrentResult ?? true
+    };
+  });
+  const issueCount = rows.filter((row) => row.severity !== "info").length;
+  const noteCount = rows.length - issueCount;
+  const occurrenceCount = rows.reduce((sum, row) => sum + row.occurrences.totalCount, 0);
+  const warningSetIdentity = indexed.map((entry) => entry.identity).join("\n");
+  return {
+    warningSetId: rows.length
+      ? `planner-warning-set-${rows.length}-${stableNoticeHash(warningSetIdentity)}`
+      : "planner-warning-set-empty",
+    issueCount,
+    noteCount,
+    occurrenceCount,
+    rows
+  };
+}
+
+export function createPlannerPanelViewModel(
+  plan: PlannerPlan,
+  context?: Pick<SimulationContext, "gameData" | "priceSet">
+): PlannerPanelViewModel {
   const timeline = plan.unlocks.map(timelineEvent);
   return {
     summary: {
@@ -490,7 +864,7 @@ export function createPlannerPanelViewModel(plan: PlannerPlan): PlannerPanelView
     unlocks: plan.unlocks.map(unlockRow),
     timeline,
     chart: createPlannerChartViewModel(plan),
-    warnings: plan.warnings.map((warning) => warning.message),
+    notices: createPlannerNoticePresentation(plan, context),
     isEmpty: plan.steps.length === 0
   };
 }
