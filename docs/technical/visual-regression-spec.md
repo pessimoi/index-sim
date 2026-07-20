@@ -347,6 +347,39 @@ absolute path or raw diagnostic. The explicit update completed 20/20, and the
 following full tracked-baseline read-only run passed 20/20 against all 31
 fixture-only images. Candidate evidence remains workspace-local and ignored.
 
+## 2026-07-20 six-goal release-readiness review
+
+The first escalated read-only run reached all 26 scenarios: 21 passed and five
+stopped at their first mismatch (`Loot desktop`, `Loot mobile`, `Economy
+desktop`, `Planner mobile` and `Settings desktop`). A separate ignored
+candidate configuration then generated all 37 images so later Loot, Economy
+and Settings captures could be reviewed without writing tracked baselines.
+
+The review accepted exactly ten fixture-only images:
+
+- Loot desktop/mobile, action impact and nested desktop/mobile;
+- Economy desktop and selected-trend desktop;
+- Planner mobile; and
+- Settings desktop and Price data desktop.
+
+The differences are owned by the six implemented release-readiness goals:
+complete Planner issues/notes/actions, the Monster-specific Settings inventory,
+the local-history lifecycle, user-friendly price date/time facts and current
+deterministic price fixtures. Loot and Economy remain numerically consistent
+with the functional browser snapshots. No real player name, imported user file,
+browser profile data, secret, token, absolute path or raw parser diagnostic
+appeared in a candidate.
+
+Image inspection also exposed one real nested-table defect: the broad
+`.loot-table thead th` selector made a nested action-impact header sticky and
+covered its first row after scrolling. Restricting it to the direct main-table
+header restored the visible `Loot` row before baseline acceptance. The scoped
+official update wrote only the ten images above; Planner desktop, Duel, Settings
+legacy review and the other 24 scenarios retained their accepted comparison.
+Two subsequent full tracked-baseline read-only runs passed 26/26 in 38.9 and
+43.6 seconds against all 37 images. The complete functional Chromium gate also
+passed 115/115 with one worker.
+
 ## Diff policy
 
 Use Playwright `toHaveScreenshot` with:

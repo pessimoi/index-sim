@@ -9,6 +9,7 @@ import {
   DEFAULT_LOOT_TABLE_SORT_STATE
 } from "../app/view-models/loot";
 import { createSimulationViewModel } from "../app/view-models/simulation";
+import { createPriceTimeContext, presentPriceDateTime } from "../app/view-models/price-time";
 import type { LootAction } from "../domain/trip";
 
 const noOp = () => undefined;
@@ -44,6 +45,54 @@ function elements(node: ReactNode): ReactElement[] {
 }
 
 describe("Loot pane", () => {
+  it("renders friendly semantic latest and baseline capture facts", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const simulation = createSimulationViewModel(DEFAULT_FORM_STATE, context);
+    const template = simulation.loot.actionableRows[0]!;
+    const timeContext = createPriceTimeContext(new Date("2026-07-20T13:00:00Z"), "UTC");
+    const row = {
+      ...template,
+      historyContext: {
+        ...template.historyContext,
+        tracked: true,
+        statusLabel: "Tracked",
+        latestPrice: 250,
+        baselinePrice: 200,
+        gpDelta: 50,
+        percentDelta: 25,
+        latestCaptureTime: presentPriceDateTime("2026-07-20T12:00:00Z", timeContext),
+        baselineCaptureTime: presentPriceDateTime("2026-07-19T12:00:00Z", timeContext)
+      }
+    };
+    const markup = renderToStaticMarkup(
+      createElement(LootPane, {
+        hidden: false,
+        model: {
+          presentation: {
+            ...simulation.loot,
+            rows: [row],
+            actionableRows: [row],
+            conditionalRows: []
+          },
+          settings: lootSettingsForMonster({}, DEFAULT_FORM_STATE.monsterId),
+          notice: null,
+          gpPerKill: simulation.trip.gpPerKill,
+          effectiveNetGpPerHour: simulation.trip.effectiveNetGpPerHour,
+          sort: DEFAULT_LOOT_TABLE_SORT_STATE,
+          nestedSort: DEFAULT_LOOT_NESTED_TABLE_SORT_STATE
+        },
+        actions
+      })
+    );
+
+    expect(markup).toContain("<strong>Price history</strong>");
+    expect(markup).toContain("Latest</dt><dd>250 · <time");
+    expect(markup).toContain(">20 Jul 2026, 12:00 UTC</time>");
+    expect(markup).toContain("Baseline</dt><dd>200 · <time");
+    expect(markup).toContain(">19 Jul 2026, 12:00 UTC</time>");
+    expect(markup).not.toContain(">2026-07-20T12:00:00Z<");
+  });
+
   it("renders source names as primary copy and underscored ids only in technical details", async () => {
     const { context } = await loadBundledLegacyContext();
     const simulation = createSimulationViewModel(DEFAULT_FORM_STATE, context);
@@ -128,7 +177,7 @@ describe("Loot pane", () => {
       markup.startsWith('<section class="loot-strip" aria-label="Current monster loot" hidden="">')
     ).toBe(true);
     inOrder(markup, [
-      "<h2>Loot actions</h2>",
+      '<h2 id="loot-actions-heading" tabindex="-1">Loot actions</h2>',
       "High alch",
       "Overhead",
       "Overhead (seconds)",
@@ -141,7 +190,7 @@ describe("Loot pane", () => {
       'aria-label="Current monster drops"'
     ]);
     expect(markup).toContain("Monster actions");
-    expect(markup).toContain("Local history");
+    expect(markup).toContain("Price history");
     expect(markup).toContain("loot-price-cell");
     expect(markup).toContain("Price data");
     expect(markup).not.toContain('aria-label="Loot price warnings"');

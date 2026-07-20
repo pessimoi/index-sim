@@ -84,6 +84,7 @@ function matrixFixture(): DuelMatrixViewModel {
         snapshotId: null,
         source: "live",
         name: "Live setup",
+        displayName: "Live setup",
         combatStyle: "melee",
         loadoutLabel: "melee"
       }

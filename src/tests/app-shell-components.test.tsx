@@ -1,6 +1,8 @@
 import { createElement, createRef, isValidElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { AppHeader } from "../app/components/shell/app-header";
+import { PendingUndoStatus, type PendingUndo } from "../app/components/app-presenters";
+import { globalStatusAnnouncement } from "../app/view-models/global-status";
 import { LegacyMigrationPanel } from "../app/components/shell/legacy-migration-panel";
 import { SharedSetupReview } from "../app/components/shell/shared-setup-review";
 import { WorkbenchShell } from "../app/components/shell/workbench-shell";
@@ -36,6 +38,28 @@ function elements(node: ReactNode): ReactElement[] {
 }
 
 describe("app shell components", () => {
+  it("renders one labelled polite Undo surface and suppresses its duplicate global announcement", () => {
+    const pendingUndo: PendingUndo = {
+      id: "undo-1",
+      label: "A long reset result that must remain visible without losing the native action",
+      restoreLabel: "Restored reset",
+      createdAt: 1,
+      restore: noOp
+    };
+    const markup = renderToStaticMarkup(
+      <PendingUndoStatus pendingUndo={pendingUndo} onUndo={noOp} />
+    );
+
+    expect(markup.match(/role="status"/g)).toHaveLength(1);
+    expect(markup).toContain('aria-live="polite"');
+    expect(markup).toContain('aria-label="Local state undo"');
+    expect(markup).toContain("A long reset result");
+    expect(markup).toContain(">Undo</button>");
+    expect(globalStatusAnnouncement(pendingUndo.label, pendingUndo)).toBe("");
+    expect(globalStatusAnnouncement("Unrelated status", pendingUndo)).toBe("Unrelated status");
+    expect(renderToStaticMarkup(<PendingUndoStatus pendingUndo={null} onUndo={noOp} />)).toBe("");
+  });
+
   it("computes minimal bounded workbench-tab scroll targets", () => {
     const tabs = [
       { start: 0, end: 80 },

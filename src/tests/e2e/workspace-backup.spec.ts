@@ -212,6 +212,7 @@ test("workspace restore mixed Merge preview retains unrelated current rows and s
     .click();
   await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Economy" }).click();
   await page.getByRole("button", { name: "Save local comparison" }).click();
+  await page.waitForFunction(() => window.localStorage.getItem("index-sim:price-history") !== null);
   const currentRows = await page.evaluate(() => ({
     duel: JSON.parse(window.localStorage.getItem("index-sim:duel-snapshots")!).data.snapshots[0],
     history: JSON.parse(window.localStorage.getItem("index-sim:price-history")!).data.snapshots[0]

@@ -1,6 +1,6 @@
 # Global Undo visibility and targeted Reset recovery specification
 
-- Status: proposed on 2026-07-20
+- Status: implemented on 2026-07-20
 - Priority: high
 - Estimated effort: M
 - Owner: ready app shell, global status/Undo and existing state owners
@@ -9,6 +9,18 @@
 - Depends on: the existing single `PendingUndo` slot, normal Default/Custom form
   write-through, local-state recovery and the implemented Economy/Hiscores/setup
   Undo contracts
+
+Implementation evidence: one `PendingUndoStatus` remains the only interactive
+and polite owner, matching hidden general-status copy is suppressed, all seven
+targeted Reset classes use changed/no-op/restore handling and mobile/portrait
+sticky behavior no longer inherits an accidental shell scroll container.
+Focused component/state coverage passes 87/87, the full unit suite passes
+952/952, four targeted production-preview transactions plus three existing
+Loot/hidden-tier regressions pass, the 390/620/768/640/desktop reachability
+matrix passes, architecture has 149 modules with no cycles, all 19 goldens pass
+and the production build plus diff check pass. The final combined release run
+passes the complete 115/115 Chromium gate and two 26/26 read-only Darwin visual
+runs after the explicitly reviewed, feature-owned baseline update.
 
 ## Purpose
 

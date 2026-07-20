@@ -7,6 +7,7 @@ import {
 } from "./helpers/domain-planner";
 import {
   buildPlan,
+  collectPlannerEvaluationWarnings,
   defaultPool,
   equippable,
   evaluatePlannerCandidate,
@@ -17,7 +18,7 @@ import {
   xpAt
 } from "../domain/planner";
 import { sumEquipmentBonuses } from "../domain/equipment";
-import type { SimulationContext } from "../domain/shared";
+import type { SimulationContext, SimulationWarning } from "../domain/shared";
 
 interface PlannerGoldenFixture {
   cases: Array<{
@@ -235,7 +236,82 @@ describe("planner domain scoring", () => {
       maxLevels: 1
     });
 
-    expect(plan.warnings.map((warning) => warning.code)).toContain("missing-planner-weapon");
+    expect(plan.warnings).toContainEqual(
+      expect.objectContaining({
+        code: "missing-planner-weapon",
+        itemId: "abyssal_whip"
+      })
+    );
+  });
+
+  it("preserves exact item ids for missing and hypothetical equipment candidates", () => {
+    const { runtime, context } = createPlannerRuntime();
+    const sourceHelm = context.gameData.equipment.helm.iron_full_helm;
+    const sourceItem = context.gameData.items.iron_full_helm;
+    expect(sourceHelm).toBeDefined();
+    expect(sourceItem).toBeDefined();
+    const hypotheticalId = "hypothetical_test_helm";
+    const candidateContext: SimulationContext = {
+      ...context,
+      gameData: {
+        ...context.gameData,
+        items: {
+          ...context.gameData.items,
+          [hypotheticalId]: {
+            ...sourceItem!,
+            id: hypotheticalId,
+            provenance: {
+              source: "hypothetical",
+              sourceRef: "test#hypothetical-equipment"
+            }
+          }
+        },
+        equipment: {
+          ...context.gameData.equipment,
+          helm: {
+            ...context.gameData.equipment.helm,
+            [hypotheticalId]: { ...sourceHelm! }
+          }
+        }
+      }
+    };
+    const input = plannerInputFromDefinition(runtime, {
+      id: "planner_equipment_warning_ids",
+      description: "Planner equipment warning ids",
+      combatType: "melee",
+      monsterId: "giant",
+      weapon: "rune_scimitar",
+      style: "aggressive",
+      levels: { attack: 40, strength: 40, defence: 40, ranged: 1, magic: 1, prayer: 1 },
+      prayers: ["none"],
+      boosts: ["none"],
+      trip: { foodKey: "none", teleport: false, bankSeconds: 0, prayerMode: "none" }
+    });
+
+    const plan = buildPlan(input, candidateContext, {
+      targets: { strength: 41 },
+      pool: {
+        weapon: ["rune_scimitar"],
+        helm: ["missing_test_helm", hypotheticalId],
+        body: ["none"],
+        legs: ["none"],
+        shield: ["none"]
+      },
+      maxLevels: 1
+    });
+
+    expect(plan.warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "missing-planner-equipment",
+          itemId: "missing_test_helm"
+        }),
+        expect.objectContaining({
+          code: "hypothetical-planner-equipment",
+          itemId: hypotheticalId
+        })
+      ])
+    );
   });
 
   it("surfaces manual requirement fallback when generated data is missing", () => {
@@ -259,9 +335,62 @@ describe("planner domain scoring", () => {
       expect.objectContaining({
         code: "manual-planner-requirement-fallback",
         severity: "info",
+        itemId: expect.any(String),
         message: expect.stringContaining("manual requirement fallback")
       })
     );
+  });
+
+  it("collects start, result and training warnings without losing current relevance", () => {
+    const { runtime, context } = createPlannerRuntime();
+    const input = plannerInputFromDefinition(runtime, {
+      id: "planner_warning_collection",
+      description: "Planner structured warning collection",
+      combatType: "melee",
+      monsterId: "giant",
+      weapon: "rune_scimitar",
+      style: "aggressive",
+      levels: { attack: 40, strength: 40, defence: 40, ranged: 1, magic: 1, prayer: 1 },
+      prayers: ["none"],
+      boosts: ["none"],
+      trip: { foodKey: "none", teleport: false, bankSeconds: 0, prayerMode: "none" }
+    });
+    const plan = buildPlan(input, context, { targets: { strength: 41 }, maxLevels: 1 });
+    const repeated: SimulationWarning = {
+      code: "missing-price",
+      severity: "warning",
+      itemId: "rune_scimitar",
+      message: `  Rune scimitar\n${"price ".repeat(60)}`,
+      priceContext: { consumer: "supply", affectsCurrentResult: false }
+    };
+    const current: SimulationWarning = {
+      ...repeated,
+      priceContext: { consumer: "supply", affectsCurrentResult: true }
+    };
+    const trainingOnly: SimulationWarning = {
+      code: "training-only-test",
+      severity: "info",
+      message: "Training stance only"
+    };
+    const step = plan.steps[0];
+    expect(step).toBeDefined();
+
+    const warnings = collectPlannerEvaluationWarnings({ ...plan.start.cfg, warnings: [repeated] }, [
+      {
+        ...step,
+        cfg: { ...step.cfg, warnings: [current] },
+        trainingCfg: { ...step.trainingCfg, warnings: [repeated, trainingOnly] }
+      }
+    ]);
+
+    expect(warnings).toHaveLength(2);
+    expect(warnings.find((warning) => warning.code === "missing-price")).toMatchObject({
+      itemId: "rune_scimitar",
+      message: expect.not.stringMatching(/\s{2,}/),
+      priceContext: { affectsCurrentResult: true }
+    });
+    expect(warnings.find((warning) => warning.code === "missing-price")?.message.length).toBe(240);
+    expect(warnings.map((warning) => warning.code)).toContain("training-only-test");
   });
 
   it("uses generated requirements for Planner unlock binding without fallback warning", () => {

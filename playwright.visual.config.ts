@@ -31,6 +31,7 @@ export default defineConfig({
         baseURL,
         colorScheme: "light",
         locale: "en-US",
+        timezoneId: "UTC",
         trace: "on-first-retry"
       }
     }

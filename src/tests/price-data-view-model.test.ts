@@ -22,10 +22,10 @@ import {
   createSelectedPriceItemPresentation,
   economyAriaSort,
   economyMoverTone,
-  formatPriceAge,
   summarizeItemPriceMetadata
 } from "../app/view-models/price-data";
 import type { PriceSet } from "../domain/shared";
+import { createPriceTimeContext } from "../app/view-models/price-time";
 
 function priceSet(overrides: Partial<PriceSet> = {}): PriceSet {
   return {
@@ -332,8 +332,11 @@ describe("price-data view model", () => {
       available: true,
       sourceLabel: "Manual item overrides (2)",
       label: "Fixture prices",
-      ageLabel: "1 hr",
-      ageAccessibleLabel: "1 hour",
+      timeLabel: "Active prices updated",
+      time: {
+        exactVisible: "14 Jul 2026, 12:00 UTC",
+        relativeVisible: "1 hr ago"
+      },
       itemCount: 2,
       alchCount: 2,
       metadata: { observedHigh: 1, generatedFallback: 1 }
@@ -341,7 +344,8 @@ describe("price-data view model", () => {
     expect(presentation.scheduled).toMatchObject({
       ready: true,
       label: "Scheduled prices",
-      ageLabel: "2 hr",
+      timeLabel: "Snapshot captured",
+      time: { relativeVisible: "2 hr ago" },
       itemCount: 2
     });
     expect(presentation.reset).toMatchObject({
@@ -350,6 +354,62 @@ describe("price-data view model", () => {
       canReset: true
     });
     expect(presentation.reset.fallbackPriceSet?.id).toBe("scheduled-prices");
+  });
+
+  it("assigns source-accurate PriceSet time labels and preserves date-only or invalid precision", () => {
+    const context = createPriceTimeContext(new Date("2026-07-20T01:00:00Z"), "UTC");
+    const labels = (
+      [
+        ["scheduled", 0, "Active snapshot captured"],
+        ["bundled", 0, "Bundled price set created"],
+        ["selected", 0, "Selected price set created"],
+        ["selected", 1, "Active prices updated"]
+      ] as const
+    ).map(([activePriceSetOrigin, overrideCount, expected]) => {
+      const presentation = createPriceSetPresentation({
+        activePriceSet: priceSet(),
+        bundledPriceSet: priceSet(),
+        scheduledSnapshotStatus: scheduledStatus(),
+        activePriceSetOrigin,
+        priceLabel: "Fallback",
+        activeManualPriceOverrideCount: overrideCount,
+        timeContext: context
+      });
+      expect(presentation.active.timeLabel).toBe(expected);
+      return presentation.active.timeLabel;
+    });
+    expect(new Set(labels).size).toBe(4);
+
+    const dateOnly = createPriceSetPresentation({
+      activePriceSet: priceSet({ createdAt: "2026-07-05" }),
+      bundledPriceSet: null,
+      scheduledSnapshotStatus: null,
+      activePriceSetOrigin: "selected",
+      priceLabel: "Fallback",
+      activeManualPriceOverrideCount: 0,
+      timeContext: context
+    });
+    expect(dateOnly.active.time).toMatchObject({
+      precision: "date",
+      dateTime: "2026-07-05",
+      exactVisible: "5 Jul 2026",
+      relativeVisible: null
+    });
+    const invalid = createPriceSetPresentation({
+      activePriceSet: priceSet({ createdAt: "legacy free-form private value" }),
+      bundledPriceSet: null,
+      scheduledSnapshotStatus: null,
+      activePriceSetOrigin: "selected",
+      priceLabel: "Fallback",
+      activeManualPriceOverrideCount: 0,
+      timeContext: context
+    });
+    expect(invalid.active.time).toMatchObject({
+      precision: "invalid",
+      dateTime: null,
+      exactVisible: "Date unavailable"
+    });
+    expect(JSON.stringify(invalid.active.time)).not.toContain("legacy free-form private value");
   });
 
   it("preserves empty/loading and bundled fallback status, warnings and metadata buckets", () => {
@@ -431,7 +491,11 @@ describe("price-data view model", () => {
     });
 
     expect(empty).toMatchObject({
-      active: { available: false, label: "Fallback label", ageLabel: "-" },
+      active: {
+        available: false,
+        label: "Fallback label",
+        time: { precision: "missing", exactVisible: "Unavailable" }
+      },
       scheduled: { ready: false, statusLabel: "Loading", tone: "neutral" },
       reset: { fallbackOrigin: "bundled", canReset: false }
     });
@@ -496,6 +560,20 @@ describe("price-data view model", () => {
       canApply: true
     });
     expect(presentation.selectedOverride?.updatedAt).toBe("2026-07-14T12:30:00.000Z");
+    expect(presentation.updatedTime).toMatchObject({
+      dateTime: "2026-07-14T12:30:00.000Z",
+      exactVisible: "14 Jul 2026, 12:30 UTC"
+    });
+    expect(
+      createManualPriceEditorPresentation({
+        activePriceSet: priceSet(),
+        basePriceSet: priceSet(),
+        itemLabels: { lobster: "Lobster" },
+        manualPriceOverrides: DEFAULT_MANUAL_PRICE_OVERRIDES_STATE,
+        selectedItemId: "lobster",
+        draft: null
+      }).updatedTime.exactVisible
+    ).toBe("Not applicable");
   });
 
   it("disables a new manual override at the storage cap without blocking an existing row", () => {
@@ -590,7 +668,7 @@ describe("price-data view model", () => {
       snapshotCount: 2,
       trackedItemCount: 2,
       latestAgeSeconds: 90,
-      latestAgeLabel: "1 min",
+      latestTime: { relativeVisible: "1 min ago" },
       activeMatchesLatest: true
     });
   });
@@ -776,6 +854,89 @@ describe("price-data view model", () => {
     );
   });
 
+  it("keeps canonical history identity while disambiguating friendly captures and provenance", () => {
+    const capturedAt = "2026-07-20T00:00:01.000Z";
+    const sources = createPriceHistorySources({
+      scheduledSnapshotStatus: null,
+      localPriceHistory: {
+        snapshots: [
+          {
+            capturedAt,
+            sourcePriceSetId: "same",
+            label: "Duplicate",
+            itemPrices: { lobster: 220 },
+            itemPriceMetadata: {
+              lobster: {
+                valueOrigin: "market-observation",
+                refreshStatus: "retained",
+                quality: "medium",
+                sourceId: "markets.lostcity.rs",
+                sourceSlug: "lobster",
+                valueObservedAt: "2026-07-18T10:00:00.000Z",
+                evaluatedAt: "2026-07-20T00:00:00.000Z",
+                reasonCode: "source-item-unavailable"
+              }
+            },
+            itemPriceStatuses: { lobster: "retained" }
+          },
+          {
+            capturedAt,
+            sourcePriceSetId: "same",
+            label: "Duplicate",
+            itemPrices: { lobster: 200 },
+            itemPriceMetadata: {
+              lobster: {
+                valueOrigin: "imported",
+                refreshStatus: "not-evaluated",
+                quality: "unknown"
+              }
+            },
+            itemPriceStatuses: { lobster: "legacy-unknown" }
+          }
+        ]
+      }
+    });
+    const history = createEconomyHistoryPresentation({
+      sources,
+      itemLabels: { lobster: "Lobster" },
+      controls: {
+        baselineMode: "previous",
+        snapshotKey: "",
+        itemFilter: "",
+        trendItemId: "lobster",
+        sort: { key: "item", direction: "asc" }
+      },
+      timeZone: "UTC"
+    });
+
+    expect(history.snapshotOptions.map((option) => option.id)).toEqual([
+      `${capturedAt}::same`,
+      `${capturedAt}::same`
+    ]);
+    expect(history.snapshotOptions.map((option) => option.label)).toEqual([
+      "Duplicate · 20 Jul 2026, 00:00:01 UTC (1 of 2)",
+      "Duplicate · 20 Jul 2026, 00:00:01 UTC (2 of 2)"
+    ]);
+    expect(history.trend.points.map((point) => point.price)).toEqual([200, 220]);
+    expect(history.trend.points.map((point) => point.priceStatus)).toEqual([
+      "legacy-unknown",
+      "retained"
+    ]);
+    expect(history.trend.points[0]).toMatchObject({
+      observedTime: { exactVisible: "Not recorded" },
+      evaluatedTime: { exactVisible: "Not evaluated" }
+    });
+    expect(history.trend.points[1]).toMatchObject({
+      captureTime: { exactVisible: "20 Jul 2026, 00:00:01 UTC (2 of 2)" },
+      observedTime: { exactVisible: "18 Jul 2026, 10:00 UTC" },
+      evaluatedTime: { exactVisible: "20 Jul 2026, 00:00 UTC" }
+    });
+    expect(history.lootHistoryByItem.lobster).toMatchObject({
+      latestCaptureTime: { dateTime: capturedAt },
+      baselineCaptureTime: { dateTime: capturedAt }
+    });
+  });
+
   it("derives selected provenance freshness and compact formatter semantics", () => {
     const selected = createSelectedPriceItemPresentation({
       activePriceSet: priceSet(),
@@ -795,9 +956,15 @@ describe("price-data view model", () => {
       technicalId: "lobster",
       source: "game-data"
     });
-    expect(formatPriceAge(null)).toBe("-");
-    expect(formatPriceAge(59)).toBe("<1 min");
-    expect(formatPriceAge(86_400)).toBe("1 day");
+    expect(selected.observedTime.exactVisible).toBe("14 Jul 2026, 11:55 UTC");
+    expect(selected.evaluatedTime.exactVisible).toBe("14 Jul 2026, 12:00 UTC");
+    const generated = createSelectedPriceItemPresentation({
+      activePriceSet: priceSet(),
+      itemId: "big_bones",
+      freshnessNow: new Date("2026-07-14T13:00:00.000Z")
+    });
+    expect(generated.observedTime.exactVisible).toBe("Not applicable");
+    expect(generated.evaluatedTime.exactVisible).toBe("Not evaluated");
     expect(economyAriaSort({ key: "gpDelta", direction: "desc" }, "gpDelta")).toBe("descending");
     expect(economyMoverTone({ gpDelta: 1 })).toBe("gain");
     expect(economyMoverTone({ gpDelta: -1 })).toBe("loss");

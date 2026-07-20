@@ -8,7 +8,10 @@ import {
   DEFAULT_MANUAL_PRICE_OVERRIDES_STATE,
   setManualPriceOverride
 } from "../app/state/manual-price-overrides";
-import { DEFAULT_PRICE_HISTORY_STATE } from "../app/state/price-history";
+import {
+  DEFAULT_PRICE_HISTORY_STATE,
+  PRICE_HISTORY_MAX_SNAPSHOTS
+} from "../app/state/price-history";
 import { PRICE_SET_IMPORT_MAX_BYTES } from "../data/schemas";
 import type { GameDataSnapshot, PriceSet } from "../domain/shared";
 
@@ -174,7 +177,7 @@ describe("PriceSet transfer controller", () => {
       "refresh",
       "unblock"
     ]);
-    expect(test.unblockReplaced).toHaveBeenCalledWith(["price-history", "selected-price-set"]);
+    expect(test.unblockReplaced).toHaveBeenCalledWith(["selected-price-set"]);
     expect(test.core.getSnapshot()).toEqual({
       importNotice: {
         tone: "success",
@@ -200,6 +203,39 @@ describe("PriceSet transfer controller", () => {
       status: "rejected"
     });
     expect(beforeAccept).toHaveBeenCalledTimes(1);
+  });
+
+  it("accepts and persists the PriceSet while reporting a byte-stable full history skip", () => {
+    const test = harness();
+    const fullHistory = {
+      snapshots: Array.from({ length: PRICE_HISTORY_MAX_SNAPSHOTS }, (_, index) => ({
+        capturedAt: new Date(Date.UTC(2026, 6, index + 1, 12)).toISOString(),
+        sourcePriceSetId: `existing-${index}`,
+        label: `Existing ${index}`,
+        itemPrices: { lobster: 200 + index }
+      }))
+    };
+
+    const outcome = test.core.acceptPriceSet({
+      priceSet: JSON.parse(priceSetText()),
+      acceptedAt: FIXED_NOW,
+      nextStatus: "Imported price set",
+      gameData: gameData(),
+      manualPriceOverrides: DEFAULT_MANUAL_PRICE_OVERRIDES_STATE
+    });
+    const capture = outcome.priceHistoryCapture(fullHistory);
+
+    expect(capture).toEqual({
+      status: "full-skipped",
+      history: fullHistory,
+      guidance:
+        "Local history is full, so this PriceSet was not saved as a comparison. Review local history, then save it explicitly."
+    });
+    expect(capture.history).toBe(fullHistory);
+    expect(outcome.activePriceSet.id).toBe("imported-prices");
+    expect(outcome.selectedPersisted).toBe(true);
+    expect(test.saveSelectedPriceSet).toHaveBeenCalledOnce();
+    expect(test.unblockReplaced).toHaveBeenCalledWith(["selected-price-set"]);
   });
 
   it.each([
@@ -239,7 +275,7 @@ describe("PriceSet transfer controller", () => {
         "Imported price set: Imported fixture prices. High alch uses current generated game data. Local restore was not saved."
     });
     expect(events).toContain(expectedEvent);
-    expect(test.unblockReplaced).toHaveBeenCalledWith(["price-history", "selected-price-set"]);
+    expect(test.unblockReplaced).toHaveBeenCalledWith(["selected-price-set"]);
   });
 
   it.each([

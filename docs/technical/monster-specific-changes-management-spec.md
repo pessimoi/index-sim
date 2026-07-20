@@ -1,6 +1,6 @@
 # Monster-specific changes management specification
 
-- Status: proposed on 2026-07-20
+- Status: implemented on 2026-07-20
 - Priority: high
 - Estimated effort: L
 - Owner: Settings, app-shell navigation and existing monster-specific state
@@ -637,6 +637,32 @@ required.
   completion for existing state, not a new product feature family.
 - Focused state/controller/component, type, architecture, browser, visual,
   golden, build, complete functional and diff gates pass.
+
+## Implementation evidence
+
+- `src/app/view-models/monster-specific-changes.ts` owns the closed five-kind
+  inventory, friendly summaries, deterministic sorting and totals;
+  `src/app/state/monster-specific-changes.ts` owns review projection,
+  stale/no-op validation and schema-validated next-state derivation.
+- `src/app/controllers/local-state-batch.ts` is now the one shared exact-
+  preimage write/reverse-rollback primitive used by both Workspace restore and
+  `monster-specific-changes-transaction.ts`. The new transaction writes only
+  selected existing envelopes with one timestamp, has an explicit safe
+  session-only branch and keeps raw values out of the DOM model.
+- Settings composes the pure responsive panel after Calculation context.
+  Category Review uses current target/tab state and bounded post-render focus;
+  Compare Review also exposes the selected hidden row before focusing it.
+- Focused inventory, candidate, panel, transaction and unchanged Workspace
+  coverage passes 26/26; full unit coverage passes 961/961 and full functional
+  Chromium passes 110/110. Typecheck, 19 goldens, the 154-module no-cycle
+  architecture gate, production build and diff check pass. Two focused Chromium cases cover all five Review
+  destinations, zero-mutation review, durable three-area cleanup, same-target
+  Default fallback, unrelated-state retention, complete Undo and containment
+  at 390 x 844, 620 x 844, 768 x 1024, 640 x 360 and 1440 x 900.
+- The repository-local visual runner remains subject to the managed Chromium
+  Mach-port permission limitation recorded by the preceding global-Undo goal;
+  this implementation therefore adds functional viewport containment evidence
+  without changing screenshot baselines before the shared final release run.
 
 ## Implementation sequence
 

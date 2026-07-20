@@ -85,6 +85,87 @@ test("reviews the Settings PriceSet in Economy without changing price or disclos
   ).toEqual(storageBefore);
 });
 
+test("presents price dates semantically and preserves compatible date precision", async ({
+  page
+}) => {
+  await page.clock.install({ time: new Date("2026-07-20T12:00:00.000Z") });
+  await page.goto("/");
+  const tabs = page.getByLabel("Workbench tabs");
+  await tabs.getByRole("tab", { name: "Economy" }).click();
+  const market = page.getByLabel("Market price data");
+  const scheduled = market.getByLabel("Scheduled price snapshot summary");
+  const active = market.getByLabel("Market active PriceSet summary");
+
+  await expect(scheduled).toContainText("Snapshot captured");
+  await expect(scheduled).toContainText("Captured");
+  await expect(scheduled.locator("time")).toHaveCount(1);
+  await expect(scheduled.locator("time")).toHaveAttribute("dateTime", /Z$/);
+  expect(await scheduled.locator("time").textContent()).not.toMatch(
+    /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/
+  );
+  await expect(active).toContainText(/(Active snapshot captured|Bundled price set created)/);
+  await expect(active.locator("time")).toHaveCount(1);
+
+  await tabs.getByRole("tab", { name: "Settings" }).click();
+  const compact = page.getByLabel("Active PriceSet summary");
+  await expect(compact.locator("time")).toHaveCount(1);
+  await expect(compact.locator("time")).toHaveAttribute("aria-label", /exact local time/i);
+
+  await tabs.getByRole("tab", { name: "Economy" }).click();
+  const tools = market.getByLabel("Advanced PriceSet tools");
+  await tools.locator(":scope > summary").click();
+  const importInput = tools
+    .locator("label.file-button")
+    .filter({ hasText: "Import full PriceSet" })
+    .locator('input[type="file"]');
+  await importInput.setInputFiles({
+    name: "date-only-prices.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(
+      JSON.stringify({
+        id: "date-only-prices",
+        label: "Date-only prices",
+        source: "manual",
+        createdAt: "2026-07-05",
+        itemPrices: { lobster: 250 },
+        alchValues: { lobster: 0 }
+      })
+    )
+  });
+  await expect(active).toContainText("Selected price set created 5 Jul 2026");
+  await expect(active).toContainText("Age Exact time not recorded");
+  await expect(active.locator("time")).toHaveAttribute("dateTime", "2026-07-05");
+  await expect(active).not.toContainText("00:00");
+
+  await importInput.setInputFiles({
+    name: "compatible-invalid-date-prices.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(
+      JSON.stringify({
+        id: "compatible-invalid-date-prices",
+        label: "Compatible invalid date prices",
+        source: "manual",
+        createdAt: "stored date is unrecognized",
+        itemPrices: { lobster: 260 },
+        alchValues: { lobster: 0 }
+      })
+    )
+  });
+  await expect(active).toContainText("Selected price set created Date unavailable");
+  await expect(active).not.toContainText("stored date is unrecognized");
+
+  const manual = page.getByRole("region", { name: "Manual item price", exact: true });
+  await chooseSearchableOption(manual, "Manual price item", "Lobster", true);
+  await expect(manual.getByLabel("Manual item price summary")).toContainText(
+    "Manual price updated Not applicable"
+  );
+  await manual.getByLabel("Manual price", { exact: true }).fill("270");
+  await manual.getByRole("button", { name: "Apply price" }).click();
+  const manualTime = manual.getByLabel("Manual item price summary").locator("time");
+  await expect(manualTime).toHaveAttribute("dateTime", /^2026-07-20T12:00:/);
+  expect(await manualTime.textContent()).not.toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/);
+});
+
 test("looks up hiscores through the same-origin API and applies previewed levels", async ({
   page
 }) => {
@@ -558,9 +639,9 @@ test("refreshes the latest price-history age while Economy stays open", async ({
   await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Economy" }).click();
   const summary = page.getByLabel("Price history summary");
 
-  await expect(summary).toContainText("Latest age <1 min");
+  await expect(summary).toContainText("Latest age just now");
   await page.clock.fastForward(60_000);
-  await expect(summary).toContainText("Latest age 1 min");
+  await expect(summary).toContainText("Latest age 1 min ago");
 });
 
 test("analyzes and manages browser-local price history in Economy", async ({ page }) => {
@@ -630,7 +711,9 @@ test("analyzes and manages browser-local price history in Economy", async ({ pag
   await expect(itemTrend).toContainText("Maximum500");
   await expect(itemTrend).toContainText("+50 / +16.7%");
   await expect(page.getByRole("img", { name: "Big bones price trend", exact: true })).toBeVisible();
-  await expect(page.getByLabel("Price points for Big bones")).toContainText("2026-07-04");
+  const bigBonesPricePoints = page.getByLabel("Price points for Big bones");
+  await expect(bigBonesPricePoints).toContainText("4 Jul 2026, 12:00 UTC");
+  await expect(bigBonesPricePoints).not.toContainText("2026-07-04T12:00");
 
   await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Loot" }).click();
   const bigBonesRow = page.getByRole("table", { name: "Current monster drops" }).getByRole("row", {
@@ -658,6 +741,7 @@ test("analyzes and manages browser-local price history in Economy", async ({ pag
   );
   expect(afterSnapshot.data.snapshots).toHaveLength(4);
 
+  await page.locator("details.local-history-management > summary").click();
   await page.getByRole("button", { name: "Clear local history" }).click();
   expect(
     await page.evaluate(() => window.localStorage.getItem("index-sim:price-history"))
@@ -674,6 +758,186 @@ test("analyzes and manages browser-local price history in Economy", async ({ pag
   );
   await expect(page.getByLabel("Market active PriceSet summary")).toContainText(
     /scheduled static prices/i
+  );
+});
+
+test("reviews one duplicate local-history occurrence and restores its exact raw order", async ({
+  page
+}) => {
+  await page.route("**/price-history.json", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+  });
+  const capturedAt = "2026-07-10T12:00:00.000Z";
+  const rawBefore = JSON.stringify({
+    version: 2,
+    savedAt: "2026-07-20T10:00:00.000Z",
+    data: {
+      snapshots: [
+        {
+          capturedAt,
+          sourcePriceSetId: "duplicate",
+          label: "Duplicate prices",
+          itemPrices: { lobster: 200 }
+        },
+        {
+          capturedAt,
+          sourcePriceSetId: "duplicate",
+          label: "Duplicate prices",
+          itemPrices: { lobster: 210, big_bones: 400 }
+        },
+        {
+          capturedAt: "2026-07-09T12:00:00.000Z",
+          sourcePriceSetId: "older",
+          label: "Older prices",
+          itemPrices: { lobster: 180 }
+        }
+      ]
+    }
+  });
+  await page.addInitScript((raw) => {
+    window.localStorage.setItem("index-sim:price-history", raw);
+  }, rawBefore);
+
+  await page.goto("/");
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Economy" }).click();
+  const lifecycle = page.getByLabel("Local price history lifecycle");
+  await expect(lifecycle).toContainText("Local comparisons 3/20");
+  await lifecycle.locator("details.local-history-management > summary").click();
+  const duplicateActions = lifecycle.getByRole("button", {
+    name: /Review removal for Duplicate prices captured 10 July 2026 at 12:00:00 Coordinated Universal Time, [12] of 2/
+  });
+  await expect(duplicateActions).toHaveCount(2);
+  await expect(lifecycle).toContainText("10 Jul 2026, 12:00:00 UTC");
+  expect((await lifecycle.locator("time").allTextContents()).join(" ")).not.toContain(capturedAt);
+  const duplicateSnapshotKeys = lifecycle
+    .locator("details.technical-details code")
+    .filter({ hasText: capturedAt });
+  await expect(duplicateSnapshotKeys).toHaveCount(2);
+  await expect(duplicateSnapshotKeys.first()).not.toBeVisible();
+
+  await duplicateActions.first().click();
+  await expect(page.getByRole("heading", { name: "Remove local comparison?" })).toBeFocused();
+  await lifecycle.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(duplicateActions.first()).toBeFocused();
+  expect(await page.evaluate(() => window.localStorage.getItem("index-sim:price-history"))).toBe(
+    rawBefore
+  );
+
+  await duplicateActions.nth(1).click();
+  await lifecycle.getByRole("button", { name: "Remove local comparison", exact: true }).click();
+  await expect(lifecycle).toContainText("Local comparisons 2/20");
+  const afterRemoval = await page.evaluate(() =>
+    JSON.parse(window.localStorage.getItem("index-sim:price-history") ?? "null")
+  );
+  expect(afterRemoval.data.snapshots).toEqual([
+    JSON.parse(rawBefore).data.snapshots[0],
+    JSON.parse(rawBefore).data.snapshots[2]
+  ]);
+
+  await page.getByLabel("Local state undo").getByRole("button", { name: "Undo" }).click();
+  await expect(lifecycle).toContainText("Local comparisons 3/20");
+  expect(await page.evaluate(() => window.localStorage.getItem("index-sim:price-history"))).toBe(
+    rawBefore
+  );
+});
+
+test("reviews full-history replacement and keeps a later accepted PriceSet separate", async ({
+  page
+}) => {
+  await page.clock.install({ time: new Date("2026-07-20T15:30:00.000Z") });
+  await page.route("**/price-history.json", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+  });
+  const snapshots = Array.from({ length: 20 }, (_, index) => ({
+    capturedAt: new Date(Date.UTC(2026, 6, 20 - index, 12)).toISOString(),
+    sourcePriceSetId: `existing-${index}`,
+    label: index === 19 ? "Exact oldest prices" : `Existing prices ${index}`,
+    itemPrices: { lobster: 200 + index }
+  }));
+  const rawBefore = JSON.stringify({
+    version: 2,
+    savedAt: "2026-07-20T10:00:00.000Z",
+    data: { snapshots }
+  });
+  await page.addInitScript((raw) => {
+    window.localStorage.setItem("index-sim:price-history", raw);
+  }, rawBefore);
+
+  await page.goto("/");
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Economy" }).click();
+  const lifecycle = page.getByLabel("Local price history lifecycle");
+  const save = lifecycle.getByRole("button", { name: "Save local comparison" });
+  await expect(lifecycle).toContainText("Local comparisons 20/20");
+  await expect(lifecycle).toContainText("History full");
+
+  await save.click();
+  const reviewHeading = page.getByRole("heading", {
+    name: "Save and replace the oldest local comparison?"
+  });
+  await expect(reviewHeading).toBeFocused();
+  await expect(lifecycle.getByLabel("Replace oldest local comparison")).toContainText(
+    "Exact oldest prices"
+  );
+  await lifecycle.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(save).toBeFocused();
+  expect(await page.evaluate(() => window.localStorage.getItem("index-sim:price-history"))).toBe(
+    rawBefore
+  );
+
+  await save.click();
+  await lifecycle.getByRole("button", { name: "Save and replace oldest" }).click();
+  await expect(lifecycle).toContainText("Local comparisons 20/20");
+  await page.waitForFunction(
+    (raw) => window.localStorage.getItem("index-sim:price-history") !== raw,
+    rawBefore
+  );
+  const afterReplacement = await page.evaluate(() =>
+    JSON.parse(window.localStorage.getItem("index-sim:price-history") ?? "null")
+  );
+  expect(afterReplacement.data.snapshots).toHaveLength(20);
+  expect(afterReplacement.data.snapshots[0].capturedAt).toMatch(/^2026-07-20T15:30:\d{2}\.\d{3}Z$/);
+  expect(
+    afterReplacement.data.snapshots.some(
+      (snapshot: { sourcePriceSetId: string }) => snapshot.sourcePriceSetId === "existing-19"
+    )
+  ).toBe(false);
+  await page.getByLabel("Local state undo").getByRole("button", { name: "Undo" }).click();
+  await page.waitForFunction(
+    (raw) => window.localStorage.getItem("index-sim:price-history") === raw,
+    rawBefore
+  );
+  expect(await page.evaluate(() => window.localStorage.getItem("index-sim:price-history"))).toBe(
+    rawBefore
+  );
+
+  const advancedPriceSetTools = page.getByLabel("Advanced PriceSet tools");
+  await advancedPriceSetTools.locator(":scope > summary").click();
+  await advancedPriceSetTools.locator('input[type="file"]').setInputFiles({
+    name: "accepted-while-full.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(
+      JSON.stringify({
+        id: "accepted-while-full",
+        label: "Accepted while full",
+        source: "manual",
+        createdAt: "2026-07-20T15:00:00.000Z",
+        itemPrices: { lobster: 777 },
+        alchValues: { lobster: 0 }
+      })
+    )
+  });
+
+  await expect(page.getByLabel("Market active PriceSet summary")).toContainText(
+    "Accepted while full"
+  );
+  await expect(page.getByLabel("Market price data")).toContainText(
+    "Local history is full, so this PriceSet was not saved as a comparison"
+  );
+  await expect(lifecycle).toContainText(
+    "Local history is full, so this PriceSet was not saved as a comparison"
+  );
+  expect(await page.evaluate(() => window.localStorage.getItem("index-sim:price-history"))).toBe(
+    rawBefore
   );
 });
 
@@ -701,6 +965,7 @@ test("keeps shared scheduled price history read-only beside local comparisons", 
   await expect(summary).toContainText("Local 0");
   await chooseSearchableOption(page, "Trend item", "Big bones");
   await expect(page.getByRole("img", { name: "Big bones price trend", exact: true })).toBeVisible();
+  await page.locator("details.local-history-management > summary").click();
   await expect(page.getByRole("button", { name: "Clear local history" })).toBeDisabled();
   expect(await page.evaluate(() => window.localStorage.getItem("index-sim:price-history"))).toBe(
     null
@@ -738,6 +1003,7 @@ test("Economy destructive Undo restores exact durable price history raw data", a
   );
   expect(rawBefore).not.toBeNull();
 
+  await page.locator("details.local-history-management > summary").click();
   await page.getByRole("button", { name: "Clear local history" }).click();
   await page.getByRole("button", { name: "Confirm clear local history" }).click();
   await expect(summary).toContainText("Local 0");
@@ -753,7 +1019,9 @@ test("Economy destructive Undo restores exact durable price history raw data", a
   expect(await page.evaluate(() => window.localStorage.getItem("index-sim:unrelated-test"))).toBe(
     "keep"
   );
-  await expect(page.getByLabel("Market price data")).toContainText("Restored local price history");
+  await expect(page.getByLabel("Local price history lifecycle")).toContainText(
+    "Restored local price history"
+  );
 
   await page.reload();
   await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Economy" }).click();
@@ -926,6 +1194,7 @@ test("Economy destructive Undo stays live-only in a safe session", async ({ page
   const summary = page.getByLabel("Price history summary");
   await page.getByRole("button", { name: "Save local comparison" }).click();
   await expect(summary).toContainText("Local 1");
+  await page.locator("details.local-history-management > summary").click();
   await page.getByRole("button", { name: "Clear local history" }).click();
   await page.getByRole("button", { name: "Confirm clear local history" }).click();
   await expect(summary).toContainText("Local 0");
@@ -935,7 +1204,7 @@ test("Economy destructive Undo stays live-only in a safe session", async ({ page
 
   await page.getByLabel("Local state undo").getByRole("button", { name: "Undo" }).click();
   await expect(summary).toContainText("Local 1");
-  await expect(page.getByLabel("Market price data")).toContainText(
+  await expect(page.getByLabel("Local price history lifecycle")).toContainText(
     "Restored local price history for this session"
   );
   expect(await page.evaluate(() => window.localStorage.getItem("index-sim:price-history"))).toBe(
@@ -971,6 +1240,7 @@ test("Economy destructive Undo restores live state after a price-history clear f
     };
   });
 
+  await page.locator("details.local-history-management > summary").click();
   await page.getByRole("button", { name: "Clear local history" }).click();
   await page.getByRole("button", { name: "Confirm clear local history" }).click();
   await expect(summary).toContainText("Local 0");
@@ -979,7 +1249,9 @@ test("Economy destructive Undo restores live state after a price-history clear f
   );
   await page.getByLabel("Local state undo").getByRole("button", { name: "Undo" }).click();
   await expect(summary).toContainText("Local 1");
-  await expect(page.getByLabel("Market price data")).toContainText("Saved data was left unchanged");
+  await expect(page.getByLabel("Local price history lifecycle")).toContainText(
+    "Saved data was left unchanged"
+  );
   expect(await page.evaluate(() => window.localStorage.getItem("index-sim:price-history"))).toBe(
     rawBefore
   );

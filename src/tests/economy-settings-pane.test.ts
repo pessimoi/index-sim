@@ -23,6 +23,7 @@ import {
   type GameRevisionViewModel
 } from "../app/view-models/settings";
 import type { PriceSet } from "../domain/shared";
+import { createPriceTimeContext, presentPriceDateTime } from "../app/view-models/price-time";
 
 const noOp = () => undefined;
 
@@ -52,6 +53,9 @@ const defaultActions: EconomySettingsPaneActions = {
     requestClear: noOp,
     confirmClear: noOp,
     cancelClear: noOp,
+    reviewRemoval: noOp,
+    cancelReview: noOp,
+    confirmReview: noOp,
     setBaselineMode: noOp,
     setSnapshotKey: noOp,
     setItemFilter: noOp,
@@ -78,6 +82,12 @@ const defaultActions: EconomySettingsPaneActions = {
     cancelClear: noOp,
     confirmClearItem: noOp,
     confirmClearInvalid: noOp
+  },
+  monsterChanges: {
+    reviewCategory: noOp,
+    reviewRemoval: noOp,
+    cancelRemoval: noOp,
+    confirmRemoval: noOp
   },
   workspace: {
     setIncludeLastHiscoresPlayer: noOp,
@@ -162,6 +172,8 @@ function model(mode: EconomySettingsPaneMode): EconomySettingsPaneModel {
     priceSetResetPending: false,
     priceHistoryClearPending: false,
     manualPriceClearPending: false,
+    historyNotice: null,
+    historyReview: null,
     recovery: {
       visible: false,
       report: {
@@ -173,6 +185,23 @@ function model(mode: EconomySettingsPaneMode): EconomySettingsPaneModel {
       },
       notice: null,
       pendingClearId: null
+    },
+    monsterChanges: {
+      inventory: {
+        monsterCount: 0,
+        categoryCount: 0,
+        countsByKind: {
+          "custom-setup": 0,
+          cannon: 0,
+          "loot-actions": 0,
+          "loot-settings": 0,
+          "compare-hidden": 0
+        },
+        rows: []
+      },
+      removalCandidate: null,
+      notice: null,
+      sessionOnlyAvailable: false
     },
     workspace: {
       phase: "idle",
@@ -216,8 +245,9 @@ describe("Economy and Settings pane", () => {
       'aria-label="Market price data"',
       'aria-label="Market active PriceSet summary"',
       'aria-label="Manual item price"',
-      'aria-label="Price history summary"',
       'aria-label="Price history analysis"',
+      'aria-label="Local price history lifecycle"',
+      'aria-label="Price history summary"',
       'aria-label="Selected item price provenance"',
       'aria-label="Top movers"',
       'aria-label="Price movers"'
@@ -251,7 +281,9 @@ describe("Economy and Settings pane", () => {
     ]);
     expect(markup).toContain("Review in Economy");
     expect(markup).toContain("Active source Bundled fallback");
-    expect(markup).toContain('aria-label="Age 1 hour"');
+    expect(markup).toContain("Bundled price set created");
+    expect(markup).toContain("1 hr ago");
+    expect(markup).toContain('dateTime="2026-07-14T12:00:00.000Z"');
     expect(markup).not.toContain('aria-label="Scheduled price snapshot summary"');
     expect(markup).not.toContain('aria-label="Market price data"');
     expect(markup).not.toContain("Advanced PriceSet tools");
@@ -504,9 +536,85 @@ describe("Economy and Settings pane", () => {
       "Confirm reset to bundled prices",
       "Market import fixture succeeded",
       "Market fixture ready",
-      "Confirm clear local history",
-      'aria-label="Price history analysis"'
+      'aria-label="Price history analysis"',
+      "Confirm clear local history"
     ]);
+  });
+
+  it("lists each local occurrence separately and renders exact lifecycle reviews", () => {
+    const base = model("economy");
+    const timeContext = createPriceTimeContext(new Date("2026-07-20T13:00:00Z"), "UTC");
+    const localManagement = {
+      count: 20,
+      maximum: 20,
+      remaining: 0,
+      atCapacity: true,
+      rows: [
+        {
+          occurrenceId: "duplicate--0",
+          sourceIndex: 0,
+          snapshotKey: "same-key",
+          label: "Newest prices",
+          capturedAt: "2026-07-20T12:00:00.000Z",
+          captureTime: presentPriceDateTime("2026-07-20T12:00:00.000Z", timeContext),
+          sourcePriceSetId: "prices-newest",
+          itemCount: 2,
+          newest: true,
+          oldest: false,
+          nextReplacement: false,
+          selectedAsBaseline: false
+        },
+        {
+          occurrenceId: "duplicate--1",
+          sourceIndex: 19,
+          snapshotKey: "same-key",
+          label: "Oldest prices",
+          capturedAt: "2026-07-01T12:00:00.000Z",
+          captureTime: presentPriceDateTime("2026-07-01T12:00:00.000Z", timeContext),
+          sourcePriceSetId: "prices-oldest",
+          itemCount: 1,
+          newest: false,
+          oldest: true,
+          nextReplacement: true,
+          selectedAsBaseline: true
+        }
+      ]
+    };
+    const paneModel: EconomySettingsPaneModel = {
+      ...base,
+      prices: {
+        ...base.prices,
+        history: { ...base.prices.history, localManagement }
+      },
+      historyNotice: { tone: "warning", message: "Fixture lifecycle warning" },
+      historyReview: {
+        kind: "replacement",
+        id: 7,
+        activePriceSetLabel: "Active prices",
+        replacedLabel: "Oldest prices",
+        replacedCaptureTime: presentPriceDateTime("2026-07-01T12:00:00.000Z", timeContext),
+        replacedItemCount: 1
+      }
+    };
+    const markup = renderToStaticMarkup(
+      createElement(EconomySettingsPane, { model: paneModel, actions: defaultActions })
+    );
+
+    expect(markup).toContain("Local comparisons 20/20");
+    expect(markup).toContain("History full");
+    expect(markup.match(/Review removal/g)).toHaveLength(4);
+    expect(markup).toContain("Newest prices");
+    expect(markup).toContain("Oldest prices");
+    expect(markup).toContain("Next to be replaced");
+    expect(markup).toContain("Selected baseline");
+    expect(markup).toContain(
+      '<time dateTime="2026-07-01T12:00:00.000Z" title="1 Jul 2026, 12:00:00 UTC" aria-label="1 July 2026 at 12:00 Coordinated Universal Time">1 Jul 2026, 12:00 UTC</time>'
+    );
+    expect(markup).toContain("Save and replace the oldest local comparison?");
+    expect(markup).toContain("Replace Oldest prices");
+    expect(markup).toContain("Fixture lifecycle warning");
+    expect(markup).toContain("Scheduled shared history is read-only");
+    expect(markup).toContain("Local history is included in Workspace backup");
   });
 
   it("routes sorting, tier toggles and file imports through typed actions", async () => {

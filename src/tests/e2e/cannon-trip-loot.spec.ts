@@ -9,7 +9,9 @@ import {
   test
 } from "./scaffold-fixture";
 
-test("enables cannon for the selected monster and shows cannon rates", async ({ page }) => {
+test("targeted Reset restores Cannon without changing linked Trip scarce values", async ({
+  page
+}) => {
   await page.goto("/");
   await selectCombatType(page, "ranged");
   await page.getByLabel("TARGET", { exact: true }).selectOption("dagannoth");
@@ -78,13 +80,28 @@ test("enables cannon for the selected monster and shows cannon rates", async ({ 
   await reloadedCannon.getByRole("button", { name: "Reset monster cannon" }).click();
   await expect(reloadedCannon.getByLabel("Set up cannon")).not.toBeChecked();
   await expect(reloadedCannon.getByLabel("Link Trip sparse")).toBeDisabled();
+  const cannonUndo = page.getByLabel("Local state undo");
+  await expect(cannonUndo).toContainText("Current monster cannon reset");
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Trip" }).click();
+  const resetTrip = page.locator('section[aria-label="Trip assumptions"]');
+  await expect(resetTrip.getByLabel("Scarce spot")).toBeChecked();
+  await expect(resetTrip.getByLabel("Targets at spot")).toHaveValue("6");
+  await expect(resetTrip.getByLabel("Respawn (seconds)")).toHaveValue("30");
+  await cannonUndo.getByRole("button", { name: "Undo" }).click();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Cannon" }).click();
+  await expect(reloadedCannon.getByLabel("Set up cannon")).toBeChecked();
+  await expect(reloadedCannon.getByLabel("Mobs at spot")).toHaveValue("6");
+  await expect(reloadedCannon.getByLabel("Respawn (seconds)")).toHaveValue("30");
+  await expect(page.getByLabel("Local state undo")).toHaveCount(0);
   await page.waitForFunction(() => {
     const saved = window.localStorage.getItem("index-sim:rewrite-setup") ?? "";
-    return !saved.includes('"dagannoth":{"enabled":true');
+    return saved.includes('"dagannoth"') && saved.includes('"targets":6');
   });
 });
 
-test("updates trip survival controls and keeps the trip summary visible", async ({ page }) => {
+test("targeted Reset restores scarce spot and safespot without changing their neighboring values", async ({
+  page
+}) => {
   await page.goto("/");
   await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Trip" }).click();
 
@@ -136,6 +153,36 @@ test("updates trip survival controls and keeps the trip summary visible", async 
   await expect(reloadedTrip.getByLabel("Targets at spot")).toHaveValue("2");
   await expect(reloadedTrip.getByLabel("Respawn (seconds)")).toHaveValue("90");
   await expect(page.locator('[aria-label="Trip summary"]')).toBeVisible();
+
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Stats" }).click();
+  const assumptions = page.getByLabel("Active assumptions");
+  const openMoreIfNeeded = async (buttonName: string) => {
+    const button = assumptions.getByRole("button", { name: buttonName });
+    if (!(await button.isVisible())) {
+      const more = assumptions.locator("details.active-assumption-more");
+      if (!(await more.getAttribute("open"))) await more.locator(":scope > summary").click();
+    }
+    return button;
+  };
+
+  await (await openMoreIfNeeded("Reset scarce spot")).click();
+  const scarceUndo = page.getByLabel("Local state undo");
+  await expect(scarceUndo).toContainText("Scarce spot disabled; target and respawn values kept");
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Trip" }).click();
+  await expect(reloadedTrip.getByLabel("Scarce spot")).not.toBeChecked();
+  await expect(reloadedTrip.getByLabel("Targets at spot")).toHaveValue("2");
+  await expect(reloadedTrip.getByLabel("Respawn (seconds)")).toHaveValue("90");
+  await scarceUndo.getByRole("button", { name: "Undo" }).click();
+  await expect(reloadedTrip.getByLabel("Scarce spot")).toBeChecked();
+
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Stats" }).click();
+  await (await openMoreIfNeeded("Reset safespot override")).click();
+  const safespotUndo = page.getByLabel("Local state undo");
+  await expect(safespotUndo).toContainText("Safespot override reset to auto");
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Trip" }).click();
+  await expect(reloadedTrip.getByLabel("Safespot")).toHaveValue("auto");
+  await safespotUndo.getByRole("button", { name: "Undo" }).click();
+  await expect(reloadedTrip.getByLabel("Safespot")).toHaveValue("off");
 });
 
 test("updates manual food controls and recoil ring count", async ({ page }) => {

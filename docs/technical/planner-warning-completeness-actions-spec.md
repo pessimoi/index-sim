@@ -1,10 +1,33 @@
 # Planner warning completeness and actions specification
 
-Status: proposed on 2026-07-20; implementation pending.
+Status: implemented on 2026-07-20.
 
 Priority: high.
 
 Estimated effort: M.
+
+Implementation evidence: Planner now retains structured warning identity from
+the start, displayed result and training stance evaluations, and presents every
+distinct row through one serializable issue/note model. The panel adds the
+existing truncation fact as an actionable issue, uses the exhaustive current
+producer registry plus a bounded unknown fallback and keeps deterministic
+occurrence counts and ids across the Worker boundary. The native disclosure is
+keyed by warning-set identity, labels retained output as previous and routes to
+current Planner, gear, Loadout, Economy or Trip controls without automatic
+edit, persistence, Undo or Recompute.
+
+Focused domain, view-model, Worker, controller and component coverage passes
+68/68; the complete unit suite passes 988/988 and goldens 19/19. Two focused
+production-preview Chromium transactions pass: one covers a 25-row,
+three-category truncated plan, keyboard disclosure, exact Target/Trip/Economy
+focus, retained scope, unchanged storage/Undo and all five required viewports;
+the other retains the same closed warning set through a failed refresh and
+Retry. Typecheck, the 156-module zero-cycle architecture gate, production
+build and diff checks pass. The final combined release run passes 115/115
+functional Chromium cases. The expanded Planner-mobile candidate was reviewed
+with all six issues and three notes, technical disclosures and correction
+actions contained; its one owned baseline was updated explicitly, followed by
+two complete 26/26 read-only Darwin runs.
 
 ## Purpose
 

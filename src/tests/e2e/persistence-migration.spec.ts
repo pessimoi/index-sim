@@ -294,7 +294,7 @@ test("reviews and imports compatible legacy setup data", async ({ page }) => {
     }
   });
   await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Setups" }).click();
-  await expect(page.getByLabel("Rename saved setup Legacy ranged")).toHaveValue("Legacy ranged");
+  await expect(page.getByLabel("Rename saved setup Legacy ranged")).toBeVisible();
 });
 
 test("updates manual combat overrides and resets to derived values", async ({ page }) => {
@@ -845,7 +845,8 @@ test("keeps global actions focused and completes setup export and Import setup r
     )
   ).toBe(3);
   await expect(setupInput).toHaveValue("");
-  await expect(page.locator('span.visually-hidden[role="status"]')).toHaveText(
+  await expect(page.locator('span.visually-hidden[role="status"]')).toHaveText("");
+  await expect(page.getByLabel("Local state undo")).toContainText(
     "Imported rewrite setup using current Revision 274 data."
   );
   await expect(page.getByLabel("TARGET", { exact: true })).toHaveValue("giant");
@@ -1122,7 +1123,7 @@ test("keeps PriceSet import failures non-fatal and recoverable", async ({ page }
   await settings.getByRole("button", { name: "Review in Economy" }).click();
   const market = page.getByLabel("Market price data");
   const priceSetSummary = market.locator('[aria-label="Market active PriceSet summary"]');
-  const historySummary = market.locator('[aria-label="Price history summary"]');
+  const historySummary = page.getByLabel("Price history summary");
   const summaryText = async (locator: Locator) =>
     (await locator.locator("span").allTextContents()).map((text) => text.trim()).join(" | ");
 

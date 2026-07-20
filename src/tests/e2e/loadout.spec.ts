@@ -652,6 +652,74 @@ test("filters hidden gear tiers while keeping current selections", async ({ page
   await expectSearchableSelection(reloadedMeleePane, "Body", "iron_platebody");
   const reloadedHelmOptions = await searchableOptionLabels(reloadedMeleePane, "Helm");
   expect(reloadedHelmOptions.join("\n")).not.toContain("Iron full helm");
+
+  await tabs.getByRole("tab", { name: "Settings" }).click();
+  const reloadedSettings = page.locator('[aria-label="Hidden gear tiers"]');
+  await reloadedSettings.getByRole("button", { name: "Show all tiers" }).click();
+  const hiddenTierUndo = page.getByLabel("Local state undo");
+  await expect(hiddenTierUndo).toContainText("Hidden gear tiers shown");
+  await expect(reloadedSettings.getByLabel("Hide iron gear")).not.toBeChecked();
+  await hiddenTierUndo.getByRole("button", { name: "Undo" }).click();
+  await expect(reloadedSettings.getByLabel("Hide iron gear")).toBeChecked();
+});
+
+test("global Undo restores the manual override targeted Reset", async ({ page }) => {
+  await page.goto("/");
+  await selectCombatType(page, "melee");
+  const overrides = page.getByLabel("Manual combat overrides");
+  const accuracy = overrides.getByLabel("Accuracy bonus");
+  const reset = overrides.getByRole("button", { name: "Reset all overrides" });
+
+  await accuracy.fill("44");
+  await accuracy.press("Enter");
+  await expect(accuracy).toHaveValue("44");
+  await reset.click();
+  await expect(accuracy).toHaveValue("");
+  const undo = page.getByLabel("Local state undo");
+  await expect(undo).toContainText("Manual overrides reset");
+  await undo.getByRole("button", { name: "Undo" }).click();
+  await expect(accuracy).toHaveValue("44");
+  await expect(page.getByLabel("Local state undo")).toHaveCount(0);
+  await expectAppStatus(page, "Restored manual combat overrides");
+});
+
+test("global Undo stays reachable across supported targeted Reset viewports", async ({ page }) => {
+  const viewports = [
+    { width: 390, height: 844 },
+    { width: 620, height: 844 },
+    { width: 768, height: 1024 },
+    { width: 640, height: 360 },
+    { width: 1440, height: 900 }
+  ] as const;
+
+  for (const viewport of viewports) {
+    await page.setViewportSize(viewport);
+    await page.goto("/");
+    const tabs = page.getByLabel("Workbench tabs");
+    await tabs.getByRole("tab", { name: "Settings" }).click();
+    const settings = page.locator('[aria-label="Hidden gear tiers"]');
+    const iron = settings.getByLabel("Hide iron gear");
+    await iron.check();
+    await settings.getByRole("button", { name: "Show all tiers" }).click();
+
+    const undo = page.getByLabel("Local state undo");
+    await expect(undo).toBeVisible();
+    const box = await undo.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.x).toBeGreaterThanOrEqual(0);
+    expect(box!.y).toBeGreaterThanOrEqual(0);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(viewport.width);
+    expect(box!.y + box!.height).toBeLessThanOrEqual(viewport.height);
+    if (viewport.width <= 620 || (viewport.width <= 980 && viewport.height > viewport.width)) {
+      await expect(undo.getByRole("button", { name: "Undo" })).toHaveCSS("min-height", "40px");
+    }
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+    ).toBe(true);
+
+    await undo.getByRole("button", { name: "Undo" }).click();
+    await expect(iron).toBeChecked();
+  }
 });
 
 test("creates, restores and removes monster-specific custom setups", async ({ page }) => {

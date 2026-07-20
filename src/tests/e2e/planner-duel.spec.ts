@@ -107,6 +107,119 @@ test("recomputes the Planner tab workflow from visible planner controls", async 
   await expectPageWidthContained(page);
 });
 
+test("shows complete actionable Planner notices without mutating their owners", async ({
+  page
+}) => {
+  test.setTimeout(180_000);
+  await page.goto("/");
+  await page.getByLabel("TARGET", { exact: true }).selectOption("black_dragon");
+
+  const tabs = page.getByLabel("Workbench tabs");
+  await tabs.getByRole("tab", { name: "Planner" }).click();
+  const planner = page.getByRole("region", { name: "Planner", exact: true });
+  await planner.getByLabel("Only current gear").check();
+  await planner.getByLabel("Attack target").fill("99");
+  await planner.getByLabel("Strength target").fill("99");
+  await planner.getByLabel("Defence target").fill("99");
+  await planner.getByRole("button", { name: "Recompute plan" }).click();
+  await expect(planner.getByText("ready", { exact: true })).toBeVisible({ timeout: 90_000 });
+
+  const disclosure = planner.locator("details.planner-notices");
+  const summary = disclosure.locator(":scope > summary");
+  const rows = disclosure.locator("li.planner-notice-row");
+  await expect(disclosure).toHaveAttribute("open", "");
+  await expect.poll(() => rows.count()).toBeGreaterThan(5);
+  const categories = await rows.evaluateAll((elements) =>
+    elements.map((element) => element.getAttribute("data-notice-category"))
+  );
+  expect(new Set(categories)).toEqual(new Set(["plan-limit", "price-data", "trip-model"]));
+  await expect(disclosure).toContainText("Plan stopped at its level limit");
+  await expect(disclosure).toContainText("Incoming damage uses a compatibility model");
+  await expect(disclosure).toContainText(/Estimated price|Previous price retained/);
+  await expect(disclosure).toContainText("more occurrences");
+
+  const summaryText = (await summary.textContent()) ?? "";
+  const counts = summaryText.match(/(\d+) issues? · (\d+) notes?/);
+  expect(counts).not.toBeNull();
+  expect(Number(counts![1]) + Number(counts![2])).toBe(await rows.count());
+
+  await summary.focus();
+  await page.keyboard.press("Space");
+  await expect(disclosure).not.toHaveAttribute("open", "");
+  await expect(summary).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(disclosure).toHaveAttribute("open", "");
+
+  await page.waitForFunction(() => {
+    const raw = window.localStorage.getItem("index-sim:planner-ui") ?? "";
+    return (
+      raw.includes('"attack":99') &&
+      raw.includes('"strength":99') &&
+      raw.includes('"defence":99') &&
+      raw.includes('"onlyCurrentGear":true')
+    );
+  });
+  const storageBeforeActions = await page.evaluate(() =>
+    JSON.stringify(
+      Object.keys(window.localStorage)
+        .sort()
+        .map((key) => [key, window.localStorage.getItem(key)])
+    )
+  );
+  await expect(page.getByRole("button", { name: "Undo", exact: true })).toHaveCount(0);
+
+  await disclosure.getByRole("button", { name: /^Review targets:/ }).click();
+  await expect(planner.getByLabel("Planner skill targets")).toBeFocused();
+  await expect(planner.getByLabel("Attack target")).toHaveValue("99");
+  await expect(planner.getByText("ready", { exact: true })).toBeVisible();
+
+  await disclosure.getByRole("button", { name: /^Review Trip assumptions:/ }).click();
+  await expect(tabs.getByRole("tab", { name: "Trip" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByLabel("Food per kill override")).toBeFocused();
+  await tabs.getByRole("tab", { name: "Planner" }).click();
+
+  await disclosure
+    .getByRole("button", { name: /^Review price data:/ })
+    .first()
+    .click();
+  await expect(tabs.getByRole("tab", { name: "Economy" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByLabel("Selected item price provenance")).toBeFocused();
+  await tabs.getByRole("tab", { name: "Planner" }).click();
+
+  expect(
+    await page.evaluate(() =>
+      JSON.stringify(
+        Object.keys(window.localStorage)
+          .sort()
+          .map((key) => [key, window.localStorage.getItem(key)])
+      )
+    )
+  ).toBe(storageBeforeActions);
+  await expect(page.getByRole("button", { name: "Undo", exact: true })).toHaveCount(0);
+
+  const retainedSetId = await disclosure.getAttribute("data-warning-set-id");
+  await summary.click();
+  await expect(disclosure).not.toHaveAttribute("open", "");
+  await planner.getByLabel("Attack target").fill("98");
+  await expect(planner.getByLabel("Previous plan notices")).toBeVisible();
+  await expect(disclosure).toHaveAttribute("data-warning-set-id", retainedSetId!);
+  await expect(disclosure).not.toHaveAttribute("open", "");
+  await expect(planner.getByLabel("Attack target")).toHaveValue("98");
+
+  await summary.click();
+  await expect(disclosure).toHaveAttribute("open", "");
+  for (const viewport of [
+    { width: 1440, height: 1000 },
+    { width: 640, height: 360 },
+    { width: 390, height: 844 },
+    { width: 620, height: 844 },
+    { width: 768, height: 1024 }
+  ]) {
+    await page.setViewportSize(viewport);
+    await expectPageWidthContained(page);
+  }
+});
+
 test("keeps Planner Auto XP and effective targets aligned with live levels", async ({ page }) => {
   test.setTimeout(90_000);
   await page.goto("/");
@@ -168,7 +281,7 @@ test("keeps Planner Auto XP and effective targets aligned with live levels", asy
   );
 
   await tabs.getByRole("tab", { name: "Setups" }).click();
-  await setups.getByRole("button", { name: "Load", exact: true }).click();
+  await setups.getByRole("button", { name: /^Load saved setup / }).click();
   await expect(player.getByLabel("ATT", { exact: true })).toHaveValue("60");
   await tabs.getByRole("tab", { name: "Planner" }).click();
   await expect(attackXp).toHaveValue("");
@@ -223,8 +336,20 @@ test("uses saved setup comparison to import export rename load delete and persis
   await expect(table).toContainText("GP/XP");
 
   const rename = table.getByLabel(/Rename saved setup/).first();
-  await rename.fill("Melee saved");
-  await rename.press("Enter");
+  await rename.click();
+  const renameInput = table.getByLabel(/New name for saved setup/);
+  await renameInput.fill("Melee saved");
+  await renameInput.blur();
+  await expect(table.getByLabel(/New name for saved setup/)).toHaveValue("Melee saved");
+  await expect
+    .poll(async () => {
+      const raw = await page.evaluate(() =>
+        window.localStorage.getItem("index-sim:duel-snapshots")
+      );
+      return raw ? JSON.parse(raw).data?.snapshots?.[0]?.name : null;
+    })
+    .not.toBe("Melee saved");
+  await renameInput.press("Enter");
   await page.waitForFunction(() => {
     const raw = window.localStorage.getItem("index-sim:duel-snapshots");
     if (!raw) return false;
@@ -284,9 +409,9 @@ test("uses saved setup comparison to import export rename load delete and persis
   await expect(reloadedDuel).toBeVisible();
   reloadedTable = reloadedDuel.getByRole("table", { name: "Setup comparison table" });
   await expect(reloadedTable).toContainText("best", { timeout: 30000 });
-  const reviewDiff = reloadedTable.getByRole("button", { name: "Review diff" });
+  const reviewDiff = reloadedTable.getByRole("button", { name: /^Review differences for / });
   await reviewDiff.click();
-  const hideDiff = reloadedTable.getByRole("button", { name: "Hide diff" });
+  const hideDiff = reloadedTable.getByRole("button", { name: /^Hide differences for / });
   await expect(hideDiff).toHaveAttribute("aria-expanded", "true");
   await expect(hideDiff).toHaveAttribute("aria-controls", /^duel-diff-/);
   const setupDiff = reloadedTable.getByRole("region", {
@@ -307,7 +432,7 @@ test("uses saved setup comparison to import export rename load delete and persis
   const setupBeforeSavedLoad = await page.evaluate(
     () => JSON.parse(window.localStorage.getItem("index-sim:rewrite-setup") ?? "null").data
   );
-  await reloadedTable.getByRole("button", { name: "Load", exact: true }).click();
+  await reloadedTable.getByRole("button", { name: "Load saved setup Melee saved" }).click();
   await expect(combatType.getByRole("button", { name: "melee" })).toHaveAttribute(
     "aria-pressed",
     "true"
@@ -329,7 +454,7 @@ test("uses saved setup comparison to import export rename load delete and persis
   }, setupBeforeSavedLoad);
 
   await page.evaluate(() => window.localStorage.setItem("duel_unrelated_key", "keep"));
-  await reloadedTable.getByRole("button", { name: "Delete" }).click();
+  await reloadedTable.getByRole("button", { name: "Delete saved setup Melee saved" }).click();
   await expect(reloadedTable).toContainText("No saved setups");
   const duelUndo = page.getByLabel("Local state undo");
   await expect(duelUndo).toContainText("Deleted saved setup: Melee saved");
@@ -346,7 +471,7 @@ test("uses saved setup comparison to import export rename load delete and persis
     );
   });
 
-  await reloadedTable.getByRole("button", { name: "Delete" }).click();
+  await reloadedTable.getByRole("button", { name: "Delete saved setup Melee saved" }).click();
   await expect(reloadedTable).toContainText("No saved setups");
   await page.waitForFunction(() => {
     const raw = window.localStorage.getItem("index-sim:duel-snapshots");
@@ -385,12 +510,12 @@ test("uses saved setup comparison to import export rename load delete and persis
   await expect(importReview).toBeVisible();
   await expect(importReview).toContainText("Setups in file1");
   await expect(importReview).toContainText("Add1");
-  await expect(importReview).toContainText("Update0");
+  await expect(importReview).toContainText("Replace0");
   await expect(importReview).toContainText("older format does not record a game revision");
   await expect(reloadedTable).toContainText("No saved setups");
-  await importReview.getByRole("button", { name: "Merge setups" }).click();
+  await importReview.getByRole("button", { name: "Merge selected setups" }).click();
   await expect(reloadedDuel.getByLabel("Saved setup import notice")).toContainText(
-    "using current Revision 274 data: 1 added, 0 updated"
+    "using current Revision 274 data: 1 added, 0 replaced, 0 not selected"
   );
   await expect(reloadedTable.getByLabel("Rename saved setup Melee saved")).toBeVisible();
   await page.waitForFunction(() => {
@@ -402,6 +527,90 @@ test("uses saved setup comparison to import export rename load delete and persis
       window.localStorage.getItem("duel_unrelated_key") === "keep"
     );
   });
+});
+
+test("reviews matching-ID setup replacements, refreshes stale plans and undoes exact storage", async ({
+  page
+}) => {
+  test.setTimeout(90_000);
+  await page.goto("/");
+  const tabs = page.getByLabel("Workbench tabs");
+  await tabs.getByRole("tab", { name: "Setups" }).click();
+  const duel = page.getByRole("region", { name: "Setup comparison", exact: true });
+  await duel.getByRole("button", { name: "Save current setup" }).click();
+  await duel.getByText("Manage saved setups", { exact: true }).click();
+
+  const fixture = await page.evaluate(() => {
+    const raw = window.localStorage.getItem("index-sim:duel-snapshots")!;
+    const data = JSON.parse(raw).data;
+    const replacement = structuredClone(data.snapshots[0]);
+    replacement.name = "Imported replacement";
+    replacement.form.levels.attack += 1;
+    const addition = structuredClone(data.snapshots[0]);
+    addition.id = "duel-import-addition";
+    addition.name = "Imported addition";
+    return {
+      raw,
+      replacement: JSON.stringify({
+        version: 1,
+        exportedAt: "2026-07-20T16:00:00.000Z",
+        data: { snapshots: [replacement] }
+      }),
+      addition: JSON.stringify({
+        version: 1,
+        exportedAt: "2026-07-20T16:01:00.000Z",
+        data: { snapshots: [addition] }
+      })
+    };
+  });
+
+  const importInput = duel.getByLabel("Import setups");
+  await importInput.setInputFiles({
+    name: "replacement.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(fixture.replacement)
+  });
+  let review = duel.getByLabel("Saved setup import review");
+  await expect(review.getByRole("heading", { name: "Review saved setups" })).toBeFocused();
+  await expect(review).toContainText("Matching ID");
+  await expect(review.getByRole("radio", { name: "Keep current setup" })).toBeChecked();
+  await expect(review.getByRole("button", { name: "Merge selected setups" })).toBeDisabled();
+  const sourceDiff = review.getByText(/Review source differences/);
+  await sourceDiff.click();
+  await expect(review).toContainText("stored setup fields only; no calculated impact is inferred");
+  await expect(review).toContainText("Attack");
+
+  await review.getByRole("radio", { name: "Replace with imported setup" }).check();
+  await expect(review.getByLabel("Saved name")).toHaveValue("Imported replacement");
+  await expect(review.getByRole("button", { name: "Merge selected setups" })).toBeEnabled();
+  await review.getByRole("button", { name: "Merge selected setups" }).click();
+  await expect(duel.getByLabel("Rename saved setup Imported replacement")).toBeVisible();
+  await expect(page.getByLabel("Local state undo")).toContainText("Merged saved setups");
+  await page.getByLabel("Local state undo").getByRole("button", { name: "Undo" }).click();
+  await expect(duel.getByLabel(/Rename saved setup Rune scimitar/)).toBeVisible();
+  await expect
+    .poll(() => page.evaluate(() => window.localStorage.getItem("index-sim:duel-snapshots")))
+    .toBe(fixture.raw);
+
+  await importInput.setInputFiles({
+    name: "addition.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(fixture.addition)
+  });
+  review = duel.getByLabel("Saved setup import review");
+  await expect(review.getByRole("checkbox", { name: "Add this setup" })).toBeChecked();
+  await duel.getByRole("button", { name: "Save current setup" }).click();
+  await expect(review).toContainText("Refresh required");
+  await expect(review.getByRole("button", { name: "Merge selected setups" })).toBeDisabled();
+  await review.getByRole("button", { name: "Refresh review" }).click();
+  await expect(review.getByRole("heading", { name: "Review saved setups" })).toBeFocused();
+  await expect(review.getByRole("checkbox", { name: "Add this setup" })).toBeChecked();
+  await expect(review.getByRole("button", { name: "Merge selected setups" })).toBeEnabled();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expectPageWidthContained(page);
+  await review.getByRole("button", { name: "Dismiss" }).click();
+  await expect(importInput).toBeFocused();
 });
 
 test("builds and filters the all-monster saved setup matrix on demand", async ({ page }) => {

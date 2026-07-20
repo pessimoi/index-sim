@@ -11,7 +11,7 @@ This directory is the project memory layer for humans and AI agents. It keeps cu
 - Rewrite specification: [technical/rewrite-spec.md](technical/rewrite-spec.md)
 - UI parity specification: [technical/ui-parity-spec.md](technical/ui-parity-spec.md)
 - Duel setup diff specification: [technical/duel-setup-diff-spec.md](technical/duel-setup-diff-spec.md)
-- Proposed saved setup Merge and rename safety specification: [technical/saved-setup-merge-rename-safety-spec.md](technical/saved-setup-merge-rename-safety-spec.md)
+- Implemented saved setup Merge and rename safety specification: [technical/saved-setup-merge-rename-safety-spec.md](technical/saved-setup-merge-rename-safety-spec.md)
 - Stats source distribution specification: [technical/stats-source-distribution-spec.md](technical/stats-source-distribution-spec.md)
 - Hit distribution comparison visualization specification: [technical/hit-distribution-visualization-spec.md](technical/hit-distribution-visualization-spec.md)
 - Risk and variability specification: [technical/risk-variability-spec.md](technical/risk-variability-spec.md)
@@ -27,8 +27,9 @@ This directory is the project memory layer for humans and AI agents. It keeps cu
 - Conditional loot presentation specification: [technical/conditional-loot-presentation-spec.md](technical/conditional-loot-presentation-spec.md)
 - Manual item price overrides specification: [technical/manual-item-price-overrides-spec.md](technical/manual-item-price-overrides-spec.md)
 - Economy destructive actions Undo specification: [technical/economy-destructive-actions-undo-spec.md](technical/economy-destructive-actions-undo-spec.md)
-- Proposed local price-history lifecycle management specification: [technical/local-price-history-lifecycle-management-spec.md](technical/local-price-history-lifecycle-management-spec.md)
-- Proposed global Undo visibility and targeted Reset recovery specification: [technical/global-undo-visibility-targeted-reset-spec.md](technical/global-undo-visibility-targeted-reset-spec.md)
+- Implemented local price-history lifecycle management specification: [technical/local-price-history-lifecycle-management-spec.md](technical/local-price-history-lifecycle-management-spec.md)
+- Implemented user-friendly price date and time presentation specification: [technical/price-date-time-presentation-spec.md](technical/price-date-time-presentation-spec.md)
+- Implemented global Undo visibility and targeted Reset recovery specification: [technical/global-undo-visibility-targeted-reset-spec.md](technical/global-undo-visibility-targeted-reset-spec.md)
 - High-impact dynamic-loot market allowlist specification: [technical/high-impact-dynamic-loot-market-allowlist-spec.md](technical/high-impact-dynamic-loot-market-allowlist-spec.md)
 - Accessibility and keyboard specification: [technical/accessibility-keyboard-spec.md](technical/accessibility-keyboard-spec.md)
 - Requirement-aware loadout optimizer specification: [technical/requirement-aware-loadout-optimizer-spec.md](technical/requirement-aware-loadout-optimizer-spec.md)
@@ -41,7 +42,7 @@ This directory is the project memory layer for humans and AI agents. It keeps cu
 - Compare/Duel pane, view-model and calculation-controller refactor specification: [technical/compare-duel-pane-refactor-spec.md](technical/compare-duel-pane-refactor-spec.md)
 - Planner pane, view-model and calculation-controller refactor specification: [technical/planner-pane-refactor-spec.md](technical/planner-pane-refactor-spec.md)
 - Implemented Planner results-first and advanced gear-pool specification: [technical/planner-results-first-advanced-gear-pool-spec.md](technical/planner-results-first-advanced-gear-pool-spec.md)
-- Proposed Planner warning completeness and actions specification: [technical/planner-warning-completeness-actions-spec.md](technical/planner-warning-completeness-actions-spec.md)
+- Implemented Planner warning completeness and actions specification: [technical/planner-warning-completeness-actions-spec.md](technical/planner-warning-completeness-actions-spec.md)
 - Risk pane, view-model and analysis-controller refactor specification: [technical/risk-pane-refactor-spec.md](technical/risk-pane-refactor-spec.md)
 - Loot and Trip pane and view-model refactor specification: [technical/loot-trip-pane-refactor-spec.md](technical/loot-trip-pane-refactor-spec.md)
 - Implemented Economy and Settings pane and price-data view-model refactor specification: [technical/economy-settings-pane-refactor-spec.md](technical/economy-settings-pane-refactor-spec.md)
@@ -55,7 +56,7 @@ This directory is the project memory layer for humans and AI agents. It keeps cu
 - Implemented rewrite setup file-transfer controller specification: [technical/setup-file-transfer-controller-spec.md](technical/setup-file-transfer-controller-spec.md)
 - Implemented setup replacement Review/Undo contract: [technical/setup-replacement-review-undo-spec.md](technical/setup-replacement-review-undo-spec.md)
 - Implemented safe active setup reset specification: [technical/active-setup-reset-spec.md](technical/active-setup-reset-spec.md)
-- Proposed monster-specific changes management specification: [technical/monster-specific-changes-management-spec.md](technical/monster-specific-changes-management-spec.md)
+- Implemented monster-specific changes management specification: [technical/monster-specific-changes-management-spec.md](technical/monster-specific-changes-management-spec.md)
 - Default/custom setup mode and autosave clarity specification: [technical/setup-mode-autosave-clarity-spec.md](technical/setup-mode-autosave-clarity-spec.md)
 - Implemented PriceSet transfer and acceptance controller specification: [technical/price-set-transfer-controller-spec.md](technical/price-set-transfer-controller-spec.md)
 - Implemented Cannon feature-pane extraction specification: [technical/cannon-pane-extraction-spec.md](technical/cannon-pane-extraction-spec.md)
@@ -130,7 +131,8 @@ These files are useful evidence, but they are not the living source of truth. Pr
 - Inactive quest/clue row grouping belongs in [technical/conditional-loot-presentation-spec.md](technical/conditional-loot-presentation-spec.md); source eligibility and zero-calculation policy remain in [technical/conditional-quest-clue-loot-spec.md](technical/conditional-quest-clue-loot-spec.md).
 - Browser-local per-item price overlay and reset behavior belongs in [technical/manual-item-price-overrides-spec.md](technical/manual-item-price-overrides-spec.md).
 - Exact-raw one-step Undo for local price-history clear, manual-price reset/clear and imported PriceSet reset belongs in [technical/economy-destructive-actions-undo-spec.md](technical/economy-destructive-actions-undo-spec.md); storage schemas, PriceSet acceptance and Workspace atomic restore remain in their existing owners.
-- Browser-local comparison inventory, visible 20-point capacity, non-silent overflow, individual removal and reviewed oldest-point replacement belong in [technical/local-price-history-lifecycle-management-spec.md](technical/local-price-history-lifecycle-management-spec.md); shared history, provenance, analysis formulas, Workspace transfer and visible date formatting remain in their existing owners.
+- Browser-local comparison inventory, visible 20-point capacity, non-silent overflow, individual removal and reviewed oldest-point replacement belong in [technical/local-price-history-lifecycle-management-spec.md](technical/local-price-history-lifecycle-management-spec.md); shared history, provenance, analysis formulas and Workspace transfer remain in their existing owners.
+- Semantic visible price dates, browser-local exact time with UTC fallback, signed relative age, `<time>` markup and distinct capture/creation, observation, evaluation and manual-update wording belong in [technical/price-date-time-presentation-spec.md](technical/price-date-time-presentation-spec.md); D-085 retains timestamp meaning and the local price-history lifecycle specification retains management ownership.
 - Global one-slot Undo viewport placement, duplicate live-announcement prevention and the seven targeted Active assumptions Reset transactions belong in [technical/global-undo-visibility-targeted-reset-spec.md](technical/global-undo-visibility-targeted-reset-spec.md); area-specific raw Economy recovery, setup replacement and Hiscores Apply snapshots remain in their existing Undo specifications.
 - Workbench and Dense keyboard interaction requirements belong in [technical/accessibility-keyboard-spec.md](technical/accessibility-keyboard-spec.md).
 - Player-adjacent mobile headline results, measured tab overflow controls, the four-action mobile setup row and the 390/620/768 normal-flow evidence belong in [technical/mobile-result-navigation-loop-spec.md](technical/mobile-result-navigation-loop-spec.md); D-070 remains the base roving-tablist contract and D-075/D-082 retain desktop and compact-landscape ownership.

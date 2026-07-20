@@ -24,7 +24,8 @@ const actions: PlannerPaneActions = {
   setGearPoolItem: noOp,
   resetGearPool: noOp,
   recompute: noOp,
-  retry: noOp
+  retry: noOp,
+  reviewNotice: noOp
 };
 
 function panelFixture(isEmpty = false): PlannerPanelViewModel {
@@ -101,7 +102,37 @@ function panelFixture(isEmpty = false): PlannerPanelViewModel {
       maxCumXp: 1_000,
       isEmpty
     },
-    warnings: isEmpty ? [] : ["Fixture warning"],
+    notices: isEmpty
+      ? {
+          warningSetId: "planner-warning-set-empty",
+          issueCount: 0,
+          noteCount: 0,
+          occurrenceCount: 0,
+          rows: []
+        }
+      : {
+          warningSetId: "planner-warning-set-fixture",
+          issueCount: 1,
+          noteCount: 0,
+          occurrenceCount: 1,
+          rows: [
+            {
+              id: "planner-notice-fixture",
+              code: "fixture-warning",
+              severity: "warning",
+              category: "other",
+              title: "Planner notice",
+              detail: "Fixture warning",
+              occurrences: {
+                totalCount: 1,
+                visibleLabels: ["Planner setup"],
+                hiddenCount: 0
+              },
+              action: { kind: "review-planner-inputs", label: "Review Planner inputs" },
+              affectsCurrentResult: true
+            }
+          ]
+        },
     isEmpty
   };
 }
@@ -183,7 +214,7 @@ describe("Planner pane", () => {
       'aria-label="Planner unlock summary"',
       'aria-label="Planner DPS chart"',
       'aria-label="Planner gear timeline"',
-      'aria-label="Planner warnings"',
+      'aria-label="Plan notices"',
       "Advanced gear pool",
       'aria-label="Planner gear pool editor"'
     ]);
@@ -196,6 +227,8 @@ describe("Planner pane", () => {
     expect(markup).toContain("Use level floor");
     expect(markup).toContain("+0.50");
     expect(markup).toContain("Fixture warning");
+    expect(markup).toContain("Plan notices · 1 issue · 0 notes");
+    expect(markup).not.toContain("more notices");
   });
 
   it("renders Auto XP, locked effective targets, adjustment status and dirty output copy", () => {
@@ -354,5 +387,58 @@ describe("Planner pane", () => {
 
     expect(markup).not.toContain("Planner is available after bundled data loads.");
     expect(markup).toContain("Advanced gear pool");
+  });
+
+  it("renders every notice and distinguishes previous note-only output", () => {
+    const fixture = panelFixture();
+    fixture.notices = {
+      warningSetId: "planner-warning-set-many-notes",
+      issueCount: 0,
+      noteCount: 6,
+      occurrenceCount: 8,
+      rows: Array.from({ length: 6 }, (_, index) => ({
+        id: `note-${index}`,
+        code: `note-${index}`,
+        severity: "info" as const,
+        category: "other" as const,
+        title: `Planner note ${index + 1}`,
+        detail: `Complete detail ${index + 1}`,
+        occurrences: {
+          totalCount: index === 0 ? 3 : 1,
+          visibleLabels: index === 0 ? ["Plan start", "Attack 60–61 result"] : ["Planner setup"],
+          hiddenCount: index === 0 ? 1 : 0
+        },
+        action: {
+          kind: "review-planner-inputs" as const,
+          label: "Review Planner inputs" as const
+        },
+        affectsCurrentResult: true
+      }))
+    };
+    const markup = renderToStaticMarkup(
+      createElement(PlannerPane, {
+        hidden: false,
+        model: model({
+          panel: fixture,
+          presentation: {
+            status: "stale",
+            displayIsCurrent: false,
+            message: "Showing the previous plan.",
+            canRetry: false,
+            retryActionLabel: "Retry plan"
+          }
+        }),
+        actions
+      })
+    );
+
+    expect(markup).toContain('aria-label="Previous plan notices"');
+    expect(markup).toContain("Previous plan notices · 0 issues · 6 notes");
+    expect(markup).not.toContain('<details class="planner-notices" open');
+    for (let index = 1; index <= 6; index += 1) {
+      expect(markup).toContain(`Complete detail ${index}`);
+    }
+    expect(markup).toContain("1 more occurrences");
+    expect(markup).not.toContain("more notices");
   });
 });

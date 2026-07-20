@@ -96,6 +96,10 @@ test("keeps Dense, Planner and Risk failures recoverable across first and refres
   await expect(plannerGearPool).not.toHaveAttribute("open", "");
   const previousPlan = planner.getByLabel("Planner output");
   await expect(previousPlan).toBeVisible();
+  const plannerNotices = planner.locator("details.planner-notices");
+  const retainedNoticeSetId = await plannerNotices.getAttribute("data-warning-set-id");
+  await plannerNotices.locator(":scope > summary").click();
+  await expect(plannerNotices).not.toHaveAttribute("open", "");
 
   await failNextCalculation(page, "planner");
   await planner.getByLabel("Optimize metric").selectOption("dps");
@@ -104,6 +108,9 @@ test("keeps Dense, Planner and Risk failures recoverable across first and refres
     "Planner could not compute the current plan. Showing the previous result."
   );
   await expect(previousPlan).toBeVisible();
+  await expect(planner.getByLabel("Previous plan notices")).toBeVisible();
+  await expect(plannerNotices).toHaveAttribute("data-warning-set-id", retainedNoticeSetId!);
+  await expect(plannerNotices).not.toHaveAttribute("open", "");
   await expect
     .poll(() =>
       planner

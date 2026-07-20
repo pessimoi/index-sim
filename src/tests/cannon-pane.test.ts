@@ -71,7 +71,7 @@ describe("Cannon pane", () => {
     expect(markup.startsWith('<section class="cannon-strip" aria-label="Cannon" hidden="">')).toBe(
       true
     );
-    expect(markup).toContain("<h2>Dwarf multicannon</h2>");
+    expect(markup).toContain('<h2 id="cannon-heading" tabindex="-1">Dwarf multicannon</h2>');
     expect(markup).toContain('class="status-pill ">off</span>');
     expect(markup).toContain("Cannon is off for this monster.");
     expect(markup).toContain('aria-label="Cannon sparse status"');

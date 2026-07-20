@@ -115,7 +115,7 @@ Within `Planner output`, use this primary-to-secondary order:
 2. `Planner training order`;
 3. `Planner unlock summary`;
 4. `Planner DPS chart` and `Planner gear timeline`; and
-5. `Planner warnings`, when present.
+5. `Plan notices`, when present.
 
 The existing responsive two-column groupings may remain where space permits,
 but CSS must not change the semantic reading order above. In particular, the
@@ -184,6 +184,13 @@ The disclosure contract is:
 - labelled by visible summary content that exposes both purpose and count to
   assistive technology. Decorative punctuation may be hidden from speech, but
   the words and both counts must remain in the accessible name.
+
+The implemented [Planner notice contract](planner-warning-completeness-actions-spec.md)
+adds one explicit exception to initial-collapse-only control: a user-triggered
+`Review gear` notice action may open this same transient disclosure and focus
+the exact current option, or its summary when the item is unavailable. Result
+settlement, stale/building/failed lifecycle changes, Retry, Recompute and reload
+still never open it automatically.
 
 The summary replaces the current always-visible `Gear pool` title/count row.
 Do not create a second competing disclosure title. Inside the open disclosure,

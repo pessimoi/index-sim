@@ -13,12 +13,14 @@ import {
 } from "../app/components/panes/duel-pane";
 import { DEFAULT_DENSE_COMPARE_STATE } from "../app/state/dense-compare";
 import { createDuelSnapshot } from "../app/state/duel-snapshots";
+import { createSavedSetupMergePlan } from "../app/state/saved-setup-merge";
 import { DEFAULT_FORM_STATE } from "../app/state/ui-state";
 import { createDenseCompareRows, createDenseCompareScaleModel } from "../app/view-models/compare";
 import {
   DEFAULT_DUEL_COMPARISON_SORT_STATE,
   DEFAULT_DUEL_MATRIX_SORT_STATE,
   createDuelComparisonViewModel,
+  createSavedSetupMergeReviewViewModel,
   type DuelMatrixViewModel
 } from "../app/view-models/duel";
 
@@ -41,7 +43,11 @@ const duelActions: DuelPaneActions = {
   importDuelSnapshots: async () => undefined,
   mergeDuelSnapshotsImport: noOp,
   dismissDuelSnapshotsImport: noOp,
-  commitDuelSnapshotName: () => true,
+  setDuelSnapshotsImportDecision: noOp,
+  setDuelSnapshotsImportName: noOp,
+  refreshDuelSnapshotsImport: noOp,
+  applyDuelSessionOnlyChange: noOp,
+  commitDuelSnapshotName: () => "renamed",
   loadDuelSnapshot: noOp,
   deleteDuelSnapshot: noOp,
   showCurrentDuelTarget: noOp,
@@ -187,15 +193,26 @@ describe("Compare and Duel panes", () => {
       duelMatrixSort: DEFAULT_DUEL_MATRIX_SORT_STATE,
       duelImportNotice: { tone: "success", message: "Imported saved setups." },
       duelImportReview: {
-        id: 4,
-        setupCount: 2,
-        addedCount: 1,
-        updatedCount: 1,
-        skippedCount: 0,
+        ...createSavedSetupMergeReviewViewModel({
+          plan: createSavedSetupMergePlan({
+            reviewId: 4,
+            current: { snapshots: [snapshot] },
+            source: {
+              snapshots: [
+                createDuelSnapshot(snapshot.id, "Imported ranged", DEFAULT_FORM_STATE),
+                createDuelSnapshot("new-saved", "New saved", DEFAULT_FORM_STATE)
+              ]
+            }
+          }),
+          current: { snapshots: [snapshot] },
+          context
+        }),
         contextTone: "warning",
         contextMessage:
           "This older format does not record a game revision. It will use the current Revision 274 data."
-      }
+      },
+      duelSessionOnlyAvailable: false,
+      duelChangeRevision: 0
     };
     const markup = renderToStaticMarkup(
       createElement(DuelPane, { hidden: true, model, actions: duelActions })
@@ -214,7 +231,7 @@ describe("Compare and Duel panes", () => {
       'aria-label="Setup comparison view"',
       'aria-label="Saved setup import notice"',
       'aria-label="Saved setup import review"',
-      "Merge setups",
+      "Merge selected setups",
       "Dismiss",
       'aria-label="Setup comparison table"',
       'aria-label="Saved ranged setup and impact diff"',
@@ -240,6 +257,7 @@ describe("Compare and Duel panes", () => {
           snapshotId: null,
           source: "live",
           name: "Live setup",
+          displayName: "Live setup",
           combatStyle: "melee",
           loadoutLabel: "melee · Rune scimitar"
         }
@@ -291,7 +309,9 @@ describe("Compare and Duel panes", () => {
       filteredDuelMatrixRows: matrix.rows,
       duelMatrixSort: DEFAULT_DUEL_MATRIX_SORT_STATE,
       duelImportNotice: null,
-      duelImportReview: null
+      duelImportReview: null,
+      duelSessionOnlyAvailable: false,
+      duelChangeRevision: 0
     };
     const markup = renderToStaticMarkup(
       createElement(DuelPane, { hidden: false, model, actions: duelActions })

@@ -13,6 +13,7 @@ import {
   sortLootTableRows
 } from "../app/view-models/loot";
 import type { ItemPriceHistoryContext } from "../app/view-models/price-data";
+import { createPriceTimeContext, presentPriceDateTime } from "../app/view-models/price-time";
 
 async function fixture(
   options: {
@@ -150,7 +151,15 @@ describe("Loot view model", () => {
         gpDelta: 20,
         percentDelta: 20,
         latestLabel: "Latest",
-        baselineLabel: "Baseline"
+        baselineLabel: "Baseline",
+        latestCaptureTime: presentPriceDateTime(
+          "2026-07-20T12:00:00Z",
+          createPriceTimeContext(new Date("2026-07-20T13:00:00Z"), "UTC")
+        ),
+        baselineCaptureTime: presentPriceDateTime(
+          "2026-07-19T12:00:00Z",
+          createPriceTimeContext(new Date("2026-07-20T13:00:00Z"), "UTC")
+        )
       }
     };
     const presentation = await fixture({
@@ -173,7 +182,9 @@ describe("Loot view model", () => {
       latestPrice: 120,
       baselinePrice: 100,
       gpDelta: 20,
-      percentDelta: 20
+      percentDelta: 20,
+      latestCaptureTime: { exactVisible: "20 Jul 2026, 12:00 UTC" },
+      baselineCaptureTime: { exactVisible: "19 Jul 2026, 12:00 UTC" }
     });
   });
 

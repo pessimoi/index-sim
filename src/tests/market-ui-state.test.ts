@@ -1094,7 +1094,7 @@ describe("market sync UI state helpers", () => {
     expect(keepPriceHistoryOnFailure(history)).toBe(history);
   });
 
-  it("caps browser-local price history snapshots", () => {
+  it("stops automatic capture at capacity without evicting an existing snapshot", () => {
     let history = DEFAULT_PRICE_HISTORY_STATE;
 
     for (let index = 0; index < PRICE_HISTORY_MAX_SNAPSHOTS + 3; index += 1) {
@@ -1106,7 +1106,7 @@ describe("market sync UI state helpers", () => {
     }
 
     expect(history.snapshots).toHaveLength(PRICE_HISTORY_MAX_SNAPSHOTS);
-    expect(history.snapshots[0].sourcePriceSetId).toBe(`manual-${PRICE_HISTORY_MAX_SNAPSHOTS + 2}`);
-    expect(history.snapshots.at(-1)?.sourcePriceSetId).toBe("manual-3");
+    expect(history.snapshots[0].sourcePriceSetId).toBe(`manual-${PRICE_HISTORY_MAX_SNAPSHOTS - 1}`);
+    expect(history.snapshots.at(-1)?.sourcePriceSetId).toBe("manual-0");
   });
 });

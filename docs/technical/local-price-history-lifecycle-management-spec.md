@@ -1,6 +1,6 @@
 # Local price-history lifecycle management specification
 
-- Status: proposed on 2026-07-20
+- Status: implemented on 2026-07-20
 - Priority: high
 - Estimated effort: M
 - Owner: Economy price-history state, presentation and persistence lifecycle
@@ -41,15 +41,35 @@ The implemented Economy destructive-action Undo remains the recovery owner for
 exact raw preimages. This goal extends that proven boundary to individual
 removal and full-capacity replacement; it does not create a second Undo model.
 
-The later user-friendly price-date specification owns localized visible date
-and time wording. This goal passes semantic timestamps through the management
-model and may retain the current ISO presentation until that follow-up lands.
+The implemented
+[user-friendly price date and time presentation specification](price-date-time-presentation-spec.md)
+owns localized visible date and time wording. This goal passes semantic
+timestamps through the management model, and the shared formatter now renders
+them without changing canonical lifecycle identities.
 
-## Verified current behavior and user gap
+## Implemented outcome
 
-### Current data and analysis contract
+Economy Price history now owns one local-only lifecycle surface with `N/20`
+capacity, duplicate-safe occurrence rows, chronological markers and semantic
+timestamps. Under-cap Save commits directly; a full manual Save reviews the
+exact oldest occurrence before replacement. Individual removal uses the same
+complete-state stale check and both destructive paths register the existing
+one-step exact-raw Economy Undo. The final row removes the local key.
 
-`src/app/state/price-history.ts` currently defines:
+The direct controller validates the complete state before storage, writes one
+v2 envelope or clears the key, protects blocked raw data and reports durable
+versus session-only truth without allowing the generic persistence effect to
+retry a failed action. PriceSet acceptance now exposes `added` versus
+`full-skipped`; at capacity the PriceSet remains active/persisted, history keeps
+exact identity and fixed guidance points the user to this normal review flow.
+Shared history, combined analysis, Workspace, schemas and formulas are
+unchanged.
+
+## Baseline before implementation
+
+### Baseline data and analysis contract
+
+`src/app/state/price-history.ts` already defined:
 
 - `index-sim:price-history` version 2;
 - at most 20 browser-local snapshots;
@@ -63,29 +83,29 @@ model and may retain the current ISO presentation until that follow-up lands.
 The local state schema does not require snapshot keys to be unique or the
 stored array to be chronological. `priceHistorySnapshotKey()` combines
 `capturedAt` and `sourcePriceSetId`; analysis sorts by capture time, while the
-append helper currently prepends and truncates the array to 20.
+append helper previously prepended and truncated the array to 20.
 
 Shared `price-history.json` is loaded through the scheduled snapshot adapter and
 never written by browser-local actions. Clearing local history removes only the
 local key. Baseline, trend and Loot context consume the combined analysis
 projection rather than either source independently.
 
-### Current capture and persistence paths
+### Baseline capture and persistence paths
 
 - `Save local comparison` captures the active composed PriceSet at click time.
 - Accepting an imported or compatible legacy PriceSet appends its canonical
   base PriceSet at acceptance time.
-- The append helper prepends the new row and retains the first 20 array entries.
-  In the ordinary newest-first state, at capacity it silently drops the array
+- The append helper prepended the new row and retained the first 20 array entries.
+  In the ordinary newest-first state, at capacity it silently dropped the array
   tail; the schema itself does not prove that the tail is chronologically
   oldest.
-- App applies appended state first and its normal persistence effect later
-  writes the v2 envelope. The action-specific success copy therefore cannot
-  currently prove whether that capture became durable.
+- App applied appended state first and its normal persistence effect later
+  wrote the v2 envelope. The action-specific success copy therefore could not
+  prove whether that capture became durable.
 - A failed import keeps history unchanged, and resetting the selected PriceSet
   preserves history.
 
-### Current management and recovery paths
+### Baseline management and recovery paths
 
 Economy shows combined snapshot totals and exposes confirmed all-local clear.
 It does not list the local records behind that total. A user cannot identify a
@@ -142,7 +162,8 @@ It is the broad transfer/recovery workflow, not an ordinary per-point editor.
   transaction. Their existing separate ownership remains explicit.
 - Do not add a second toast, Undo button, persisted Undo stack or multi-step
   history of management actions.
-- Do not solve localized date/time display here. The later price-date follow-up
+- Do not solve localized date/time display here. The
+  [price date and time presentation specification](price-date-time-presentation-spec.md)
   owns visible formatting and timezone policy.
 
 ## Local management projection
@@ -504,8 +525,10 @@ by the normal architecture gate.
 - `Price history` remains a labelled section and the management disclosure has
   a visible count-bearing summary.
 - Capacity status and row markers use text, not color alone.
-- Every timestamp uses `<time dateTime>` even before the later visible date
-  formatting follow-up.
+- Every timestamp uses the implemented
+  [shared visible price date and time presentation](price-date-time-presentation-spec.md):
+  friendly exact local copy, canonical `<time dateTime>`, UTC title and stable
+  seconds/ordinal disambiguation for colliding captures.
 - Every removal action names the snapshot label and capture time in its
   accessible name.
 - Review headings are focusable programmatically after opening.
@@ -516,7 +539,7 @@ by the normal architecture gate.
   order reaches its single viewport-accessible owner.
 - Valid capacity and review information does not use `role="alert"`. Fixed
   storage failures retain the existing alert convention.
-- Long labels, ISO timestamps and fixed status copy wrap at 390 px, and
+- Long labels, friendly zoned timestamps and fixed status copy wrap at 390 px, and
   Technical details never becomes the row's sole accessible name.
 
 This is a bounded keyboard/focus contract, not a WCAG conformance claim.
@@ -630,6 +653,15 @@ desktop and 390 px mobile. Review actual/diff images before updating only the
 owning Economy baselines.
 
 ## Validation
+
+Implementation evidence on 2026-07-20: the focused lifecycle, PriceSet,
+recovery, Workspace and pane command passes 122/122 tests. Six targeted
+production-preview Chromium workflows pass for age refresh, duplicate-key
+individual removal and exact Undo, full-history replacement plus accepted
+PriceSet separation, shared-history isolation and durable/session-only recovery.
+Typecheck, the 155-source-module zero-cycle architecture check, 19/19 goldens,
+production build and `git diff --check` pass. Complete cross-feature and visual
+release verification remains part of the final combined goal step.
 
 Run at minimum during implementation:
 

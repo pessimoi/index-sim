@@ -156,7 +156,9 @@ describe("rewrite UI view models", () => {
             gpDelta: 10,
             percentDelta: 25,
             latestLabel: "Latest",
-            baselineLabel: "Baseline"
+            baselineLabel: "Baseline",
+            latestCaptureTime: null,
+            baselineCaptureTime: null
           }
         }
       }
@@ -301,7 +303,9 @@ describe("rewrite UI view models", () => {
             gpDelta: -150,
             percentDelta: -30,
             latestLabel: "Latest test prices",
-            baselineLabel: "Previous test prices"
+            baselineLabel: "Previous test prices",
+            latestCaptureTime: null,
+            baselineCaptureTime: null
           }
         }
       }
@@ -351,7 +355,9 @@ describe("rewrite UI view models", () => {
             gpDelta: Number.NEGATIVE_INFINITY,
             percentDelta: Number.POSITIVE_INFINITY,
             latestLabel: "Malformed latest",
-            baselineLabel: "Malformed baseline"
+            baselineLabel: "Malformed baseline",
+            latestCaptureTime: null,
+            baselineCaptureTime: null
           }
         }
       }

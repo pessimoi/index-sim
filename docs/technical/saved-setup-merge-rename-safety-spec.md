@@ -1,6 +1,39 @@
 # Saved setup Merge and rename safety specification
 
-Status: proposed on 2026-07-20; implementation pending.
+Status: implemented on 2026-07-20.
+
+Implementation evidence:
+
+- `src/app/state/duel-snapshots.ts` owns comparison-only NFKC/lower-case
+  name keys, operation-level name validation, deterministic Save suffixes,
+  duplicate-name occurrence metadata and ID-only safe rename derivation. The
+  version-1 schema remains permissive for readable historical duplicates.
+- `src/app/state/saved-setup-merge.ts` owns the immutable source/current
+  fingerprint, deterministic row classifications, default-Keep replacement
+  decisions, selected-capacity counts, recipient-name status, stale detection,
+  Refresh defaults and exact candidate construction.
+- `src/app/controllers/saved-setup-changes.ts` owns the one-key direct
+  Merge/rename transaction. It captures the exact raw preimage, writes and
+  verifies the version-1 envelope before live publication, rolls back exactly
+  on handled failure, exposes only explicit session-only alternatives and
+  guards durable/session Undo with both live and raw postimages.
+- `DuelPane` now renders complete row decisions and source-field diffs, focuses
+  a new review, returns Dismiss focus to Import, exposes stale Refresh and uses
+  one controlled explicit Rename editor. Historical duplicate names receive
+  visible and accessible ordinal disambiguation in comparison and matrix
+  presentation.
+- Focused state/controller/component coverage passes 30/30 and the two
+  deterministic Chromium saved-setup transactions pass. They cover default
+  Keep/explicit Replace, source-only diff, capacity and name conflicts, exact
+  raw Undo, stale Refresh, blur/Escape/Enter rename semantics, duplicate-name
+  actions, mobile containment and unchanged unrelated storage.
+- The broader owning regression set passes 142/142, the full functional suite
+  passes 1,014/1,014, goldens pass 19/19, architecture passes with 158 source
+  modules / 143 client-reachable modules and no cycles, and the production
+  build passes with only the known chunk-size advisory. `git diff --check` and
+  focused ESLint pass. The final combined release run passes 115/115 functional
+  Chromium cases and two complete 26/26 read-only Darwin visual runs; both Duel
+  baselines remain accepted without an owned update.
 
 Priority: medium.
 

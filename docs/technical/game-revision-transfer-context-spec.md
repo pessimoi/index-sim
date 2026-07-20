@@ -328,13 +328,20 @@ After strict parse and active-snapshot entity validation, show an in-memory
 review with:
 
 - setup count;
-- add/update/limit-skip preview against the current collection;
+- complete unchanged, matching-ID replacement, addition and capacity-excluded
+  classifications against an exact current-collection fingerprint;
+- default Keep plus explicit Replace decisions for matching IDs, selectable
+  additions, recipient-name validation and source-backed replacement diffs;
 - context match copy; and
-- `Merge setups` / `Dismiss` actions.
+- `Merge selected setups` / `Dismiss` actions.
 
-Do not merge or persist before `Merge setups`. Exact-snapshot, same-revision,
+Do not merge or persist before `Merge selected setups`. Exact-snapshot, same-revision,
 different-revision and unknown formats all use the same explicit review; tone
-differs. Existing id-wins merge and 12-row cap remain unchanged.
+differs. A changed recipient collection makes decisions stale until Refresh.
+[The saved setup Merge and rename safety specification](saved-setup-merge-rename-safety-spec.md)
+owns row decisions, name/capacity policy and the direct transaction. Context
+comparison remains owned here; Workspace and legacy retain their separate
+ID-wins merge boundaries and the 12-row cap remains unchanged.
 
 ## Shareable link contract
 

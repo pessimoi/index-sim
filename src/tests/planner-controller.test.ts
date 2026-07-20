@@ -73,7 +73,13 @@ function panelFixture(isEmpty = false): PlannerPanelViewModel {
       maxCumXp: 0,
       isEmpty: true
     },
-    warnings: [],
+    notices: {
+      warningSetId: "planner-warning-set-empty",
+      issueCount: 0,
+      noteCount: 0,
+      occurrenceCount: 0,
+      rows: []
+    },
     isEmpty
   };
 }
