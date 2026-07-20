@@ -24,7 +24,6 @@ import { DuelPane } from "./components/panes/duel-pane";
 import { MonsterCardPanel } from "./components/panes/monster-card-panel";
 import { LoadoutPane } from "./components/panes/loadout-pane";
 import { PlannerPane } from "./components/panes/planner-pane";
-import { RiskPane } from "./components/panes/risk-pane";
 import { StatsPane } from "./components/panes/stats-pane";
 import { LootPane } from "./components/panes/loot-pane";
 import { TripPane } from "./components/panes/trip-pane";
@@ -38,7 +37,7 @@ import {
 } from "@/adapters/browser";
 import type { ScheduledStaticPriceSnapshotStatus } from "@/adapters/market";
 import { LastHiscoresPlayerStateSchema } from "@/adapters/hiscores";
-import { loadPersisted, tryClearPersisted } from "@/adapters/storage";
+import { loadPersisted } from "@/adapters/storage";
 import { SAFE_SESSION_NOTICE, createBrowserStorageAccess } from "./application-recovery";
 import {
   clearKnownLegacyStorageKeys,
@@ -74,6 +73,7 @@ import { useLocalStateRecovery } from "./controllers/use-local-state-recovery";
 import { useSetupFileTransfer } from "./controllers/use-setup-file-transfer";
 import { usePriceSetTransfer } from "./controllers/use-price-set-transfer";
 import { useWorkspaceFileTransfer } from "./controllers/use-workspace-file-transfer";
+import type { EconomyDataUndoScope } from "./controllers/economy-data-undo";
 import type {
   WorkspaceRestoreApplyOutcome,
   WorkspaceRestoreExecutionInput,
@@ -87,8 +87,8 @@ import type {
   ResetPriceSetOutcome
 } from "./controllers/price-set-transfer";
 import {
-  applyHiscoresLevels,
   canApplyHiscoresPreview,
+  createHiscoresLevelApplyTransaction,
   createHiscoresPreviewRows,
   isHiscoresPreviewCurrent
 } from "./state/hiscores";
@@ -163,7 +163,6 @@ import {
   canSetManualPriceOverride,
   loadManualPriceOverrides,
   removeManualPriceOverride,
-  saveManualPriceOverrides,
   setManualPriceOverride,
   type ManualPriceOverridesState
 } from "./state/manual-price-overrides";
@@ -300,7 +299,15 @@ import { defaultDuelSnapshotName, describeDuelSnapshotsImportError } from "./vie
 import type { InlineNoticeViewModel } from "./view-models/contracts";
 import type { WorkspaceLiveState } from "./state/workspace-backup";
 
-const EconomySettingsPane = lazy(() => import("./components/panes/economy-settings-pane"));
+const loadEconomySettingsPane = () => import("./components/panes/economy-settings-lazy");
+const EconomySettingsPane = lazy(loadEconomySettingsPane);
+const RiskPane = lazy(() => import("./components/panes/risk-pane"));
+
+const ECONOMY_UNDO_SCOPE_IDS: ReadonlySet<string> = new Set<EconomyDataUndoScope>([
+  "price-history",
+  "manual-price-overrides",
+  "selected-price-set"
+]);
 
 const browserStorageAccess = createBrowserStorageAccess(
   typeof window === "undefined" ? undefined : window
@@ -491,6 +498,7 @@ export function App() {
   });
   const persistLocalState = localStateRecovery.persist;
   const shouldSkipPersistLocalState = localStateRecovery.shouldSkipPersist;
+  const prepareExternalLocalStateApply = localStateRecovery.prepareExternalApply;
   const blockedLocalStateIds = localStateRecovery.blockedIds;
   const rewriteSetupBlocked = blockedLocalStateIds.includes("rewrite-setup");
   const lootPrefsBlocked = blockedLocalStateIds.includes("loot-prefs");
@@ -767,8 +775,16 @@ export function App() {
     setContext(result.context);
     setPriceLabel(result.priceLabel);
     if (result.marketNotice) setMarketNotice(result.marketNotice);
+    if (priceHistory.snapshots.length > 0) {
+      prepareExternalLocalStateApply(["price-history"]);
+    }
     setReadyToPersist(true);
-  }, [blockContextInvalidLocalState, runtimeBootstrap]);
+  }, [
+    blockContextInvalidLocalState,
+    prepareExternalLocalStateApply,
+    priceHistory.snapshots.length,
+    runtimeBootstrap
+  ]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const legacyMigrationReport = useMemo<LegacySetupMigrationReport | null>(() => {
@@ -1453,15 +1469,25 @@ export function App() {
     });
   };
 
-  const setUndoableStatus = (label: string, restoreLabel: string, restore: () => string | void) => {
+  const setUndoableStatus = (
+    label: string,
+    restoreLabel: string,
+    restore: () => string | void,
+    scope?: PendingUndo["scope"]
+  ) => {
     setPendingUndo({
       id: localUndoId(),
       label,
       restoreLabel,
       createdAt: Date.now(),
+      scope,
       restore
     });
     setStatus(label);
+  };
+
+  const invalidatePendingEconomyUndo = (): void => {
+    setPendingUndo((current) => (current?.scope === "economy-data" ? null : current));
   };
 
   const optimizeCurrentLoadout = () => {
@@ -1521,6 +1547,7 @@ export function App() {
 
   const acceptPriceSet = (priceSet: PriceSet, acceptedAt: Date, nextStatus: string) => {
     if (!context) return;
+    invalidatePendingEconomyUndo();
     applyAcceptedPriceSet(
       priceSetTransfer.acceptPriceSet({
         priceSet,
@@ -1536,7 +1563,8 @@ export function App() {
     if (!context) return;
     const outcome = await priceSetTransfer.importFile(file, {
       gameData: context.gameData,
-      manualPriceOverrides
+      manualPriceOverrides,
+      beforeAccept: invalidatePendingEconomyUndo
     });
     if (outcome.status === "ready") applyAcceptedPriceSet(outcome);
   };
@@ -1751,6 +1779,7 @@ export function App() {
   const confirmClearLocalStateItem = (itemId: LocalStateHealthItemId) => {
     const outcome = localStateRecovery.confirmClearItem(itemId);
     if (outcome.clearedIds.includes("manual-price-overrides")) {
+      invalidatePendingEconomyUndo();
       setManualPriceOverrides(DEFAULT_MANUAL_PRICE_OVERRIDES_STATE);
       setManualPriceDraft(null);
       setManualPriceClearPending(false);
@@ -1772,13 +1801,25 @@ export function App() {
   const applyHiscoresPreview = () => {
     const outcome = hiscores.prepareApply();
     if (outcome.status === "stale") return;
-    setFormSafe((current) => applyHiscoresLevels(current, outcome.response));
-    hiscores.recordApplied(outcome.applicableSkillCount);
+    const transaction = createHiscoresLevelApplyTransaction(form, outcome.response);
+    if (transaction.changedSkills.length === 0) {
+      hiscores.recordNoChanges();
+      return;
+    }
+    commitFormState(transaction.nextForm);
+    setUndoableStatus(
+      `Applied ${transaction.changedSkills.length} levels`,
+      "Restored levels from before Hiscores Apply",
+      () => {
+        commitFormState(transaction.previousForm);
+      }
+    );
   };
 
   const saveLocalPriceComparison = () => {
     if (!context) return;
     const capturedAt = new Date();
+    invalidatePendingEconomyUndo();
     setPriceHistory((current) =>
       appendAcceptedPriceSetToHistory(current, context.priceSet, capturedAt)
     );
@@ -1792,25 +1833,35 @@ export function App() {
     setMarketNotice({ tone: "neutral", message: "Confirm clearing local comparison history" });
   };
 
-  const confirmClearPriceHistory = () => {
-    const cleared = tryClearPersisted(priceHistoryStorageOptions);
-    const persistedClear = cleared.status === "cleared" && !localPersistenceUnavailable;
-    if (cleared.status === "failed") {
-      localStateRecovery.recordStorageFailure("price-history", cleared.reason);
-    } else if (persistedClear) {
-      localStateRecovery.clearStorageFailures(["price-history"]);
-    } else {
-      localStateRecovery.markPersistenceUnavailable();
-    }
+  const confirmClearPriceHistory = async (): Promise<void> => {
+    if (priceHistory.snapshots.length === 0) return;
+    const { clearEconomyPriceHistory } = await loadEconomySettingsPane();
+    invalidatePendingEconomyUndo();
+    const outcome = clearEconomyPriceHistory({
+      storage,
+      persistenceUnavailable: localPersistenceUnavailable,
+      liveState: priceHistory,
+      recovery: localStateRecovery
+    });
     setPriceHistory(DEFAULT_PRICE_HISTORY_STATE);
     setPriceHistoryClearPending(false);
-    setStatus(!persistedClear ? "Cleared price history for this session" : "Cleared price history");
-    setMarketNotice({
-      tone: !persistedClear ? "neutral" : "success",
-      message: !persistedClear
-        ? "Cleared price history for this session. Local storage is unavailable, so reload may restore it."
-        : "Cleared local comparison history"
-    });
+    setStatus(outcome.actionStatus);
+    setMarketNotice(outcome.marketNotice);
+    setUndoableStatus(
+      outcome.actionStatus,
+      "Restored local price history",
+      () =>
+        outcome.record.restore({
+          applyLiveState: (previousHistory) => {
+            setPriceHistory(previousHistory);
+            setPriceHistoryClearPending(false);
+          },
+          recovery: localStateRecovery,
+          onNotice: setMarketNotice,
+          restoredMessage: "Restored local price history"
+        }).message,
+      "economy-data"
+    );
   };
 
   const updateEconomySort = (key: PriceHistoryMoverSortKey) => {
@@ -1873,25 +1924,32 @@ export function App() {
   const registerWorkspaceUndo = (
     outcome: Extract<WorkspaceRestoreApplyOutcome, { status: "applied" }>
   ) => {
-    setUndoableStatus(outcome.message, "Restored pre-Workspace state", () => {
-      const execution = workspaceExecutionRef.current;
-      if (!execution) return "Workspace Undo is no longer available.";
-      const undo = workspaceFileTransfer.undoRestore(execution);
-      if (undo.status === "session-only-available") {
-        setPendingUndo({
-          id: localUndoId(),
-          label: undo.message,
-          restoreLabel: "Restored prior Workspace values for this session",
-          createdAt: Date.now(),
-          restore: () => {
-            const currentExecution = workspaceExecutionRef.current;
-            if (!currentExecution) return "Session-only Workspace Undo is no longer available.";
-            return workspaceFileTransfer.undoRestoreForSession(currentExecution).message;
-          }
-        });
-      }
-      return undo.message;
-    });
+    const includesEconomyData = outcome.selectedIds.some((id) => ECONOMY_UNDO_SCOPE_IDS.has(id));
+    setUndoableStatus(
+      outcome.message,
+      "Restored pre-Workspace state",
+      () => {
+        const execution = workspaceExecutionRef.current;
+        if (!execution) return "Workspace Undo is no longer available.";
+        const undo = workspaceFileTransfer.undoRestore(execution);
+        if (undo.status === "session-only-available") {
+          setPendingUndo({
+            id: localUndoId(),
+            label: undo.message,
+            restoreLabel: "Restored prior Workspace values for this session",
+            createdAt: Date.now(),
+            scope: includesEconomyData ? "economy-data" : undefined,
+            restore: () => {
+              const currentExecution = workspaceExecutionRef.current;
+              if (!currentExecution) return "Session-only Workspace Undo is no longer available.";
+              return workspaceFileTransfer.undoRestoreForSession(currentExecution).message;
+            }
+          });
+        }
+        return undo.message;
+      },
+      includesEconomyData ? "economy-data" : undefined
+    );
   };
 
   const applyWorkspaceRestore = async (
@@ -2616,24 +2674,32 @@ export function App() {
         priceFallback: [resetFallbackPriceSet, resetFallbackOrigin] as const
       }
     : null;
-  const commitManualPriceOverrides = (
+  const commitManualPriceOverrides = async (
     next: ManualPriceOverridesState,
-    successMessage: string
-  ): void => {
-    let persisted = true;
-    try {
-      saveManualPriceOverrides(storage, next);
-      if (localPersistenceUnavailable) {
-        persisted = false;
-        localStateRecovery.markPersistenceUnavailable();
-      } else {
-        localStateRecovery.clearStorageFailures(["manual-price-overrides"]);
-      }
-    } catch {
-      persisted = false;
-      localStateRecovery.recordStorageFailure("manual-price-overrides", "save_failed");
+    successMessage: string,
+    undo?: { restoredMessage: string }
+  ): Promise<void> => {
+    if (next === manualPriceOverrides) {
+      setStatus(successMessage);
+      setMarketNotice({ tone: "neutral", message: successMessage });
+      return;
     }
-    localStateRecovery.unblockReplaced(["manual-price-overrides"]);
+    const { saveEconomyManualPriceOverrides } = await loadEconomySettingsPane();
+    invalidatePendingEconomyUndo();
+    const outcome = saveEconomyManualPriceOverrides({
+      storage,
+      persistenceUnavailable: localPersistenceUnavailable,
+      liveState: {
+        manualPriceOverrides,
+        activePriceSet: context.priceSet,
+        priceLabel,
+        manualPriceDraft
+      },
+      next,
+      successMessage,
+      undo: Boolean(undo),
+      recovery: localStateRecovery
+    });
     setManualPriceOverrides(next);
     if (basePriceSet) {
       const nextActivePriceSet = applyManualPriceOverrides(basePriceSet, next);
@@ -2641,22 +2707,44 @@ export function App() {
       setPriceLabel(nextActivePriceSet.label);
     }
     setManualPriceClearPending(false);
-    localStateRecovery.refresh();
-    setStatus(persisted ? successMessage : `${successMessage} for this session`);
-    setMarketNotice({
-      tone: persisted ? "success" : "neutral",
-      message: persisted
-        ? successMessage
-        : `${successMessage} for this session. Local storage is unavailable, so reload may restore the previous value.`
-    });
+    setStatus(outcome.actionStatus);
+    setMarketNotice(outcome.marketNotice);
+    const undoRecord = outcome.record;
+    if (undoRecord && undo) {
+      setUndoableStatus(
+        outcome.actionStatus,
+        undo.restoredMessage,
+        () =>
+          undoRecord.restore({
+            applyLiveState: (previous) => {
+              setManualPriceOverrides(previous.manualPriceOverrides);
+              setContext((current) =>
+                current ? { ...current, priceSet: previous.activePriceSet } : current
+              );
+              setPriceLabel(previous.priceLabel);
+              setManualPriceDraft(previous.manualPriceDraft);
+              setManualPriceClearPending(false);
+              setFatalError(null);
+              setPriceAgeNowMs(Date.now());
+            },
+            recovery: localStateRecovery,
+            onNotice: setMarketNotice,
+            restoredMessage: undo.restoredMessage
+          }).message,
+        "economy-data"
+      );
+    }
   };
-  const applyManualItemPrice = () => {
+  const applyManualItemPrice = async (): Promise<void> => {
     if (!effectiveManualPriceItemId || selectedManualBasePrice === null) return;
     if (manualPriceInputValue === selectedManualBasePrice) {
       const next = removeManualPriceOverride(manualPriceOverrides, effectiveManualPriceItemId);
-      commitManualPriceOverrides(
+      await commitManualPriceOverrides(
         next,
-        `Restored ${priceHistoryItemLabels[effectiveManualPriceItemId] ?? effectiveManualPriceItemId} to ${formatNumber(selectedManualBasePrice)} GP. Current results use the base PriceSet value.`
+        `Restored ${priceHistoryItemLabels[effectiveManualPriceItemId] ?? effectiveManualPriceItemId} to ${formatNumber(selectedManualBasePrice)} GP. Current results use the base PriceSet value.`,
+        {
+          restoredMessage: `Restored manual item price for ${priceHistoryItemLabels[effectiveManualPriceItemId] ?? effectiveManualPriceItemId}`
+        }
       );
       return;
     }
@@ -2672,12 +2760,12 @@ export function App() {
       manualPriceInputValue,
       new Date()
     );
-    commitManualPriceOverrides(
+    await commitManualPriceOverrides(
       next,
       `Applied ${formatNumber(manualPriceInputValue)} GP manual price for ${priceHistoryItemLabels[effectiveManualPriceItemId] ?? effectiveManualPriceItemId}. Current results use this manual value.`
     );
   };
-  const resetManualItemPrice = () => {
+  const resetManualItemPrice = async (): Promise<void> => {
     if (
       !effectiveManualPriceItemId ||
       !selectedManualOverride ||
@@ -2686,16 +2774,20 @@ export function App() {
       return;
     }
     const next = removeManualPriceOverride(manualPriceOverrides, effectiveManualPriceItemId);
-    commitManualPriceOverrides(
+    await commitManualPriceOverrides(
       next,
-      `Reset ${priceHistoryItemLabels[effectiveManualPriceItemId] ?? effectiveManualPriceItemId} to ${formatNumber(selectedManualBasePrice)} GP. Current results use the base PriceSet value.`
+      `Reset ${priceHistoryItemLabels[effectiveManualPriceItemId] ?? effectiveManualPriceItemId} to ${formatNumber(selectedManualBasePrice)} GP. Current results use the base PriceSet value.`,
+      {
+        restoredMessage: `Restored manual item price for ${priceHistoryItemLabels[effectiveManualPriceItemId] ?? effectiveManualPriceItemId}`
+      }
     );
     setManualPriceDraft(selectedManualBasePrice);
   };
-  const confirmClearAllManualPrices = () => {
-    commitManualPriceOverrides(
+  const confirmClearAllManualPrices = async (): Promise<void> => {
+    await commitManualPriceOverrides(
       DEFAULT_MANUAL_PRICE_OVERRIDES_STATE,
-      "Cleared all manual item prices"
+      "Cleared all manual item prices",
+      { restoredMessage: "Restored all manual item prices" }
     );
     setManualPriceDraft(selectedManualBasePrice);
   };
@@ -2720,15 +2812,52 @@ export function App() {
     setMarketNotice(outcome.marketNotice);
     setFatalError(null);
   };
-  const resetActivePriceSetToFallback = () => {
-    if (!resetFallbackPriceSet) return;
-    applyResetPriceSet(
-      priceSetTransfer.resetToFallback({
-        fallbackPriceSet: resetFallbackPriceSet,
-        fallbackOrigin: resetFallbackOrigin,
-        fallbackLabel: resetFallbackLabel,
-        manualPriceOverrides
-      })
+  const resetActivePriceSetToFallback = async (): Promise<void> => {
+    if (!resetFallbackPriceSet || !basePriceSet) return;
+    const { prepareEconomyDataUndo } = await loadEconomySettingsPane();
+    const undoPreparation = prepareEconomyDataUndo({
+      scope: "selected-price-set",
+      storage,
+      persistenceUnavailable: localPersistenceUnavailable,
+      liveState: {
+        basePriceSet,
+        activePriceSet: context.priceSet,
+        activePriceSetOrigin,
+        priceLabel,
+        manualPriceDraft
+      }
+    });
+    invalidatePendingEconomyUndo();
+    const outcome = priceSetTransfer.resetToFallback({
+      fallbackPriceSet: resetFallbackPriceSet,
+      fallbackOrigin: resetFallbackOrigin,
+      fallbackLabel: resetFallbackLabel,
+      manualPriceOverrides
+    });
+    applyResetPriceSet(outcome);
+    const undoRecord = undoPreparation.finish(outcome.persistedReset);
+    setUndoableStatus(
+      outcome.appStatus,
+      "Restored imported PriceSet",
+      () =>
+        undoRecord.restore({
+          applyLiveState: (previous) => {
+            setBasePriceSet(previous.basePriceSet);
+            setContext((current) =>
+              current ? { ...current, priceSet: previous.activePriceSet } : current
+            );
+            setActivePriceSetOrigin(previous.activePriceSetOrigin);
+            setPriceLabel(previous.priceLabel);
+            setManualPriceDraft(previous.manualPriceDraft);
+            setManualPriceClearPending(false);
+            setFatalError(null);
+            setPriceAgeNowMs(Date.now());
+          },
+          recovery: localStateRecovery,
+          onNotice: setMarketNotice,
+          restoredMessage: "Restored imported PriceSet"
+        }).message,
+      "economy-data"
     );
   };
   const visibleShareableSetupInspection = shareReviewDismissed
@@ -3040,25 +3169,27 @@ export function App() {
           }}
         />
 
-        <RiskPane
-          hidden={activeTab !== "risk"}
-          model={{
-            controls: riskAnalysis.controls,
-            presentation: riskAnalysis.presentation,
-            targetDropOptions: riskAnalysis.targetDropOptions,
-            display: riskAnalysis.display,
-            expectedTtkSec: viewModel.result.rates.ttkSec,
-            expectedKillsPerTrip: viewModel.trip.trip.killsPerTrip
-          }}
-          actions={{
-            setTargetKills: riskAnalysis.setTargetKills,
-            setHorizonMinutes: riskAnalysis.setHorizonMinutes,
-            setGpTarget: riskAnalysis.setGpTarget,
-            setTargetDropRowId: riskAnalysis.setTargetDropRowId,
-            run: riskAnalysis.run,
-            cancel: riskAnalysis.cancel
-          }}
-        />
+        <Suspense fallback={null}>
+          <RiskPane
+            hidden={activeTab !== "risk"}
+            model={{
+              controls: riskAnalysis.controls,
+              presentation: riskAnalysis.presentation,
+              targetDropOptions: riskAnalysis.targetDropOptions,
+              display: riskAnalysis.display,
+              expectedTtkSec: viewModel.result.rates.ttkSec,
+              expectedKillsPerTrip: viewModel.trip.trip.killsPerTrip
+            }}
+            actions={{
+              setTargetKills: riskAnalysis.setTargetKills,
+              setHorizonMinutes: riskAnalysis.setHorizonMinutes,
+              setGpTarget: riskAnalysis.setGpTarget,
+              setTargetDropRowId: riskAnalysis.setTargetDropRowId,
+              run: riskAnalysis.run,
+              cancel: riskAnalysis.cancel
+            }}
+          />
+        </Suspense>
         <CannonPane
           hidden={activeTab !== "cannon"}
           enabled={cannonEnabled}

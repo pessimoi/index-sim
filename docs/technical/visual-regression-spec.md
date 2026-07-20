@@ -20,10 +20,11 @@ without redefining functional parity or legacy CSS as the product truth.
   `process.platform` snapshot paths and the production Vite build/preview path.
 - `src/tests/e2e/helpers/visual-state.ts` freezes time, seeds bounded fixture
   state, disables live integration calls and waits for app/fonts readiness.
-- `src/tests/e2e/visual-regression.visual.spec.ts` implements 20 scenarios over
-  root, Compare, loadouts, Stats, Trip, Loot, Economy, Cannon, Planner, Duel and
-  Settings. D-075 scroll coverage and focused Loot details bring the reviewed
-  Darwin set to 31 snapshots.
+- `src/tests/e2e/visual-regression.visual.spec.ts` implements 26 scenarios over
+  root, Compare, loadouts, Stats, Trip, Loot, Economy, Cannon, Planner, Duel,
+  Settings and the three-size mobile result/navigation loop. D-075 scroll
+  coverage, focused Loot details and six bounded mobile-loop images bring the
+  reviewed Darwin set to 37 snapshots.
 - Reviewed Darwin baselines live in
   `src/tests/e2e/__screenshots__/darwin/`.
 - `npm run test:e2e:visual` compares only; baseline writes require
@@ -137,6 +138,8 @@ Use these fixed CSS viewports:
 | compact landscape |   640 |    360 | D-082 in-app legacy-console containment      |
 | tablet            |   768 |   1024 | Dense overflow and workbench containment     |
 | mobile            |   390 |    844 | Stacking, controls and right-rail placement  |
+| wide mobile       |   620 |    844 | Exact normal-flow phone breakpoint boundary  |
+| portrait tablet   |   768 |   1024 | Normal-flow mobile-loop presentation         |
 
 Do not scale font size based on viewport. The tests must use the production
 responsive CSS at each viewport.
@@ -160,6 +163,7 @@ The first accepted baseline set must cover:
 | Planner        | Deterministically recomputed plan with chart and timeline           | desktop pane, mobile pane          |
 | Duel           | Fixed snapshots and built monster matrix                            | desktop pane, mobile pane          |
 | Settings       | Price data plus sanitized legacy/local-state review notices         | desktop recovery, price, legacy    |
+| Mobile loop    | Player-adjacent headline result and open measured tab overflow      | result + navigation at 390/620/768 |
 
 Use locator screenshots for pane-level cases. Full-page screenshots are limited
 to the root desktop/mobile shell because very tall full-page baselines make
@@ -189,6 +193,31 @@ The fixed first-focus skip link must be both translated and visually inert when
 unfocused. Its focus-visible state remains part of the functional keyboard
 gate; descendant screenshot stitching must not composite the unfocused link
 into an unrelated long mobile pane.
+
+## 2026-07-20 mobile-loop diff review
+
+The mobile result/navigation implementation was first run read-only. Six
+missing bounded candidates and the expected normal-flow typography/layout
+diffs were inspected as actual/diff images before the explicit update. The
+accepted set contains `mobile-result-loop-*` and `mobile-navigation-loop-*` at
+390 × 844, 620 × 844 and 768 × 1024. The existing mobile/portrait baselines
+whose 12/14-pixel text or downstream flow changed were accepted only when the
+content stayed readable and horizontally contained. A nested Loot image first
+reached comparison only after its parent mobile screenshot was accepted; its
+fixture-only table was inspected before final acceptance.
+
+The navigation row was then tightened so the initial active `Monsters` tab is
+fully visible while the left boundary control remains disabled. A second
+read-only candidate review covered `root-shell-mobile` and the three
+navigation-loop images before their bounded update. The next complete
+read-only run exposed one stable 237-pixel glyph-alignment diff in the existing
+`duel-mobile` locator image after the navigation row added 44 CSS pixels to the
+normal document flow. Its actual/diff pair was inspected and accepted through
+its own grep-scoped update; content, dimensions and comparison data were
+unchanged. Desktop, desktop pane and 640 × 360 compact-landscape baselines
+remained comparison owners; no data, calculation or tolerance change was
+accepted. Two complete read-only runs after the final update are the
+determinism evidence for the 26-scenario, 37-snapshot set.
 
 ## 2026-07-12 diff review decision matrix
 

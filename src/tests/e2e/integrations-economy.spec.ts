@@ -3,10 +3,12 @@ import {
   MANUAL_PRICE_OVERRIDES_STORAGE_KEY,
   chooseSearchableOption,
   expect,
+  expectAppStatus,
   expectPageWidthContained,
   searchableCombobox,
   test
 } from "./scaffold-fixture";
+import { readFileSync } from "node:fs";
 
 test("shows the accepted Revision 274 context in the ready shell and Settings", async ({
   page
@@ -190,13 +192,50 @@ test("looks up hiscores through the same-origin API and applies previewed levels
   await expect(setup.getByLabel("STR", { exact: true })).toHaveValue("74");
   await expect(setup.getByLabel("DEF", { exact: true })).toHaveValue("65");
 
-  await workbenchTabs.getByRole("tab", { name: "Planner" }).click();
+  const undo = page.getByLabel("Local state undo");
+  await expect(undo).toContainText("Applied 7 levels");
+  await expect(undo).not.toContainText("Other Player");
+  await expect(previewDetails).toHaveAttribute("open", "");
+  const attackPreviewRow = page
+    .getByRole("table", { name: "Hiscores preview" })
+    .locator("tbody tr")
+    .filter({ hasText: "attack" });
+  await expect(attackPreviewRow.locator("td").nth(1)).toHaveText("71");
+
+  await hiscores.getByRole("button", { name: "Apply" }).click();
+  await expect(hiscores).toContainText("Current levels already match Hiscores");
+  await expect(undo).toContainText("Applied 7 levels");
+
+  const plannerTab = workbenchTabs.getByRole("tab", { name: "Planner" });
+  await plannerTab.focus();
+  await page.keyboard.press("Enter");
   const reconciledPlanner = page.getByRole("region", { name: "Planner", exact: true });
   await expect(reconciledPlanner.getByLabel("Attack current XP")).toHaveValue("");
   await expect(reconciledPlanner.getByLabel("Attack target")).toHaveValue("71");
   await expect(reconciledPlanner).toContainText("Attack XP uses Auto");
   await expect(reconciledPlanner).toContainText("Attack target is now 71");
   await expect(reconciledPlanner).toContainText("the level 71 floor");
+
+  await undo.getByRole("button", { name: "Undo" }).focus();
+  await page.keyboard.press("Enter");
+  await expect(undo).toHaveCount(0);
+  await expectAppStatus(page, "Restored levels from before Hiscores Apply");
+  await expect(previewDetails).toHaveAttribute("open", "");
+  await expect(attackPreviewRow.locator("td").nth(1)).toHaveText("60");
+  await expect(hiscores.getByRole("button", { name: "Apply" })).toBeEnabled();
+
+  const meleeTab = workbenchTabs.getByRole("tab", { name: "Melee setup" });
+  await meleeTab.focus();
+  await page.keyboard.press("Enter");
+  await expect(setup.getByLabel("ATT", { exact: true })).toHaveValue("60");
+  await expect(setup.getByLabel("STR", { exact: true })).toHaveValue("60");
+  await expect(setup.getByLabel("DEF", { exact: true })).toHaveValue("50");
+
+  await plannerTab.focus();
+  await page.keyboard.press("Enter");
+  await expect(reconciledPlanner.getByLabel("Attack current XP")).toHaveValue("");
+  await expect(reconciledPlanner.getByLabel("Attack target")).toHaveValue("71");
+  await expect(reconciledPlanner).toContainText("the level 60 floor");
 });
 
 test("keeps market UI scheduled-only when the compatibility sync API exists", async ({ page }) => {
@@ -405,6 +444,28 @@ test("keeps manual item drafts and unavailable overrides scoped across base chan
 });
 
 test("corrects a warned item price", async ({ page }) => {
+  const prices = JSON.parse(
+    readFileSync(new URL("../../../prices.json", import.meta.url), "utf8")
+  ) as Record<string, number>;
+  const provenance = JSON.parse(
+    readFileSync(new URL("../../../price-provenance.json", import.meta.url), "utf8")
+  ) as { items: Record<string, unknown> };
+  delete prices.rune_spear;
+  delete provenance.items.rune_spear;
+  await page.route("**/prices.json", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(prices)
+    });
+  });
+  await page.route("**/price-provenance.json", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(provenance)
+    });
+  });
   await page.goto("/");
   const tabs = page.getByLabel("Workbench tabs");
   const resultIssue = page.getByLabel("Price data issue");
@@ -449,6 +510,9 @@ test("corrects a warned item price", async ({ page }) => {
   ).toHaveCount(0);
 
   await panel.getByRole("button", { name: "Reset item" }).click();
+  await expect(
+    page.getByLabel("Local state undo").getByRole("button", { name: "Undo" })
+  ).toBeVisible();
   await expect(summary).toContainText("Base 154");
   await expect(summary).toContainText("Active 154");
   await expect(summary).toContainText("Status Base");
@@ -655,5 +719,268 @@ test("keeps shared scheduled price history read-only beside local comparisons", 
   await expect(searchableCombobox(page, "Trend item")).toBeEnabled();
   expect(await page.evaluate(() => window.localStorage.getItem("index-sim:price-history"))).toBe(
     null
+  );
+});
+
+test("Economy destructive Undo restores exact durable price history raw data", async ({ page }) => {
+  await page.route("**/price-history.json", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+  });
+  await page.addInitScript(() => window.localStorage.setItem("index-sim:unrelated-test", "keep"));
+  await page.goto("/");
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Economy" }).click();
+  const summary = page.getByLabel("Price history summary");
+
+  await page.getByRole("button", { name: "Save local comparison" }).click();
+  await expect(summary).toContainText("Local 1");
+  const rawBefore = await page.evaluate(() =>
+    window.localStorage.getItem("index-sim:price-history")
+  );
+  expect(rawBefore).not.toBeNull();
+
+  await page.getByRole("button", { name: "Clear local history" }).click();
+  await page.getByRole("button", { name: "Confirm clear local history" }).click();
+  await expect(summary).toContainText("Local 0");
+  expect(await page.evaluate(() => window.localStorage.getItem("index-sim:price-history"))).toBe(
+    null
+  );
+
+  await page.getByLabel("Local state undo").getByRole("button", { name: "Undo" }).click();
+  await expect(summary).toContainText("Local 1");
+  expect(await page.evaluate(() => window.localStorage.getItem("index-sim:price-history"))).toBe(
+    rawBefore
+  );
+  expect(await page.evaluate(() => window.localStorage.getItem("index-sim:unrelated-test"))).toBe(
+    "keep"
+  );
+  await expect(page.getByLabel("Market price data")).toContainText("Restored local price history");
+
+  await page.reload();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Economy" }).click();
+  await expect(page.getByLabel("Price history summary")).toContainText("Local 1");
+  expect(await page.evaluate(() => window.localStorage.getItem("index-sim:price-history"))).toBe(
+    rawBefore
+  );
+});
+
+test("Economy destructive Undo restores manual price reset, base Apply and clear", async ({
+  page
+}) => {
+  const manualRaw = JSON.stringify({
+    version: 1,
+    savedAt: "2026-07-20T00:00:00.000Z",
+    data: {
+      items: {
+        lobster: { price: 123456, updatedAt: "2026-07-20T00:00:00.000Z" },
+        unavailable_fixture: { price: 654, updatedAt: "2026-07-20T00:00:00.000Z" }
+      }
+    }
+  });
+  await page.addInitScript((raw) => {
+    window.localStorage.setItem("index-sim:manual-price-overrides", raw);
+    window.localStorage.setItem("index-sim:unrelated-test", "keep");
+  }, manualRaw);
+  await page.goto("/");
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Economy" }).click();
+  const panel = page.getByRole("region", { name: "Manual item price", exact: true });
+  const summary = panel.getByLabel("Manual item price summary");
+  const input = panel.getByLabel("Manual price", { exact: true });
+  await chooseSearchableOption(panel, "Manual price item", "Lobster", true);
+  await expect(summary).toContainText("Active 123,456");
+  await expect(panel).toContainText("1 active · 1 unavailable");
+  const baseText = await summary
+    .locator("span")
+    .filter({ hasText: /^Base / })
+    .textContent();
+  const basePrice = Number((baseText ?? "").replace(/[^0-9.]/g, ""));
+  expect(basePrice).toBeGreaterThanOrEqual(0);
+
+  await panel.getByRole("button", { name: "Reset item" }).click();
+  await expect(
+    page.getByLabel("Local state undo").getByRole("button", { name: "Undo" })
+  ).toBeVisible();
+  expect(
+    await page.evaluate(() => window.localStorage.getItem("index-sim:manual-price-overrides"))
+  ).not.toBe(manualRaw);
+  await page.getByLabel("Local state undo").getByRole("button", { name: "Undo" }).click();
+  await expect(summary).toContainText("Active 123,456");
+  await expect(input).toHaveValue("123456");
+  expect(
+    await page.evaluate(() => window.localStorage.getItem("index-sim:manual-price-overrides"))
+  ).toBe(manualRaw);
+
+  await input.fill(String(basePrice));
+  await panel.getByRole("button", { name: "Apply price" }).click();
+  await expect(summary).toContainText("Status Base");
+  await page.getByLabel("Local state undo").getByRole("button", { name: "Undo" }).click();
+  await expect(summary).toContainText("Status Manual");
+  expect(
+    await page.evaluate(() => window.localStorage.getItem("index-sim:manual-price-overrides"))
+  ).toBe(manualRaw);
+
+  await panel.getByRole("button", { name: "Clear all manual prices" }).click();
+  await panel.getByRole("button", { name: "Confirm clear all manual prices" }).click();
+  await expect(
+    page.getByLabel("Local state undo").getByRole("button", { name: "Undo" })
+  ).toBeVisible();
+  expect(
+    await page.evaluate(() => window.localStorage.getItem("index-sim:manual-price-overrides"))
+  ).toBeNull();
+  await page.getByLabel("Local state undo").getByRole("button", { name: "Undo" }).click();
+  await expect(summary).toContainText("Active 123,456");
+  await expect(panel).toContainText("1 active · 1 unavailable");
+  expect(
+    await page.evaluate(() => window.localStorage.getItem("index-sim:manual-price-overrides"))
+  ).toBe(manualRaw);
+  expect(await page.evaluate(() => window.localStorage.getItem("index-sim:unrelated-test"))).toBe(
+    "keep"
+  );
+});
+
+test("Economy destructive Undo restores imported PriceSet reset without history drift", async ({
+  page
+}) => {
+  await page.addInitScript(() => window.localStorage.setItem("index-sim:unrelated-test", "keep"));
+  await page.goto("/");
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Economy" }).click();
+  const market = page.getByLabel("Market price data");
+  const tools = market.locator("details.advanced-price-set-tools");
+  await tools.locator(":scope > summary").click();
+  await tools
+    .locator("label.file-button")
+    .filter({ hasText: "Import full PriceSet" })
+    .locator('input[type="file"]')
+    .setInputFiles({
+      name: "economy-undo-price-set.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(
+        JSON.stringify({
+          id: "economy-undo-price-set",
+          label: "Economy Undo PriceSet",
+          source: "manual",
+          createdAt: "2026-07-20T00:00:00.000Z",
+          itemPrices: { lobster: 987, big_bones: 654 },
+          alchValues: { lobster: 1, big_bones: 2 }
+        })
+      )
+    });
+  await expect(market.getByLabel("Market active PriceSet summary")).toContainText(
+    "Economy Undo PriceSet"
+  );
+  const manualPanel = page.getByRole("region", { name: "Manual item price", exact: true });
+  await chooseSearchableOption(manualPanel, "Manual price item", "Lobster", true);
+  await manualPanel.getByLabel("Manual price", { exact: true }).fill("777");
+  const before = await page.evaluate(() => ({
+    selected: window.localStorage.getItem("index-sim:price-set:selected"),
+    history: window.localStorage.getItem("index-sim:price-history"),
+    manual: window.localStorage.getItem("index-sim:manual-price-overrides")
+  }));
+  expect(before.selected).not.toBeNull();
+
+  await tools.getByRole("button", { name: "Reset imported PriceSet" }).click();
+  await market.getByRole("button", { name: "Confirm reset to scheduled prices" }).click();
+  await expect(
+    page.getByLabel("Local state undo").getByRole("button", { name: "Undo" })
+  ).toBeVisible();
+  expect(
+    await page.evaluate(() => window.localStorage.getItem("index-sim:price-set:selected"))
+  ).toBe(null);
+  await page.getByLabel("Local state undo").getByRole("button", { name: "Undo" }).click();
+  await expect(market.getByLabel("Market active PriceSet summary")).toContainText(
+    "Economy Undo PriceSet"
+  );
+  await expect(manualPanel.getByLabel("Manual price", { exact: true })).toHaveValue("777");
+  expect(
+    await page.evaluate(() => ({
+      selected: window.localStorage.getItem("index-sim:price-set:selected"),
+      history: window.localStorage.getItem("index-sim:price-history"),
+      manual: window.localStorage.getItem("index-sim:manual-price-overrides")
+    }))
+  ).toEqual(before);
+  expect(await page.evaluate(() => window.localStorage.getItem("index-sim:unrelated-test"))).toBe(
+    "keep"
+  );
+
+  await page.reload();
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Economy" }).click();
+  await expect(page.getByLabel("Market active PriceSet summary")).toContainText(
+    "Economy Undo PriceSet"
+  );
+  expect(
+    await page.evaluate(() => window.localStorage.getItem("index-sim:price-set:selected"))
+  ).toBe(before.selected);
+});
+
+test("Economy destructive Undo stays live-only in a safe session", async ({ page }) => {
+  const durableRaw = JSON.stringify({
+    version: 2,
+    savedAt: "2026-07-20T00:00:00.000Z",
+    data: { snapshots: [] }
+  });
+  await page.addInitScript((raw) => {
+    window.localStorage.setItem("index-sim:price-history", raw);
+    window.localStorage.setItem("index-sim:unrelated-test", "keep");
+  }, durableRaw);
+  await page.goto("/?index_sim_safe_session=1");
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Economy" }).click();
+  const summary = page.getByLabel("Price history summary");
+  await page.getByRole("button", { name: "Save local comparison" }).click();
+  await expect(summary).toContainText("Local 1");
+  await page.getByRole("button", { name: "Clear local history" }).click();
+  await page.getByRole("button", { name: "Confirm clear local history" }).click();
+  await expect(summary).toContainText("Local 0");
+  expect(await page.evaluate(() => window.localStorage.getItem("index-sim:price-history"))).toBe(
+    durableRaw
+  );
+
+  await page.getByLabel("Local state undo").getByRole("button", { name: "Undo" }).click();
+  await expect(summary).toContainText("Local 1");
+  await expect(page.getByLabel("Market price data")).toContainText(
+    "Restored local price history for this session"
+  );
+  expect(await page.evaluate(() => window.localStorage.getItem("index-sim:price-history"))).toBe(
+    durableRaw
+  );
+  expect(await page.evaluate(() => window.localStorage.getItem("index-sim:unrelated-test"))).toBe(
+    "keep"
+  );
+});
+
+test("Economy destructive Undo restores live state after a price-history clear failure", async ({
+  page
+}) => {
+  await page.route("**/price-history.json", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+  });
+  await page.goto("/");
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Economy" }).click();
+  const summary = page.getByLabel("Price history summary");
+  await page.getByRole("button", { name: "Save local comparison" }).click();
+  await expect(summary).toContainText("Local 1");
+  const rawBefore = await page.evaluate(() =>
+    window.localStorage.getItem("index-sim:price-history")
+  );
+  await page.evaluate(() => {
+    const original = Storage.prototype.removeItem;
+    Storage.prototype.removeItem = function (key: string) {
+      if (key === "index-sim:price-history") {
+        Storage.prototype.removeItem = original;
+        throw new DOMException("forced private clear failure", "QuotaExceededError");
+      }
+      return original.call(this, key);
+    };
+  });
+
+  await page.getByRole("button", { name: "Clear local history" }).click();
+  await page.getByRole("button", { name: "Confirm clear local history" }).click();
+  await expect(summary).toContainText("Local 0");
+  expect(await page.evaluate(() => window.localStorage.getItem("index-sim:price-history"))).toBe(
+    rawBefore
+  );
+  await page.getByLabel("Local state undo").getByRole("button", { name: "Undo" }).click();
+  await expect(summary).toContainText("Local 1");
+  await expect(page.getByLabel("Market price data")).toContainText("Saved data was left unchanged");
+  expect(await page.evaluate(() => window.localStorage.getItem("index-sim:price-history"))).toBe(
+    rawBefore
   );
 });

@@ -160,7 +160,7 @@ function inOrder(markup: string, fragments: readonly string[]): void {
 }
 
 describe("Planner pane", () => {
-  it("keeps the hidden landmark, controls, gear editor and complete output order", () => {
+  it("puts primary results before the collapsed advanced gear editor", () => {
     const markup = renderToStaticMarkup(
       createElement(PlannerPane, { hidden: true, model: model(), actions })
     );
@@ -177,15 +177,20 @@ describe("Planner pane", () => {
       "Recompute plan",
       'aria-label="Planner gear options"',
       'aria-label="Planner skill targets"',
-      'aria-label="Planner gear pool editor"',
       'aria-label="Planner output"',
       'aria-label="Planner summary"',
-      'aria-label="Planner DPS chart"',
-      'aria-label="Planner gear timeline"',
       'aria-label="Planner training order"',
       'aria-label="Planner unlock summary"',
-      'aria-label="Planner warnings"'
+      'aria-label="Planner DPS chart"',
+      'aria-label="Planner gear timeline"',
+      'aria-label="Planner warnings"',
+      "Advanced gear pool",
+      'aria-label="Planner gear pool editor"'
     ]);
+    expect(markup).toContain('<details class="planner-gear-editor">');
+    expect(markup).not.toContain('<details class="planner-gear-editor" open');
+    expect(markup).toContain("Advanced gear pool · ");
+    expect(markup).toContain("1/1");
     expect(markup).toContain('aria-label="Planner pool Rune scimitar"');
     expect(markup).toContain("Next plan starts at");
     expect(markup).toContain("Use level floor");
@@ -222,6 +227,12 @@ describe("Planner pane", () => {
     expect(markup).toContain("Planner inputs adjusted for current levels");
     expect(markup).toContain("Planner inputs changed. This plan uses the last recomputed inputs.");
     expect(markup).toContain('aria-live="polite"');
+    inOrder(markup, [
+      'aria-label="Planner skill targets"',
+      "Planner inputs changed. This plan uses the last recomputed inputs.",
+      'aria-label="Planner output"',
+      "Advanced gear pool"
+    ]);
   });
 
   it("keeps calculating and fixed-error presentation contracts", () => {
@@ -257,6 +268,21 @@ describe("Planner pane", () => {
         actions
       })
     );
+    const retainedErrorMarkup = renderToStaticMarkup(
+      createElement(PlannerPane, {
+        hidden: false,
+        model: model({
+          presentation: {
+            status: "failed",
+            displayIsCurrent: false,
+            message: "Planner could not compute the current plan. Showing the previous result.",
+            canRetry: true,
+            retryActionLabel: "Retry plan"
+          }
+        }),
+        actions
+      })
+    );
 
     expect(pendingMarkup).toContain("Calculating the plan for current inputs.");
     expect(pendingMarkup).not.toContain('aria-label="Planner output"');
@@ -265,6 +291,12 @@ describe("Planner pane", () => {
     );
     expect(errorMarkup).toContain('role="alert"');
     expect(errorMarkup).toContain("Retry plan");
+    inOrder(retainedErrorMarkup, [
+      "Planner could not compute the current plan. Showing the previous result.",
+      "Retry plan",
+      'aria-label="Planner output"',
+      "Advanced gear pool"
+    ]);
   });
 
   it("keeps unavailable and fresh-empty output states distinct", () => {
@@ -294,10 +326,33 @@ describe("Planner pane", () => {
     );
 
     expect(unavailableMarkup).toContain("Planner is available after bundled data loads.");
+    expect(unavailableMarkup).not.toContain("Advanced gear pool");
     expect(emptyMarkup).toContain('aria-label="Planner output"');
     expect(emptyMarkup).toContain("No chart points for current targets.");
     expect(emptyMarkup).toContain("No gear unlocks in this plan.");
     expect(emptyMarkup).toContain("No training steps for current targets.");
     expect(emptyMarkup).toContain("No gear or spell unlocks in this plan.");
+  });
+
+  it("does not show the unavailable copy when only the advanced editor is ready", () => {
+    const markup = renderToStaticMarkup(
+      createElement(PlannerPane, {
+        hidden: false,
+        model: model({
+          panel: null,
+          presentation: {
+            status: "idle",
+            displayIsCurrent: false,
+            message: "",
+            canRetry: false,
+            retryActionLabel: "Retry plan"
+          }
+        }),
+        actions
+      })
+    );
+
+    expect(markup).not.toContain("Planner is available after bundled data loads.");
+    expect(markup).toContain("Advanced gear pool");
   });
 });

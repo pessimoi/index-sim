@@ -1,4 +1,4 @@
-import type { KeyboardEvent, ReactNode, RefObject } from "react";
+import type { ReactNode, RefObject } from "react";
 import type { CombatStyle, EntityId } from "@/domain/shared";
 import type { ActiveAssumptionsSummaryViewModel } from "../../view-models/active-assumptions";
 import type {
@@ -9,8 +9,6 @@ import {
   COMBAT_STYLE_OPTIONS,
   PRIMARY_BOOST_OPTIONS,
   PRIMARY_PRAYER_OPTIONS,
-  WORKBENCH_TABS,
-  nextWorkbenchTabId,
   workbenchTabLabel,
   type AppShellSetupViewModel,
   type WorkbenchResultViewModel,
@@ -35,6 +33,7 @@ import {
   type SelectOption
 } from "../form-fields";
 import { MetricList } from "../app-presenters";
+import { WorkbenchTabNavigation } from "./workbench-tab-navigation";
 
 export interface WorkbenchShellActions {
   activateTab(tabId: WorkbenchTabId): void;
@@ -134,16 +133,6 @@ export function WorkbenchShell({
   rail
 }: WorkbenchShellProps) {
   const setupTabLabel = workbenchTabLabel("loadout", form.combatStyle);
-  const handleTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
-    const nextTabId = nextWorkbenchTabId(activeTab, event.key);
-    if (!nextTabId) return;
-    event.preventDefault();
-    actions.activateTab(nextTabId);
-    event.currentTarget.parentElement
-      ?.querySelector<HTMLButtonElement>(`#workbench-tab-${nextTabId}`)
-      ?.focus();
-  };
-
   return (
     <>
       <nav className="setup-guide-bar" aria-label="Setup quick navigation">
@@ -232,6 +221,12 @@ export function WorkbenchShell({
               options={styleOptions}
               onChange={actions.setStyle}
             />
+          </section>
+          <section
+            className="sidebar-section mobile-result-summary"
+            aria-label="Mobile result summary"
+          >
+            <MetricList items={result.contextMetrics} />
           </section>
           <section className="sidebar-section player-profile" aria-label="Active player setup">
             <div className="section-title-row">
@@ -329,24 +324,11 @@ export function WorkbenchShell({
 
           <div className="setup-review-slot">{setupReview}</div>
 
-          <nav className="tab-bar" aria-label="Workbench tabs" role="tablist">
-            {WORKBENCH_TABS.map((tab) => (
-              <button
-                key={tab.id}
-                id={`workbench-tab-${tab.id}`}
-                type="button"
-                role="tab"
-                className={activeTab === tab.id ? "active" : undefined}
-                aria-selected={activeTab === tab.id}
-                aria-controls="workbench-active-panel"
-                tabIndex={activeTab === tab.id ? 0 : -1}
-                onClick={() => actions.activateTab(tab.id)}
-                onKeyDown={handleTabKeyDown}
-              >
-                {workbenchTabLabel(tab.id, form.combatStyle)}
-              </button>
-            ))}
-          </nav>
+          <WorkbenchTabNavigation
+            activeTab={activeTab}
+            combatStyle={form.combatStyle}
+            onActivateTab={actions.activateTab}
+          />
 
           <section
             id="workbench-active-panel"

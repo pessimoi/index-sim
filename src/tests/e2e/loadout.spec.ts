@@ -230,7 +230,9 @@ test("updates results when the combat style changes", async ({ page }) => {
   await expect(tabs.getByRole("tab", { name: "Melee setup" })).toHaveCount(0);
   await expect(tabs.getByRole("tab", { name: "Magic setup" })).toHaveCount(0);
   await expect(page.getByLabel("TARGET", { exact: true })).toHaveValue("giant");
-  await expect(page.getByText("XP/HR").first()).toBeVisible();
+  await expect(
+    page.getByLabel("Setup context").getByText("Effective XP/hr", { exact: true })
+  ).toBeVisible();
 
   await tabs.getByRole("tab", { name: "Monsters" }).click();
   await tabs.getByRole("tab", { name: "Ranged setup" }).click();
@@ -529,7 +531,7 @@ test("edits combat equipment panes and persists style-specific selections", asyn
   });
 
   await page.reload();
-  const reloadedTabs = page.getByLabel("Workbench tabs");
+  const reloadedTabs = page.getByRole("tablist", { name: "Workbench tabs" });
   await expect(reloadedTabs).toBeVisible();
   await selectCombatType(page, "melee");
   await expectSearchableSelection(page.getByLabel("Equipment loadout"), "Weapon", "dragon_halberd");

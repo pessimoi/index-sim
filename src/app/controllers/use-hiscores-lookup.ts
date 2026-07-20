@@ -24,7 +24,7 @@ export interface HiscoresLookupController extends HiscoresLookupSnapshot {
   setPreviewOpen(open: boolean): void;
   closePreview(): void;
   prepareApply(): HiscoresApplyOutcome;
-  recordApplied(applicableSkillCount: number): void;
+  recordNoChanges(): void;
   replacePersistedPlayer(player: string): boolean;
 }
 
@@ -62,7 +62,7 @@ export function useHiscoresLookup(input: UseHiscoresLookupInput): HiscoresLookup
     setPreviewOpen: controller.setPreviewOpen,
     closePreview: controller.closePreview,
     prepareApply: controller.prepareApply,
-    recordApplied: controller.recordApplied,
+    recordNoChanges: controller.recordNoChanges,
     replacePersistedPlayer: controller.replacePersistedPlayer
   };
 }

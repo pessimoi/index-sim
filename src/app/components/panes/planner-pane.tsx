@@ -165,53 +165,6 @@ export function PlannerPane({ hidden, model, actions }: PlannerPaneProps) {
             </div>
           ))}
         </div>
-
-        {model.gearPoolEditor && (
-          <div className="planner-gear-editor" aria-label="Planner gear pool editor">
-            <div className="section-title-row">
-              <h3>Gear pool</h3>
-              <span className="status-pill">
-                {formatNumber(model.gearPoolEditor.totalSelectedCount)} /{" "}
-                {formatNumber(model.gearPoolEditor.totalOptionCount)}
-              </span>
-            </div>
-            <div className="planner-gear-slots">
-              {model.gearPoolEditor.slots.map((slot) => (
-                <section className="planner-gear-slot" key={slot.slot}>
-                  <div className="planner-gear-slot-header">
-                    <h4>{slot.label}</h4>
-                    <span>
-                      {formatNumber(slot.selectedCount)} / {formatNumber(slot.totalCount)}
-                    </span>
-                    <button
-                      type="button"
-                      disabled={slot.selectedCount === slot.totalCount}
-                      onClick={() => actions.resetGearPool(slot.slot)}
-                    >
-                      Reset
-                    </button>
-                  </div>
-                  <div className="planner-gear-options">
-                    {slot.options.map((option) => (
-                      <label className="planner-gear-option" key={option.id}>
-                        <input
-                          type="checkbox"
-                          checked={option.selected}
-                          aria-label={`Planner pool ${option.label}`}
-                          onChange={(event) =>
-                            actions.setGearPoolItem(slot.slot, option.id, event.target.checked)
-                          }
-                        />
-                        <span>{option.label}</span>
-                        <small>{option.hint}</small>
-                      </label>
-                    ))}
-                  </div>
-                </section>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
       {model.presentation.message && (
@@ -246,83 +199,6 @@ export function PlannerPane({ hidden, model, actions }: PlannerPaneProps) {
                 { label: "Truncated", value: model.panel.summary.truncated ? "Yes" : "No" }
               ]}
             />
-          </div>
-
-          <div className="planner-visual-grid">
-            <section className="planner-output-section" aria-label="Planner DPS chart">
-              <div className="section-title-row">
-                <h3>DPS vs cumulative XP</h3>
-                <span className="status-pill">
-                  {formatNumber(model.panel.chart.points.length)} points
-                </span>
-              </div>
-              {model.panel.chart.isEmpty ? (
-                <p className="empty-state">No chart points for current targets.</p>
-              ) : (
-                <div className="planner-chart-wrap">
-                  <svg
-                    className="planner-chart"
-                    role="img"
-                    aria-label="DPS vs cumulative XP chart"
-                    viewBox="0 0 100 100"
-                    preserveAspectRatio="none"
-                  >
-                    {model.panel.chart.points.slice(1).map((point, index) => {
-                      const previous = model.panel!.chart.points[index];
-                      return (
-                        <line
-                          className="planner-chart-line"
-                          key={`${previous.id}:${point.id}`}
-                          x1={previous.x}
-                          y1={previous.y}
-                          x2={point.x}
-                          y2={point.y}
-                        />
-                      );
-                    })}
-                    {model.panel.chart.points.map((point) => (
-                      <circle
-                        className="planner-chart-point"
-                        key={point.id}
-                        cx={point.x}
-                        cy={point.y}
-                        r="1.8"
-                      >
-                        <title>{`${point.label}: ${formatNumber(point.dps, 2)} DPS after ${formatNumber(point.cumXp)} XP`}</title>
-                      </circle>
-                    ))}
-                  </svg>
-                  <div className="planner-chart-scale" aria-hidden="true">
-                    <span>{formatNumber(model.panel.chart.minDps, 2)} DPS</span>
-                    <span>{formatNumber(model.panel.chart.maxCumXp)} XP</span>
-                    <span>{formatNumber(model.panel.chart.maxDps, 2)} DPS</span>
-                  </div>
-                </div>
-              )}
-            </section>
-
-            <section className="planner-output-section" aria-label="Planner gear timeline">
-              <div className="section-title-row">
-                <h3>Gear timeline</h3>
-                <span className="status-pill">{formatNumber(model.panel.timeline.length)}</span>
-              </div>
-              {model.panel.timeline.length === 0 ? (
-                <p className="empty-state">No gear unlocks in this plan.</p>
-              ) : (
-                <ol className="planner-timeline">
-                  {model.panel.timeline.map((event) => (
-                    <li key={event.id}>
-                      <span>{formatNumber(event.cumXp)} XP</span>
-                      <strong>{event.itemName}</strong>
-                      <small>
-                        {event.slotLabel} - {event.skillLabel} {formatNumber(event.level)} -{" "}
-                        {signedDecimal(event.dpsDelta, 2)} DPS
-                      </small>
-                    </li>
-                  ))}
-                </ol>
-              )}
-            </section>
           </div>
 
           <div className="planner-output-grid">
@@ -416,6 +292,83 @@ export function PlannerPane({ hidden, model, actions }: PlannerPaneProps) {
             </section>
           </div>
 
+          <div className="planner-visual-grid">
+            <section className="planner-output-section" aria-label="Planner DPS chart">
+              <div className="section-title-row">
+                <h3>DPS vs cumulative XP</h3>
+                <span className="status-pill">
+                  {formatNumber(model.panel.chart.points.length)} points
+                </span>
+              </div>
+              {model.panel.chart.isEmpty ? (
+                <p className="empty-state">No chart points for current targets.</p>
+              ) : (
+                <div className="planner-chart-wrap">
+                  <svg
+                    className="planner-chart"
+                    role="img"
+                    aria-label="DPS vs cumulative XP chart"
+                    viewBox="0 0 100 100"
+                    preserveAspectRatio="none"
+                  >
+                    {model.panel.chart.points.slice(1).map((point, index) => {
+                      const previous = model.panel!.chart.points[index];
+                      return (
+                        <line
+                          className="planner-chart-line"
+                          key={`${previous.id}:${point.id}`}
+                          x1={previous.x}
+                          y1={previous.y}
+                          x2={point.x}
+                          y2={point.y}
+                        />
+                      );
+                    })}
+                    {model.panel.chart.points.map((point) => (
+                      <circle
+                        className="planner-chart-point"
+                        key={point.id}
+                        cx={point.x}
+                        cy={point.y}
+                        r="1.8"
+                      >
+                        <title>{`${point.label}: ${formatNumber(point.dps, 2)} DPS after ${formatNumber(point.cumXp)} XP`}</title>
+                      </circle>
+                    ))}
+                  </svg>
+                  <div className="planner-chart-scale" aria-hidden="true">
+                    <span>{formatNumber(model.panel.chart.minDps, 2)} DPS</span>
+                    <span>{formatNumber(model.panel.chart.maxCumXp)} XP</span>
+                    <span>{formatNumber(model.panel.chart.maxDps, 2)} DPS</span>
+                  </div>
+                </div>
+              )}
+            </section>
+
+            <section className="planner-output-section" aria-label="Planner gear timeline">
+              <div className="section-title-row">
+                <h3>Gear timeline</h3>
+                <span className="status-pill">{formatNumber(model.panel.timeline.length)}</span>
+              </div>
+              {model.panel.timeline.length === 0 ? (
+                <p className="empty-state">No gear unlocks in this plan.</p>
+              ) : (
+                <ol className="planner-timeline">
+                  {model.panel.timeline.map((event) => (
+                    <li key={event.id}>
+                      <span>{formatNumber(event.cumXp)} XP</span>
+                      <strong>{event.itemName}</strong>
+                      <small>
+                        {event.slotLabel} - {event.skillLabel} {formatNumber(event.level)} -{" "}
+                        {signedDecimal(event.dpsDelta, 2)} DPS
+                      </small>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </section>
+          </div>
+
           {model.panel.warnings.length > 0 ? (
             <div className="planner-warnings" role="status" aria-label="Planner warnings">
               {model.panel.warnings.slice(0, 4).map((warning) => (
@@ -424,9 +377,55 @@ export function PlannerPane({ hidden, model, actions }: PlannerPaneProps) {
             </div>
           ) : null}
         </div>
-      ) : model.presentation.status === "idle" ? (
+      ) : model.presentation.status === "idle" && !model.gearPoolEditor ? (
         <p className="empty-state">Planner is available after bundled data loads.</p>
       ) : null}
+
+      {model.gearPoolEditor && (
+        <details className="planner-gear-editor">
+          <summary>
+            Advanced gear pool · {formatNumber(model.gearPoolEditor.totalSelectedCount)}/
+            {formatNumber(model.gearPoolEditor.totalOptionCount)}
+          </summary>
+          <div className="planner-gear-editor-content" aria-label="Planner gear pool editor">
+            <div className="planner-gear-slots">
+              {model.gearPoolEditor.slots.map((slot) => (
+                <section className="planner-gear-slot" key={slot.slot}>
+                  <div className="planner-gear-slot-header">
+                    <h4>{slot.label}</h4>
+                    <span>
+                      {formatNumber(slot.selectedCount)} / {formatNumber(slot.totalCount)}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={slot.selectedCount === slot.totalCount}
+                      onClick={() => actions.resetGearPool(slot.slot)}
+                    >
+                      Reset
+                    </button>
+                  </div>
+                  <div className="planner-gear-options">
+                    {slot.options.map((option) => (
+                      <label className="planner-gear-option" key={option.id}>
+                        <input
+                          type="checkbox"
+                          checked={option.selected}
+                          aria-label={`Planner pool ${option.label}`}
+                          onChange={(event) =>
+                            actions.setGearPoolItem(slot.slot, option.id, event.target.checked)
+                          }
+                        />
+                        <span>{option.label}</span>
+                        <small>{option.hint}</small>
+                      </label>
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
+          </div>
+        </details>
+      )}
     </section>
   );
 }

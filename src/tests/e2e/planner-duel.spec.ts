@@ -16,25 +16,64 @@ test("recomputes the Planner tab workflow from visible planner controls", async 
   const planner = page.getByRole("region", { name: "Planner", exact: true });
   await expect(planner).toBeVisible();
   await expect(planner.getByLabel("Planner controls")).toBeVisible();
-  await expect(planner.getByLabel("Planner gear pool editor")).toBeVisible();
   await expect(planner.getByLabel("Planner DPS chart")).toBeVisible();
   await expect(planner.getByLabel("Planner gear timeline")).toBeVisible();
   await expect(planner.getByRole("table", { name: "Planner training order" })).toBeVisible();
+
+  const gearPoolDisclosure = planner.locator("details.planner-gear-editor");
+  const gearPoolSummary = gearPoolDisclosure.locator("summary");
+  const gearPoolEditor = planner.getByLabel("Planner gear pool editor");
+  await expect(gearPoolSummary).toHaveText("Advanced gear pool · 41/41");
+  await expect(gearPoolEditor).toBeHidden();
+  await gearPoolSummary.focus();
+  await expect(gearPoolSummary).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(gearPoolEditor).toBeVisible();
+  await expect(gearPoolSummary).toBeFocused();
+  const firstGearControl = gearPoolEditor
+    .locator("button:not([disabled]), input:not([disabled])")
+    .first();
+  await page.keyboard.press("Tab");
+  await expect(firstGearControl).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(gearPoolSummary).toBeFocused();
+  await page.keyboard.press("Space");
+  await expect(gearPoolEditor).toBeHidden();
+  await expect(gearPoolSummary).toBeFocused();
+  await gearPoolSummary.click();
+  await expect(gearPoolEditor).toBeVisible();
 
   await planner.getByLabel("Avg over session").uncheck();
   await expect(planner.getByText("stale", { exact: true })).toBeVisible();
   await planner.getByLabel("Avg over session").check();
   await planner.getByLabel("Only current gear").check();
   await planner.getByLabel("Only current gear").uncheck();
-  await planner.getByLabel("Planner pool Iron scimitar").uncheck();
+  const ironScimitar = planner.getByLabel("Planner pool Iron scimitar");
+  const weaponReset = ironScimitar
+    .locator("xpath=ancestor::section[contains(@class, 'planner-gear-slot')]")
+    .getByRole("button", { name: "Reset" });
+  await ironScimitar.uncheck();
+  await expect(gearPoolSummary).toHaveText("Advanced gear pool · 40/41");
+  await expect(weaponReset).toBeEnabled();
+  await weaponReset.click();
+  await expect(ironScimitar).toBeChecked();
+  await expect(gearPoolSummary).toHaveText("Advanced gear pool · 41/41");
+  await expect(weaponReset).toBeDisabled();
+  await ironScimitar.uncheck();
+  await expect(gearPoolSummary).toHaveText("Advanced gear pool · 40/41");
   await planner.getByLabel("Optimize metric").selectOption("dps");
   await planner.getByLabel("Strength current XP").fill("274000");
   await planner.getByLabel("Strength target").fill("63");
   await planner.getByLabel("Lock Attack").check();
   await expect(planner.getByText("stale", { exact: true })).toBeVisible();
 
-  await planner.getByRole("button", { name: "Recompute plan" }).click();
+  await gearPoolSummary.click();
+  await expect(gearPoolEditor).toBeHidden();
+  const recompute = planner.getByRole("button", { name: "Recompute plan" });
+  await recompute.click();
+  await expect(recompute).toBeFocused();
   await expect(planner.getByText("ready")).toBeVisible();
+  await expect(gearPoolEditor).toBeHidden();
   await expect(planner.getByRole("table", { name: "Planner training order" })).toContainText(
     "Strength"
   );
@@ -55,6 +94,17 @@ test("recomputes the Planner tab workflow from visible planner controls", async 
       !saved.includes('"iron_scimitar"')
     );
   });
+
+  await page.reload();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Planner" }).click();
+  await expect(gearPoolSummary).toHaveText("Advanced gear pool · 40/41");
+  await expect(gearPoolEditor).toBeHidden();
+  await expect(ironScimitar).not.toBeChecked();
+  await gearPoolSummary.click();
+  await expect(gearPoolEditor).toBeVisible();
+  await expect(ironScimitar).not.toBeChecked();
+  await expectPageWidthContained(page);
 });
 
 test("keeps Planner Auto XP and effective targets aligned with live levels", async ({ page }) => {

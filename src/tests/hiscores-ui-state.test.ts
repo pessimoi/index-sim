@@ -5,6 +5,7 @@ import {
   applyHiscoresLevels,
   canApplyHiscoresPreview,
   countApplicableHiscoresSkills,
+  createHiscoresLevelApplyTransaction,
   createHiscoresPreviewRows,
   isHiscoresPreviewCurrent,
   normalizeHiscoresPlayerInput
@@ -75,6 +76,48 @@ describe("hiscores UI state helpers", () => {
     expect(applied.levels.strength).toBe(20);
     expect(applied.levels.prayer).toBe(30);
     expect(countApplicableHiscoresSkills(response)).toBe(2);
+  });
+
+  it("captures an immutable exact snapshot and counts only genuinely changed returned levels", () => {
+    const response: HiscoresResponse = {
+      ...readHiscoresFixture(),
+      skills: {
+        attack: { level: 60 },
+        strength: { level: 64 },
+        hitpoints: { level: 63 }
+      }
+    };
+    const original = structuredClone(DEFAULT_FORM_STATE);
+    const transaction = createHiscoresLevelApplyTransaction(original, response);
+
+    expect(transaction.changedSkills).toEqual(["strength", "hitpoints"]);
+    expect(transaction.previousForm).toEqual(original);
+    expect(transaction.previousForm).not.toBe(original);
+    expect(transaction.nextForm.levels).toMatchObject({
+      attack: 60,
+      strength: 64,
+      hitpoints: 63,
+      defence: 50,
+      prayer: 43,
+      ranged: 50,
+      magic: 50
+    });
+    expect(original).toEqual(DEFAULT_FORM_STATE);
+    expect(transaction.previousForm).toEqual(DEFAULT_FORM_STATE);
+  });
+
+  it("returns an exact restorable snapshot for a no-change partial response", () => {
+    const response: HiscoresResponse = {
+      ...readHiscoresFixture(),
+      skills: {
+        attack: { level: DEFAULT_FORM_STATE.levels.attack }
+      }
+    };
+    const transaction = createHiscoresLevelApplyTransaction(DEFAULT_FORM_STATE, response);
+
+    expect(transaction.changedSkills).toEqual([]);
+    expect(transaction.nextForm).toEqual(transaction.previousForm);
+    expect(transaction.previousForm).toEqual(DEFAULT_FORM_STATE);
   });
 
   it("allows Apply only for current previews with at least one supported skill", () => {

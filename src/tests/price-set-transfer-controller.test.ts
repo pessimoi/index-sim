@@ -186,6 +186,22 @@ describe("PriceSet transfer controller", () => {
     expect(listener).toHaveBeenCalledOnce();
   });
 
+  it("runs the accepted-import boundary only after parsing succeeds", async () => {
+    const beforeAccept = vi.fn();
+    const test = harness();
+    const input = { ...importInput(), beforeAccept };
+
+    await expect(
+      test.core.importFile({ id: "valid", text: priceSetText() }, input)
+    ).resolves.toMatchObject({ status: "ready" });
+    expect(beforeAccept).toHaveBeenCalledTimes(1);
+
+    await expect(test.core.importFile({ id: "invalid", text: "{bad" }, input)).resolves.toEqual({
+      status: "rejected"
+    });
+    expect(beforeAccept).toHaveBeenCalledTimes(1);
+  });
+
   it.each([
     {
       label: "storage unavailable",

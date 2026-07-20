@@ -30,7 +30,9 @@ export const VISUAL_VIEWPORTS = {
   desktop: { width: 1440, height: 1000 },
   compactLandscape: { width: 640, height: 360 },
   tablet: { width: 768, height: 1024 },
-  mobile: { width: 390, height: 844 }
+  mobile: { width: 390, height: 844 },
+  wideMobile: { width: 620, height: 844 },
+  portraitTablet: { width: 768, height: 1024 }
 } as const;
 
 interface VisualStateOptions {

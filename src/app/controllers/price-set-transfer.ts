@@ -51,7 +51,9 @@ export type PriceSetFileImportOutcome = AcceptedPriceSetOutcome | { status: "rej
 export type ImportPriceSetFileInput = Omit<
   AcceptPriceSetInput,
   "priceSet" | "acceptedAt" | "nextStatus"
->;
+> & {
+  beforeAccept?(): void;
+};
 
 export interface ResetPriceSetInput {
   fallbackPriceSet: PriceSet;
@@ -172,8 +174,10 @@ export class PriceSetTransferControllerCore<TFile> {
         await this.dependencies.readFileText(file, PRICE_SET_IMPORT_MAX_BYTES),
         { maxBytes: PRICE_SET_IMPORT_MAX_BYTES }
       );
+      input.beforeAccept?.();
       const outcome = this.acceptPriceSet({
-        ...input,
+        gameData: input.gameData,
+        manualPriceOverrides: input.manualPriceOverrides,
         priceSet,
         acceptedAt: this.dependencies.now(),
         nextStatus: "Imported price set"

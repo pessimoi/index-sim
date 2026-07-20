@@ -34,7 +34,6 @@ export type HiscoresApplyOutcome =
   | {
       status: "ready";
       response: HiscoresResponse;
-      applicableSkillCount: number;
     }
   | { status: "stale" };
 
@@ -252,18 +251,15 @@ export class HiscoresLookupControllerCore {
     }
     return {
       status: "ready",
-      response: this.snapshot.response,
-      applicableSkillCount: countApplicableHiscoresSkills(this.snapshot.response)
+      response: this.snapshot.response
     };
   };
 
-  recordApplied = (applicableSkillCount: number): void => {
+  recordNoChanges = (): void => {
     this.update({
       notice: {
-        tone: applicableSkillCount ? "success" : "neutral",
-        message: applicableSkillCount
-          ? `Applied ${applicableSkillCount} skills`
-          : "No current setup skills to apply"
+        tone: "neutral",
+        message: "Current levels already match Hiscores"
       }
     });
   };

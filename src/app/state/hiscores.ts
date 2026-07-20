@@ -20,7 +20,7 @@ const FORM_LEVEL_SKILLS = [
   "ranged",
   "magic"
 ] as const;
-type FormLevelSkill = (typeof FORM_LEVEL_SKILLS)[number];
+export type FormLevelSkill = (typeof FORM_LEVEL_SKILLS)[number];
 const FORM_LEVEL_SKILL_SET = new Set<HiscoresSkill>(FORM_LEVEL_SKILLS);
 
 export interface HiscoresPreviewRow {
@@ -28,6 +28,12 @@ export interface HiscoresPreviewRow {
   currentLevel: number | null;
   fetchedLevel: number;
   canApply: boolean;
+}
+
+export interface HiscoresLevelApplyTransaction {
+  previousForm: CombatSetupFormState;
+  nextForm: CombatSetupFormState;
+  changedSkills: readonly FormLevelSkill[];
 }
 
 function isFormLevelSkill(skill: HiscoresSkill): skill is FormLevelSkill {
@@ -93,4 +99,19 @@ export function applyHiscoresLevels(
   }
 
   return CombatSetupFormSchema.parse({ ...form, levels });
+}
+
+export function createHiscoresLevelApplyTransaction(
+  form: CombatSetupFormState,
+  response: HiscoresResponse
+): HiscoresLevelApplyTransaction {
+  const previousForm = CombatSetupFormSchema.parse(form);
+  const nextForm = applyHiscoresLevels(previousForm, response);
+  return {
+    previousForm,
+    nextForm,
+    changedSkills: FORM_LEVEL_SKILLS.filter(
+      (skill) => previousForm.levels[skill] !== nextForm.levels[skill]
+    )
+  };
 }

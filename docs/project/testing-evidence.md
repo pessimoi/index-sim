@@ -5,6 +5,83 @@ It does not own current commands, required gates or test strategy; those remain 
 [the testing guide](../technical/testing.md). Counts and artifact hashes below
 apply only to the source state described by each entry.
 
+## 2026-07-20 Hiscores Apply/Undo transaction
+
+The implemented App-owned transaction rechecks normalized-player freshness,
+captures an immutable exact pre-Apply form, counts only genuinely changed
+supported fields and commits through the existing Default/Custom write-through
+path. Its single global action is `Applied N levels`; stale and zero-change
+attempts leave the form and preceding pending Undo unchanged. Undo restores the
+captured form through the same path, while the retained preview derives Current
+values from live form state. The controller no longer emits competing
+changed-Apply success copy.
+
+Focused Hiscores and Planner coverage passes 4 files / 39 tests. It includes
+partial, missing and unchanged response values, canonical changed count,
+immutable/exact snapshot, stale mutation authority, preview-retaining
+no-change feedback, Apply/Undo Planner reconciliation and rejection of a late
+applied-level source after Undo. The mocked Hiscores production-preview
+selection passes 2/2; the extended transaction path proves `Applied 7 levels`,
+no player identity in the action, a no-change second Apply preserving the
+action, exact form restoration, an open/current preview in both directions and
+Auto XP plus still-valid raised target semantics.
+
+The complete functional Chromium suite passes 106/106 with one worker. Final
+`npm run verify` passes 95 Vitest files / 950 tests, 19/19 goldens, typecheck,
+the 149-source/134-client/eight-entrypoint zero-cycle architecture check,
+production build and artifact budgets, lint and formatting. The 15-file,
+two-asset, eight-JavaScript-chunk artifact totals 2,227,535 bytes; its entry is
+787,630 raw / 229,007 gzip bytes and its SHA-256 is
+`768ff9c7c0ff510c46facfdcbd8577b2e51427c3b25f0f7c47bafbecf666925a`.
+Dependency audit remains skipped by the network-disabled gate. This is
+`LOCAL_RUNTIME` / mocked `SYNTHETIC_TEST` evidence and makes no live-provider,
+production-deployment or real-player-data claim.
+
+## 2026-07-20 mobile result and navigation loop
+
+Scope: implement the normal-flow mobile/portrait result and tab-navigation
+contract without changing calculations, view models, persistence, desktop or
+the 640 × 360 compact-landscape workbench.
+
+- Before, the inspected 390 × 844 profile placed the first headline row at
+  2 141.5 CSS px and 1 114.8 px after Player setup; the profile included an
+  existing local-state attention notice, so this is observation evidence, not
+  a permanent assertion. After, `Mobile result summary` starts at 1 038.4 px,
+  13.6 px after Player setup, while document width remains 390/390 and
+  `scrollX` remains zero.
+- Focused component/view-model coverage: 11/11 passed, including static shell
+  order, single tablist, shared metric presentation and pure minimal/bounded
+  scroll targets.
+- Focused production-preview Chromium: the parametrized `mobile result and
+navigation loop` cases passed 3/3 at 390 × 844, 620 × 844 and 768 × 1024.
+  They cover dynamic summary updates, initial arrow boundaries, one-full-tab
+  reveal, More/Settings focus, Home/End/arrows, the four-action row,
+  typography and containment.
+- Visual review: the first read-only run exposed six missing mobile-loop
+  candidates plus expected mobile/portrait typography/layout diffs. Actual and
+  diff images were reviewed before the bounded update. The tightened initial
+  left-boundary design then produced four inspected candidates
+  (`root-shell-mobile` plus three navigation images), updated by a grep-scoped
+  command. The following full read-only pass exposed a stable 237-pixel
+  glyph-alignment diff in `duel-mobile` after the navigation row moved the
+  downstream normal flow by 44 CSS pixels; its actual/diff pair and unchanged
+  content/dimensions were reviewed before a separate scoped update. The final
+  suite contains 26 scenarios / 37 fixture-only snapshots; two complete 26/26
+  read-only runs after the last write prove determinism.
+- Desktop and compact-landscape scenarios stayed clean in the candidate run.
+  No calculation, golden, request, persisted schema, data or visual tolerance
+  was changed.
+
+Final integrated evidence: `npm run verify` passes 94 Vitest files / 937 tests,
+19/19 explicit goldens, typecheck, the 147-source/132-client-reachable/eight-
+external-entrypoint zero-cycle architecture check, build/artifact budgets,
+lint and formatting. The artifact contains 14 files / two assets / seven
+JavaScript chunks, totals 2,221,431 bytes and has SHA-256
+`2348cbe19730b10f90dc2730261fe85931f604aea51c0d4a5f1049d554148011`;
+the direct entry is 791,165 raw / 229,811 gzip bytes. The complete
+production-preview Chromium suite passes 101/101 with one worker, and the final
+visual evidence is the two consecutive 26/26 read-only runs above.
+
 ## 2026-07-19 user-facing language, units and information hierarchy
 
 The implemented presentation owner resolves source/snapshot/row names before a

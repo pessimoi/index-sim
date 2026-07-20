@@ -69,6 +69,10 @@ async function preparePlanner(page: Page) {
   const planner = page.getByRole("region", { name: "Planner", exact: true });
   await planner.getByRole("button", { name: "Recompute plan" }).click();
   await expect(planner.getByLabel("Planner summary")).toBeVisible();
+  await expect(planner.locator("details.planner-gear-editor > summary")).toHaveText(
+    "Advanced gear pool · 41/41"
+  );
+  await expect(planner.getByLabel("Planner gear pool editor")).toBeHidden();
   await expect(planner.getByRole("img", { name: "DPS vs cumulative XP chart" })).toBeVisible();
   return planner;
 }
@@ -82,6 +86,87 @@ async function prepareDuelMatrix(page: Page) {
   await duel.getByLabel("Find monster in setup comparison").fill("giant");
   await expect(matrix.getByRole("row", { name: /Giant/ }).first()).toBeVisible();
   return duel;
+}
+
+async function captureMobileResultLoop(page: Page, name: string) {
+  const playerSetup = page.getByRole("region", { name: "Player setup", exact: true });
+  const summary = page.getByLabel("Mobile result summary");
+  const activeSetup = page.getByRole("region", { name: "Active player setup", exact: true });
+  await summary.scrollIntoViewIfNeeded();
+  await expect(summary).toBeVisible();
+  await expect(summary.locator(".metric")).toContainText([
+    "DPS3.05",
+    "Effective XP/hr21,573",
+    "Net GP/hr-81,544"
+  ]);
+  const [playerBox, summaryBox, activeBox] = await Promise.all([
+    playerSetup.boundingBox(),
+    summary.boundingBox(),
+    activeSetup.boundingBox()
+  ]);
+  expect(playerBox).not.toBeNull();
+  expect(summaryBox).not.toBeNull();
+  expect(activeBox).not.toBeNull();
+  const top = Math.max(0, playerBox!.y + playerBox!.height - 176);
+  const bottom = Math.min(await page.evaluate(() => innerHeight), activeBox!.y + 176);
+  await expect(page).toHaveScreenshot(name, {
+    clip: {
+      x: playerBox!.x,
+      y: top,
+      width: playerBox!.width,
+      height: bottom - top
+    }
+  });
+}
+
+async function captureMobileNavigationLoop(page: Page, name: string) {
+  const setupContext = page.getByLabel("Setup context");
+  const navigation = page.locator(".workbench-tab-navigation");
+  const moreTabs = navigation.locator("details.workbench-more-tabs");
+  await setupContext.evaluate((element) => element.scrollIntoView({ block: "start" }));
+  await expect(setupContext.locator(".setup-context-actions button")).toHaveText([
+    "New",
+    "Edit",
+    "Remove",
+    "Reset"
+  ]);
+  await moreTabs.locator(":scope > summary").click();
+  const popup = moreTabs.locator(".workbench-more-tabs-list");
+  await expect(popup).toBeVisible();
+  const popupItems = popup.locator(":scope > button");
+  await expect(popupItems).toHaveCount(11);
+  await expect(popupItems.first()).toHaveText("Stats");
+  await expect(popupItems.last()).toHaveText("Settings");
+  const [setupBox, navigationBox, popupBox] = await Promise.all([
+    setupContext.boundingBox(),
+    navigation.boundingBox(),
+    popup.boundingBox()
+  ]);
+  expect(setupBox).not.toBeNull();
+  expect(navigationBox).not.toBeNull();
+  expect(popupBox).not.toBeNull();
+  const viewport = await page.evaluate(() => ({ width: innerWidth, height: innerHeight }));
+  const left = Math.max(0, Math.min(setupBox!.x, navigationBox!.x, popupBox!.x));
+  const top = Math.max(0, Math.min(setupBox!.y, navigationBox!.y, popupBox!.y));
+  const right = Math.min(
+    viewport.width,
+    Math.max(
+      setupBox!.x + setupBox!.width,
+      navigationBox!.x + navigationBox!.width,
+      popupBox!.x + popupBox!.width
+    )
+  );
+  const bottom = Math.min(
+    viewport.height,
+    Math.max(
+      setupBox!.y + setupBox!.height,
+      navigationBox!.y + navigationBox!.height,
+      popupBox!.y + popupBox!.height
+    )
+  );
+  await expect(page).toHaveScreenshot(name, {
+    clip: { x: left, y: top, width: right - left, height: bottom - top }
+  });
 }
 
 test.describe("repository visual regression", () => {
@@ -101,6 +186,22 @@ test.describe("repository visual regression", () => {
     await bootVisualApp(page, "mobile");
     await captureFullPage(page, "root-shell-mobile.png");
   });
+
+  for (const viewport of [
+    { id: "mobile", name: "mobile" },
+    { id: "wideMobile", name: "wide-mobile" },
+    { id: "portraitTablet", name: "portrait-tablet" }
+  ] as const) {
+    test(`mobile result loop ${viewport.name}`, async ({ page }) => {
+      await bootVisualApp(page, viewport.id);
+      await captureMobileResultLoop(page, `mobile-result-loop-${viewport.name}.png`);
+    });
+
+    test(`mobile navigation loop ${viewport.name}`, async ({ page }) => {
+      await bootVisualApp(page, viewport.id);
+      await captureMobileNavigationLoop(page, `mobile-navigation-loop-${viewport.name}.png`);
+    });
+  }
 
   test("dense Compare desktop", async ({ page }) => {
     await bootVisualApp(page, "desktop");

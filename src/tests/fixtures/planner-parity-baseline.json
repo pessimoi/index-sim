@@ -5,14 +5,14 @@
       "id": "boosted_sustained_strength_path::current-product",
       "caseId": "boosted_sustained_strength_path",
       "mode": "current-product",
-      "result": "different",
-      "classification": "accepted-rewrite-delta",
-      "reason": "Current-product now consumes D-071 source-backed requirement rows; the only baseline change is removal of manual-planner-requirement-fallback while previously reviewed training, numeric, configuration and transition deltas remain unchanged.",
-      "source": "docs/project/decisions.md D-051/D-071; docs/technical/source-backed-requirements-npc-size-spec.md; docs/product/feature-inventory.md (Planner)",
+      "result": "match",
+      "classification": null,
+      "reason": null,
+      "source": null,
       "legacyDigest": "d0654477d147ca84",
-      "rewriteDigest": "14e56a0519eccbab",
-      "differenceDigest": "0724c6c69a49254a",
-      "differenceCount": 1
+      "rewriteDigest": "d0654477d147ca84",
+      "differenceDigest": "4f53cda18c2baa0c",
+      "differenceCount": 0
     },
     {
       "id": "boosted_sustained_strength_path::reference-context",
@@ -31,14 +31,14 @@
       "id": "current_gear_lock::current-product",
       "caseId": "current_gear_lock",
       "mode": "current-product",
-      "result": "different",
-      "classification": "accepted-rewrite-delta",
-      "reason": "Current-product now consumes D-071 source-backed requirement rows; the only baseline change is removal of manual-planner-requirement-fallback while previously reviewed training, numeric, configuration and transition deltas remain unchanged.",
-      "source": "docs/project/decisions.md D-051/D-071; docs/technical/source-backed-requirements-npc-size-spec.md; docs/product/feature-inventory.md (Planner)",
+      "result": "match",
+      "classification": null,
+      "reason": null,
+      "source": null,
       "legacyDigest": "19835253eed06326",
-      "rewriteDigest": "2234f7b7485429be",
-      "differenceDigest": "0724c6c69a49254a",
-      "differenceCount": 1
+      "rewriteDigest": "19835253eed06326",
+      "differenceDigest": "4f53cda18c2baa0c",
+      "differenceCount": 0
     },
     {
       "id": "current_gear_lock::reference-context",
@@ -57,14 +57,14 @@
       "id": "locked_attack_strength_training::current-product",
       "caseId": "locked_attack_strength_training",
       "mode": "current-product",
-      "result": "different",
-      "classification": "accepted-rewrite-delta",
-      "reason": "Current-product now consumes D-071 source-backed requirement rows; the only baseline change is removal of manual-planner-requirement-fallback while previously reviewed training, numeric, configuration and transition deltas remain unchanged.",
-      "source": "docs/project/decisions.md D-051/D-071; docs/technical/source-backed-requirements-npc-size-spec.md; docs/product/feature-inventory.md (Planner)",
+      "result": "match",
+      "classification": null,
+      "reason": null,
+      "source": null,
       "legacyDigest": "5a7e5e402776ed44",
-      "rewriteDigest": "c7b93543e1ee43f4",
-      "differenceDigest": "0724c6c69a49254a",
-      "differenceCount": 1
+      "rewriteDigest": "5a7e5e402776ed44",
+      "differenceDigest": "4f53cda18c2baa0c",
+      "differenceCount": 0
     },
     {
       "id": "locked_attack_strength_training::reference-context",
@@ -85,11 +85,11 @@
       "mode": "current-product",
       "result": "different",
       "classification": "source-data-delta",
-      "reason": "The training order and bounded numeric or configuration differences remain unchanged. The source-backed Revision 274 incoming-attack profile adds the expected D-081 partial-model warning to this current-product magic comparison.",
-      "source": "docs/project/decisions.md D-059/D-060/D-081; docs/technical/source-backed-incoming-damage-spec.md; docs/technical/architecture.md",
+      "reason": "The committed 2026-07-20 market snapshot adds a market-observed rune_spear price and removes the price-fallback-used warning. Training order and bounded numeric/configuration differences remain unchanged, and the source-backed Revision 274 incoming-attack profile retains the expected D-081 partial-model warning.",
+      "source": "prices.json; price-provenance.json; price-history.json; docs/project/decisions.md D-059/D-060/D-062/D-081; docs/technical/source-backed-incoming-damage-spec.md",
       "legacyDigest": "5c31fab2dfe6c4be",
-      "rewriteDigest": "65e0c00cd0e871ae",
-      "differenceDigest": "b36701e1178f6043",
+      "rewriteDigest": "05cbc36fb9b2a39c",
+      "differenceDigest": "1118913d306d09ce",
       "differenceCount": 23
     },
     {
@@ -111,11 +111,11 @@
       "mode": "current-product",
       "result": "different",
       "classification": "source-data-delta",
-      "reason": "The training order and bounded numeric or configuration differences remain unchanged. The source-backed Revision 274 incoming-attack profile adds the expected D-081 partial-model warning to this current-product magic comparison.",
-      "source": "docs/project/decisions.md D-059/D-060/D-081; docs/technical/source-backed-incoming-damage-spec.md; docs/technical/architecture.md",
+      "reason": "The committed 2026-07-20 market snapshot adds a market-observed rune_spear price and removes the price-fallback-used warning. Training order and bounded numeric/configuration differences remain unchanged, and the source-backed Revision 274 incoming-attack profile retains the expected D-081 partial-model warning.",
+      "source": "prices.json; price-provenance.json; price-history.json; docs/project/decisions.md D-059/D-060/D-062/D-081; docs/technical/source-backed-incoming-damage-spec.md",
       "legacyDigest": "d9bb8abc7b78d52d",
-      "rewriteDigest": "ae028ad7a4866881",
-      "differenceDigest": "cba05cc5a8fea5c2",
+      "rewriteDigest": "c6a4c4e422c409fe",
+      "differenceDigest": "217039db138f14a6",
       "differenceCount": 14
     },
     {
@@ -137,12 +137,12 @@
       "mode": "current-product",
       "result": "different",
       "classification": "source-data-delta",
-      "reason": "The training order and bounded difference set remain unchanged. The current-product metric values and digests reflect the committed scheduled price snapshot layered on the Revision 274 game context.",
-      "source": "prices.json; price-provenance.json; price-history.json; docs/technical/architecture.md; docs/project/decisions.md D-059/D-060",
+      "reason": "The committed 2026-07-20 market snapshot updates current-product GP/hour metrics and adds a market-observed rune_spear price, removing the price-fallback-used warning. Training order and the bounded configuration/DPS difference set remain unchanged.",
+      "source": "prices.json; price-provenance.json; price-history.json; docs/technical/architecture.md; docs/project/decisions.md D-059/D-060/D-062",
       "legacyDigest": "9dbd0105c727379a",
-      "rewriteDigest": "a7e6bf4bb45d8a3c",
-      "differenceDigest": "98696ec5132ff32f",
-      "differenceCount": 17
+      "rewriteDigest": "82c208b1263ea8fe",
+      "differenceDigest": "38020237dc3b8e0d",
+      "differenceCount": 16
     },
     {
       "id": "magic_negative_gph::reference-context",
@@ -163,12 +163,12 @@
       "mode": "current-product",
       "result": "different",
       "classification": "accepted-rewrite-delta",
-      "reason": "Current-product now consumes D-071 source-backed requirement rows; the only baseline change is removal of manual-planner-requirement-fallback while previously reviewed training, numeric, configuration and transition deltas remain unchanged.",
-      "source": "docs/project/decisions.md D-051/D-071; docs/technical/source-backed-requirements-npc-size-spec.md; docs/product/feature-inventory.md (Planner)",
+      "reason": "The committed 2026-07-20 market snapshot adds a market-observed rune_spear price and removes the price-fallback-used warning. The previously reviewed training, numeric, configuration and transition deltas remain unchanged.",
+      "source": "prices.json; price-provenance.json; price-history.json; docs/project/decisions.md D-051/D-059/D-062/D-071; docs/technical/source-backed-requirements-npc-size-spec.md",
       "legacyDigest": "7c4a0b3ce4cdae44",
-      "rewriteDigest": "b02a3cf4bb137837",
-      "differenceDigest": "71e75c387684eca6",
-      "differenceCount": 17
+      "rewriteDigest": "a639ded7ed00ecbb",
+      "differenceDigest": "3e4a71fdcb5e2be6",
+      "differenceCount": 16
     },
     {
       "id": "max_levels_truncation::reference-context",
@@ -189,12 +189,12 @@
       "mode": "current-product",
       "result": "different",
       "classification": "accepted-rewrite-delta",
-      "reason": "Current-product now consumes D-071 source-backed requirement rows; the only baseline change is removal of manual-planner-requirement-fallback while previously reviewed training, numeric, configuration and transition deltas remain unchanged.",
-      "source": "docs/project/decisions.md D-051/D-071; docs/technical/source-backed-requirements-npc-size-spec.md; docs/product/feature-inventory.md (Planner)",
+      "reason": "The committed 2026-07-20 market snapshot adds a market-observed rune_spear price and removes the price-fallback-used warning. The previously reviewed training, numeric, configuration and transition deltas remain unchanged.",
+      "source": "prices.json; price-provenance.json; price-history.json; docs/project/decisions.md D-051/D-059/D-062/D-071; docs/technical/source-backed-requirements-npc-size-spec.md",
       "legacyDigest": "cfc4a0ff0eb9eb50",
-      "rewriteDigest": "bbde364cfba5a9ef",
-      "differenceDigest": "f89a78c580ccd7f1",
-      "differenceCount": 18
+      "rewriteDigest": "430ba96863920873",
+      "differenceDigest": "924ffda413b9747a",
+      "differenceCount": 17
     },
     {
       "id": "melee_attack_strength_greedy_order::reference-context",
@@ -215,12 +215,12 @@
       "mode": "current-product",
       "result": "different",
       "classification": "accepted-rewrite-delta",
-      "reason": "Current-product now consumes D-071 source-backed requirement rows; the only baseline change is removal of manual-planner-requirement-fallback while previously reviewed training, numeric, configuration and transition deltas remain unchanged.",
-      "source": "docs/project/decisions.md D-051/D-071; docs/technical/source-backed-requirements-npc-size-spec.md; docs/product/feature-inventory.md (Planner)",
+      "reason": "The committed 2026-07-20 market snapshot adds a market-observed rune_spear price and removes the price-fallback-used warning. The previously reviewed training, numeric, configuration and transition deltas remain unchanged.",
+      "source": "prices.json; price-provenance.json; price-history.json; docs/project/decisions.md D-051/D-059/D-062/D-071; docs/technical/source-backed-requirements-npc-size-spec.md",
       "legacyDigest": "fb21b35eccc79ee5",
-      "rewriteDigest": "d17a216f947c50ff",
-      "differenceDigest": "73c7756362f39dd4",
-      "differenceCount": 22
+      "rewriteDigest": "abd7c8e299ef0ca1",
+      "differenceDigest": "d327dd7129fdba98",
+      "differenceCount": 21
     },
     {
       "id": "melee_balanced_metric::reference-context",
@@ -241,12 +241,12 @@
       "mode": "current-product",
       "result": "different",
       "classification": "accepted-rewrite-delta",
-      "reason": "Current-product now consumes D-071 source-backed requirement rows; the only baseline change is removal of manual-planner-requirement-fallback while previously reviewed training, numeric, configuration and transition deltas remain unchanged.",
-      "source": "docs/project/decisions.md D-051/D-071; docs/technical/source-backed-requirements-npc-size-spec.md; docs/product/feature-inventory.md (Planner)",
+      "reason": "The committed 2026-07-20 market snapshot adds a market-observed rune_spear price and removes the price-fallback-used warning. The previously reviewed training, numeric, configuration and transition deltas remain unchanged.",
+      "source": "prices.json; price-provenance.json; price-history.json; docs/project/decisions.md D-051/D-059/D-062/D-071; docs/technical/source-backed-requirements-npc-size-spec.md",
       "legacyDigest": "f5afd64c771172e9",
-      "rewriteDigest": "532095e749b186f1",
-      "differenceDigest": "f834065a5a9c3822",
-      "differenceCount": 17
+      "rewriteDigest": "1f53aec062392627",
+      "differenceDigest": "945cd9a75bd3f75c",
+      "differenceCount": 16
     },
     {
       "id": "melee_defence_armour_unlock::reference-context",
@@ -267,12 +267,12 @@
       "mode": "current-product",
       "result": "different",
       "classification": "accepted-rewrite-delta",
-      "reason": "Current-product now consumes D-071 source-backed requirement rows; the only baseline change is removal of manual-planner-requirement-fallback while previously reviewed training, numeric, configuration and transition deltas remain unchanged.",
-      "source": "docs/project/decisions.md D-051/D-071; docs/technical/source-backed-requirements-npc-size-spec.md; docs/product/feature-inventory.md (Planner)",
+      "reason": "The committed 2026-07-20 market snapshot adds a market-observed rune_spear price and removes the price-fallback-used warning. The previously reviewed training, numeric, configuration and transition deltas remain unchanged.",
+      "source": "prices.json; price-provenance.json; price-history.json; docs/project/decisions.md D-051/D-059/D-062/D-071; docs/technical/source-backed-requirements-npc-size-spec.md",
       "legacyDigest": "f162237b680dcc13",
-      "rewriteDigest": "d1afe9e7a1d60842",
-      "differenceDigest": "811576ebaefd5802",
-      "differenceCount": 10
+      "rewriteDigest": "c73c5345868f749e",
+      "differenceDigest": "0e35cadb1abb5b9b",
+      "differenceCount": 9
     },
     {
       "id": "melee_rune_scimitar_attack_unlock::reference-context",
@@ -293,12 +293,12 @@
       "mode": "current-product",
       "result": "different",
       "classification": "accepted-rewrite-delta",
-      "reason": "Current-product now consumes D-071 source-backed requirement rows; the only baseline change is removal of manual-planner-requirement-fallback while previously reviewed training, numeric, configuration and transition deltas remain unchanged.",
-      "source": "docs/project/decisions.md D-051/D-071; docs/technical/source-backed-requirements-npc-size-spec.md; docs/product/feature-inventory.md (Planner)",
+      "reason": "The committed 2026-07-20 market snapshot adds a market-observed rune_spear price and removes the price-fallback-used warning. The previously reviewed training, numeric, configuration and transition deltas remain unchanged.",
+      "source": "prices.json; price-provenance.json; price-history.json; docs/project/decisions.md D-051/D-059/D-062/D-071; docs/technical/source-backed-requirements-npc-size-spec.md",
       "legacyDigest": "d26e97e207edd124",
-      "rewriteDigest": "6ae8bf52a235e2f2",
-      "differenceDigest": "da7c18a637fa2da1",
-      "differenceCount": 3
+      "rewriteDigest": "fd7f77ee2b830511",
+      "differenceDigest": "3109483166ad753d",
+      "differenceCount": 2
     },
     {
       "id": "no_work_target::reference-context",
@@ -319,12 +319,12 @@
       "mode": "current-product",
       "result": "different",
       "classification": "accepted-rewrite-delta",
-      "reason": "Current-product now consumes D-071 source-backed requirement rows; the only baseline change is removal of manual-planner-requirement-fallback while previously reviewed training, numeric, configuration and transition deltas remain unchanged.",
-      "source": "docs/project/decisions.md D-051/D-071; docs/technical/source-backed-requirements-npc-size-spec.md; docs/product/feature-inventory.md (Planner)",
+      "reason": "The committed 2026-07-20 market snapshot adds a market-observed rune_spear price and removes the price-fallback-used warning. The previously reviewed training, numeric, configuration and transition deltas remain unchanged.",
+      "source": "prices.json; price-provenance.json; price-history.json; docs/project/decisions.md D-051/D-059/D-062/D-071; docs/technical/source-backed-requirements-npc-size-spec.md",
       "legacyDigest": "1f0157962ebb9355",
-      "rewriteDigest": "277874b626ecd1fb",
-      "differenceDigest": "ba0f1525f33450c0",
-      "differenceCount": 8
+      "rewriteDigest": "c578492f22175b3b",
+      "differenceDigest": "277dcd68a52a60ec",
+      "differenceCount": 7
     },
     {
       "id": "partial_current_attack_xp::reference-context",
@@ -343,14 +343,14 @@
       "id": "ranged_longrange_defence_training::current-product",
       "caseId": "ranged_longrange_defence_training",
       "mode": "current-product",
-      "result": "different",
-      "classification": "accepted-rewrite-delta",
-      "reason": "Current-product now consumes D-071 source-backed requirement rows; the only baseline change is removal of manual-planner-requirement-fallback while previously reviewed training, numeric, configuration and transition deltas remain unchanged.",
-      "source": "docs/project/decisions.md D-051/D-071; docs/technical/source-backed-requirements-npc-size-spec.md; docs/product/feature-inventory.md (Planner)",
+      "result": "match",
+      "classification": null,
+      "reason": null,
+      "source": null,
       "legacyDigest": "c562f5c79f939807",
-      "rewriteDigest": "ee6fa41d110f21b4",
-      "differenceDigest": "0724c6c69a49254a",
-      "differenceCount": 1
+      "rewriteDigest": "c562f5c79f939807",
+      "differenceDigest": "4f53cda18c2baa0c",
+      "differenceCount": 0
     },
     {
       "id": "ranged_longrange_defence_training::reference-context",
@@ -371,12 +371,12 @@
       "mode": "current-product",
       "result": "different",
       "classification": "accepted-rewrite-delta",
-      "reason": "Current-product now consumes D-071 source-backed requirement rows; the only baseline change is removal of manual-planner-requirement-fallback while previously reviewed training, numeric, configuration and transition deltas remain unchanged.",
-      "source": "docs/project/decisions.md D-051/D-071; docs/technical/source-backed-requirements-npc-size-spec.md; docs/product/feature-inventory.md (Planner)",
+      "reason": "The committed 2026-07-20 market snapshot adds a market-observed rune_spear price and removes the price-fallback-used warning. The previously reviewed training, numeric, configuration and transition deltas remain unchanged.",
+      "source": "prices.json; price-provenance.json; price-history.json; docs/project/decisions.md D-051/D-059/D-062/D-071; docs/technical/source-backed-requirements-npc-size-spec.md",
       "legacyDigest": "f6222f2613b97ea5",
-      "rewriteDigest": "5a3bba00a2f7d3f7",
-      "differenceDigest": "b666c4d548a72b7d",
-      "differenceCount": 2
+      "rewriteDigest": "f92f18416a76c748",
+      "differenceDigest": "c4d3797b3f04e68a",
+      "differenceCount": 1
     },
     {
       "id": "ranged_yew_shortbow_unlock::reference-context",
@@ -397,12 +397,12 @@
       "mode": "current-product",
       "result": "different",
       "classification": "accepted-rewrite-delta",
-      "reason": "Current-product now consumes D-071 source-backed requirement rows; the only baseline change is removal of manual-planner-requirement-fallback while previously reviewed training, numeric, configuration and transition deltas remain unchanged.",
-      "source": "docs/project/decisions.md D-051/D-071; docs/technical/source-backed-requirements-npc-size-spec.md; docs/product/feature-inventory.md (Planner)",
+      "reason": "The committed 2026-07-20 market snapshot adds a market-observed rune_spear price and removes the price-fallback-used warning. The previously reviewed training, numeric, configuration and transition deltas remain unchanged.",
+      "source": "prices.json; price-provenance.json; price-history.json; docs/project/decisions.md D-051/D-059/D-062/D-071; docs/technical/source-backed-requirements-npc-size-spec.md",
       "legacyDigest": "e9f8d0caf7e7a2df",
-      "rewriteDigest": "df8a1317645a10df",
-      "differenceDigest": "962f19172c26a802",
-      "differenceCount": 25
+      "rewriteDigest": "786f86112c0967e6",
+      "differenceDigest": "8b79a2b05f0a0d35",
+      "differenceCount": 24
     },
     {
       "id": "stable_weapon_transition::reference-context",

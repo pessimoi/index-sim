@@ -246,3 +246,5 @@ export function RiskPane({
     </section>
   );
 }
+
+export default RiskPane;

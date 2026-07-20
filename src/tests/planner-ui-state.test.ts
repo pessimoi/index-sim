@@ -2,6 +2,8 @@ import { createMemoryStorage, loadPersisted } from "../adapters/storage";
 import { loadBundledLegacyContext } from "../adapters/legacy-runtime";
 import { defaultPool, plannerXpBounds, xpAt } from "../domain/planner";
 import { DEFAULT_FORM_STATE } from "../app/state/ui-state";
+import { createHiscoresLevelApplyTransaction } from "../app/state/hiscores";
+import type { HiscoresResponse } from "../domain/shared";
 import {
   DEFAULT_PLANNER_UI_STATE,
   PLANNER_UI_STORAGE_KEY,
@@ -139,6 +141,47 @@ describe("planner UI state", () => {
     ]);
     expect(effectivePlannerTarget(65, 60, true)).toBe(65);
     expect(effectivePlannerTarget(65, 60, false)).toBe(65);
+  });
+
+  it("reconciles an Apply and Undo level sequence without pretending Planner state is reversible", () => {
+    const previousForm = {
+      ...DEFAULT_FORM_STATE,
+      levels: { ...DEFAULT_FORM_STATE.levels, attack: 60 }
+    };
+    const initialState = PlannerUiStateSchema.parse({
+      ...createDefaultPlannerUiState(previousForm),
+      currentXp: {
+        ...DEFAULT_PLANNER_UI_STATE.currentXp,
+        attack: xpAt(60) + 10
+      },
+      targetLevels: {
+        ...DEFAULT_PLANNER_UI_STATE.targetLevels,
+        attack: 62
+      }
+    });
+    const response: HiscoresResponse = {
+      player: "Fixture Player",
+      normalizedPlayer: "Fixture Player",
+      source: { id: "fixture", label: "Fixture" },
+      fetchedAt: "2026-07-20T12:00:00.000Z",
+      skills: { attack: { level: 71 } },
+      warnings: []
+    };
+    const transaction = createHiscoresLevelApplyTransaction(previousForm, response);
+    const applied = reconcilePlannerProgressWithLevels(initialState, transaction.nextForm.levels);
+    const restored = reconcilePlannerProgressWithLevels(
+      applied.state,
+      transaction.previousForm.levels
+    );
+
+    expect(transaction.changedSkills).toEqual(["attack"]);
+    expect(applied.state.currentXp.attack).toBe(0);
+    expect(applied.state.targetLevels.attack).toBe(71);
+    expect(restored.state.currentXp.attack).toBe(0);
+    expect(restored.state.targetLevels.attack).toBe(71);
+    expect(effectivePlannerStartXp(60, restored.state.currentXp.attack)).toBe(xpAt(60));
+    expect(effectivePlannerTarget(60, restored.state.targetLevels.attack, false)).toBe(71);
+    expect(transaction.previousForm.levels.attack).toBe(60);
   });
 
   it("falls back to defaults for invalid JSON and mismatched planner UI state versions", () => {

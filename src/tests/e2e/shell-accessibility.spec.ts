@@ -14,6 +14,12 @@ import {
   test
 } from "./scaffold-fixture";
 
+const MOBILE_RESULT_NAV_VIEWPORTS = [
+  { name: "mobile", width: 390, height: 844 },
+  { name: "wide mobile", width: 620, height: 844 },
+  { name: "portrait tablet", width: 768, height: 1024 }
+] as const;
+
 test("loads the dense combat spreadsheet root", async ({ page }) => {
   await page.setViewportSize({ width: 1600, height: 900 });
   await page.goto("/");
@@ -59,7 +65,9 @@ test("loads the dense combat spreadsheet root", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Sort by gold pieces per kill" })).toBeVisible();
   await expect(page.getByLabel(/Food per kill: /)).toBeVisible();
   await expect(page.getByText("F/KL", { exact: true })).toBeVisible();
-  await expect(page.getByText("DPS").first()).toBeVisible();
+  await expect(
+    page.getByLabel("Simulation results").getByText("DPS", { exact: true })
+  ).toBeVisible();
   const hiscores = page.getByRole("region", { name: "Hiscores" });
   await expect(hiscores).toBeVisible();
   await expect(page.locator(".topbar").getByRole("region", { name: "Hiscores" })).toBeVisible();
@@ -348,8 +356,7 @@ test("shows Stats XP routing and trip summary plus setup damage distribution", a
   const playerSidebar = page.getByLabel("Player sidebar");
   const activePlayerSetup = playerSidebar.getByLabel("Active player setup");
   const setupContext = page.getByLabel("Setup context");
-  await expect(playerSidebar).not.toContainText("Effective XP/hr");
-  await expect(playerSidebar).not.toContainText("Net GP/hr");
+  await expect(playerSidebar.getByLabel("Mobile result summary")).toBeHidden();
   await expect(activePlayerSetup).toContainText("Rune scimitar");
   await expect(activePlayerSetup).toContainText("Attack speed");
   await expect(activePlayerSetup).toContainText("Effective levels");
@@ -592,6 +599,221 @@ test("places MonsterCard after the active pane on mobile", async ({ page }) => {
   expect(mobileCardBox).not.toBeNull();
   expect(mobileCardBox!.y).toBeGreaterThanOrEqual(plannerBox!.y + plannerBox!.height - 1);
 });
+
+for (const viewport of MOBILE_RESULT_NAV_VIEWPORTS) {
+  test(`keeps the mobile result and navigation loop complete at ${viewport.name}`, async ({
+    page
+  }) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.addInitScript(() => window.localStorage.clear());
+    await page.goto("/");
+
+    const playerSidebar = page.getByLabel("Player sidebar");
+    const playerSetup = page.getByRole("region", { name: "Player setup", exact: true });
+    const resultSummary = page.getByLabel("Mobile result summary");
+    const activeSetup = page.getByRole("region", { name: "Active player setup", exact: true });
+    const setupContext = page.getByLabel("Setup context");
+    const hiddenContextMetrics = setupContext.locator(".setup-context-metrics");
+    await expect(resultSummary).toBeVisible();
+    await expect(hiddenContextMetrics).toBeHidden();
+    await expect(resultSummary.locator(".metric")).toHaveCount(3);
+
+    const playerSectionOrder = await playerSidebar
+      .locator(":scope > .sidebar-section")
+      .evaluateAll((sections) => sections.map((section) => section.getAttribute("aria-label")));
+    expect(playerSectionOrder).toEqual([
+      "Player setup",
+      "Mobile result summary",
+      "Active player setup"
+    ]);
+    const verticalLoop = await Promise.all([
+      playerSetup.boundingBox(),
+      resultSummary.boundingBox(),
+      activeSetup.boundingBox()
+    ]);
+    expect(verticalLoop.every(Boolean)).toBe(true);
+    expect(
+      verticalLoop[1]!.y - (verticalLoop[0]!.y + verticalLoop[0]!.height)
+    ).toBeGreaterThanOrEqual(0);
+    expect(verticalLoop[1]!.y - (verticalLoop[0]!.y + verticalLoop[0]!.height)).toBeLessThanOrEqual(
+      16
+    );
+    expect(verticalLoop[2]!.y - (verticalLoop[1]!.y + verticalLoop[1]!.height)).toBeLessThanOrEqual(
+      16
+    );
+
+    const mobileMetrics = await resultSummary.locator(".metric").allTextContents();
+    const contextMetrics = await hiddenContextMetrics.locator(".metric").allTextContents();
+    expect(mobileMetrics.map((text) => text.trim())).toEqual(
+      contextMetrics.map((text) => text.trim())
+    );
+    expect(mobileMetrics.map((text) => text.replace(/\s+/g, " ").trim())).toEqual([
+      expect.stringMatching(/^DPS/),
+      expect.stringMatching(/^Effective XP\/hr/),
+      expect.stringMatching(/^Net GP\/hr/)
+    ]);
+
+    const summaryBefore = await resultSummary.locator(".metric strong").allTextContents();
+    const selectedBeforeUpdate = await page
+      .getByRole("tablist", { name: "Workbench tabs" })
+      .getByRole("tab", { selected: true })
+      .textContent();
+    await playerSetup.getByLabel("STR", { exact: true }).fill("99");
+    await expect
+      .poll(async () => resultSummary.locator(".metric strong").allTextContents())
+      .not.toEqual(summaryBefore);
+    await expect(
+      page.getByRole("tablist", { name: "Workbench tabs" }).getByRole("tab", { selected: true })
+    ).toHaveText(selectedBeforeUpdate ?? "Monsters");
+
+    const navigation = page.locator(".workbench-tab-navigation");
+    const tablist = page.getByRole("tablist", { name: "Workbench tabs" });
+    const tabs = tablist.getByRole("tab");
+    const scrollLeft = page.getByRole("button", { name: "Scroll workbench tabs left" });
+    const scrollRight = page.getByRole("button", { name: "Scroll workbench tabs right" });
+    const moreTabs = navigation.locator("details.workbench-more-tabs");
+    const moreSummary = moreTabs.locator(":scope > summary");
+    await expect(tabs).toHaveCount(11);
+    await expect(scrollLeft).toBeVisible();
+    await expect(scrollRight).toBeVisible();
+    await expect(moreSummary).toHaveText("More tabs");
+    await expect(scrollLeft).toBeDisabled();
+    await expect(scrollRight).toBeEnabled();
+
+    for (let index = 0; index < 11 && (await scrollLeft.isEnabled()); index += 1) {
+      await scrollLeft.click();
+    }
+    await expect(scrollLeft).toBeDisabled();
+    await expect(scrollRight).toBeEnabled();
+
+    const firstHiddenRightIndex = await tablist.evaluate((element) => {
+      const listRect = element.getBoundingClientRect();
+      return Array.from(element.querySelectorAll<HTMLElement>('[role="tab"]')).findIndex(
+        (tab) => tab.getBoundingClientRect().right > listRect.right + 1
+      );
+    });
+    expect(firstHiddenRightIndex).toBeGreaterThan(0);
+    await navigation.scrollIntoViewIfNeeded();
+    const scrollYBeforeArrow = await page.evaluate(() => window.scrollY);
+    const selectedBeforeArrow = await tablist
+      .getByRole("tab", { selected: true })
+      .getAttribute("id");
+    await scrollRight.click();
+    await expect
+      .poll(async () =>
+        tablist.evaluate((element, index) => {
+          const listRect = element.getBoundingClientRect();
+          const tab = element.querySelectorAll<HTMLElement>('[role="tab"]')[index];
+          if (!tab) return false;
+          const tabRect = tab.getBoundingClientRect();
+          return tabRect.left >= listRect.left - 1 && tabRect.right <= listRect.right + 1;
+        }, firstHiddenRightIndex)
+      )
+      .toBe(true);
+    await expect(tablist.getByRole("tab", { selected: true })).toHaveAttribute(
+      "id",
+      selectedBeforeArrow ?? "workbench-tab-monsters"
+    );
+    expect(await page.evaluate(() => window.scrollY)).toBe(scrollYBeforeArrow);
+
+    await moreSummary.click();
+    await expect(moreTabs).toHaveAttribute("open", "");
+    const moreItems = moreTabs.locator(".workbench-more-tabs-list > button");
+    await expect(moreItems).toHaveCount(11);
+    await expect(moreItems).toHaveText([
+      "Stats",
+      "Melee setup",
+      "Monsters",
+      "Setups",
+      "Loot",
+      "Trip",
+      "Risk",
+      "Cannon",
+      "Planner",
+      "Economy",
+      "Settings"
+    ]);
+    await expect(moreItems.filter({ hasText: selectedBeforeUpdate ?? "Monsters" })).toHaveAttribute(
+      "aria-current",
+      "page"
+    );
+    await moreItems.filter({ hasText: "Settings" }).click();
+    await expect(moreTabs).not.toHaveAttribute("open", "");
+    await expect(moreSummary).toBeFocused();
+    await expect(page.getByRole("tabpanel", { name: "Settings" })).toBeVisible();
+
+    const expectSelectedTabVisible = async (name: string) => {
+      const tab = tablist.getByRole("tab", { name, exact: true });
+      await expect(tab).toHaveAttribute("aria-selected", "true");
+      await expect
+        .poll(async () => {
+          const [listBox, tabBox] = await Promise.all([tablist.boundingBox(), tab.boundingBox()]);
+          return Boolean(
+            listBox &&
+            tabBox &&
+            tabBox.x >= listBox.x - 1 &&
+            tabBox.x + tabBox.width <= listBox.x + listBox.width + 1
+          );
+        })
+        .toBe(true);
+      return tab;
+    };
+    const settingsTab = await expectSelectedTabVisible("Settings");
+    await settingsTab.focus();
+    await page.keyboard.press("Home");
+    await expectSelectedTabVisible("Stats");
+    await page.keyboard.press("End");
+    await expectSelectedTabVisible("Settings");
+    await page.keyboard.press("ArrowLeft");
+    await expectSelectedTabVisible("Economy");
+    await page.keyboard.press("ArrowRight");
+    await expectSelectedTabVisible("Settings");
+
+    const setupActionBoxes = await setupContext
+      .locator(".setup-context-actions button")
+      .evaluateAll((buttons) =>
+        buttons.map((button) => {
+          const rect = button.getBoundingClientRect();
+          return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+        })
+      );
+    expect(setupActionBoxes).toHaveLength(4);
+    expect(new Set(setupActionBoxes.map((box) => Math.round(box.y))).size).toBe(1);
+    expect(setupActionBoxes.every((box) => box.height >= 40)).toBe(true);
+    expect(setupActionBoxes[0]!.x).toBeGreaterThanOrEqual(0);
+    expect(setupActionBoxes.at(-1)!.x + setupActionBoxes.at(-1)!.width).toBeLessThanOrEqual(
+      viewport.width + 1
+    );
+
+    const typography = await page.getByLabel("Workbench shell").evaluate((shell) => {
+      const informative = Array.from(
+        shell.querySelectorAll<HTMLElement>(
+          "button, input, select, textarea, output, summary, label, small, span, p, li, dt, dd, th, td, strong, em"
+        )
+      ).filter((element) => {
+        const style = getComputedStyle(element);
+        return (
+          element.getClientRects().length > 0 &&
+          style.visibility !== "hidden" &&
+          style.display !== "none" &&
+          (element.textContent?.trim() || element.getAttribute("aria-label"))
+        );
+      });
+      return {
+        belowTwelve: informative
+          .filter((element) => Number.parseFloat(getComputedStyle(element).fontSize) < 12)
+          .map((element) => element.textContent?.trim() || element.getAttribute("aria-label")),
+        summaryHeadlineSizes: Array.from(
+          shell.querySelectorAll<HTMLElement>('[aria-label="Mobile result summary"] .metric strong')
+        ).map((element) => Number.parseFloat(getComputedStyle(element).fontSize))
+      };
+    });
+    expect(typography.belowTwelve).toEqual([]);
+    expect(typography.summaryHeadlineSizes.every((size) => size >= 14)).toBe(true);
+    await expectPageWidthContained(page);
+    expect(await page.evaluate(() => window.scrollX)).toBe(0);
+  });
+}
 
 test("keeps the desktop workbench inside one console viewport", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
@@ -886,7 +1108,7 @@ test("keeps every workbench tab inside a narrow mobile viewport", async ({ page 
   const setupTargets = [
     searchableCombobox(setupContext, "Monster"),
     setupContext.getByLabel("Setup actions"),
-    setupContext.locator(".setup-context-metrics")
+    page.getByLabel("Mobile result summary")
   ];
   for (const tabName of [
     "Stats",
@@ -1018,8 +1240,8 @@ test("keeps the Food dropdown search and results inside the mobile viewport", as
         rowHeight: option.getBoundingClientRect().height
       };
     });
-  expect(optionDensity.fontSize).toBeLessThanOrEqual(12);
-  expect(optionDensity.rowHeight).toBeLessThanOrEqual(35);
+  expect(optionDensity.fontSize).toBe(12);
+  expect(optionDensity.rowHeight).toBeLessThanOrEqual(40);
 
   await search.fill("swordfish");
   await listbox.getByRole("option", { name: "Swordfish" }).click();

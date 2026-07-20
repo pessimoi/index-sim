@@ -123,11 +123,12 @@ deployment model.
 - Apply rechecks freshness synchronously. A stale attempt performs no form
   mutation, drops the response and shows
   `Hiscores preview no longer matches Player. Run Lookup again.`
-- A valid Apply returns the validated `HiscoresResponse` and applicable count to
-  the caller. `App` remains responsible for calling `applyHiscoresLevels()`
-  through its safe form setter. The controller then reports
-  `Applied <n> skills`, or `No current setup skills to apply` when the count is
-  zero.
+- A valid Apply returns the validated `HiscoresResponse` to the caller. `App`
+  remains responsible for calling `applyHiscoresLevels()` through its safe
+  form commit path. The implemented
+  [Hiscores Apply Undo follow-up](hiscores-apply-undo-spec.md) makes App own the
+  changed-field count and sole changed-Apply success announcement; the
+  controller owns only the fixed no-change notice.
 - Missing returned skills leave current form levels unchanged. No setup schema,
   persistence, simulation request or calculation behavior changes.
 - Apply does not implicitly close the current preview.
@@ -241,7 +242,6 @@ type HiscoresApplyOutcome =
   | {
       status: "ready";
       response: HiscoresResponse;
-      applicableSkillCount: number;
     }
   | { status: "stale" };
 
@@ -251,7 +251,7 @@ interface HiscoresLookupController extends HiscoresLookupSnapshot {
   setPreviewOpen(open: boolean): void;
   closePreview(): void;
   prepareApply(): HiscoresApplyOutcome;
-  recordApplied(applicableSkillCount: number): void;
+  recordNoChanges(): void;
   replacePersistedPlayer(player: string): boolean;
 }
 ```
@@ -418,8 +418,8 @@ diff as a regression unless separately reviewed.
   landmark/form/notice/preview DOM and only the disclosure-scoped outside
   pointer, Escape and focus-return effects. It has no adapter, storage,
   recovery or combat-form dependency.
-- `App.tsx` is 8,190 lines. It retains only current-form preview-row derivation,
-  the safe `applyHiscoresLevels()` mutation bridge, legacy import orchestration
+- `App.tsx` retains only current-form preview-row derivation, the safe
+  `applyHiscoresLevels()` mutation/Undo bridge, legacy import orchestration
   through `replacePersistedPlayer()` and panel placement. Direct Hiscores
   adapter calls, local state, request/input/DOM refs, effects, messages,
   handlers and inline panel JSX are gone.
@@ -435,6 +435,12 @@ diff as a regression unless separately reviewed.
 - No provider, API, privacy, schema, storage-key, CSS or calculation contract
   changed in this extraction. Dependency audit was skipped under the
   documented network-disabled policy.
+
+The 2026-07-20 Apply/Undo follow-up supersedes only the former controller-owned
+`recordApplied()` success copy. `prepareApply()` remains the synchronous
+freshness authority; `recordNoChanges()` now publishes
+`Current levels already match Hiscores` without closing the preview. App owns
+the immutable form transaction and global `Applied N levels` Undo strip.
 
 ## Open questions
 

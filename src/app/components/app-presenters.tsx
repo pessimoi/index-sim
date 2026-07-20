@@ -21,6 +21,7 @@ export interface PendingUndo {
   label: string;
   restoreLabel: string;
   createdAt: number;
+  scope?: "economy-data";
   restore: () => string | void;
 }
 

@@ -28,6 +28,19 @@ Run browser smoke tests with:
 npm run test:e2e
 ```
 
+Run the focused normal-flow mobile result/navigation contract with:
+
+```sh
+npm run test:e2e -- --grep "mobile result and navigation loop"
+```
+
+The three parametrized cases use 390 × 844, 620 × 844 and 768 × 1024. They
+measure the Player-to-result gap, shared headline values and live updates,
+single tablist/tabpanel semantics, true-overflow boundary controls, More-list
+activation/focus, active-tab horizontal reveal, setup-action geometry,
+12/14-pixel typography and document containment. The test uses the visible
+controls rather than Playwright's implicit scroll of a hidden tab.
+
 They cover:
 
 - UI form state to `SimulationRequest` separation
@@ -186,6 +199,19 @@ npm run test:e2e -- --workers=1 -g "keeps market UI scheduled-only"
 npm run test:e2e -- --workers=1 -g "analyzes and manages browser-local price history"
 npm run test:e2e -- --workers=1 -g "keeps shared scheduled price history"
 ```
+
+Run the exact-raw one-step Economy Undo paths with:
+
+```sh
+npm run test:e2e -- --workers=1 --grep "Economy destructive Undo|price history Undo|manual price Undo|PriceSet reset Undo"
+```
+
+The named paths compare raw localStorage strings before a destructive action
+and after Undo, reload the durable history and selected-PriceSet restores,
+retain unavailable manual rows and generated alch inside the exact selected
+envelope, keep history/manual/unrelated keys isolated and separately prove
+safe-session plus forced-clear-failure live-only restoration. This is local
+Chromium evidence, not a cross-browser storage guarantee.
 
 Run the focused browser smoke for the accepted Trip slice with:
 

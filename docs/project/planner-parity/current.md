@@ -1,17 +1,17 @@
 # Legacy Planner parity audit
 
 - Status: classified
-- Evidence date: 2026-07-10
+- Evidence date: 2026-07-20
 - Cases: 16
 - Comparisons: 32
-- Matches: 0
-- Differences: 32
+- Matches: 4
+- Differences: 28
 - Runtime policy: archived Planner is comparison evidence; the Revision 274 rewrite remains product truth
 
 ## Classification summary
 
-- match: 0
-- accepted-rewrite-delta: 29
+- match: 4
+- accepted-rewrite-delta: 25
 - legacy-defect: 0
 - source-data-delta: 3
 - rewrite-gap: 0
@@ -33,20 +33,16 @@
 
 Boosted sustained melee training remains deterministic on the V1 rewrite path.
 
-- Result: different
-- Classification: accepted-rewrite-delta
-- Reason: Current-product now consumes D-071 source-backed requirement rows; the only baseline change is removal of manual-planner-requirement-fallback while previously reviewed training, numeric, configuration and transition deltas remain unchanged.
-- Source: docs/project/decisions.md D-051/D-071; docs/technical/source-backed-requirements-npc-size-spec.md; docs/product/feature-inventory.md (Planner)
-- Difference count: 1
+- Result: match
+- Classification: none
+- Reason: None; normalized outputs match.
+- Source: None
+- Difference count: 0
 - Legacy step order: strength -> strength
 - Rewrite step order: strength -> strength
-- Rewrite warning codes: `price-fallback-used`
+- Rewrite warning codes: none
 - Legacy digest: `d0654477d147ca84`
-- Rewrite digest: `14e56a0519eccbab`
-
-| Path             | Kind   | Legacy | Rewrite |
-| ---------------- | ------ | ------ | ------- |
-| `$.warningCodes` | length | 0      | 1       |
+- Rewrite digest: `d0654477d147ca84`
 
 ### boosted_sustained_strength_path / reference-context
 
@@ -71,20 +67,16 @@ Boosted sustained melee training remains deterministic on the V1 rewrite path.
 
 Current-gear lock prevents an otherwise eligible weapon replacement.
 
-- Result: different
-- Classification: accepted-rewrite-delta
-- Reason: Current-product now consumes D-071 source-backed requirement rows; the only baseline change is removal of manual-planner-requirement-fallback while previously reviewed training, numeric, configuration and transition deltas remain unchanged.
-- Source: docs/project/decisions.md D-051/D-071; docs/technical/source-backed-requirements-npc-size-spec.md; docs/product/feature-inventory.md (Planner)
-- Difference count: 1
+- Result: match
+- Classification: none
+- Reason: None; normalized outputs match.
+- Source: None
+- Difference count: 0
 - Legacy step order: attack -> attack
 - Rewrite step order: attack -> attack
-- Rewrite warning codes: `price-fallback-used`
+- Rewrite warning codes: none
 - Legacy digest: `19835253eed06326`
-- Rewrite digest: `2234f7b7485429be`
-
-| Path             | Kind   | Legacy | Rewrite |
-| ---------------- | ------ | ------ | ------- |
-| `$.warningCodes` | length | 0      | 1       |
+- Rewrite digest: `19835253eed06326`
 
 ### current_gear_lock / reference-context
 
@@ -109,20 +101,16 @@ Current-gear lock prevents an otherwise eligible weapon replacement.
 
 A current-level Attack target locks Attack while Strength advances.
 
-- Result: different
-- Classification: accepted-rewrite-delta
-- Reason: Current-product now consumes D-071 source-backed requirement rows; the only baseline change is removal of manual-planner-requirement-fallback while previously reviewed training, numeric, configuration and transition deltas remain unchanged.
-- Source: docs/project/decisions.md D-051/D-071; docs/technical/source-backed-requirements-npc-size-spec.md; docs/product/feature-inventory.md (Planner)
-- Difference count: 1
+- Result: match
+- Classification: none
+- Reason: None; normalized outputs match.
+- Source: None
+- Difference count: 0
 - Legacy step order: strength -> strength
 - Rewrite step order: strength -> strength
-- Rewrite warning codes: `price-fallback-used`
+- Rewrite warning codes: none
 - Legacy digest: `5a7e5e402776ed44`
-- Rewrite digest: `c7b93543e1ee43f4`
-
-| Path             | Kind   | Legacy | Rewrite |
-| ---------------- | ------ | ------ | ------- |
-| `$.warningCodes` | length | 0      | 1       |
+- Rewrite digest: `5a7e5e402776ed44`
 
 ### locked_attack_strength_training / reference-context
 
@@ -149,14 +137,14 @@ Magic and Defence ordering includes a bounded elemental spell ladder.
 
 - Result: different
 - Classification: source-data-delta
-- Reason: The training order and bounded numeric or configuration differences remain unchanged. The source-backed Revision 274 incoming-attack profile adds the expected D-081 partial-model warning to this current-product magic comparison.
-- Source: docs/project/decisions.md D-059/D-060/D-081; docs/technical/source-backed-incoming-damage-spec.md; docs/technical/architecture.md
+- Reason: The committed 2026-07-20 market snapshot adds a market-observed rune_spear price and removes the price-fallback-used warning. Training order and bounded numeric/configuration differences remain unchanged, and the source-backed Revision 274 incoming-attack profile retains the expected D-081 partial-model warning.
+- Source: prices.json; price-provenance.json; price-history.json; docs/project/decisions.md D-059/D-060/D-062/D-081; docs/technical/source-backed-incoming-damage-spec.md
 - Difference count: 23
 - Legacy step order: magic -> magic -> defence -> defence
 - Rewrite step order: magic -> magic -> defence -> defence
-- Rewrite warning codes: `incoming-attack-partial-model`, `price-fallback-used`
+- Rewrite warning codes: `incoming-attack-partial-model`
 - Legacy digest: `5c31fab2dfe6c4be`
-- Rewrite digest: `65e0c00cd0e871ae`
+- Rewrite digest: `05cbc36fb9b2a39c`
 
 | Path                      | Kind   | Legacy       | Rewrite      |
 | ------------------------- | ------ | ------------ | ------------ |
@@ -200,14 +188,14 @@ Magic training unlocks fire bolt from the staff spell ladder.
 
 - Result: different
 - Classification: source-data-delta
-- Reason: The training order and bounded numeric or configuration differences remain unchanged. The source-backed Revision 274 incoming-attack profile adds the expected D-081 partial-model warning to this current-product magic comparison.
-- Source: docs/project/decisions.md D-059/D-060/D-081; docs/technical/source-backed-incoming-damage-spec.md; docs/technical/architecture.md
+- Reason: The committed 2026-07-20 market snapshot adds a market-observed rune_spear price and removes the price-fallback-used warning. Training order and bounded numeric/configuration differences remain unchanged, and the source-backed Revision 274 incoming-attack profile retains the expected D-081 partial-model warning.
+- Source: prices.json; price-provenance.json; price-history.json; docs/project/decisions.md D-059/D-060/D-062/D-081; docs/technical/source-backed-incoming-damage-spec.md
 - Difference count: 14
 - Legacy step order: magic -> magic
 - Rewrite step order: magic -> magic
-- Rewrite warning codes: `incoming-attack-partial-model`, `price-fallback-used`
+- Rewrite warning codes: `incoming-attack-partial-model`
 - Legacy digest: `d9bb8abc7b78d52d`
-- Rewrite digest: `ae028ad7a4866881`
+- Rewrite digest: `c6a4c4e422c409fe`
 
 | Path                      | Kind   | Legacy       | Rewrite      |
 | ------------------------- | ------ | ------------ | ------------ |
@@ -252,31 +240,31 @@ GP/hour planning remains finite when rune costs outweigh loot value.
 
 - Result: different
 - Classification: source-data-delta
-- Reason: The training order and bounded difference set remain unchanged. The current-product metric values and digests reflect the committed scheduled price snapshot layered on the Revision 274 game context.
-- Source: prices.json; price-provenance.json; price-history.json; docs/technical/architecture.md; docs/project/decisions.md D-059/D-060
-- Difference count: 17
+- Reason: The committed 2026-07-20 market snapshot updates current-product GP/hour metrics and adds a market-observed rune_spear price, removing the price-fallback-used warning. Training order and the bounded configuration/DPS difference set remain unchanged.
+- Source: prices.json; price-provenance.json; price-history.json; docs/technical/architecture.md; docs/project/decisions.md D-059/D-060/D-062
+- Difference count: 16
 - Legacy step order: magic -> magic
 - Rewrite step order: magic -> magic
-- Rewrite warning codes: `price-fallback-used`
+- Rewrite warning codes: none
 - Legacy digest: `9dbd0105c727379a`
-- Rewrite digest: `a7e6bf4bb45d8a3c`
+- Rewrite digest: `82c208b1263ea8fe`
 
 | Path                        | Kind   | Legacy         | Rewrite       |
 | --------------------------- | ------ | -------------- | ------------- |
 | `$.end.config.spellId`      | value  | fire_bolt      | fire_strike   |
 | `$.end.dps`                 | number | 1.829934       | 1.219956      |
-| `$.end.metricValue`         | number | -164731.276636 | -46781.521196 |
+| `$.end.metricValue`         | number | -164731.276636 | -57404.60161  |
 | `$.phases[0].endDps`        | number | 1.829934       | 1.219956      |
-| `$.phases[0].endMetric`     | number | -164731.276636 | -46781.521196 |
+| `$.phases[0].endMetric`     | number | -164731.276636 | -57404.60161  |
 | `$.phases[0].startDps`      | number | 1.822994       | 1.215329      |
-| `$.phases[0].startMetric`   | number | -165079.604202 | -47012.881161 |
+| `$.phases[0].startMetric`   | number | -165079.604202 | -57636.581585 |
 | `$.start.config.spellId`    | value  | fire_bolt      | fire_strike   |
 | `$.start.dps`               | number | 1.822994       | 1.215329      |
-| `$.start.metricValue`       | number | -165079.604202 | -47012.881161 |
+| `$.start.metricValue`       | number | -165079.604202 | -57636.581585 |
 | `$.steps[0].config.spellId` | value  | fire_bolt      | fire_strike   |
 | `$.steps[0].dps`            | number | 1.826533       | 1.217689      |
 
-Only the first 12 of 17 bounded differences are shown.
+Only the first 12 of 16 bounded differences are shown.
 
 ### magic_negative_gph / reference-context
 
@@ -316,14 +304,14 @@ A deliberately short maxLevels bound reports truncation.
 
 - Result: different
 - Classification: accepted-rewrite-delta
-- Reason: Current-product now consumes D-071 source-backed requirement rows; the only baseline change is removal of manual-planner-requirement-fallback while previously reviewed training, numeric, configuration and transition deltas remain unchanged.
-- Source: docs/project/decisions.md D-051/D-071; docs/technical/source-backed-requirements-npc-size-spec.md; docs/product/feature-inventory.md (Planner)
-- Difference count: 17
+- Reason: The committed 2026-07-20 market snapshot adds a market-observed rune_spear price and removes the price-fallback-used warning. The previously reviewed training, numeric, configuration and transition deltas remain unchanged.
+- Source: prices.json; price-provenance.json; price-history.json; docs/project/decisions.md D-051/D-059/D-062/D-071; docs/technical/source-backed-requirements-npc-size-spec.md
+- Difference count: 16
 - Legacy step order: strength -> attack
 - Rewrite step order: strength -> attack
-- Rewrite warning codes: `price-fallback-used`
+- Rewrite warning codes: none
 - Legacy digest: `7c4a0b3ce4cdae44`
-- Rewrite digest: `b02a3cf4bb137837`
+- Rewrite digest: `a639ded7ed00ecbb`
 
 | Path                      | Kind   | Legacy       | Rewrite      |
 | ------------------------- | ------ | ------------ | ------------ |
@@ -340,7 +328,7 @@ A deliberately short maxLevels bound reports truncation.
 | `$.start.dps`             | number | 1.404255     | 1.473342     |
 | `$.start.metricValue`     | number | 17363.434686 | 18140.816534 |
 
-Only the first 12 of 17 bounded differences are shown.
+Only the first 12 of 16 bounded differences are shown.
 
 ### max_levels_truncation / reference-context
 
@@ -380,14 +368,14 @@ Compare Attack and Strength ordering across a nearby max-hit boundary.
 
 - Result: different
 - Classification: accepted-rewrite-delta
-- Reason: Current-product now consumes D-071 source-backed requirement rows; the only baseline change is removal of manual-planner-requirement-fallback while previously reviewed training, numeric, configuration and transition deltas remain unchanged.
-- Source: docs/project/decisions.md D-051/D-071; docs/technical/source-backed-requirements-npc-size-spec.md; docs/product/feature-inventory.md (Planner)
-- Difference count: 18
+- Reason: The committed 2026-07-20 market snapshot adds a market-observed rune_spear price and removes the price-fallback-used warning. The previously reviewed training, numeric, configuration and transition deltas remain unchanged.
+- Source: prices.json; price-provenance.json; price-history.json; docs/project/decisions.md D-051/D-059/D-062/D-071; docs/technical/source-backed-requirements-npc-size-spec.md
+- Difference count: 17
 - Legacy step order: attack -> attack -> strength -> strength
 - Rewrite step order: attack -> attack -> strength -> strength
-- Rewrite warning codes: `price-fallback-used`
+- Rewrite warning codes: none
 - Legacy digest: `cfc4a0ff0eb9eb50`
-- Rewrite digest: `bbde364cfba5a9ef`
+- Rewrite digest: `430ba96863920873`
 
 | Path                      | Kind   | Legacy       | Rewrite      |
 | ------------------------- | ------ | ------------ | ------------ |
@@ -404,7 +392,7 @@ Compare Attack and Strength ordering across a nearby max-hit boundary.
 | `$.steps[1].dps`          | number | 1.41386      | 1.481538     |
 | `$.steps[1].metricValue`  | number | 17471.90556  | 18232.599809 |
 
-Only the first 12 of 18 bounded differences are shown.
+Only the first 12 of 17 bounded differences are shown.
 
 ### melee_attack_strength_greedy_order / reference-context
 
@@ -444,14 +432,14 @@ Balanced scoring maps rewrite balanced to legacy bal deterministically.
 
 - Result: different
 - Classification: accepted-rewrite-delta
-- Reason: Current-product now consumes D-071 source-backed requirement rows; the only baseline change is removal of manual-planner-requirement-fallback while previously reviewed training, numeric, configuration and transition deltas remain unchanged.
-- Source: docs/project/decisions.md D-051/D-071; docs/technical/source-backed-requirements-npc-size-spec.md; docs/product/feature-inventory.md (Planner)
-- Difference count: 22
+- Reason: The committed 2026-07-20 market snapshot adds a market-observed rune_spear price and removes the price-fallback-used warning. The previously reviewed training, numeric, configuration and transition deltas remain unchanged.
+- Source: prices.json; price-provenance.json; price-history.json; docs/project/decisions.md D-051/D-059/D-062/D-071; docs/technical/source-backed-requirements-npc-size-spec.md
+- Difference count: 21
 - Legacy step order: attack -> strength -> strength -> attack
 - Rewrite step order: attack -> strength -> strength -> attack
-- Rewrite warning codes: `price-fallback-used`
+- Rewrite warning codes: none
 - Legacy digest: `fb21b35eccc79ee5`
-- Rewrite digest: `d17a216f947c50ff`
+- Rewrite digest: `abd7c8e299ef0ca1`
 
 | Path                      | Kind   | Legacy   | Rewrite  |
 | ------------------------- | ------ | -------- | -------- |
@@ -468,7 +456,7 @@ Balanced scoring maps rewrite balanced to legacy bal deterministically.
 | `$.phases[2].startDps`    | number | 1.560284 | 1.637047 |
 | `$.phases[2].startMetric` | number | 1.219372 | 1.27346  |
 
-Only the first 12 of 22 bounded differences are shown.
+Only the first 12 of 21 bounded differences are shown.
 
 ### melee_balanced_metric / reference-context
 
@@ -508,14 +496,14 @@ Defence training unlocks rune armour from a bounded pool.
 
 - Result: different
 - Classification: accepted-rewrite-delta
-- Reason: Current-product now consumes D-071 source-backed requirement rows; the only baseline change is removal of manual-planner-requirement-fallback while previously reviewed training, numeric, configuration and transition deltas remain unchanged.
-- Source: docs/project/decisions.md D-051/D-071; docs/technical/source-backed-requirements-npc-size-spec.md; docs/product/feature-inventory.md (Planner)
-- Difference count: 17
+- Reason: The committed 2026-07-20 market snapshot adds a market-observed rune_spear price and removes the price-fallback-used warning. The previously reviewed training, numeric, configuration and transition deltas remain unchanged.
+- Source: prices.json; price-provenance.json; price-history.json; docs/project/decisions.md D-051/D-059/D-062/D-071; docs/technical/source-backed-requirements-npc-size-spec.md
+- Difference count: 16
 - Legacy step order: defence -> defence
 - Rewrite step order: defence -> defence
-- Rewrite warning codes: `price-fallback-used`
+- Rewrite warning codes: none
 - Legacy digest: `f5afd64c771172e9`
-- Rewrite digest: `532095e749b186f1`
+- Rewrite digest: `1f53aec062392627`
 
 | Path                              | Kind  | Legacy            | Rewrite |
 | --------------------------------- | ----- | ----------------- | ------- |
@@ -532,7 +520,7 @@ Defence training unlocks rune armour from a bounded pool.
 | `$.steps[0].config.armour.legs`   | value | rune_platelegs    | none    |
 | `$.steps[0].config.armour.shield` | value | rune_kite         | none    |
 
-Only the first 12 of 17 bounded differences are shown.
+Only the first 12 of 16 bounded differences are shown.
 
 ### melee_defence_armour_unlock / reference-context
 
@@ -572,14 +560,14 @@ Attack training unlocks rune scimitar through domain combat scoring.
 
 - Result: different
 - Classification: accepted-rewrite-delta
-- Reason: Current-product now consumes D-071 source-backed requirement rows; the only baseline change is removal of manual-planner-requirement-fallback while previously reviewed training, numeric, configuration and transition deltas remain unchanged.
-- Source: docs/project/decisions.md D-051/D-071; docs/technical/source-backed-requirements-npc-size-spec.md; docs/product/feature-inventory.md (Planner)
-- Difference count: 10
+- Reason: The committed 2026-07-20 market snapshot adds a market-observed rune_spear price and removes the price-fallback-used warning. The previously reviewed training, numeric, configuration and transition deltas remain unchanged.
+- Source: prices.json; price-provenance.json; price-history.json; docs/project/decisions.md D-051/D-059/D-062/D-071; docs/technical/source-backed-requirements-npc-size-spec.md
+- Difference count: 9
 - Legacy step order: attack -> attack
 - Rewrite step order: attack -> attack
-- Rewrite warning codes: `price-fallback-used`
+- Rewrite warning codes: none
 - Legacy digest: `f162237b680dcc13`
-- Rewrite digest: `d1afe9e7a1d60842`
+- Rewrite digest: `c73c5345868f749e`
 
 | Path                     | Kind   | Legacy       | Rewrite      |
 | ------------------------ | ------ | ------------ | ------------ |
@@ -592,7 +580,6 @@ Attack training unlocks rune scimitar through domain combat scoring.
 | `$.steps[1].dps`         | number | 1.41386      | 1.481538     |
 | `$.steps[1].metricValue` | number | 17471.90556  | 18232.599809 |
 | `$.transitions`          | length | 0            | 1            |
-| `$.warningCodes`         | length | 0            | 1            |
 
 ### melee_rune_scimitar_attack_unlock / reference-context
 
@@ -628,20 +615,19 @@ A plan with targets at current levels returns no steps.
 
 - Result: different
 - Classification: accepted-rewrite-delta
-- Reason: Current-product now consumes D-071 source-backed requirement rows; the only baseline change is removal of manual-planner-requirement-fallback while previously reviewed training, numeric, configuration and transition deltas remain unchanged.
-- Source: docs/project/decisions.md D-051/D-071; docs/technical/source-backed-requirements-npc-size-spec.md; docs/product/feature-inventory.md (Planner)
-- Difference count: 3
+- Reason: The committed 2026-07-20 market snapshot adds a market-observed rune_spear price and removes the price-fallback-used warning. The previously reviewed training, numeric, configuration and transition deltas remain unchanged.
+- Source: prices.json; price-provenance.json; price-history.json; docs/project/decisions.md D-051/D-059/D-062/D-071; docs/technical/source-backed-requirements-npc-size-spec.md
+- Difference count: 2
 - Legacy step order: none
 - Rewrite step order: none
-- Rewrite warning codes: `price-fallback-used`
+- Rewrite warning codes: none
 - Legacy digest: `d26e97e207edd124`
-- Rewrite digest: `6ae8bf52a235e2f2`
+- Rewrite digest: `fd7f77ee2b830511`
 
 | Path                  | Kind   | Legacy       | Rewrite      |
 | --------------------- | ------ | ------------ | ------------ |
 | `$.start.dps`         | number | 1.404255     | 1.473342     |
 | `$.start.metricValue` | number | 17363.434686 | 18140.816534 |
-| `$.warningCodes`      | length | 0            | 1            |
 
 ### no_work_target / reference-context
 
@@ -670,14 +656,14 @@ Only the remaining XP in the current Attack level is charged.
 
 - Result: different
 - Classification: accepted-rewrite-delta
-- Reason: Current-product now consumes D-071 source-backed requirement rows; the only baseline change is removal of manual-planner-requirement-fallback while previously reviewed training, numeric, configuration and transition deltas remain unchanged.
-- Source: docs/project/decisions.md D-051/D-071; docs/technical/source-backed-requirements-npc-size-spec.md; docs/product/feature-inventory.md (Planner)
-- Difference count: 8
+- Reason: The committed 2026-07-20 market snapshot adds a market-observed rune_spear price and removes the price-fallback-used warning. The previously reviewed training, numeric, configuration and transition deltas remain unchanged.
+- Source: prices.json; price-provenance.json; price-history.json; docs/project/decisions.md D-051/D-059/D-062/D-071; docs/technical/source-backed-requirements-npc-size-spec.md
+- Difference count: 7
 - Legacy step order: attack
 - Rewrite step order: attack
-- Rewrite warning codes: `price-fallback-used`
+- Rewrite warning codes: none
 - Legacy digest: `1f0157962ebb9355`
-- Rewrite digest: `277874b626ecd1fb`
+- Rewrite digest: `c578492f22175b3b`
 
 | Path                     | Kind   | Legacy       | Rewrite      |
 | ------------------------ | ------ | ------------ | ------------ |
@@ -688,7 +674,6 @@ Only the remaining XP in the current Attack level is charged.
 | `$.steps[0].dps`         | number | 1.404255     | 1.473342     |
 | `$.steps[0].metricValue` | number | 17363.434686 | 18140.816534 |
 | `$.transitions`          | length | 0            | 1            |
-| `$.warningCodes`         | length | 0            | 1            |
 
 ### partial_current_attack_xp / reference-context
 
@@ -720,20 +705,16 @@ Only the remaining XP in the current Attack level is charged.
 
 Longrange planning compares Ranged and Defence stance-aware ordering.
 
-- Result: different
-- Classification: accepted-rewrite-delta
-- Reason: Current-product now consumes D-071 source-backed requirement rows; the only baseline change is removal of manual-planner-requirement-fallback while previously reviewed training, numeric, configuration and transition deltas remain unchanged.
-- Source: docs/project/decisions.md D-051/D-071; docs/technical/source-backed-requirements-npc-size-spec.md; docs/product/feature-inventory.md (Planner)
-- Difference count: 1
+- Result: match
+- Classification: none
+- Reason: None; normalized outputs match.
+- Source: None
+- Difference count: 0
 - Legacy step order: ranged -> ranged -> defence -> defence
 - Rewrite step order: ranged -> ranged -> defence -> defence
-- Rewrite warning codes: `price-fallback-used`
+- Rewrite warning codes: none
 - Legacy digest: `c562f5c79f939807`
-- Rewrite digest: `ee6fa41d110f21b4`
-
-| Path             | Kind   | Legacy | Rewrite |
-| ---------------- | ------ | ------ | ------- |
-| `$.warningCodes` | length | 0      | 1       |
+- Rewrite digest: `c562f5c79f939807`
 
 ### ranged_longrange_defence_training / reference-context
 
@@ -760,19 +741,18 @@ Ranged training unlocks yew shortbow without copying ranged formulas.
 
 - Result: different
 - Classification: accepted-rewrite-delta
-- Reason: Current-product now consumes D-071 source-backed requirement rows; the only baseline change is removal of manual-planner-requirement-fallback while previously reviewed training, numeric, configuration and transition deltas remain unchanged.
-- Source: docs/project/decisions.md D-051/D-071; docs/technical/source-backed-requirements-npc-size-spec.md; docs/product/feature-inventory.md (Planner)
-- Difference count: 2
+- Reason: The committed 2026-07-20 market snapshot adds a market-observed rune_spear price and removes the price-fallback-used warning. The previously reviewed training, numeric, configuration and transition deltas remain unchanged.
+- Source: prices.json; price-provenance.json; price-history.json; docs/project/decisions.md D-051/D-059/D-062/D-071; docs/technical/source-backed-requirements-npc-size-spec.md
+- Difference count: 1
 - Legacy step order: ranged -> ranged
 - Rewrite step order: ranged -> ranged
-- Rewrite warning codes: `price-fallback-used`
+- Rewrite warning codes: none
 - Legacy digest: `f6222f2613b97ea5`
-- Rewrite digest: `5a3bba00a2f7d3f7`
+- Rewrite digest: `f92f18416a76c748`
 
-| Path             | Kind   | Legacy | Rewrite |
-| ---------------- | ------ | ------ | ------- |
-| `$.transitions`  | length | 0      | 1       |
-| `$.warningCodes` | length | 0      | 1       |
+| Path            | Kind   | Legacy | Rewrite |
+| --------------- | ------ | ------ | ------- |
+| `$.transitions` | length | 0      | 1       |
 
 ### ranged_yew_shortbow_unlock / reference-context
 
@@ -800,14 +780,14 @@ A longer Strength path exposes stable transition-run behavior.
 
 - Result: different
 - Classification: accepted-rewrite-delta
-- Reason: Current-product now consumes D-071 source-backed requirement rows; the only baseline change is removal of manual-planner-requirement-fallback while previously reviewed training, numeric, configuration and transition deltas remain unchanged.
-- Source: docs/project/decisions.md D-051/D-071; docs/technical/source-backed-requirements-npc-size-spec.md; docs/product/feature-inventory.md (Planner)
-- Difference count: 25
+- Reason: The committed 2026-07-20 market snapshot adds a market-observed rune_spear price and removes the price-fallback-used warning. The previously reviewed training, numeric, configuration and transition deltas remain unchanged.
+- Source: prices.json; price-provenance.json; price-history.json; docs/project/decisions.md D-051/D-059/D-062/D-071; docs/technical/source-backed-requirements-npc-size-spec.md
+- Difference count: 24
 - Legacy step order: strength -> strength -> strength -> strength -> strength -> strength -> strength -> strength -> strength -> strength
 - Rewrite step order: strength -> strength -> strength -> strength -> strength -> strength -> strength -> strength -> strength -> strength
-- Rewrite warning codes: `price-fallback-used`
+- Rewrite warning codes: none
 - Legacy digest: `e9f8d0caf7e7a2df`
-- Rewrite digest: `df8a1317645a10df`
+- Rewrite digest: `786f86112c0967e6`
 
 | Path                         | Kind   | Legacy        | Rewrite          |
 | ---------------------------- | ------ | ------------- | ---------------- |
@@ -824,7 +804,7 @@ A longer Strength path exposes stable transition-run behavior.
 | `$.steps[4].metricValue`     | number | 2.372674      | 2.336171         |
 | `$.steps[5].config.weaponId` | value  | rune_scimitar | dragon_longsword |
 
-Only the first 12 of 25 bounded differences are shown.
+Only the first 12 of 24 bounded differences are shown.
 
 ### stable_weapon_transition / reference-context
 

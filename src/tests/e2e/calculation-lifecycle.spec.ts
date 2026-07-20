@@ -78,10 +78,22 @@ test("keeps Dense, Planner and Risk failures recoverable across first and refres
   );
   await expect(planner.getByRole("button", { name: "Retry plan" })).toBeEnabled();
   await expect(planner.getByLabel("Planner output")).toHaveCount(0);
+  const plannerGearPool = planner.locator("details.planner-gear-editor");
+  const plannerGearPoolSummary = plannerGearPool.locator("summary");
+  await expect(plannerGearPoolSummary).toHaveText("Advanced gear pool · 41/41");
+  await expect(planner.getByLabel("Planner gear pool editor")).toBeHidden();
+  await expect
+    .poll(() =>
+      planner
+        .getByRole("alert")
+        .evaluate((element) => element.nextElementSibling?.matches("details.planner-gear-editor"))
+    )
+    .toBe(true);
   await expect(planner).not.toContainText("private planner worker path");
 
   await planner.getByRole("button", { name: "Retry plan" }).click();
   await expect(planner.getByText("ready", { exact: true })).toBeVisible({ timeout: 30_000 });
+  await expect(plannerGearPool).not.toHaveAttribute("open", "");
   const previousPlan = planner.getByLabel("Planner output");
   await expect(previousPlan).toBeVisible();
 
@@ -92,8 +104,19 @@ test("keeps Dense, Planner and Risk failures recoverable across first and refres
     "Planner could not compute the current plan. Showing the previous result."
   );
   await expect(previousPlan).toBeVisible();
+  await expect
+    .poll(() =>
+      planner
+        .getByRole("alert")
+        .evaluate(
+          (element) => element.nextElementSibling?.getAttribute("aria-label") === "Planner output"
+        )
+    )
+    .toBe(true);
+  await expect(plannerGearPool).not.toHaveAttribute("open", "");
   await planner.getByRole("button", { name: "Retry plan" }).click();
   await expect(planner.getByText("ready", { exact: true })).toBeVisible({ timeout: 30_000 });
+  await expect(plannerGearPool).not.toHaveAttribute("open", "");
 
   await failNextCalculation(page, "risk-analysis");
   await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Risk" }).click();

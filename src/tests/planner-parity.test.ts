@@ -112,15 +112,23 @@ describe("legacy Planner representative matrix", () => {
       rewriteGaps: []
     });
 
+    const changedComparisonIndex = audit.comparisons.findIndex(
+      (comparison) => comparison.result === "different"
+    );
+    expect(changedComparisonIndex).toBeGreaterThanOrEqual(0);
+
     const changedAudit = {
       ...audit,
       comparisons: audit.comparisons.map((comparison, index) =>
-        index === 0 ? { ...comparison, differenceDigest: "changed" } : comparison
+        index === changedComparisonIndex
+          ? { ...comparison, differenceDigest: "changed" }
+          : comparison
       )
     };
-    expect(createPlannerParityBaseline(changedAudit, baseline).comparisons[0]?.classification).toBe(
-      "needs-review"
-    );
+    expect(
+      createPlannerParityBaseline(changedAudit, baseline).comparisons[changedComparisonIndex]
+        ?.classification
+    ).toBe("needs-review");
   }, 60_000);
 });
 

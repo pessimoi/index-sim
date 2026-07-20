@@ -398,13 +398,20 @@ describe("Hiscores lookup controller", () => {
     const ready = harness.core.prepareApply();
     expect(ready).toMatchObject({
       status: "ready",
-      response: { player: "Fixture Player" },
-      applicableSkillCount: 2
+      response: { player: "Fixture Player" }
     });
-    harness.core.recordApplied(2);
+    expect(harness.core.getSnapshot()).toMatchObject({
+      previewOpen: true,
+      notice: { tone: "success", message: "Hiscores preview ready" }
+    });
+    harness.core.recordNoChanges();
     expect(harness.core.getSnapshot().notice).toEqual({
-      tone: "success",
-      message: "Applied 2 skills"
+      tone: "neutral",
+      message: "Current levels already match Hiscores"
+    });
+    expect(harness.core.getSnapshot()).toMatchObject({
+      previewOpen: true,
+      response: { player: "Fixture Player" }
     });
 
     harness.core.changePlayer("Other Player");

@@ -12,7 +12,11 @@ import {
   type PlannerCalculationController,
   type UsePlannerCalculationInput
 } from "../app/controllers/use-planner-calculation";
-import { PlannerUiStateSchema, createDefaultPlannerUiState } from "../app/state/planner";
+import {
+  PlannerUiStateSchema,
+  createDefaultPlannerUiState,
+  reconcilePlannerProgressWithLevels
+} from "../app/state/planner";
 import { DEFAULT_FORM_STATE } from "../app/state/ui-state";
 import type { PlannerPanelViewModel } from "../app/view-models/planner";
 import type { SimulationContext } from "../domain/shared";
@@ -226,7 +230,7 @@ describe("Planner calculation controller", () => {
     expect(requests[2]!.plannerState.metric).toBe("dps");
   });
 
-  it("reconciles live-level draft and computed XP before starting the replacement source", async () => {
+  it("reconciles Apply and Undo sources and rejects the late applied-level result", async () => {
     const { context } = await loadBundledLegacyContext();
     const requests: PlannerCalculationRequest[] = [];
     const resolvers: Array<(value: PlannerPanelViewModel) => void> = [];
@@ -290,6 +294,19 @@ describe("Planner calculation controller", () => {
     expect(cancels[0]).toHaveBeenCalledOnce();
 
     await act(async () => resolvers[0]!(panelFixture()));
+    expect(controller!.panel).toBeNull();
+
+    const appliedTaskIndex = requests.length - 1;
+    const appliedDraft = reconcilePlannerProgressWithLevels(draftState, newForm.levels).state;
+    await render({ ...initial, form: oldForm, draftState: appliedDraft });
+    expect(cancels[appliedTaskIndex]).toHaveBeenCalledOnce();
+    expect(requests.at(-1)?.form).toBe(oldForm);
+    expect(requests.at(-1)?.plannerState).toMatchObject({
+      currentXp: { attack: 0 },
+      targetLevels: { attack: 61 }
+    });
+
+    await act(async () => resolvers[appliedTaskIndex]!(panelFixture()));
     expect(controller!.panel).toBeNull();
     await act(async () => resolvers.at(-1)!(panelFixture()));
     expect(controller!.panel).not.toBeNull();

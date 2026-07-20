@@ -4,6 +4,10 @@ import { AppHeader } from "../app/components/shell/app-header";
 import { LegacyMigrationPanel } from "../app/components/shell/legacy-migration-panel";
 import { SharedSetupReview } from "../app/components/shell/shared-setup-review";
 import { WorkbenchShell } from "../app/components/shell/workbench-shell";
+import {
+  scrollLeftForAdjacentTab,
+  scrollLeftForVisibleItem
+} from "../app/components/shell/workbench-tab-scroll";
 import { DEFAULT_FORM_STATE } from "../app/state/ui-state";
 import {
   createAppShellSetupViewModel,
@@ -32,6 +36,22 @@ function elements(node: ReactNode): ReactElement[] {
 }
 
 describe("app shell components", () => {
+  it("computes minimal bounded workbench-tab scroll targets", () => {
+    const tabs = [
+      { start: 0, end: 80 },
+      { start: 84, end: 180 },
+      { start: 184, end: 280 },
+      { start: 284, end: 380 }
+    ];
+
+    expect(scrollLeftForVisibleItem(0, 200, 380, tabs[1]!)).toBe(0);
+    expect(scrollLeftForVisibleItem(0, 200, 380, tabs[2]!)).toBe(80);
+    expect(scrollLeftForVisibleItem(180, 200, 380, tabs[0]!)).toBe(0);
+    expect(scrollLeftForAdjacentTab("right", 0, 200, 380, tabs)).toBe(80);
+    expect(scrollLeftForAdjacentTab("left", 180, 200, 380, tabs)).toBe(84);
+    expect(scrollLeftForAdjacentTab("right", 180, 200, 380, tabs)).toBe(180);
+  });
+
   it("keeps skip link, header, Hiscores, setup actions and notices in order", () => {
     const markup = renderToStaticMarkup(
       <AppHeader
@@ -328,6 +348,8 @@ describe("app shell components", () => {
       'aria-label="Setup quick navigation"',
       'aria-label="Workbench shell"',
       'aria-label="Player sidebar"',
+      'aria-label="Player setup"',
+      'aria-label="Mobile result summary"',
       'aria-label="Active player setup"',
       'aria-label="Setup context"',
       'aria-label="Workbench tabs"',
@@ -338,6 +360,15 @@ describe("app shell components", () => {
       'aria-label="Feature pane fixture"',
       'aria-label="Monster information"'
     ]);
+    expect(markup.match(/role="tablist"/g)).toHaveLength(1);
+    expect(markup).toContain('aria-label="Scroll workbench tabs left"');
+    expect(markup).toContain('aria-label="Scroll workbench tabs right"');
+    expect(markup).toContain("More tabs");
+    expect(markup).toContain('aria-label="All workbench tabs"');
+    expect(markup).toContain('aria-current="page"');
+    expect(markup.match(/aria-label="Damage per second: 4\.00"/g)).toHaveLength(3);
+    expect(markup.match(/>Effective XP\/hr<\/span>/g)).toHaveLength(2);
+    expect(markup.match(/>Net GP\/hr<\/span>/g)).toHaveLength(2);
     expect(markup).toContain(
       'id="workbench-tab-stats" type="button" role="tab" class="active" aria-selected="true"'
     );
