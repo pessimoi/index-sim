@@ -487,6 +487,16 @@ git diff --check
   tab-järjestystä, setup-transaktioita tai desktop/compact-landscape-rakennetta
   ei muutettu.
 
+## Nykyinen browser-context-laajennus 2026-07-21
+
+PF-06 säilyttää tämän rakenteen ja tekee More-valinnan samaksi typed user-
+aktivoinniksi kuin näkyvän tabin ja roving-näppäimistön. Paneen vaihto lisää
+yhden `pane=<id>`-history-entryn, sama pane ei lisää entryä ja Back/Forward
+käyttää nykyistä aktiivisen tabin minimaalista vaakapaljastusta ilman document-
+scrollausta. Nimetty 390 x 844 Chromium-flow todistaa More → Trip -valinnan,
+URL/pane/title-yhtäpitävyyden ja containmentin; CB-09 todistaa history/reload-
+käytöksen Firefoxissa sekä desktop/mobile WebKitissä.
+
 ## Avoimet kysymykset
 
 - Sticky-yhteenvetoa ei tarvita nykyisessä hyväksytyssä 390/620/768-matriisissa;

@@ -72,6 +72,17 @@ a redesign of every control.
 - The browser test checks the computed outline on a keyboard-focused Dense row
   so a future style edit cannot silently remove it.
 
+## Current browser-context extension
+
+PF-06 keeps the same roving tab and skip-link contract while making activation
+browser-history aware. Click, Arrow/Home/End and mobile More choices use the
+typed user source and push one entry only when the pane changes. Popstate does
+not generally move focus; if focus belonged to the pane being hidden, the new
+active tab receives focus after rendering. Ready titles provide pane/target
+context without a new live region. The three-engine CB-09 extension covers
+keyboard activation, Back/Forward and reload; this remains automated behavior
+evidence, not a screen-reader certification claim.
+
 ## Documentation
 
 - Add this specification to the documentation map.

@@ -59,6 +59,13 @@ non-durable. Workspace export/import must consume that selected storage and
 `persistenceUnavailable` truth; it must never bypass the boundary to reach
 `window.localStorage`.
 
+The implemented session-only exit guard reuses this same live-state registry
+and capture. It never reads raw storage or changes the Workspace envelope. A
+successful `exportWorkspace()` request now additionally returns the actual
+included transfer-area ids to its caller, allowing exact in-memory
+acknowledgement while retaining nine required areas, default Hiscores exclusion
+and the existing truthful download-request notice.
+
 The existing transfer safety boundaries already provide reusable behavior:
 
 - rewrite setup files use bounded duplicate-key-safe parsing, Revision context,
@@ -230,6 +237,12 @@ One `Download Workspace backup` action captures one coherent live-state
 snapshot, constructs all area records at the same `exportedAt`, validates and
 downloads it. It does not read arbitrary raw keys. A validation or size failure
 creates sanitized visible copy and no partial download.
+
+The same action is also available from the armed session-only ready-shell
+notice. That route takes one coherent capture, uses the current non-persisted
+Hiscores privacy choice and delegates unchanged envelope construction and
+download dispatch here. It does not create a second backup format or persist a
+guard acknowledgement.
 
 The Hiscores choice is not persisted. Every new page session and every new
 export surface starts unchecked.

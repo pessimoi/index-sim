@@ -36,6 +36,12 @@ paths at both checkpoints. A one-pair workstation sample is recorded in the
 testing evidence log; it is a command-contract check, not a latency baseline or
 SLA.
 
+PF-06 extends only initial-family selection: the exact allowlisted browser
+`pane` query now seeds the requested family, so a Planner/Settings/etc. deep
+link starts that family immediately. A missing or invalid query retains the
+Compare default. History activation reuses the same monotonic request owner;
+visited panes remain mounted and failures stay inside the same pane boundary.
+
 ## Purpose
 
 Make the existing pane chunks genuinely on-demand, replace blank Suspense
@@ -68,7 +74,8 @@ already loaded component render/lifecycle failure.
 
 ## Verified current behavior and problem
 
-- The app starts with `activeTab: "compare"`.
+- A queryless app start uses `activeTab: "compare"`; an exact allowlisted pane
+  deep link now supplies the initial tab.
 - Stats is synchronously imported; nine pane components are declared through
   `React.lazy()`.
 - All nine lazy components appear unconditionally in the Workbench children on
@@ -181,9 +188,10 @@ persisted.
 
 Rules:
 
-1. Initialize the set with Compare because it is the default active tab.
-2. Every tab/quick-navigation/action route continues through the single
-   `activateWorkbenchTab(tabId)` owner.
+1. Initialize the set with the URL-selected family; missing/invalid URL state
+   uses Compare because it remains the default active tab.
+2. Every tab/quick-navigation/action route continues through the single typed
+   `activateWorkbenchTab(tabId, source)` owner.
 3. That owner adds the mapped family to the requested set before or in the same
    state transaction as changing `activeTab`.
 4. Render a lazy pane subtree only if its family has been requested.

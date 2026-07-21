@@ -36,10 +36,12 @@
 - [hiscores-lookup-controller-spec.md](hiscores-lookup-controller-spec.md): implemented request-race-safe Hiscores lifecycle extraction and topbar panel boundary.
 - [setup-file-transfer-controller-spec.md](setup-file-transfer-controller-spec.md): implemented bounded rewrite setup import/export orchestration and typed caller-owned Apply boundary.
 - [setup-replacement-review-undo-spec.md](setup-replacement-review-undo-spec.md): implemented review-before-Apply and persistence-aware Undo for setup file and saved-row replacement paths.
+- [setup-transfer-change-review-spec.md](setup-transfer-change-review-spec.md): implemented complete current-to-incoming review for setup files, shared links and saved-row Load through one exhaustive form registry.
 - [active-setup-reset-spec.md](active-setup-reset-spec.md): implemented canonical active Default/current-target Custom reset with grouped Review, all-style-cache scope, protected surrounding state and persistence-aware Undo.
 - [setup-mode-autosave-clarity-spec.md](setup-mode-autosave-clarity-spec.md): implemented explicit Default/current-monster Custom editing scope, destination-aware setup actions and exact-current-value browser/session persistence feedback.
 - [cross-tab-local-state-conflict-spec.md](cross-tab-local-state-conflict-spec.md): implemented external-tab detection, freshness-guarded browser writes and explicit per-area conflict resolution without a server sync layer.
 - [file-export-outcome-feedback-spec.md](file-export-outcome-feedback-spec.md): implemented typed browser download dispatch and truthful started/failed feedback for every existing JSON export.
+- [transfer-artifact-scope-filenames-spec.md](transfer-artifact-scope-filenames-spec.md): implemented exact artifact scope language and one bounded contextual/sortable filename contract for existing JSON transfers.
 - [duel-only-legacy-import-readiness-spec.md](duel-only-legacy-import-readiness-spec.md): implemented import-plan-derived gating that makes already validated Duel-only legacy data actionable.
 - [assistive-technology-accessibility-spec.md](assistive-technology-accessibility-spec.md): implemented WCAG 2.2 AA journey manifest, automated scans and semantic repairs; the VoiceOver/NVDA release gate remains open.
 - [cross-browser-release-support-spec.md](cross-browser-release-support-spec.md): implemented Firefox/WebKit/mobile-WebKit CB-01 through CB-12 release manifest, browser-API/diagnostic gates and bounded Safari support claim.
@@ -47,6 +49,8 @@
 - [price-set-transfer-controller-spec.md](price-set-transfer-controller-spec.md): implemented PriceSet import/acceptance/export/reset transaction extraction with typed caller-owned runtime application.
 - [price-set-import-discoverability-spec.md](price-set-import-discoverability-spec.md): implemented D-102 workflow with one advanced Market-owned full-PriceSet disclosure, explicit replacement/format guidance and no topbar/Settings duplicates.
 - [user-facing-language-units-information-hierarchy-spec.md](user-facing-language-units-information-hierarchy-spec.md): implemented source-name-first entity labels, technical-id disclosure, semantic units/abbreviations and a concise Settings-to-Economy price hierarchy.
+- [result-rate-semantics-spec.md](result-rate-semantics-spec.md): implemented whole-cycle effective primary rates and clearly separate on-site diagnostics across Result, Stats, Dense, Duel, Trip and Planner.
+- [entity-label-collision-disambiguation-spec.md](entity-label-collision-disambiguation-spec.md): implemented snapshot-explicit semantic collision descriptors, exact-id fallback and unique accessible option/row identities without generated-data changes.
 - [cannon-pane-extraction-spec.md](cannon-pane-extraction-spec.md): implemented first low-coupling feature-pane extraction with explicit calculated presentation and action props.
 - [cannon-finite-occupancy-spec.md](cannon-finite-occupancy-spec.md): implemented D-100 finite sparse occupancy, combined/player-only/cannon-only result separation, cannonball cost routing and aligned Cannon presentation.
 - [numeric-input-draft-validation-spec.md](numeric-input-draft-validation-spec.md): implemented shared draft, validation, keyboard and external-update contract for required, decimal and optional numeric fields.
@@ -57,6 +61,7 @@
 - [startup-bundle-performance-spec.md](startup-bundle-performance-spec.md): measured cold/warm startup, deterministic entry-JavaScript budgets and generated-runtime bootstrap splitting.
 - [dev-startup-reliability-spec.md](dev-startup-reliability-spec.md): implemented non-empty pre-React startup shell, canonical readiness states, real Vite-dev first-navigation smoke and checked agent localhost handoff.
 - [application-error-boundary-spec.md](application-error-boundary-spec.md): implemented root React render/lifecycle recovery, sanitized reload controls and tab-scoped in-memory startup that leaves saved browser data untouched.
+- [session-only-exit-protection-spec.md](session-only-exit-protection-spec.md): implemented dirty non-durable Workspace-area warning, bounded browser leave protection and direct exact included-state backup acknowledgement.
 - [calculation-worker-measurement-spec.md](calculation-worker-measurement-spec.md): measured production one-shot Worker construction, full-request posting, startup/delivery, execution and response phases; D-095 retains the cancellable lifecycle.
 - [calculation-worker-retention-spec.md](calculation-worker-retention-spec.md): implemented D-095 one-shot protocol/controller retention contract, quantified persistent-Worker reopen triggers and hard-cancellation-safe future target.
 - [feature-test-suite-split-spec.md](feature-test-suite-split-spec.md): implemented ARCH-2026-05 split of functional Playwright, composed view-model and current/topic/historical testing owners with title and gate preservation.
@@ -71,6 +76,7 @@
 - [dynamic-loot-market-dependency-coverage-spec.md](dynamic-loot-market-dependency-coverage-spec.md): implemented Trip-derived market dependency inventory and generated-runtime coverage audit for every active tagged loot table.
 - [high-impact-dynamic-loot-market-allowlist-spec.md](high-impact-dynamic-loot-market-allowlist-spec.md): implemented source-reviewed twelve-item market expansion for identified gem/mega and ultra-rare dependencies, leaving only ten unsupported unidentified herbs unmapped.
 - [shareable-setup-permalink-spec.md](shareable-setup-permalink-spec.md): static, review-before-load setup sharing contract.
+- [workbench-browser-history-context-spec.md](workbench-browser-history-context-spec.md): implemented allowlisted pane URLs, Back/Forward lifecycle and ready pane/target document titles without changing the default pane or persistence.
 - [visual-regression-spec.md](visual-regression-spec.md): deterministic Playwright screenshot coverage and baseline policy.
 - [live-integrations-spec.md](live-integrations-spec.md): hiscores lookup and live market sync product/API specification.
 - [hiscores-live-implementation-spec.md](hiscores-live-implementation-spec.md): implemented Hiscores provider/runtime contract and adopter live-evidence runbook.

@@ -5,6 +5,155 @@ It does not own current commands, required gates or test strategy; those remain 
 [the testing guide](../technical/testing.md). Counts and artifact hashes below
 apply only to the source state described by each entry.
 
+## 2026-07-21 PF-06 Workbench browser history context
+
+The focused browser-context and retained shell line passes 7 files / 109 tests.
+The pure owner covers all 11 pane ids, the queryless default, exact
+case-sensitive parsing, empty/unknown/duplicate/path/control/oversized invalid
+values, root and subpath URL writing, preservation of unrelated query and hash
+state, activation-source history policy and source-backed document titles.
+Deep-linked Planner, Settings and Stats initial-state tests also prove that the
+selected lazy pane family is requested immediately while the queryless route
+retains the Compare default.
+
+The named production-preview Chromium case `restores workbench pane through
+browser history` passes 1/1. It covers a direct Planner deep link and title,
+user and routed pane activations, exact history growth, same-pane no-op,
+Back/Forward traversal without history loops, retained Planner state, reload,
+keyboard roving, the 390 x 844 More menu, invalid duplicate canonicalization,
+safe-session/share-fragment composition and focused-control transfer when
+history hides its pane. The focused extended CB-09 case passes 3/3, and the
+complete release suite passes 36/36 across Playwright Firefox, desktop WebKit
+and iPhone 13-emulated mobile WebKit.
+
+The clean `npm run verify` gate passes 118/118 Vitest files and 1,136/1,136
+tests, 19/19 legacy goldens, typecheck, ESLint, Prettier, the
+178-source-module/164-client-reachable/eight-entrypoint zero-cycle architecture
+check, production build and artifact validation. Network-disabled dependency
+audit remains skipped under the existing gate policy. The 29-file/two-asset
+artifact has 22 JavaScript chunks, totals 2,442,848 bytes and retains the D-098
+direct entry at 277,198 raw / 83,815 gzip bytes; SHA-256 is
+`bfd472aaa26e64a913d3839ac6576ada69d3b303712b2171bf3a893c89fa93d3`.
+No branded Safari, physical iOS, VoiceOver or NVDA run was performed.
+
+## 2026-07-21 PF-05 transfer artifact clarity
+
+The focused browser-download, filename, five controller and three presentation
+suites pass 10 files / 90 tests. The pure filename suite freezes one UTC instant
+and covers all five canonical shapes, empty/whitespace/punctuation/path/control/
+Unicode contexts, fixed fallbacks and the 48-character segment / 160-character
+complete-name bounds. Typecheck and the 177-source-module / 163-client-reachable /
+eight-entrypoint zero-cycle architecture check pass.
+
+The named production-preview Chromium case `names and explains transfer
+artifacts` passes 1/1. It dispatches all five exact contextual filenames, checks
+the canonical actions and accessible scope descriptions, imports valid setup and
+saved-collection files under their former fixed names, accepts user-renamed
+PriceSets and checks long-name containment at desktop, 844x390 and 390x844. The
+updated CB-06 case passes 3/3 in a focused run, and the complete release suite
+passes 36/36 across Playwright Firefox, desktop WebKit and iPhone 13-emulated
+mobile WebKit. No branded Safari, physical iOS, VoiceOver or NVDA run was
+performed.
+
+An initial integrated run hit three computation-suite timeouts while other Node
+test work was active; the isolated simulation-view-model, maximum Duel matrix
+and Workspace history merge rerun passed 25/25 with normal timings and no
+assertion mismatch. After removing that concurrent load and correcting one
+test-only lint expression plus an already changed review component's formatting,
+the clean `npm run verify` gate passes 117/117 Vitest files and 1,123/1,123
+tests, 19/19 legacy goldens, typecheck, ESLint, Prettier, architecture, production
+build and artifact validation. Network-disabled dependency audit remains skipped
+under the existing gate policy. The 29-file/two-asset artifact has 22 JavaScript
+chunks, totals 2,439,626 bytes and retains the D-098 direct entry at 277,198 raw /
+83,815 gzip bytes; SHA-256 is
+`24b5eefde7f5834ba02ac44b378dfa38050e589d6a642e27e14abd319207c218`.
+
+## 2026-07-21 PF-04 session-only exit protection
+
+The focused guard/recovery/Workspace/shell command passes 8 files / 71 tests.
+It covers the Workspace-registry exhaustive contract, canonical no-edit/edit/
+revert comparison, per-area durable and session-only outcomes, exact included
+backup acknowledgement, failed request, omitted sensitive Hiscores state,
+post-backup re-arm and listener absence/add/remove plus synchronous event
+behavior. Typecheck, lint and the 176-source-module / 162-client-reachable /
+8-entrypoint / zero-cycle architecture check pass.
+
+The named production-preview Chromium case `protects session-only changes
+before leaving after safe recovery` passes 1/1. It enters safe mode through the
+implemented fatal recovery action, proves byte-identical sorted original
+localStorage key/value state, observes and cancels the native `beforeunload`
+dialog, captures a real Workspace download, verifies the exact nine default
+included ids, disarms after exact acknowledgement, keeps omitted dirty
+Hiscores state armed, includes it only after the existing privacy opt-in and
+re-arms after a later edit. The same case checks 390x844 and 844x390
+containment. A combined Chromium run with the controlled setup-persistence
+failure/Undo case passes 2/2.
+
+The retained CB-06 id now includes safe-session edit and direct Workspace
+acknowledgement. Its focused run passes 3/3, and the complete release suite
+passes 36/36 across Playwright Firefox, desktop WebKit and iPhone 13-emulated
+mobile WebKit. No branded Safari, physical iOS, VoiceOver or NVDA run was
+performed.
+
+The clean repository `npm run verify` gate passes 116/116 Vitest files and
+1,115/1,115 tests, 19/19 legacy goldens, typecheck, ESLint, Prettier, the
+176-source-module/162-client-reachable/eight-entrypoint zero-cycle architecture
+check, production build and artifact validation. Network-disabled dependency
+audit remains skipped under the existing gate policy. The 29-file/two-asset
+artifact has 22 JavaScript chunks, totals 2,437,110 bytes and retains the D-098
+direct entry at 277,193 raw / 83,812 gzip bytes; SHA-256 is
+`64cdfc64c65348c635757f1ff1d6bb29cec8f06288628ff1d4a58fb0b947608b`.
+
+## 2026-07-21 PF-03B setup-transfer review completion
+
+PF-03B closes the shared-link and saved-row half of the parent setup-transfer
+review specification. The required focused setup-import/share/saved-change/Duel/
+app-shell line plus the exhaustive shared registry suite passes 53/53. The
+retained share-link production-preview regression passes 3/3. The combined
+one-worker Chromium transaction `reviews every setup transfer change across
+file, shared-link and saved-row Load` passes 1/1 across all three scopes,
+applicable stale/Refresh, file/share PriceSet exclusion, no-op without Undo,
+complete Apply/Load/Undo, keyboard focus and 390 x 844 plus 844 x 390
+containment.
+
+The clean repository `npm run verify` gate passes 115/115 Vitest files and
+1,106/1,106 tests, 19/19 legacy goldens, typecheck, ESLint, Prettier, the
+174-source-module/160-client-reachable/eight-entrypoint zero-cycle architecture
+check, production build and artifact validation. Network-disabled dependency
+audit remains skipped under the existing gate policy. The 29-file/two-asset
+artifact has 22 JavaScript chunks, totals 2,430,050 bytes and retains the D-098
+direct entry at 276,038 raw / 83,401 gzip bytes; SHA-256 is
+`a20d2edb6b2d22cdba57b35a379cb4b948c8cd187230d4af7918e2ab406a41cb`.
+
+No conditional setup file/shared/saved-Load review baseline exists in the
+current visual owner, so no baseline was written. The named browser transaction
+owns the new responsive-surface evidence. Existing manual VoiceOver/Safari and
+NVDA/browser rows remain `not run` and no screen-reader-conformance claim is
+added.
+
+## 2026-07-21 PF-02 completion and PF-03A setup-file change review
+
+The final quiet-host rerun closes PF-02's previously pending integrated check
+and evidences PF-03A. The clean `npm run verify` gate passes 115/115 Vitest files
+and 1,102/1,102 tests, 19/19 legacy goldens, typecheck, ESLint, Prettier, the
+174-source-module/160-client-reachable/eight-entrypoint zero-cycle architecture
+check, production build and artifact validation. Network-disabled dependency
+audit is skipped under the existing gate policy. The 28-file/two-asset artifact
+has 21 JavaScript chunks, totals 2,419,361 bytes and retains the D-098 direct
+entry budget at 276,038 raw / 83,401 gzip bytes; SHA-256 is
+`75581ad5c6ab09c63501182ece97724fd7eb23b5949d150e06c41009e8f51621`.
+
+PF-03A's focused setup import, transfer, reset and saved-change line plus its new
+schema-drift suite passes 45/45. The named production-preview transaction
+`reviews every setup file change` passes 1/1 and covers the 13-group review,
+complete underlying custom/cannon entries with one materialized detail,
+included versus PriceSet-excluded stale behavior, same-candidate Refresh,
+synchronous Apply guard, disabled no-op, complete Apply/Undo, keyboard actions,
+390 x 844 and 844 x 390 containment. No setup-import visual baseline exists in
+the current read-only visual owner and no baseline was written. At this PF-03A
+checkpoint, PF-03B remained the shared-link and saved-row half of the parent
+specification; the newer entry above records its completion.
+
 ## 2026-07-21 cross-browser release support
 
 The durable browser release boundary now keeps the complete Chromium functional

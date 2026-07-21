@@ -30,6 +30,10 @@ surface, while retaining separate fixed messages and separate regression tests.
 - A successful safe-session startup shows a visible `Session-only safe mode`
   notice explaining that saved data is ignored, changes are non-durable and
   existing saved data is unchanged.
+- Safe-session mode alone remains informational. After a meaningful Workspace
+  area edit, that same visible owner becomes `Unsaved session-only changes`,
+  exposes the direct Workspace backup and arms the browser-native leave guard
+  until exact included state is acknowledged or reverted.
 
 The pre-React guard remains active only while the canonical marker is
 `starting`. Once React owns the root, the Error Boundary owns descendant render
@@ -71,7 +75,11 @@ parameter.
   existing feature state, runtime bootstrap and persistence effects.
 - `src/app/startup-guard-core.ts` remains the DOM-only pre-React boundary.
 - `src/app/controllers/local-state-recovery.ts` distinguishes storage-read
-  availability from non-durable session-only persistence.
+  availability from non-durable session-only persistence and reports typed
+  per-area durability outcomes to the exit guard.
+- `src/app/controllers/session-only-exit-protection.ts` owns in-memory semantic
+  baselines/acknowledgements; `use-session-only-before-unload.ts` owns only the
+  bounded browser listener.
 
 No domain module, generated data, persisted schema, backend, provider or
 deployment boundary changes.
@@ -116,7 +124,7 @@ npm run test -- src/tests/application-error-boundary.test.tsx src/tests/startup-
 npm run typecheck
 npm run architecture:check
 npm run build
-npm run test:e2e -- --workers=1 --grep "recovers a ready-pane render failure"
+npm run test:e2e -- --workers=1 --grep "protects session-only changes before leaving"
 git diff --check
 ```
 
@@ -132,3 +140,10 @@ unchanged before recovery, after safe reload and after a safe-session edit. The
 approved managed-localhost startup check proves one ready marker plus one
 controlled error marker. This is `LOCAL_RUNTIME` / `SYNTHETIC_TEST` evidence
 only.
+
+PF-04 extends this same recovery path without changing isolation: its named
+Chromium case passes through the fatal recovery action, proves no listener
+before an edit, cancels a real `beforeunload` dialog after an edit, exports and
+acknowledges exact Workspace state, exercises Hiscores privacy opt-out/opt-in
+and re-arms after a later edit. The sorted original localStorage key/value byte
+snapshot remains identical throughout.
