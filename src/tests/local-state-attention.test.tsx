@@ -7,6 +7,7 @@ import { LOOT_SETTINGS_STORAGE_KEY } from "../app/state/loot-settings";
 import { PLANNER_UI_STORAGE_KEY } from "../app/state/planner";
 import { REWRITE_SETUP_STORAGE_KEY } from "../app/state/ui-state";
 import { buildLocalStateAttentionViewModel } from "../app/view-models/local-state-attention";
+import { CrossTabConflictControllerCore } from "../app/controllers/cross-tab-conflicts";
 
 const FIXED_NOW = new Date("2026-07-18T12:00:00.000Z");
 
@@ -121,5 +122,31 @@ describe("local state attention view model", () => {
       affectedLabels: ["Rewrite setup", "Planner UI state"]
     });
     expect(markup.match(/Review local data/g)).toHaveLength(1);
+  });
+
+  it("prioritizes one bounded cross-tab notice without exposing raw values", () => {
+    const storage = createMemoryStorage({ [REWRITE_SETUP_STORAGE_KEY]: "private baseline" });
+    const conflicts = new CrossTabConflictControllerCore(storage);
+    conflicts.initialize();
+    storage.setItem(REWRITE_SETUP_STORAGE_KEY, "private external payload");
+    conflicts.checkFreshness("rewrite-setup");
+    const model = buildLocalStateAttentionViewModel(
+      createLocalStateHealthReport(createMemoryStorage(), FIXED_NOW),
+      conflicts.getSnapshot()
+    );
+    const markup = renderToStaticMarkup(
+      <LocalStateAttentionBanner viewModel={model} onReview={() => {}} />
+    );
+
+    expect(model).toMatchObject({
+      visible: true,
+      kind: "conflict",
+      title: "Data changed in another tab",
+      affectedLabels: ["Rewrite setup"],
+      reviewLabel: "Review conflicts"
+    });
+    expect(markup).toContain("Review conflicts");
+    expect(markup).not.toContain("private baseline");
+    expect(markup).not.toContain("private external payload");
   });
 });

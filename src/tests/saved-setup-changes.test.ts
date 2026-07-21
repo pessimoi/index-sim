@@ -22,6 +22,7 @@ function state(id: string, name: string): DuelSnapshotsState {
 
 function recovery(): SavedSetupChangesRecoveryBoundary {
   return {
+    canStartDurableWrite: vi.fn(() => true),
     prepareExternalApply: vi.fn(),
     cancelExternalApply: vi.fn(),
     completeExternalApply: vi.fn(),

@@ -1,4 +1,5 @@
 import type { GameDataSnapshot } from "@/domain/shared";
+import type { JsonDownloadRequestResult } from "@/adapters/browser";
 import {
   SETUP_IMPORT_MAX_BYTES,
   SetupImportError,
@@ -10,9 +11,10 @@ import {
   compareSetupTransferContext,
   type SetupTransferContextReview
 } from "../state/setup-transfer-context";
+import { requestFileExport, type FileExportOutcome } from "./file-export-outcome";
 
 export interface SetupFileTransferNotice {
-  tone: "error";
+  tone: "neutral" | "error";
   message: string;
   details?: string[];
 }
@@ -48,7 +50,7 @@ export type SetupPrepareOutcome =
 
 export interface SetupFileTransferDependencies<TFile> {
   readFileText(file: TFile, maxBytes: number): Promise<string>;
-  downloadJsonFile(fileName: string, value: unknown): void;
+  downloadJsonFile(fileName: string, value: unknown): JsonDownloadRequestResult;
   now(): Date;
 }
 
@@ -197,10 +199,15 @@ export class SetupFileTransferControllerCore<TFile> {
     return candidate;
   };
 
-  exportSetup = (setup: SavedSetupState, gameData: GameDataSnapshot): void => {
-    this.dependencies.downloadJsonFile(
-      "index-sim-rewrite-setup.json",
-      createRewriteSetupTransferEnvelope(setup, gameData, this.dependencies.now())
+  exportSetup = (setup: SavedSetupState, gameData: GameDataSnapshot): FileExportOutcome => {
+    const fileName = "index-sim-rewrite-setup.json";
+    const outcome = requestFileExport("setup", fileName, () =>
+      this.dependencies.downloadJsonFile(
+        fileName,
+        createRewriteSetupTransferEnvelope(setup, gameData, this.dependencies.now())
+      )
     );
+    this.publish({ ...this.snapshot, notice: outcome.notice });
+    return outcome;
   };
 }

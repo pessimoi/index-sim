@@ -5,13 +5,13 @@ import type {
 } from "../../state/local-state-health";
 import type { LocalStateClearPendingId } from "../../controllers/local-state-recovery";
 import { formatNumber } from "../../view-models/formatting";
-
-export const LOCAL_STATE_RECOVERY_HEADING_ID = "local-state-recovery-heading";
+import { LOCAL_STATE_RECOVERY_HEADING_ID } from "./settings-heading-ids";
 
 interface LocalStateRecoveryPanelProps {
   visible: boolean;
   report: LocalStateHealthReport;
   notice: string | null;
+  exportNotice?: { tone: "neutral" | "error"; message: string };
   pendingClearId: LocalStateClearPendingId;
   onExport: () => void;
   onBeginClear: (id: LocalStateHealthItemId | "invalid-all") => void;
@@ -74,6 +74,7 @@ export function LocalStateRecoveryPanel({
   visible,
   report,
   notice,
+  exportNotice,
   pendingClearId,
   onExport,
   onBeginClear,
@@ -83,6 +84,7 @@ export function LocalStateRecoveryPanel({
 }: LocalStateRecoveryPanelProps) {
   if (!visible) return null;
   const attentionItems = report.items.filter((item) => item.needsAttention);
+  const noticeTone = exportNotice?.tone ?? (report.hasAttention ? "warning" : "success");
 
   return (
     <section className="service-group local-state-recovery-panel" aria-label="Local state recovery">
@@ -95,10 +97,13 @@ export function LocalStateRecoveryPanel({
         </span>
       </div>
       <p
-        className={`inline-status ${report.hasAttention ? "warning" : "success"}`}
-        role={report.hasAttention ? "alert" : "status"}
+        className={`inline-status ${noticeTone}`}
+        role={noticeTone === "error" || noticeTone === "warning" ? "alert" : "status"}
+        aria-label="Recovery export notice"
       >
-        {notice ?? "Some browser-local rewrite state fell back to defaults."}
+        {exportNotice?.message ??
+          notice ??
+          "Some browser-local rewrite state fell back to defaults."}
       </p>
       <div className="price-history-summary" aria-label="Local state health summary">
         <span>Known states {formatNumber(report.itemCount)}</span>

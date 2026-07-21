@@ -43,6 +43,29 @@ const priceSet: PriceSet = {
   alchValues: { lobster: 0 }
 };
 
+const singleAreaReports: Array<{
+  label: string;
+  overrides: Partial<LegacySetupMigrationReport>;
+}> = [
+  { label: "setup", overrides: { setup: DEFAULT_FORM_STATE } },
+  { label: "custom setup", overrides: { customSetupsByMonster: {} } },
+  { label: "cannon", overrides: { cannonByMonster: {} } },
+  {
+    label: "saved setup",
+    overrides: {
+      duelSnapshots: {
+        snapshots: [createDuelSnapshot("single-duel", "Single Duel", DEFAULT_FORM_STATE)]
+      }
+    }
+  },
+  { label: "loot preference", overrides: { lootPrefs: {} } },
+  { label: "hidden tier", overrides: { hiddenGearTiers: {} } },
+  { label: "Compare sort", overrides: { denseCompareSort: DEFAULT_DENSE_COMPARE_SORT_STATE } },
+  { label: "hidden monster", overrides: { irrelevantMonsterIds: [] } },
+  { label: "Hiscores player", overrides: { hiscoresPlayer: "Fixture Player" } },
+  { label: "PriceSet", overrides: { priceSet } }
+];
+
 describe("legacy migration view model", () => {
   it("presents an empty report without inventing importable data", () => {
     const viewModel = createLegacyMigrationViewModel({
@@ -126,7 +149,7 @@ describe("legacy migration view model", () => {
     });
 
     expect(viewModel.tone).toBe("");
-    expect(viewModel.statusLabel).toBe("3 compatible fields");
+    expect(viewModel.statusLabel).toBe("10 compatible areas");
     expect(viewModel.importReady).toBe(true);
     expect(viewModel.importPlan).toEqual(
       expect.arrayContaining([
@@ -172,7 +195,7 @@ describe("legacy migration view model", () => {
     expect(JSON.stringify(viewModel)).not.toContain("itemPrices");
   });
 
-  it("preserves the current Duel-only readiness discrepancy", () => {
+  it("makes a validated Duel-only plan actionable with aligned area copy", () => {
     const duelOnly = report([LEGACY_INPUT_STORAGE_KEY], {
       duelSnapshots: {
         snapshots: [createDuelSnapshot("duel-only", "Duel only", DEFAULT_FORM_STATE)]
@@ -184,8 +207,56 @@ describe("legacy migration view model", () => {
     });
 
     expect(viewModel.importPlan).toContain("Legacy setup comparisons into saved setup storage");
+    expect(viewModel.importReady).toBe(true);
+    expect(viewModel.statusLabel).toBe("1 compatible area");
+    expect(viewModel.tone).toBe("ready");
+    expect(viewModel.summaryItems).toContain("Saved setups ready");
+    expect(viewModel.outcomeItems).toContain(
+      "Import action: 1 compatible area ready; legacy keys stay in storage."
+    );
+  });
+
+  it("keeps a defensive empty Duel state non-actionable", () => {
+    const viewModel = createLegacyMigrationViewModel({
+      report: report([LEGACY_INPUT_STORAGE_KEY], {
+        duelSnapshots: { snapshots: [] }
+      }),
+      hasRewriteSetup: false
+    });
+
+    expect(viewModel.importPlan).toEqual([]);
     expect(viewModel.importReady).toBe(false);
     expect(viewModel.statusLabel).toBe("review only");
-    expect(viewModel.tone).toBe("ready");
+    expect(viewModel.summaryItems).toContain("Saved setups skipped");
+  });
+
+  it.each(singleAreaReports)("makes the single $label plan item actionable", ({ overrides }) => {
+    const viewModel = createLegacyMigrationViewModel({
+      report: report([LEGACY_INPUT_STORAGE_KEY], overrides),
+      hasRewriteSetup: false
+    });
+
+    expect(viewModel.importPlan).toHaveLength(1);
+    expect(viewModel.importReady).toBe(true);
+    expect(viewModel.statusLabel).toBe("1 compatible area");
+  });
+
+  it("uses plan areas instead of field-level audit findings for mixed status copy", () => {
+    const viewModel = createLegacyMigrationViewModel({
+      report: report([LEGACY_INPUT_STORAGE_KEY], {
+        importedFields: ["combatStyle", "monsterId", "weaponId", "another-field"],
+        setup: DEFAULT_FORM_STATE,
+        duelSnapshots: {
+          snapshots: [createDuelSnapshot("mixed-duel", "Mixed Duel", DEFAULT_FORM_STATE)]
+        }
+      }),
+      hasRewriteSetup: false
+    });
+
+    expect(viewModel.importPlan).toHaveLength(2);
+    expect(viewModel.statusLabel).toBe("2 compatible areas");
+    expect(viewModel.outcomeItems).toContain(
+      "Import action: 2 compatible areas ready; legacy keys stay in storage."
+    );
   });
 });

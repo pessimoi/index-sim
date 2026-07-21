@@ -385,6 +385,10 @@ test("uses saved setup comparison to import export rename load delete and persis
   await duel.getByRole("button", { name: "Export setups" }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe("index-sim-saved-setups.json");
+  await expect(duel.getByLabel("Saved setup transfer notice")).toHaveText(
+    "Saved setup download started: index-sim-saved-setups.json. Check your browser downloads."
+  );
+  await expect(duel.getByRole("button", { name: "Export setups" })).toBeFocused();
   const exportedFile = JSON.parse(await readDownloadText(download));
   expect(exportedFile).toMatchObject({
     kind: "index-sim-saved-setups",
@@ -514,7 +518,7 @@ test("uses saved setup comparison to import export rename load delete and persis
   await expect(importReview).toContainText("older format does not record a game revision");
   await expect(reloadedTable).toContainText("No saved setups");
   await importReview.getByRole("button", { name: "Merge selected setups" }).click();
-  await expect(reloadedDuel.getByLabel("Saved setup import notice")).toContainText(
+  await expect(reloadedDuel.getByLabel("Saved setup transfer notice")).toContainText(
     "using current Revision 274 data: 1 added, 0 replaced, 0 not selected"
   );
   await expect(reloadedTable.getByLabel("Rename saved setup Melee saved")).toBeVisible();

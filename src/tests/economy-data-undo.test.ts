@@ -47,10 +47,12 @@ function history(label: string): BrowserPriceHistoryState {
 
 function recoveryPort(): EconomyDataRecoveryPort {
   return {
+    canStartDurableWrite: vi.fn(() => true),
     clearStorageFailures: vi.fn(),
     completeExternalUndo: vi.fn(),
     markPersistenceUnavailable: vi.fn(),
     prepareExternalApply: vi.fn(),
+    recordCurrentBaselines: vi.fn(),
     recordStorageFailure: vi.fn(),
     refresh: vi.fn(),
     unblockReplaced: vi.fn()

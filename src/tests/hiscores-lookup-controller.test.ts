@@ -67,7 +67,9 @@ function controller(options: ControllerOptions = {}) {
     clearStorageFailures,
     recordStorageFailure,
     unblockReplaced,
-    refreshLocalStateHealth
+    refreshLocalStateHealth,
+    canStartDurableWrite: vi.fn(() => true),
+    recordCurrentBaselines: vi.fn()
   });
   return {
     core,

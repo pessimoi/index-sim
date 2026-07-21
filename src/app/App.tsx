@@ -1,27 +1,23 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  PendingUndoStatus,
-  ShareSetupDialog,
-  type PendingUndo,
-  type ShareSetupDialogState
-} from "./components/app-presenters";
+import { PendingUndoStatus, type PendingUndo } from "./components/app-presenters";
+import type { ShareSetupDialogState } from "./components/share-setup-dialog";
 import { globalStatusAnnouncement } from "./view-models/global-status";
 import type { SelectOption } from "./components/form-fields";
 import { formatDelta } from "./components/presentation-formatters";
 import { AppHeader } from "./components/shell/app-header";
-import { ActiveSetupResetReview } from "./components/shell/active-setup-reset-review";
 import {
   ApplicationFailureScreen,
   SafeSessionNotice
 } from "./components/shell/application-error-boundary";
-import { LocalStateAttentionBanner } from "./components/shell/local-state-attention-banner";
-import { SetupImportReview } from "./components/shell/setup-import-review";
-import { SharedSetupReview } from "./components/shell/shared-setup-review";
-import { LegacyMigrationPanel } from "./components/shell/legacy-migration-panel";
 import { WorkbenchShell } from "./components/shell/workbench-shell";
+import { PaneBoundary } from "./components/shell/pane-boundary";
+import { createTrackedLazyPane } from "./components/shell/tracked-lazy-pane";
 import { MonsterCardPanel } from "./components/panes/monster-card-panel";
 import { StatsPane } from "./components/panes/stats-pane";
-import { LOCAL_STATE_RECOVERY_HEADING_ID } from "./components/settings/local-state-recovery-panel";
+import {
+  CROSS_TAB_CONFLICT_HEADING_ID,
+  LOCAL_STATE_RECOVERY_HEADING_ID
+} from "./components/settings/settings-heading-ids";
 import {
   captureBrowserShareableSetupFragment,
   createBrowserShareableSetupUrl,
@@ -32,7 +28,11 @@ import {
 import type { ScheduledStaticPriceSnapshotStatus } from "@/adapters/market";
 import { LastHiscoresPlayerStateSchema } from "@/adapters/hiscores";
 import { loadPersisted } from "@/adapters/storage";
-import { SAFE_SESSION_NOTICE, createBrowserStorageAccess } from "./application-recovery";
+import {
+  SAFE_SESSION_NOTICE,
+  createBrowserStorageAccess,
+  reloadSimulator
+} from "./application-recovery";
 import {
   clearKnownLegacyStorageKeys,
   inspectLegacySetupMigration,
@@ -64,6 +64,9 @@ import { useDuelPane } from "./controllers/use-duel-pane";
 import { usePlannerCalculation } from "./controllers/use-planner-calculation";
 import { useRiskAnalysis } from "./controllers/use-risk-analysis";
 import { useLocalStateRecovery } from "./controllers/use-local-state-recovery";
+import { useCrossTabConflicts } from "./controllers/use-cross-tab-conflicts";
+import type { CrossTabAreaId } from "./controllers/cross-tab-conflicts";
+import { createCrossTabKeepOperation } from "./controllers/cross-tab-persistence";
 import { useSetupFileTransfer } from "./controllers/use-setup-file-transfer";
 import { usePriceSetTransfer } from "./controllers/use-price-set-transfer";
 import { useWorkspaceFileTransfer } from "./controllers/use-workspace-file-transfer";
@@ -117,7 +120,6 @@ import {
   appendDuelSnapshot,
   createDuelSnapshotId,
   createDuelSnapshot,
-  createDuelSnapshotsExport,
   mergeDuelSnapshots,
   parseDuelSnapshotsExportText,
   removeDuelSnapshot,
@@ -125,6 +127,7 @@ import {
   uniqueDuelSnapshotName,
   type DuelSnapshotsState
 } from "./state/duel-snapshots";
+import { exportDuelSnapshotsFile } from "./controllers/duel-file-transfer";
 import {
   buildSavedSetupMergeCandidate,
   createSavedSetupMergePlan,
@@ -319,10 +322,19 @@ import {
   createSharedSetupReviewViewModel,
   createWorkbenchResultViewModel,
   describeShareableSetupError,
+  type SetupPersistenceKind,
   type ShareableSetupInspection,
-  type WorkbenchTabId
+  type WorkbenchTabId,
+  workbenchTabLabel
 } from "./view-models/app-shell";
-import { createLegacyMigrationViewModel } from "./view-models/legacy-migration";
+import {
+  createInitialPaneLoadStates,
+  createInitialRequestedPaneFamilies,
+  paneFamilyForTab,
+  requestPaneFamily,
+  type PaneFamily,
+  type PaneLoadState
+} from "./state/pane-delivery";
 import {
   createSavedSetupMergeReviewViewModel,
   defaultDuelSnapshotName,
@@ -341,29 +353,76 @@ import {
 } from "./view-models/monster-specific-changes";
 
 const loadEconomySettingsPane = () => import("./components/panes/economy-settings-lazy");
-const EconomySettingsPane = lazy(loadEconomySettingsPane);
-const RiskPane = lazy(() => import("./components/panes/risk-pane"));
-const DuelPane = lazy(() =>
-  import("./components/panes/duel-pane").then((module) => ({ default: module.DuelPane }))
+const trackedEconomySettingsPane =
+  createTrackedLazyPane<
+    import("./components/panes/economy-settings-pane").EconomySettingsPaneProps
+  >(loadEconomySettingsPane);
+const EconomySettingsPane = trackedEconomySettingsPane.Component;
+const loadSetupReviews = () => import("./components/shell/setup-reviews-lazy");
+const ActiveSetupResetReview = lazy(() =>
+  loadSetupReviews().then((module) => ({ default: module.ActiveSetupResetReview }))
 );
-const PlannerPane = lazy(() =>
+const SetupImportReview = lazy(() =>
+  loadSetupReviews().then((module) => ({ default: module.SetupImportReview }))
+);
+const SharedSetupReview = lazy(() =>
+  loadSetupReviews().then((module) => ({ default: module.SharedSetupReview }))
+);
+const LegacyMigrationPanel = lazy(() =>
+  import("./components/shell/legacy-migration-panel").then((module) => ({
+    default: module.LegacyMigrationReview
+  }))
+);
+const LocalStateAttentionBanner = lazy(() =>
+  import("./components/shell/local-state-attention-banner").then((module) => ({
+    default: module.LocalStateAttentionBanner
+  }))
+);
+const ShareSetupDialog = lazy(() =>
+  import("./components/share-setup-dialog").then((module) => ({
+    default: module.ShareSetupDialog
+  }))
+);
+const trackedRiskPane = createTrackedLazyPane<import("./components/panes/risk-pane").RiskPaneProps>(
+  () => import("./components/panes/risk-pane")
+);
+const RiskPane = trackedRiskPane.Component;
+const trackedDuelPane = createTrackedLazyPane<import("./components/panes/duel-pane").DuelPaneProps>(
+  () => import("./components/panes/duel-pane").then((module) => ({ default: module.DuelPane }))
+);
+const DuelPane = trackedDuelPane.Component;
+const trackedPlannerPane = createTrackedLazyPane<
+  import("./components/panes/planner-pane").PlannerPaneProps
+>(() =>
   import("./components/panes/planner-pane").then((module) => ({ default: module.PlannerPane }))
 );
-const LootPane = lazy(() =>
-  import("./components/panes/loot-pane").then((module) => ({ default: module.LootPane }))
+const PlannerPane = trackedPlannerPane.Component;
+const trackedLootPane = createTrackedLazyPane<import("./components/panes/loot-pane").LootPaneProps>(
+  () => import("./components/panes/loot-pane").then((module) => ({ default: module.LootPane }))
 );
-const TripPane = lazy(() =>
-  import("./components/panes/trip-pane").then((module) => ({ default: module.TripPane }))
+const LootPane = trackedLootPane.Component;
+const trackedTripPane = createTrackedLazyPane<import("./components/panes/trip-pane").TripPaneProps>(
+  () => import("./components/panes/trip-pane").then((module) => ({ default: module.TripPane }))
 );
-const LoadoutPane = lazy(() =>
+const TripPane = trackedTripPane.Component;
+const trackedLoadoutPane = createTrackedLazyPane<
+  import("./components/panes/loadout-pane").LoadoutPaneProps
+>(() =>
   import("./components/panes/loadout-pane").then((module) => ({ default: module.LoadoutPane }))
 );
-const CannonPane = lazy(() =>
+const LoadoutPane = trackedLoadoutPane.Component;
+const trackedCannonPane = createTrackedLazyPane<
+  import("./components/panes/cannon-pane").CannonPaneProps
+>(() =>
   import("./components/panes/cannon-pane").then((module) => ({ default: module.CannonPane }))
 );
-const ComparePane = lazy(() =>
+const CannonPane = trackedCannonPane.Component;
+const trackedComparePane = createTrackedLazyPane<
+  import("./components/panes/compare-pane").ComparePaneProps
+>(() =>
   import("./components/panes/compare-pane").then((module) => ({ default: module.ComparePane }))
 );
+const ComparePane = trackedComparePane.Component;
 
 const ECONOMY_UNDO_SCOPE_IDS: ReadonlySet<string> = new Set<EconomyDataUndoScope>([
   "price-history",
@@ -506,6 +565,17 @@ interface MonsterSpecificReviewRequest {
   kind: MonsterSpecificChangeKind;
 }
 
+type SettledSetupPersistenceKind = Exclude<SetupPersistenceKind, "saving">;
+
+interface SetupPersistenceOutcome {
+  identity: string;
+  kind: SettledSetupPersistenceKind;
+}
+
+function setupPersistenceIdentity(setup: SavedSetupState): string {
+  return JSON.stringify(setup);
+}
+
 export function App() {
   const [context, setContext] = useState<SimulationContext | null>(null);
   const [initialSavedSetup] = useState(loadInitialSavedSetup);
@@ -517,6 +587,8 @@ export function App() {
     normalizeFormState(initialSavedSetup.setup.defaultForm)
   );
   const [setupMode, setSetupMode] = useState<SetupMode>(() => initialSavedSetup.setup.setupMode);
+  const [setupPersistenceOutcome, setSetupPersistenceOutcome] =
+    useState<SetupPersistenceOutcome | null>(null);
   const [customSetupsByMonster, setCustomSetupsByMonster] = useState<CustomSetupsByMonsterState>(
     () => initialSavedSetup.setup.customSetupsByMonster
   );
@@ -557,18 +629,29 @@ export function App() {
   const [priceTimeZone] = useState(resolveBrowserPriceTimeZone);
   const [readyToPersist, setReadyToPersist] = useState(false);
   const [status, setStatus] = useState("Loading source-backed runtime data");
+  const crossTabConflicts = useCrossTabConflicts({
+    storage,
+    enabled: readyToPersist && !localPersistenceUnavailable
+  });
   const localStateRecovery = useLocalStateRecovery({
     storage,
     storageUnavailable: localStorageAccessUnavailable,
     persistenceUnavailable: localPersistenceUnavailable,
     persistenceNotice: savedDataIgnoredForSession ? SAFE_SESSION_NOTICE : undefined,
     onStatus: setStatus,
-    onDownload: downloadJsonFile
+    onDownload: downloadJsonFile,
+    crossTab: crossTabConflicts
   });
   const persistLocalState = localStateRecovery.persist;
+  const refreshLocalStateRecovery = localStateRecovery.refresh;
   const shouldSkipPersistLocalState = localStateRecovery.shouldSkipPersist;
   const prepareExternalLocalStateApply = localStateRecovery.prepareExternalApply;
-  const blockedLocalStateIds = localStateRecovery.blockedIds;
+  const blockedLocalStateIds = [
+    ...new Set([
+      ...localStateRecovery.blockedIds,
+      ...crossTabConflicts.conflicts.map((conflict) => conflict.id)
+    ])
+  ];
   const rewriteSetupBlocked = blockedLocalStateIds.includes("rewrite-setup");
   const lootPrefsBlocked = blockedLocalStateIds.includes("loot-prefs");
   const lootSettingsBlocked = blockedLocalStateIds.includes("loot-settings");
@@ -586,6 +669,8 @@ export function App() {
     clearStorageFailures: localStateRecovery.clearStorageFailures,
     recordStorageFailure: localStateRecovery.recordStorageFailure,
     markPersistenceUnavailable: localStateRecovery.markPersistenceUnavailable,
+    canStartDurableWrite: localStateRecovery.canStartDurableWrite,
+    recordCurrentBaselines: localStateRecovery.recordCurrentBaselines,
     unblockReplaced: localStateRecovery.unblockReplaced,
     refreshLocalStateHealth: localStateRecovery.refresh
   });
@@ -593,6 +678,8 @@ export function App() {
     storage,
     clearStorageFailures: localStateRecovery.clearStorageFailures,
     recordStorageFailure: localStateRecovery.recordStorageFailure,
+    canStartDurableWrite: localStateRecovery.canStartDurableWrite,
+    recordCurrentBaselines: localStateRecovery.recordCurrentBaselines,
     unblockReplaced: localStateRecovery.unblockReplaced,
     refreshLocalStateHealth: localStateRecovery.refresh
   });
@@ -676,7 +763,31 @@ export function App() {
   const [activeSetupReset, setActiveSetupReset] = useState(INITIAL_ACTIVE_SETUP_RESET_STATE);
   const [respectLoadoutRequirements, setRespectLoadoutRequirements] = useState(true);
   const [activeTab, setActiveTab] = useState<WorkbenchTabId>("compare");
+  const [requestedPaneFamilies, setRequestedPaneFamilies] = useState<ReadonlySet<PaneFamily>>(
+    createInitialRequestedPaneFamilies
+  );
+  const [paneLoadStates, setPaneLoadStates] = useState<Record<PaneFamily, PaneLoadState>>(
+    createInitialPaneLoadStates
+  );
+  const activateWorkbenchTab = useCallback((tabId: WorkbenchTabId): void => {
+    const family = paneFamilyForTab(tabId);
+    setRequestedPaneFamilies((current) => requestPaneFamily(current, tabId));
+    setPaneLoadStates((current) =>
+      current[family] === "not-requested" ? { ...current, [family]: "loading" } : current
+    );
+    setActiveTab(tabId);
+  }, []);
+  const updatePaneLoadState = useCallback((family: PaneFamily, state: PaneLoadState): void => {
+    setPaneLoadStates((current) =>
+      current[family] === state ? current : { ...current, [family]: state }
+    );
+  }, []);
   const [localStateReviewRequest, setLocalStateReviewRequest] = useState(0);
+  const [crossTabSelectedIds, setCrossTabSelectedIds] = useState<CrossTabAreaId[]>([]);
+  const [crossTabNotice, setCrossTabNotice] = useState<{
+    tone: "neutral" | "success" | "warning" | "error";
+    message: string;
+  } | null>(null);
   const [economyReviewRequest, setEconomyReviewRequest] = useState(0);
   const [priceNotesOpen, setPriceNotesOpen] = useState(false);
   const [priceItemReviewRequest, setPriceItemReviewRequest] =
@@ -702,6 +813,7 @@ export function App() {
     savedSetupChangesTransactionRef.current = new SavedSetupChangesTransactionCore();
   }
   const resetSetupButtonRef = useRef<HTMLButtonElement>(null);
+  const setupModeHeadingRef = useRef<HTMLElement>(null);
   const duelImportAttemptRef = useRef(0);
   const priceNotesSummaryRef = useRef<HTMLElement>(null);
   const marketHeadingRef = useRef<HTMLHeadingElement>(null);
@@ -769,6 +881,28 @@ export function App() {
     return () => window.cancelAnimationFrame(frameId);
   }, [activeTab, manualPriceItemId, priceItemReviewRequest, priceNotesOpen]);
 
+  /* eslint-disable react-hooks/set-state-in-effect -- External storage revisions reset the bounded conflict review selection. */
+  useEffect(() => {
+    const eligible = crossTabConflicts.conflicts
+      .filter(
+        (conflict) => conflict.externalStatus === "valid" || conflict.externalStatus === "missing"
+      )
+      .map((conflict) => conflict.id);
+    setCrossTabSelectedIds(eligible);
+    if (
+      crossTabConflicts.conflicts.some(
+        (conflict) =>
+          conflict.externalStatus === "invalid" || conflict.externalStatus === "unsupported"
+      )
+    ) {
+      refreshLocalStateRecovery();
+    }
+    if (eligible.length === 0 && crossTabConflicts.conflicts.length === 0) {
+      setCrossTabNotice(null);
+    }
+  }, [crossTabConflicts.conflicts, crossTabConflicts.notice?.revision, refreshLocalStateRecovery]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
   useEffect(() => {
     if (
       localStateReviewRequest === 0 ||
@@ -776,12 +910,19 @@ export function App() {
     ) {
       return;
     }
-    if (activeTab !== "settings" || !localStateRecovery.report.hasAttention) {
+    if (
+      activeTab !== "settings" ||
+      (!localStateRecovery.report.hasAttention && crossTabConflicts.conflicts.length === 0)
+    ) {
       handledLocalStateReviewRequestRef.current = localStateReviewRequest;
       return;
     }
     const frameId = window.requestAnimationFrame(() => {
-      const heading = document.getElementById(LOCAL_STATE_RECOVERY_HEADING_ID);
+      const heading = document.getElementById(
+        crossTabConflicts.conflicts.length > 0
+          ? CROSS_TAB_CONFLICT_HEADING_ID
+          : LOCAL_STATE_RECOVERY_HEADING_ID
+      );
       if (heading instanceof HTMLElement) {
         heading.focus({ preventScroll: true });
         const bounds = heading.getBoundingClientRect();
@@ -792,7 +933,12 @@ export function App() {
       handledLocalStateReviewRequestRef.current = localStateReviewRequest;
     });
     return () => window.cancelAnimationFrame(frameId);
-  }, [activeTab, localStateRecovery.report.hasAttention, localStateReviewRequest]);
+  }, [
+    activeTab,
+    crossTabConflicts.conflicts.length,
+    localStateRecovery.report.hasAttention,
+    localStateReviewRequest
+  ]);
 
   useEffect(() => {
     if (
@@ -945,6 +1091,46 @@ export function App() {
         : denseCompare,
     [context, denseCompare]
   );
+  const rewriteSetupForPersistence = useMemo(
+    () =>
+      savedSetupFromForm(
+        form,
+        denseCompareForGameData,
+        cannonByMonster,
+        customSetupsByMonster,
+        defaultForm,
+        setupMode
+      ),
+    [cannonByMonster, customSetupsByMonster, defaultForm, denseCompareForGameData, form, setupMode]
+  );
+  const rewriteSetupPersistenceIdentity = useMemo(
+    () => setupPersistenceIdentity(rewriteSetupForPersistence),
+    [rewriteSetupForPersistence]
+  );
+  const recordSetupPersistenceOutcome = useCallback(
+    (setup: SavedSetupState, kind: SettledSetupPersistenceKind): void => {
+      setSetupPersistenceOutcome({ identity: setupPersistenceIdentity(setup), kind });
+    },
+    []
+  );
+  const persistRewriteSetupValue = useCallback(
+    (setup: SavedSetupState): boolean => {
+      const persisted = persistLocalState("rewrite-setup", setupStorageOptions, setup);
+      recordSetupPersistenceOutcome(
+        setup,
+        persisted ? "saved" : localPersistenceUnavailable ? "session-only" : "failed"
+      );
+      return persisted;
+    },
+    [persistLocalState, recordSetupPersistenceOutcome]
+  );
+  const setupPersistenceKind: SetupPersistenceKind = !readyToPersist
+    ? "saving"
+    : rewriteSetupBlocked || localPersistenceUnavailable
+      ? "session-only"
+      : setupPersistenceOutcome?.identity === rewriteSetupPersistenceIdentity
+        ? setupPersistenceOutcome.kind
+        : "saving";
   const lootPrefsForGameData = useMemo(() => {
     if (!context) return lootPrefsByMonster;
     const next: LootPrefsState = {};
@@ -961,34 +1147,32 @@ export function App() {
     return next;
   }, [context, lootPrefsByMonster]);
 
+  /* eslint-disable react-hooks/set-state-in-effect -- This synchronous persistence effect publishes the outcome for the exact setup value it just attempted. */
   useEffect(() => {
-    if (!readyToPersist || rewriteSetupBlocked || shouldSkipPersistLocalState("rewrite-setup")) {
+    if (!readyToPersist || rewriteSetupBlocked) {
       return;
     }
-    persistLocalState(
-      "rewrite-setup",
-      setupStorageOptions,
-      savedSetupFromForm(
-        form,
-        denseCompareForGameData,
-        cannonByMonster,
-        customSetupsByMonster,
-        defaultForm,
-        setupMode
-      )
-    );
+    if (shouldSkipPersistLocalState("rewrite-setup")) {
+      setSetupPersistenceOutcome((current) =>
+        current?.identity === rewriteSetupPersistenceIdentity
+          ? current
+          : {
+              identity: rewriteSetupPersistenceIdentity,
+              kind: localPersistenceUnavailable ? "session-only" : "saved"
+            }
+      );
+      return;
+    }
+    persistRewriteSetupValue(rewriteSetupForPersistence);
   }, [
-    cannonByMonster,
-    customSetupsByMonster,
-    defaultForm,
-    denseCompareForGameData,
-    form,
+    persistRewriteSetupValue,
     rewriteSetupBlocked,
-    persistLocalState,
     readyToPersist,
-    shouldSkipPersistLocalState,
-    setupMode
+    rewriteSetupForPersistence,
+    rewriteSetupPersistenceIdentity,
+    shouldSkipPersistLocalState
   ]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
     if (!readyToPersist || lootPrefsBlocked || shouldSkipPersistLocalState("loot-prefs")) {
@@ -1523,6 +1707,7 @@ export function App() {
       liveState: currentMonsterSpecificLiveState,
       applyLiveState: applyMonsterSpecificLiveState,
       recovery: {
+        canStartDurableWrite: localStateRecovery.canStartDurableWrite,
         prepareExternalApply: localStateRecovery.prepareExternalApply,
         cancelExternalApply: localStateRecovery.cancelExternalApply,
         completeExternalApply: localStateRecovery.completeExternalApply,
@@ -1543,6 +1728,7 @@ export function App() {
         setFatalError(null);
       },
       recovery: {
+        canStartDurableWrite: localStateRecovery.canStartDurableWrite,
         prepareExternalApply: localStateRecovery.prepareExternalApply,
         cancelExternalApply: localStateRecovery.cancelExternalApply,
         completeExternalApply: localStateRecovery.completeExternalApply,
@@ -1674,6 +1860,7 @@ export function App() {
       },
       applyLiveState: applyWorkspaceLiveState,
       recovery: {
+        canStartDurableWrite: localStateRecovery.canStartDurableWrite,
         prepareExternalApply: localStateRecovery.prepareExternalApply,
         cancelExternalApply: localStateRecovery.cancelExternalApply,
         completeExternalApply: localStateRecovery.completeExternalApply,
@@ -1686,7 +1873,7 @@ export function App() {
   });
 
   const persistAndApplyRewriteSetup = (setup: SavedSetupState): boolean => {
-    const persisted = persistLocalState("rewrite-setup", setupStorageOptions, setup);
+    const persisted = persistRewriteSetupValue(setup);
     applyRewriteSetupState(setup);
     localStateRecovery.unblockReplaced(["rewrite-setup"]);
     localStateRecovery.refresh();
@@ -2094,7 +2281,7 @@ export function App() {
 
   const exportCurrentSetup = (): void => {
     if (!context) return;
-    setupFileTransfer.exportSetup(
+    const outcome = setupFileTransfer.exportSetup(
       savedSetupFromForm(
         form,
         denseCompare,
@@ -2105,6 +2292,7 @@ export function App() {
       ),
       context.gameData
     );
+    setStatus(outcome.appStatus);
   };
 
   const dismissLegacyMigration = (report: LegacySetupMigrationReport, message: string): void => {
@@ -2435,22 +2623,128 @@ export function App() {
   const setCombatStyle = (combatStyle: CombatStyle) =>
     setFormSafe((current) => switchCombatStyleLoadout(current, combatStyle));
   const selectCombatStyle = (combatStyle: CombatStyle) => {
-    setActiveTab("loadout");
+    activateWorkbenchTab("loadout");
     setCombatStyle(combatStyle);
   };
-  const activateWorkbenchTab = (tabId: WorkbenchTabId) => setActiveTab(tabId);
   const reviewLocalState = () => {
-    setActiveTab("settings");
+    activateWorkbenchTab("settings");
     setLocalStateReviewRequest((request) => request + 1);
+  };
+  const selectedCrossTabConflictIds = (): CrossTabAreaId[] => {
+    const current = new Set(crossTabConflicts.conflicts.map((conflict) => conflict.id));
+    return crossTabSelectedIds.filter((id) => current.has(id));
+  };
+  const refreshCrossTabReview = () => {
+    const ids = selectedCrossTabConflictIds();
+    const result = crossTabConflicts.refreshReview(ids);
+    if (result.status === "ready") {
+      setCrossTabNotice({ tone: "neutral", message: "Conflict review is up to date." });
+    } else if (result.status === "stale") {
+      setCrossTabNotice({
+        tone: "warning",
+        message: "Saved data changed again. The review was refreshed; check the selected areas."
+      });
+    } else if (result.status === "invalid") {
+      setCrossTabNotice({
+        tone: "warning",
+        message: "Some saved data is invalid or unsupported. Handle it in Local state recovery."
+      });
+    } else {
+      setCrossTabNotice({
+        tone: "error",
+        message: "Saved data could not be read. No conflict was resolved."
+      });
+    }
+  };
+  const useSavedCrossTabData = () => {
+    const ids = selectedCrossTabConflictIds();
+    const result = crossTabConflicts.useSavedData(ids);
+    if (result.status === "ready") {
+      setStatus(
+        `Using saved data for ${ids.length} ${ids.length === 1 ? "area" : "areas"}. Reloading…`
+      );
+      reloadSimulator(window);
+      return;
+    }
+    if (result.status === "stale") {
+      setCrossTabNotice({
+        tone: "warning",
+        message: "Saved data changed again. Review the refreshed values before reloading."
+      });
+      return;
+    }
+    setCrossTabNotice({
+      tone: result.status === "unavailable" ? "error" : "warning",
+      message:
+        result.status === "unavailable"
+          ? "Saved data could not be read. No values were changed."
+          : "Invalid or unsupported saved data must be handled in Local state recovery."
+    });
+  };
+  const keepCurrentCrossTabData = () => {
+    const ids = selectedCrossTabConflictIds();
+    let operations: ReturnType<typeof createCrossTabKeepOperation>[];
+    try {
+      const liveState = captureCurrentWorkspaceLiveState();
+      const now = new Date();
+      operations = ids.map((id) => createCrossTabKeepOperation(id, liveState, now));
+    } catch {
+      setCrossTabNotice({
+        tone: "error",
+        message: "Current values could not be validated. No saved data was changed."
+      });
+      return;
+    }
+    const result = crossTabConflicts.keepCurrent(operations);
+    if (result.status === "kept") {
+      localStateRecovery.completeExternalApply(ids);
+      const keptMessage = `Kept this tab's data for ${ids.length} ${ids.length === 1 ? "area" : "areas"}`;
+      setCrossTabNotice({ tone: "success", message: `${keptMessage}. Undo is available.` });
+      setUndoableStatus(keptMessage, "Restored the prior saved data", () => {
+        const undo = crossTabConflicts.undoKeep(result.undo);
+        if (undo.status === "undone") {
+          reloadSimulator(window);
+          return "Restored the prior saved data. Reloading…";
+        }
+        if (undo.status === "stale") {
+          return "Saved data changed after Keep. Undo left the newer values unchanged.";
+        }
+        return "Undo could not restore saved data. Review Local state recovery.";
+      });
+      return;
+    }
+    if (result.status === "stale") {
+      setCrossTabNotice({
+        tone: "warning",
+        message: "Saved data changed again. Review the refreshed values before keeping this tab."
+      });
+      return;
+    }
+    if (result.status === "invalid") {
+      setCrossTabNotice({
+        tone: "warning",
+        message: "Invalid or unsupported saved data must be handled in Local state recovery."
+      });
+      return;
+    }
+    setCrossTabNotice({
+      tone: "error",
+      message:
+        result.status === "unavailable"
+          ? "Saved data is unavailable. No values were changed."
+          : result.rollbackFailed
+            ? "The update failed and rollback could not be verified. Review Local state recovery."
+            : "The update failed. Saved data was rolled back and current values remain active."
+    });
   };
   const navigateFromSettings = (intent: SettingsNavigationIntent) => {
     if (intent.kind !== "review-price-data-in-economy") return;
-    setActiveTab("economy");
+    activateWorkbenchTab("economy");
     setEconomyReviewRequest((request) => request + 1);
   };
   const reviewPriceData = () => {
     setPriceNotesOpen(true);
-    setActiveTab("economy");
+    activateWorkbenchTab("economy");
     window.requestAnimationFrame(() => priceNotesSummaryRef.current?.focus());
   };
 
@@ -2549,7 +2843,7 @@ export function App() {
         });
       }
     }
-    setActiveTab("economy");
+    activateWorkbenchTab("economy");
     const id = nextPriceItemReviewRequestRef.current + 1;
     nextPriceItemReviewRequestRef.current = id;
     setPriceItemReviewRequest({ id, action });
@@ -2573,13 +2867,13 @@ export function App() {
 
     if (action.kind === "review-loadout") {
       setPriceItemReviewRequest(null);
-      setActiveTab("loadout");
+      activateWorkbenchTab("loadout");
       focusInNextFrame(() => loadoutWeaponTriggerRef.current);
       return;
     }
     if (action.kind === "review-trip") {
       setPriceItemReviewRequest(null);
-      setActiveTab("trip");
+      activateWorkbenchTab("trip");
       focusInNextFrame(() => tripFoodPerKillOverrideRef.current);
       return;
     }
@@ -2615,7 +2909,7 @@ export function App() {
           message: "That Planner price item is no longer available. Showing the current price data."
         });
       }
-      setActiveTab("economy");
+      activateWorkbenchTab("economy");
       focusInNextFrame(() =>
         itemAvailable ? selectedPriceItemRef.current : marketHeadingRef.current
       );
@@ -2625,10 +2919,10 @@ export function App() {
   const reviewActiveAssumption = (tab: ActiveAssumptionReviewTarget) => {
     if (tab === "melee" || tab === "ranged" || tab === "magic") {
       setCombatStyle(tab);
-      setActiveTab("loadout");
+      activateWorkbenchTab("loadout");
       return;
     }
-    setActiveTab(tab);
+    activateWorkbenchTab(tab);
   };
 
   const updateLevel = (skill: keyof CombatSetupFormState["levels"], value: number) =>
@@ -2751,7 +3045,7 @@ export function App() {
             : "compare";
     monsterReviewIdRef.current += 1;
     setMonsterSpecificReviewRequest({ id: monsterReviewIdRef.current, monsterId, kind });
-    setActiveTab(destination);
+    activateWorkbenchTab(destination);
   };
 
   const reviewMonsterSpecificRemoval = (monsterId: string): void => {
@@ -2866,7 +3160,6 @@ export function App() {
   const currentMonster = context.gameData.monsters[form.monsterId];
   const currentCustomSetup = customSetupsByMonster[form.monsterId] ?? null;
   const hasCurrentCustomSetup = currentCustomSetup != null;
-  const activeSetupIsCustom = setupMode === "custom" && hasCurrentCustomSetup;
   const snapshotCurrentSetup = () => {
     invalidateSavedSetupUndo();
     const baseName = defaultDuelSnapshotName(viewModel, duelSnapshots.snapshots.length);
@@ -2877,15 +3170,14 @@ export function App() {
     setStatus(`Saved setup: ${snapshot.name}`);
   };
   const exportDuelSnapshots = () => {
-    downloadJsonFile(
-      "index-sim-saved-setups.json",
-      createDuelSnapshotsExport(duelSnapshots, context.gameData, new Date())
-    );
-    setDuelImportNotice({
-      tone: "success",
-      message: `Exported ${duelSnapshots.snapshots.length} saved setups.`
+    const outcome = exportDuelSnapshotsFile({
+      snapshots: duelSnapshots,
+      gameData: context.gameData,
+      now: new Date(),
+      downloadJsonFile
     });
-    setStatus("Exported saved setups");
+    setDuelImportNotice(outcome.notice);
+    setStatus(outcome.appStatus);
   };
   const importDuelSnapshots = async (file: File): Promise<void> => {
     const attemptId = ++duelImportAttemptRef.current;
@@ -3093,12 +3385,14 @@ export function App() {
     setSetupMode("custom");
     setForm(customForm);
     setStatus(`Created custom setup for ${currentMonster?.name ?? form.monsterId}`);
+    window.queueMicrotask(() => setupModeHeadingRef.current?.focus());
   };
   const editDefaultSetup = () => {
     const target = normalizeFormState({ ...defaultForm, monsterId: form.monsterId });
     setSetupMode("default");
     setForm(target);
     setStatus(`Editing default setup for ${currentMonster?.name ?? form.monsterId}`);
+    window.queueMicrotask(() => setupModeHeadingRef.current?.focus());
   };
   const editCustomSetup = () => {
     if (!currentCustomSetup) return;
@@ -3106,6 +3400,7 @@ export function App() {
     setSetupMode("custom");
     setForm(target);
     setStatus(`Editing custom setup for ${currentMonster?.name ?? form.monsterId}`);
+    window.queueMicrotask(() => setupModeHeadingRef.current?.focus());
   };
   const removeCurrentCustomSetup = () => {
     const monsterName = currentMonster?.name ?? form.monsterId;
@@ -3228,7 +3523,7 @@ export function App() {
     setCannonByMonster(applied.state.cannonByMonster);
     setLootPrefsByMonster(applied.state.lootPrefsByMonster);
     setLootSettingsByMonster(applied.state.lootSettingsByMonster);
-    setActiveTab("loadout");
+    activateWorkbenchTab("loadout");
     setShareReviewDismissed(true);
     localStateRecovery.unblockReplaced(["rewrite-setup", "loot-prefs", "loot-settings"]);
     const monsterName =
@@ -3247,7 +3542,7 @@ export function App() {
         setCannonByMonster(applied.undo.cannonByMonster);
         setLootPrefsByMonster(applied.undo.lootPrefsByMonster);
         setLootSettingsByMonster(applied.undo.lootSettingsByMonster);
-        setActiveTab(previousActiveTab);
+        activateWorkbenchTab(previousActiveTab);
       }
     );
   };
@@ -3483,8 +3778,10 @@ export function App() {
   };
   const appShellSetup = createAppShellSetupViewModel({
     form,
+    setupMode,
     hasCurrentCustomSetup,
-    activeSetupIsCustom,
+    currentMonsterLabel: currentMonster?.name ?? form.monsterId,
+    setupPersistenceKind,
     weaponName: currentWeapon?.name ?? form.weaponId,
     ammoName: context.gameData.ammo[form.ammoId]?.name ?? form.ammoId,
     spellName: context.gameData.spells[form.spellId]?.name ?? form.spellId,
@@ -3541,12 +3838,6 @@ export function App() {
     specialAttack: viewModel.combat.specialAttack,
     specialWarnings: viewModel.specialWarnings
   });
-  const legacyMigrationViewModel = legacyMigrationReport
-    ? createLegacyMigrationViewModel({
-        report: legacyMigrationReport,
-        hasRewriteSetup: initialSavedSetup.loaded
-      })
-    : null;
   const activePriceSet = context?.priceSet ?? null;
   const priceTimeContext = createPriceTimeContext(new Date(priceAgeNowMs), priceTimeZone);
   const manualPricePresentation = createManualPriceEditorPresentation({
@@ -3826,7 +4117,10 @@ export function App() {
         }
       : null
   });
-  const localStateAttentionViewModel = buildLocalStateAttentionViewModel(localStateRecovery.report);
+  const localStateAttentionViewModel = buildLocalStateAttentionViewModel(
+    localStateRecovery.report,
+    crossTabConflicts
+  );
   const setupImportReviewViewModel = setupFileTransfer.review
     ? buildSetupImportReviewViewModel(setupFileTransfer.review, captureCurrentRewriteSetup())
     : null;
@@ -3875,58 +4169,79 @@ export function App() {
       />
       {savedDataIgnoredForSession && <SafeSessionNotice />}
       {setupImportReviewViewModel && (
-        <SetupImportReview
-          viewModel={setupImportReviewViewModel}
-          onApply={applySetupImportReview}
-          onDismiss={dismissSetupImportReview}
-        />
+        <Suspense fallback={<p role="status">Loading setup review…</p>}>
+          <SetupImportReview
+            viewModel={setupImportReviewViewModel}
+            onApply={applySetupImportReview}
+            onDismiss={dismissSetupImportReview}
+          />
+        </Suspense>
       )}
-      <LocalStateAttentionBanner
-        viewModel={localStateAttentionViewModel}
-        onReview={reviewLocalState}
-      />
+      {localStateAttentionViewModel.visible && (
+        <Suspense fallback={<p role="status">Loading local data notice…</p>}>
+          <LocalStateAttentionBanner
+            viewModel={localStateAttentionViewModel}
+            onReview={reviewLocalState}
+          />
+        </Suspense>
+      )}
       <span className="visually-hidden" role="status" aria-live="polite">
-        {globalStatusAnnouncement(status, pendingUndo)}
+        {globalStatusAnnouncement(status, pendingUndo, [
+          setupFileTransfer.notice?.message,
+          setupImportNotice?.message,
+          duelImportNotice?.message,
+          marketNotice?.message,
+          workspaceFileTransfer.notice?.message,
+          localStateRecovery.notice
+        ])}
       </span>
 
       {shareDialog && (
-        <ShareSetupDialog
-          state={shareDialog}
-          onCopy={() => void copyShareSetupUrl()}
-          onClose={closeShareSetupDialog}
-        />
+        <Suspense fallback={<p role="status">Loading share setup dialog…</p>}>
+          <ShareSetupDialog
+            state={shareDialog}
+            onCopy={() => void copyShareSetupUrl()}
+            onClose={closeShareSetupDialog}
+          />
+        </Suspense>
       )}
 
       {sharedSetupReviewViewModel && (
-        <SharedSetupReview
-          viewModel={sharedSetupReviewViewModel}
-          onLoad={loadReceivedShareableSetup}
-          onDismiss={() => setShareReviewDismissed(true)}
-        />
+        <Suspense fallback={<p role="status">Loading shared setup review…</p>}>
+          <SharedSetupReview
+            viewModel={sharedSetupReviewViewModel}
+            onLoad={loadReceivedShareableSetup}
+            onDismiss={() => setShareReviewDismissed(true)}
+          />
+        </Suspense>
       )}
 
       <PendingUndoStatus pendingUndo={pendingUndo} onUndo={undoPendingAction} />
 
-      {legacyMigrationViewModel && (
-        <LegacyMigrationPanel
-          viewModel={legacyMigrationViewModel}
-          clearPending={legacyClearPending}
-          onImport={importLegacySetup}
-          onKeep={keepLegacyData}
-          onRequestClear={() => setLegacyClearPending(true)}
-          onConfirmClear={confirmClearLegacyData}
-          onCancelClear={() => setLegacyClearPending(false)}
-        />
+      {legacyMigrationReport && (
+        <Suspense fallback={<p role="status">Loading legacy data review…</p>}>
+          <LegacyMigrationPanel
+            report={legacyMigrationReport}
+            hasRewriteSetup={initialSavedSetup.loaded}
+            clearPending={legacyClearPending}
+            onImport={importLegacySetup}
+            onKeep={keepLegacyData}
+            onRequestClear={() => setLegacyClearPending(true)}
+            onConfirmClear={confirmClearLegacyData}
+            onCancelClear={() => setLegacyClearPending(false)}
+          />
+        </Suspense>
       )}
 
       <WorkbenchShell
         activeTab={activeTab}
+        activePaneFamily={paneFamilyForTab(activeTab)}
+        activePaneLoadState={paneLoadStates[paneFamilyForTab(activeTab)]}
         form={form}
         shellSetup={appShellSetup}
         result={workbenchResultViewModel}
         currentMonsterLabel={currentMonster?.name ?? form.monsterId}
-        hasCurrentCustomSetup={hasCurrentCustomSetup}
-        activeSetupIsCustom={activeSetupIsCustom}
+        setupModeHeadingRef={setupModeHeadingRef}
         resetSetupButtonRef={resetSetupButtonRef}
         monsterOptions={monsters}
         styleOptions={styles}
@@ -3935,11 +4250,15 @@ export function App() {
         priceNotices={viewModel.priceNotices}
         activeAssumptions={viewModel.activeAssumptions}
         setupReview={
-          <ActiveSetupResetReview
-            state={activeSetupResetViewState}
-            onConfirm={confirmActiveSetupReset}
-            onCancel={cancelActiveSetupResetReview}
-          />
+          activeSetupResetViewState.candidate || activeSetupResetViewState.notice ? (
+            <Suspense fallback={<p role="status">Loading active setup review…</p>}>
+              <ActiveSetupResetReview
+                state={activeSetupResetViewState}
+                onConfirm={confirmActiveSetupReset}
+                onCancel={cancelActiveSetupResetReview}
+              />
+            </Suspense>
+          ) : null
         }
         actions={{
           activateTab: activateWorkbenchTab,
@@ -3980,459 +4299,561 @@ export function App() {
           />
         }
       >
-        <StatsPane
-          hidden={activeTab !== "stats"}
-          viewModel={{
-            sourceBreakdown: viewModel.statsSourceBreakdown,
-            combatRollDetail: viewModel.combatRollDetail,
-            xpRouting: viewModel.xpRouting,
-            tripBankingSummary: viewModel.tripBankingSummary,
-            effectiveKph: viewModel.trip.effectiveKph
-          }}
-        />
-
-        <Suspense fallback={null}>
-          <LoadoutPane
-            hidden={activeTab !== "loadout"}
-            weaponTriggerRef={loadoutWeaponTriggerRef}
+        <PaneBoundary
+          active={activeTab === "stats"}
+          family="stats"
+          label="Stats"
+          moduleLoaded={() => true}
+          onLoadStateChange={updatePaneLoadState}
+        >
+          <StatsPane
+            hidden={activeTab !== "stats"}
             viewModel={{
-              ...loadoutPaneViewModel,
-              hitDistributionHitChanceLabel: viewModel.hitDistribution.hitChanceLabel,
-              hitDistributionComparison: viewModel.hitDistributionComparison
-            }}
-            actions={{
-              setWeapon: setWeaponSelection,
-              setAmmo: setAmmoSelection,
-              setSpell: setSpellSelection,
-              setStyle: (styleId) => setFormSafe((current) => updateForm(current, { styleId })),
-              setPrimaryPrayer: (prayer) =>
-                setFormSafe((current) =>
-                  updateForm(current, {
-                    prayers: setPrimaryPrayerSelection(current.prayers, prayer)
-                  })
-                ),
-              setPrimaryBoost: (boost) =>
-                setFormSafe((current) =>
-                  updateForm(current, {
-                    boosts: setPrimaryBoostSelection(current.boosts, boost)
-                  })
-                ),
-              togglePrayer: (prayer, selected) =>
-                setFormSafe((current) =>
-                  updateForm(current, {
-                    prayers: togglePrayerSelection(current.prayers, prayer, selected)
-                  })
-                ),
-              toggleBoost: (boost, selected) =>
-                setFormSafe((current) =>
-                  updateForm(current, {
-                    boosts: toggleBoostSelection(current.boosts, boost, selected)
-                  })
-                ),
-              setSustained: (sustained) =>
-                setFormSafe((current) =>
-                  updateForm(current, {
-                    sustained,
-                    repotThreshold: sustained ? (current.repotThreshold ?? 65) : null
-                  })
-                ),
-              setRepotThreshold: (repotThreshold) =>
-                setFormSafe((current) => updateForm(current, { repotThreshold })),
-              setRespectRequirements: setRespectLoadoutRequirements,
-              optimize: optimizeCurrentLoadout,
-              setManualOverride,
-              resetManualOverrides,
-              setGear: setGearSelection,
-              setSpecialWeapon: setSpecialAttackWeapon,
-              setSpecialAmmo: (ammoId) =>
-                setFormSafe((current) =>
-                  updateForm(current, {
-                    specialAttack: { ...current.specialAttack, ammoId }
-                  })
-                )
+              sourceBreakdown: viewModel.statsSourceBreakdown,
+              combatRollDetail: viewModel.combatRollDetail,
+              xpRouting: viewModel.xpRouting,
+              tripBankingSummary: viewModel.tripBankingSummary,
+              effectiveKph: viewModel.trip.effectiveKph
             }}
           />
-        </Suspense>
+        </PaneBoundary>
 
-        <Suspense fallback={null}>
-          <LootPane
-            hidden={activeTab !== "loot"}
-            model={{
-              presentation: viewModel.loot,
-              settings: currentLootSettings,
-              notice: lootUiState.notice,
-              gpPerKill: viewModel.trip.gpPerKill,
-              effectiveNetGpPerHour: viewModel.trip.effectiveNetGpPerHour,
-              sort: lootUiState.sort,
-              nestedSort: lootUiState.nestedSort
-            }}
-            actions={{
-              setHighAlch: (highAlch) => setLootSettingsForCurrentMonster({ highAlch }),
-              setOverheadMode: (mode) =>
-                setLootSettingsForCurrentMonster({
-                  overheadSec: mode === "manual" ? viewModel.loot.overheadValue : null
-                }),
-              setOverheadSeconds: (overheadSec) =>
-                setLootSettingsForCurrentMonster({ overheadSec }),
-              setTalismanSpot: (talismanSpot) => setLootSettingsForCurrentMonster({ talismanSpot }),
-              setAction: setLootActionForCurrentMonster,
-              resetSettings: resetCurrentLootSettings,
-              resetOverrides: resetCurrentLootOverrides,
-              optimize: optimizeCurrentLoot,
-              sortBy: (key) =>
-                setLootUiState((current) => ({
-                  ...current,
-                  sort: nextLootTableSortState(current.sort, key)
-                })),
-              sortNestedBy: (key) =>
-                setLootUiState((current) => ({
-                  ...current,
-                  nestedSort: nextLootNestedTableSortState(current.nestedSort, key)
-                })),
-              reviewPriceItem: requestPriceItemReview
-            }}
-          />
-        </Suspense>
+        {requestedPaneFamilies.has("loadout") ? (
+          <PaneBoundary
+            active={activeTab === "loadout"}
+            family="loadout"
+            label={workbenchTabLabel("loadout", form.combatStyle)}
+            moduleLoaded={trackedLoadoutPane.isLoaded}
+            onLoadStateChange={updatePaneLoadState}
+          >
+            <LoadoutPane
+              hidden={activeTab !== "loadout"}
+              weaponTriggerRef={loadoutWeaponTriggerRef}
+              viewModel={{
+                ...loadoutPaneViewModel,
+                hitDistributionHitChanceLabel: viewModel.hitDistribution.hitChanceLabel,
+                hitDistributionComparison: viewModel.hitDistributionComparison
+              }}
+              actions={{
+                setWeapon: setWeaponSelection,
+                setAmmo: setAmmoSelection,
+                setSpell: setSpellSelection,
+                setStyle: (styleId) => setFormSafe((current) => updateForm(current, { styleId })),
+                setPrimaryPrayer: (prayer) =>
+                  setFormSafe((current) =>
+                    updateForm(current, {
+                      prayers: setPrimaryPrayerSelection(current.prayers, prayer)
+                    })
+                  ),
+                setPrimaryBoost: (boost) =>
+                  setFormSafe((current) =>
+                    updateForm(current, {
+                      boosts: setPrimaryBoostSelection(current.boosts, boost)
+                    })
+                  ),
+                togglePrayer: (prayer, selected) =>
+                  setFormSafe((current) =>
+                    updateForm(current, {
+                      prayers: togglePrayerSelection(current.prayers, prayer, selected)
+                    })
+                  ),
+                toggleBoost: (boost, selected) =>
+                  setFormSafe((current) =>
+                    updateForm(current, {
+                      boosts: toggleBoostSelection(current.boosts, boost, selected)
+                    })
+                  ),
+                setSustained: (sustained) =>
+                  setFormSafe((current) =>
+                    updateForm(current, {
+                      sustained,
+                      repotThreshold: sustained ? (current.repotThreshold ?? 65) : null
+                    })
+                  ),
+                setRepotThreshold: (repotThreshold) =>
+                  setFormSafe((current) => updateForm(current, { repotThreshold })),
+                setRespectRequirements: setRespectLoadoutRequirements,
+                optimize: optimizeCurrentLoadout,
+                setManualOverride,
+                resetManualOverrides,
+                setGear: setGearSelection,
+                setSpecialWeapon: setSpecialAttackWeapon,
+                setSpecialAmmo: (ammoId) =>
+                  setFormSafe((current) =>
+                    updateForm(current, {
+                      specialAttack: { ...current.specialAttack, ammoId }
+                    })
+                  )
+              }}
+            />
+          </PaneBoundary>
+        ) : null}
 
-        <Suspense fallback={null}>
-          <TripPane
-            hidden={activeTab !== "trip"}
-            foodPerKillOverrideRef={tripFoodPerKillOverrideRef}
-            model={{
-              presentation: tripPanePresentation,
-              modeledKillsPerTripRange: freshRisk
-                ? formatRiskRange(freshRisk.result.killsPerTrip, 0)
-                : null
-            }}
-            actions={{
-              updateTrip,
-              openRisk: () => activateWorkbenchTab("risk")
-            }}
-          />
-        </Suspense>
+        {requestedPaneFamilies.has("loot") ? (
+          <PaneBoundary
+            active={activeTab === "loot"}
+            family="loot"
+            label="Loot"
+            moduleLoaded={trackedLootPane.isLoaded}
+            onLoadStateChange={updatePaneLoadState}
+          >
+            <LootPane
+              hidden={activeTab !== "loot"}
+              model={{
+                presentation: viewModel.loot,
+                settings: currentLootSettings,
+                notice: lootUiState.notice,
+                gpPerKill: viewModel.trip.gpPerKill,
+                effectiveNetGpPerHour: viewModel.trip.effectiveNetGpPerHour,
+                sort: lootUiState.sort,
+                nestedSort: lootUiState.nestedSort
+              }}
+              actions={{
+                setHighAlch: (highAlch) => setLootSettingsForCurrentMonster({ highAlch }),
+                setOverheadMode: (mode) =>
+                  setLootSettingsForCurrentMonster({
+                    overheadSec: mode === "manual" ? viewModel.loot.overheadValue : null
+                  }),
+                setOverheadSeconds: (overheadSec) =>
+                  setLootSettingsForCurrentMonster({ overheadSec }),
+                setTalismanSpot: (talismanSpot) =>
+                  setLootSettingsForCurrentMonster({ talismanSpot }),
+                setAction: setLootActionForCurrentMonster,
+                resetSettings: resetCurrentLootSettings,
+                resetOverrides: resetCurrentLootOverrides,
+                optimize: optimizeCurrentLoot,
+                sortBy: (key) =>
+                  setLootUiState((current) => ({
+                    ...current,
+                    sort: nextLootTableSortState(current.sort, key)
+                  })),
+                sortNestedBy: (key) =>
+                  setLootUiState((current) => ({
+                    ...current,
+                    nestedSort: nextLootNestedTableSortState(current.nestedSort, key)
+                  })),
+                reviewPriceItem: requestPriceItemReview
+              }}
+            />
+          </PaneBoundary>
+        ) : null}
 
-        <Suspense fallback={null}>
-          <RiskPane
-            hidden={activeTab !== "risk"}
-            model={{
-              controls: riskAnalysis.controls,
-              presentation: riskAnalysis.presentation,
-              targetDropOptions: riskAnalysis.targetDropOptions,
-              display: riskAnalysis.display,
-              expectedTtkSec: viewModel.result.rates.ttkSec,
-              expectedKillsPerTrip: viewModel.trip.trip.killsPerTrip
-            }}
-            actions={{
-              setTargetKills: riskAnalysis.setTargetKills,
-              setHorizonMinutes: riskAnalysis.setHorizonMinutes,
-              setGpTarget: riskAnalysis.setGpTarget,
-              setTargetDropRowId: riskAnalysis.setTargetDropRowId,
-              run: riskAnalysis.run,
-              cancel: riskAnalysis.cancel
-            }}
-          />
-        </Suspense>
-        <Suspense fallback={null}>
-          <CannonPane
-            hidden={activeTab !== "cannon"}
-            enabled={cannonEnabled}
-            targets={cannonTargets}
-            respawnSeconds={cannonRespawn}
-            tripSparseLinked={cannonTripSparseLinked}
-            hasCustomSettings={cannonHasCustomSettings}
-            output={currentCannonOutput}
-            effectiveXpPerHour={viewModel.effectiveXpPerHour}
-            effectiveNetGpPerHour={viewModel.trip.effectiveNetGpPerHour}
-            hitChance={viewModel.combat.hitChance}
-            tripSparseEnabled={form.trip.scarceSpot}
-            tripSparseMaxKph={viewModel.trip.trip.scarce.maxKph}
-            cannonReserveActive={viewModel.trip.trip.slots.reserveParts.includes(
-              "cannon (4 parts)"
-            )}
-            onEnabledChange={(enabled) => setCannonForCurrentMonster({ enabled })}
-            onTargetsChange={setCannonTargetsForCurrentMonster}
-            onRespawnChange={setCannonRespawnForCurrentMonster}
-            onTripSparseLinkedChange={setTripSparseFromCannon}
-            onReset={resetCannonForCurrentMonster}
-          />
-        </Suspense>
+        {requestedPaneFamilies.has("trip") ? (
+          <PaneBoundary
+            active={activeTab === "trip"}
+            family="trip"
+            label="Trip"
+            moduleLoaded={trackedTripPane.isLoaded}
+            onLoadStateChange={updatePaneLoadState}
+          >
+            <TripPane
+              hidden={activeTab !== "trip"}
+              foodPerKillOverrideRef={tripFoodPerKillOverrideRef}
+              model={{
+                presentation: tripPanePresentation,
+                modeledKillsPerTripRange: freshRisk
+                  ? formatRiskRange(freshRisk.result.killsPerTrip, 0)
+                  : null
+              }}
+              actions={{
+                updateTrip,
+                openRisk: () => activateWorkbenchTab("risk")
+              }}
+            />
+          </PaneBoundary>
+        ) : null}
 
-        <Suspense fallback={null}>
-          <DuelPane
-            hidden={activeTab !== "duel"}
-            model={{
-              targetLabel: currentMonster?.name ?? form.monsterId,
-              snapshotCount: duelSnapshots.snapshots.length,
-              duelComparison,
-              duelComparisonRows,
-              duelComparisonSort,
-              duelViewMode,
-              expandedDuelDiffId,
-              duelMatrixMetric,
-              duelMatrixFilter,
-              duelMatrixPresentation,
-              filteredDuelMatrixRows,
-              duelMatrixSort,
-              duelImportNotice,
-              duelImportReview: duelImportReviewViewModel,
-              duelSessionOnlyAvailable: duelSessionOnlyRequest !== null,
-              duelChangeRevision
-            }}
-            actions={{
-              snapshotCurrentSetup,
-              exportDuelSnapshots,
-              importDuelSnapshots,
-              mergeDuelSnapshotsImport,
-              dismissDuelSnapshotsImport,
-              setDuelSnapshotsImportDecision,
-              setDuelSnapshotsImportName,
-              refreshDuelSnapshotsImport,
-              applyDuelSessionOnlyChange,
-              commitDuelSnapshotName,
-              loadDuelSnapshot,
-              deleteDuelSnapshot,
-              showCurrentDuelTarget,
-              showDuelMonsterMatrix,
-              toggleDuelDiff,
-              sortDuelComparisonBy,
-              setDuelMatrixFilter,
-              setDuelMatrixMetric,
-              sortDuelMatrixBy,
-              buildDuelMatrix
-            }}
-          />
-        </Suspense>
+        {requestedPaneFamilies.has("risk") ? (
+          <PaneBoundary
+            active={activeTab === "risk"}
+            family="risk"
+            label="Risk"
+            moduleLoaded={trackedRiskPane.isLoaded}
+            onLoadStateChange={updatePaneLoadState}
+          >
+            <RiskPane
+              hidden={activeTab !== "risk"}
+              model={{
+                controls: riskAnalysis.controls,
+                presentation: riskAnalysis.presentation,
+                targetDropOptions: riskAnalysis.targetDropOptions,
+                display: riskAnalysis.display,
+                expectedTtkSec: viewModel.result.rates.ttkSec,
+                expectedKillsPerTrip: viewModel.trip.trip.killsPerTrip
+              }}
+              actions={{
+                setTargetKills: riskAnalysis.setTargetKills,
+                setHorizonMinutes: riskAnalysis.setHorizonMinutes,
+                setGpTarget: riskAnalysis.setGpTarget,
+                setTargetDropRowId: riskAnalysis.setTargetDropRowId,
+                run: riskAnalysis.run,
+                cancel: riskAnalysis.cancel
+              }}
+            />
+          </PaneBoundary>
+        ) : null}
+        {requestedPaneFamilies.has("cannon") ? (
+          <PaneBoundary
+            active={activeTab === "cannon"}
+            family="cannon"
+            label="Cannon"
+            moduleLoaded={trackedCannonPane.isLoaded}
+            onLoadStateChange={updatePaneLoadState}
+          >
+            <CannonPane
+              hidden={activeTab !== "cannon"}
+              enabled={cannonEnabled}
+              targets={cannonTargets}
+              respawnSeconds={cannonRespawn}
+              tripSparseLinked={cannonTripSparseLinked}
+              hasCustomSettings={cannonHasCustomSettings}
+              output={currentCannonOutput}
+              effectiveXpPerHour={viewModel.effectiveXpPerHour}
+              effectiveNetGpPerHour={viewModel.trip.effectiveNetGpPerHour}
+              hitChance={viewModel.combat.hitChance}
+              tripSparseEnabled={form.trip.scarceSpot}
+              tripSparseMaxKph={viewModel.trip.trip.scarce.maxKph}
+              cannonReserveActive={viewModel.trip.trip.slots.reserveParts.includes(
+                "cannon (4 parts)"
+              )}
+              onEnabledChange={(enabled) => setCannonForCurrentMonster({ enabled })}
+              onTargetsChange={setCannonTargetsForCurrentMonster}
+              onRespawnChange={setCannonRespawnForCurrentMonster}
+              onTripSparseLinkedChange={setTripSparseFromCannon}
+              onReset={resetCannonForCurrentMonster}
+            />
+          </PaneBoundary>
+        ) : null}
 
-        <Suspense fallback={null}>
-          <PlannerPane
-            hidden={activeTab !== "planner"}
-            model={{
-              draftState: plannerState,
-              panel: plannerPanel,
-              gearPoolEditor: plannerGearPoolEditor,
-              draftDirty: plannerDraftDirty,
-              presentation: plannerPresentation,
-              computedMetric: plannerComputedMetric,
-              combatStyleLabel: form.combatStyle,
-              targetLabel: currentMonster?.name ?? form.monsterId,
-              skillInputs: plannerSkillInputs,
-              adjustmentNotice: plannerAdjustmentNotice
-            }}
-            actions={{
-              setMetric: updatePlannerMetric,
-              setCurrentXp: updatePlannerCurrentXp,
-              setTargetLevel: updatePlannerTargetLevel,
-              setSkillLock: updatePlannerSkillLock,
-              setOnlyCurrentGear: updatePlannerOnlyCurrentGear,
-              setAverageOverSession: updatePlannerAverageOverSession,
-              setGearPoolItem: updatePlannerGearPoolItem,
-              resetGearPool: resetPlannerGearPool,
-              recompute: recomputePlannerPlan,
-              retry: retryPlanner,
-              reviewNotice: reviewPlannerNotice
-            }}
-          />
-        </Suspense>
-        <Suspense fallback={null}>
-          <EconomySettingsPane
-            priceNotesSummaryRef={priceNotesSummaryRef}
-            manualPriceInputRef={manualPriceInputRef}
-            workspaceImportInputRef={workspaceImportInputRef}
-            workspaceReviewHeadingRef={workspaceReviewHeadingRef}
-            setPriceNoticeActionRef={setPriceNoticeActionRef}
-            marketHeadingRef={marketHeadingRef}
-            historyReviewReturnFocusRef={priceHistoryReviewReturnFocusRef}
-            historyReviewHeadingRef={priceHistoryReviewHeadingRef}
-            historyManagementSummaryRef={priceHistoryManagementSummaryRef}
-            selectedPriceItemRef={selectedPriceItemRef}
-            model={{
-              mode:
-                activeTab === "economy"
-                  ? "economy"
-                  : activeTab === "settings"
-                    ? "settings"
-                    : "hidden",
-              prices: priceDataViewModel,
-              settings: settingsPaneViewModel,
-              priceNotices: viewModel.priceNotices,
-              priceNotesOpen,
-              marketNotice,
-              importNotice: priceSetTransfer.importNotice,
-              priceSetResetPending: priceSetTransfer.resetPending,
-              priceHistoryClearPending,
-              manualPriceClearPending,
-              historyNotice: priceHistoryNotice,
-              historyReview:
-                priceHistoryReview?.kind === "removal"
-                  ? {
-                      kind: "removal",
-                      id: priceHistoryReview.candidate.id,
-                      occurrenceId: priceHistoryReview.candidate.target.occurrenceId,
-                      label: priceHistoryReview.candidate.target.snapshot.label,
-                      captureTime: reviewedHistoryCaptureTime,
-                      itemCount: Object.keys(
-                        priceHistoryReview.candidate.target.snapshot.itemPrices
-                      ).length
-                    }
-                  : priceHistoryReview?.kind === "replacement"
+        {requestedPaneFamilies.has("duel") ? (
+          <PaneBoundary
+            active={activeTab === "duel"}
+            family="duel"
+            label="Setups"
+            moduleLoaded={trackedDuelPane.isLoaded}
+            onLoadStateChange={updatePaneLoadState}
+          >
+            <DuelPane
+              hidden={activeTab !== "duel"}
+              model={{
+                targetLabel: currentMonster?.name ?? form.monsterId,
+                snapshotCount: duelSnapshots.snapshots.length,
+                duelComparison,
+                duelComparisonRows,
+                duelComparisonSort,
+                duelViewMode,
+                expandedDuelDiffId,
+                duelMatrixMetric,
+                duelMatrixFilter,
+                duelMatrixPresentation,
+                filteredDuelMatrixRows,
+                duelMatrixSort,
+                duelImportNotice,
+                duelImportReview: duelImportReviewViewModel,
+                duelSessionOnlyAvailable: duelSessionOnlyRequest !== null,
+                duelChangeRevision
+              }}
+              actions={{
+                snapshotCurrentSetup,
+                exportDuelSnapshots,
+                importDuelSnapshots,
+                mergeDuelSnapshotsImport,
+                dismissDuelSnapshotsImport,
+                setDuelSnapshotsImportDecision,
+                setDuelSnapshotsImportName,
+                refreshDuelSnapshotsImport,
+                applyDuelSessionOnlyChange,
+                commitDuelSnapshotName,
+                loadDuelSnapshot,
+                deleteDuelSnapshot,
+                showCurrentDuelTarget,
+                showDuelMonsterMatrix,
+                toggleDuelDiff,
+                sortDuelComparisonBy,
+                setDuelMatrixFilter,
+                setDuelMatrixMetric,
+                sortDuelMatrixBy,
+                buildDuelMatrix
+              }}
+            />
+          </PaneBoundary>
+        ) : null}
+
+        {requestedPaneFamilies.has("planner") ? (
+          <PaneBoundary
+            active={activeTab === "planner"}
+            family="planner"
+            label="Planner"
+            moduleLoaded={trackedPlannerPane.isLoaded}
+            onLoadStateChange={updatePaneLoadState}
+          >
+            <PlannerPane
+              hidden={activeTab !== "planner"}
+              model={{
+                draftState: plannerState,
+                panel: plannerPanel,
+                gearPoolEditor: plannerGearPoolEditor,
+                draftDirty: plannerDraftDirty,
+                presentation: plannerPresentation,
+                computedMetric: plannerComputedMetric,
+                combatStyleLabel: form.combatStyle,
+                targetLabel: currentMonster?.name ?? form.monsterId,
+                skillInputs: plannerSkillInputs,
+                adjustmentNotice: plannerAdjustmentNotice
+              }}
+              actions={{
+                setMetric: updatePlannerMetric,
+                setCurrentXp: updatePlannerCurrentXp,
+                setTargetLevel: updatePlannerTargetLevel,
+                setSkillLock: updatePlannerSkillLock,
+                setOnlyCurrentGear: updatePlannerOnlyCurrentGear,
+                setAverageOverSession: updatePlannerAverageOverSession,
+                setGearPoolItem: updatePlannerGearPoolItem,
+                resetGearPool: resetPlannerGearPool,
+                recompute: recomputePlannerPlan,
+                retry: retryPlanner,
+                reviewNotice: reviewPlannerNotice
+              }}
+            />
+          </PaneBoundary>
+        ) : null}
+        {requestedPaneFamilies.has("economy-settings") ? (
+          <PaneBoundary
+            active={activeTab === "economy" || activeTab === "settings"}
+            family="economy-settings"
+            label={activeTab === "settings" ? "Settings" : "Economy"}
+            moduleLoaded={trackedEconomySettingsPane.isLoaded}
+            onLoadStateChange={updatePaneLoadState}
+          >
+            <EconomySettingsPane
+              priceNotesSummaryRef={priceNotesSummaryRef}
+              manualPriceInputRef={manualPriceInputRef}
+              workspaceImportInputRef={workspaceImportInputRef}
+              workspaceReviewHeadingRef={workspaceReviewHeadingRef}
+              setPriceNoticeActionRef={setPriceNoticeActionRef}
+              marketHeadingRef={marketHeadingRef}
+              historyReviewReturnFocusRef={priceHistoryReviewReturnFocusRef}
+              historyReviewHeadingRef={priceHistoryReviewHeadingRef}
+              historyManagementSummaryRef={priceHistoryManagementSummaryRef}
+              selectedPriceItemRef={selectedPriceItemRef}
+              model={{
+                mode:
+                  activeTab === "economy"
+                    ? "economy"
+                    : activeTab === "settings"
+                      ? "settings"
+                      : "hidden",
+                prices: priceDataViewModel,
+                settings: settingsPaneViewModel,
+                priceNotices: viewModel.priceNotices,
+                priceNotesOpen,
+                marketNotice,
+                importNotice: priceSetTransfer.importNotice,
+                priceSetResetPending: priceSetTransfer.resetPending,
+                priceHistoryClearPending,
+                manualPriceClearPending,
+                historyNotice: priceHistoryNotice,
+                historyReview:
+                  priceHistoryReview?.kind === "removal"
                     ? {
-                        kind: "replacement",
+                        kind: "removal",
                         id: priceHistoryReview.candidate.id,
-                        activePriceSetLabel:
-                          priceHistoryReview.candidate.sourceActivePriceSet.label,
-                        replacedLabel:
-                          priceHistoryReview.candidate.replacedOccurrence.snapshot.label,
-                        replacedCaptureTime: reviewedHistoryCaptureTime,
-                        replacedItemCount: Object.keys(
-                          priceHistoryReview.candidate.replacedOccurrence.snapshot.itemPrices
+                        occurrenceId: priceHistoryReview.candidate.target.occurrenceId,
+                        label: priceHistoryReview.candidate.target.snapshot.label,
+                        captureTime: reviewedHistoryCaptureTime,
+                        itemCount: Object.keys(
+                          priceHistoryReview.candidate.target.snapshot.itemPrices
                         ).length
                       }
-                    : null,
-              recovery: {
-                visible: localStateRecovery.visible,
-                report: localStateRecovery.report,
-                notice: localStateRecovery.notice,
-                pendingClearId: localStateRecovery.pendingClearId
-              },
-              monsterChanges: {
-                inventory: monsterSpecificChanges,
-                removalCandidate: monsterRemovalCandidate,
-                notice: monsterChangesNotice,
-                sessionOnlyAvailable: monsterChangesSessionOnlyAvailable
-              },
-              workspace: {
-                phase: workspaceFileTransfer.phase,
-                includeLastHiscoresPlayer: workspaceFileTransfer.includeLastHiscoresPlayer,
-                notice: workspaceFileTransfer.notice,
-                review: workspaceFileTransfer.review,
-                selection: workspaceFileTransfer.selection,
-                restorePlan: workspaceFileTransfer.restorePlan,
-                restoreBusy: workspaceFileTransfer.restoreBusy,
-                sessionOnlyAvailable: workspaceFileTransfer.sessionOnlyAvailable,
-                recoveryRequired: workspaceFileTransfer.recoveryRequired,
-                currentRevisionLabel: gameRevisionViewModel.revisionLabel,
-                currentSnapshotLabel: gameRevisionViewModel.snapshotLabel,
-                currentSnapshotId: gameRevisionViewModel.snapshotId,
-                canIncludeLastHiscoresPlayer: lastHiscoresPlayerState !== null
-              }
-            }}
-            actions={{
-              setPriceNotesOpen,
-              reviewPriceItem: requestPriceItemReview,
-              navigate: navigateFromSettings,
-              prices: {
-                importPriceSet: importPriceFile,
-                exportActivePriceSet,
-                requestReset: requestResetActivePriceSet,
-                confirmReset: resetActivePriceSetToFallback,
-                cancelReset: priceSetTransfer.cancelReset
-              },
-              history: {
-                saveLocalComparison: saveLocalPriceComparison,
-                requestClear: requestClearPriceHistory,
-                confirmClear: confirmClearPriceHistory,
-                cancelClear: () => setPriceHistoryClearPending(false),
-                reviewRemoval: reviewLocalPriceHistoryRemoval,
-                cancelReview: () => setPriceHistoryReview(null),
-                confirmReview: confirmLocalPriceHistoryReview,
-                setBaselineMode: setEconomyBaselineMode,
-                setSnapshotKey: setEconomySnapshotKey,
-                setItemFilter: setEconomyItemFilter,
-                setTrendItemId: setEconomyTrendItemId,
-                sortBy: updateEconomySort
-              },
-              manual: {
-                selectItem: (itemId) => {
-                  setManualPriceItemId(itemId);
-                  setManualPriceDraft(
-                    activePriceSet?.itemPrices[itemId] ?? basePriceSet?.itemPrices[itemId] ?? 0
-                  );
+                    : priceHistoryReview?.kind === "replacement"
+                      ? {
+                          kind: "replacement",
+                          id: priceHistoryReview.candidate.id,
+                          activePriceSetLabel:
+                            priceHistoryReview.candidate.sourceActivePriceSet.label,
+                          replacedLabel:
+                            priceHistoryReview.candidate.replacedOccurrence.snapshot.label,
+                          replacedCaptureTime: reviewedHistoryCaptureTime,
+                          replacedItemCount: Object.keys(
+                            priceHistoryReview.candidate.replacedOccurrence.snapshot.itemPrices
+                          ).length
+                        }
+                      : null,
+                recovery: {
+                  visible: localStateRecovery.visible,
+                  report: localStateRecovery.report,
+                  notice: localStateRecovery.notice,
+                  pendingClearId: localStateRecovery.pendingClearId
                 },
-                setDraft: (value) => {
-                  setManualPriceItemId(effectiveManualPriceItemId);
-                  setManualPriceDraft(value);
+                crossTab: {
+                  conflicts: crossTabConflicts.conflicts,
+                  selectedIds: crossTabSelectedIds,
+                  notice: crossTabNotice,
+                  persistenceAvailable:
+                    crossTabConflicts.persistenceAvailable && !localPersistenceUnavailable
                 },
-                apply: applyManualItemPrice,
-                resetItem: resetManualItemPrice,
-                requestClearAll: () => setManualPriceClearPending(true),
-                confirmClearAll: confirmClearAllManualPrices,
-                cancelClearAll: () => setManualPriceClearPending(false)
-              },
-              settings: {
-                setTierHidden: (tierId, hiddenTier) =>
-                  setHiddenGearTiers((current) => setHiddenGearTier(current, tierId, hiddenTier)),
-                hideAllTiers: () => setHiddenGearTiers(hideAllGearTiers()),
-                showAllTiers: showAllHiddenGearTiers
-              },
-              recovery: {
-                exportReport: localStateRecovery.exportReport,
-                beginClear: localStateRecovery.beginClear,
-                cancelClear: localStateRecovery.cancelClear,
-                confirmClearItem: confirmClearLocalStateItem,
-                confirmClearInvalid: confirmClearInvalidLocalState
-              },
-              monsterChanges: {
-                reviewCategory: reviewMonsterSpecificCategory,
-                reviewRemoval: reviewMonsterSpecificRemoval,
-                cancelRemoval: () => {
-                  setMonsterRemovalCandidate(null);
-                  setMonsterChangesSessionOnlyAvailable(false);
-                  setMonsterChangesNotice(null);
+                monsterChanges: {
+                  inventory: monsterSpecificChanges,
+                  removalCandidate: monsterRemovalCandidate,
+                  notice: monsterChangesNotice,
+                  sessionOnlyAvailable: monsterChangesSessionOnlyAvailable
                 },
-                confirmRemoval: confirmMonsterSpecificRemoval
-              },
-              workspace: {
-                setIncludeLastHiscoresPlayer: workspaceFileTransfer.setIncludeLastHiscoresPlayer,
-                exportWorkspace,
-                dismissReview: dismissWorkspaceReview,
-                reviewRecovery: reviewLocalState,
-                restore: (intent) => {
-                  if (!workspaceRestoreContext) return;
-                  return intent.kind === "prepare"
-                    ? workspaceFileTransfer.prepareImport(intent.file, workspaceRestoreContext)
-                    : intent.kind === "plan"
-                      ? workspaceFileTransfer.updateRestorePlan(
-                          intent.reviewId,
-                          intent.action,
-                          workspaceRestoreContext
-                        )
-                      : applyWorkspaceRestore(
-                          intent.reviewId,
-                          intent.kind === "apply" ? "durable" : "session-only"
-                        );
+                workspace: {
+                  phase: workspaceFileTransfer.phase,
+                  includeLastHiscoresPlayer: workspaceFileTransfer.includeLastHiscoresPlayer,
+                  notice: workspaceFileTransfer.notice,
+                  review: workspaceFileTransfer.review,
+                  selection: workspaceFileTransfer.selection,
+                  restorePlan: workspaceFileTransfer.restorePlan,
+                  restoreBusy: workspaceFileTransfer.restoreBusy,
+                  sessionOnlyAvailable: workspaceFileTransfer.sessionOnlyAvailable,
+                  recoveryRequired: workspaceFileTransfer.recoveryRequired,
+                  currentRevisionLabel: gameRevisionViewModel.revisionLabel,
+                  currentSnapshotLabel: gameRevisionViewModel.snapshotLabel,
+                  currentSnapshotId: gameRevisionViewModel.snapshotId,
+                  canIncludeLastHiscoresPlayer: lastHiscoresPlayerState !== null
                 }
-              }
-            }}
-          />
-        </Suspense>
+              }}
+              actions={{
+                setPriceNotesOpen,
+                reviewPriceItem: requestPriceItemReview,
+                navigate: navigateFromSettings,
+                prices: {
+                  importPriceSet: importPriceFile,
+                  exportActivePriceSet,
+                  requestReset: requestResetActivePriceSet,
+                  confirmReset: resetActivePriceSetToFallback,
+                  cancelReset: priceSetTransfer.cancelReset
+                },
+                history: {
+                  saveLocalComparison: saveLocalPriceComparison,
+                  requestClear: requestClearPriceHistory,
+                  confirmClear: confirmClearPriceHistory,
+                  cancelClear: () => setPriceHistoryClearPending(false),
+                  reviewRemoval: reviewLocalPriceHistoryRemoval,
+                  cancelReview: () => setPriceHistoryReview(null),
+                  confirmReview: confirmLocalPriceHistoryReview,
+                  setBaselineMode: setEconomyBaselineMode,
+                  setSnapshotKey: setEconomySnapshotKey,
+                  setItemFilter: setEconomyItemFilter,
+                  setTrendItemId: setEconomyTrendItemId,
+                  sortBy: updateEconomySort
+                },
+                manual: {
+                  selectItem: (itemId) => {
+                    setManualPriceItemId(itemId);
+                    setManualPriceDraft(
+                      activePriceSet?.itemPrices[itemId] ?? basePriceSet?.itemPrices[itemId] ?? 0
+                    );
+                  },
+                  setDraft: (value) => {
+                    setManualPriceItemId(effectiveManualPriceItemId);
+                    setManualPriceDraft(value);
+                  },
+                  apply: applyManualItemPrice,
+                  resetItem: resetManualItemPrice,
+                  requestClearAll: () => setManualPriceClearPending(true),
+                  confirmClearAll: confirmClearAllManualPrices,
+                  cancelClearAll: () => setManualPriceClearPending(false)
+                },
+                settings: {
+                  setTierHidden: (tierId, hiddenTier) =>
+                    setHiddenGearTiers((current) => setHiddenGearTier(current, tierId, hiddenTier)),
+                  hideAllTiers: () => setHiddenGearTiers(hideAllGearTiers()),
+                  showAllTiers: showAllHiddenGearTiers
+                },
+                recovery: {
+                  exportReport: localStateRecovery.exportReport,
+                  beginClear: localStateRecovery.beginClear,
+                  cancelClear: localStateRecovery.cancelClear,
+                  confirmClearItem: confirmClearLocalStateItem,
+                  confirmClearInvalid: confirmClearInvalidLocalState
+                },
+                crossTab: {
+                  toggle: (id, selected) =>
+                    setCrossTabSelectedIds((current) =>
+                      selected
+                        ? current.includes(id)
+                          ? current
+                          : [...current, id]
+                        : current.filter((candidate) => candidate !== id)
+                    ),
+                  refresh: refreshCrossTabReview,
+                  useSavedData: useSavedCrossTabData,
+                  keepCurrent: keepCurrentCrossTabData,
+                  exportWorkspace
+                },
+                monsterChanges: {
+                  reviewCategory: reviewMonsterSpecificCategory,
+                  reviewRemoval: reviewMonsterSpecificRemoval,
+                  cancelRemoval: () => {
+                    setMonsterRemovalCandidate(null);
+                    setMonsterChangesSessionOnlyAvailable(false);
+                    setMonsterChangesNotice(null);
+                  },
+                  confirmRemoval: confirmMonsterSpecificRemoval
+                },
+                workspace: {
+                  setIncludeLastHiscoresPlayer: workspaceFileTransfer.setIncludeLastHiscoresPlayer,
+                  exportWorkspace,
+                  dismissReview: dismissWorkspaceReview,
+                  reviewRecovery: reviewLocalState,
+                  restore: (intent) => {
+                    if (!workspaceRestoreContext) return;
+                    return intent.kind === "prepare"
+                      ? workspaceFileTransfer.prepareImport(intent.file, workspaceRestoreContext)
+                      : intent.kind === "plan"
+                        ? workspaceFileTransfer.updateRestorePlan(
+                            intent.reviewId,
+                            intent.action,
+                            workspaceRestoreContext
+                          )
+                        : applyWorkspaceRestore(
+                            intent.reviewId,
+                            intent.kind === "apply" ? "durable" : "session-only"
+                          );
+                  }
+                }
+              }}
+            />
+          </PaneBoundary>
+        ) : null}
 
-        <Suspense fallback={null}>
-          <ComparePane
-            hidden={activeTab !== "compare"}
-            model={{
-              denseCompare,
-              denseCompareRows,
-              denseCompareScale,
-              denseCompareTotalRows,
-              denseComparePresentation,
-              selectedMonsterId: form.monsterId
-            }}
-            actions={{
-              setDenseMonsterFilter,
-              setDenseDropFilter,
-              setDenseShowIrrelevant,
-              resetDenseFilters,
-              sortBy: (key) =>
-                setDenseCompare((current) => ({
-                  ...current,
-                  sort: nextDenseCompareSortState(current.sort, key)
-                })),
-              selectTarget,
-              toggleDenseIrrelevant,
-              retryDenseCompare
-            }}
-          />
-        </Suspense>
+        {requestedPaneFamilies.has("compare") ? (
+          <PaneBoundary
+            active={activeTab === "compare"}
+            family="compare"
+            label="Monsters"
+            moduleLoaded={trackedComparePane.isLoaded}
+            onLoadStateChange={updatePaneLoadState}
+          >
+            <ComparePane
+              hidden={activeTab !== "compare"}
+              model={{
+                denseCompare,
+                denseCompareRows,
+                denseCompareScale,
+                denseCompareTotalRows,
+                denseComparePresentation,
+                selectedMonsterId: form.monsterId
+              }}
+              actions={{
+                setDenseMonsterFilter,
+                setDenseDropFilter,
+                setDenseShowIrrelevant,
+                resetDenseFilters,
+                sortBy: (key) =>
+                  setDenseCompare((current) => ({
+                    ...current,
+                    sort: nextDenseCompareSortState(current.sort, key)
+                  })),
+                selectTarget,
+                toggleDenseIrrelevant,
+                retryDenseCompare
+              }}
+            />
+          </PaneBoundary>
+        ) : null}
       </WorkbenchShell>
     </main>
   );

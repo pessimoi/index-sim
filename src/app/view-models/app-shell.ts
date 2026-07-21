@@ -8,6 +8,7 @@ import {
   primaryBoostValue,
   primaryPrayerValue,
   type CombatSetupFormState,
+  type SetupMode,
   type SetupSelectionOption
 } from "../state/ui-state";
 import { ShareableSetupError, type ShareableSetupReview } from "../state/shareable-setup";
@@ -56,7 +57,7 @@ export interface AppShellSetupViewModel {
   extraBoostCount: number;
   prayerSelectionSummary: string;
   boostSelectionSummary: string;
-  setupStatus: "Custom setup" | "Default setup - custom saved" | "Default setup";
+  editor: SetupEditorContextViewModel;
   accuracyLabel: "M+%" | "ACC+";
   damageLabel: "DMG%" | "DMG+";
   derivedAccuracyPlaceholder: string;
@@ -64,6 +65,38 @@ export interface AppShellSetupViewModel {
   derivedSpeedPlaceholder: string;
   playerProfile: PlayerProfileViewModel;
   setupGuide: readonly [SetupGuideRowViewModel, SetupGuideRowViewModel, SetupGuideRowViewModel];
+}
+
+export type SetupPersistenceKind = "saving" | "saved" | "session-only" | "failed";
+
+export interface SetupPersistencePresentation {
+  kind: SetupPersistenceKind;
+  label: "Saving…" | "Saved locally" | "Session only" | "Could not save";
+  description: string;
+}
+
+export type SetupEditorActionId =
+  "create-monster" | "edit-monster" | "edit-default" | "remove-monster" | "reset-active";
+
+export interface SetupEditorActionViewModel {
+  id: SetupEditorActionId;
+  label:
+    | "Create monster setup"
+    | "Edit monster setup"
+    | "Edit default setup"
+    | "Remove monster setup"
+    | "Reset active setup";
+  tone?: "danger";
+}
+
+export interface SetupEditorContextViewModel {
+  mode: SetupMode;
+  modeLabel: "Editing default" | "Editing custom";
+  scopeDescription: string;
+  compactScopeDescription: string;
+  savedCustomDescription: string | null;
+  actions: readonly SetupEditorActionViewModel[];
+  persistence: SetupPersistencePresentation;
 }
 
 export interface PlayerProfileRowViewModel {
@@ -181,8 +214,10 @@ export function nextWorkbenchTabId(
 
 export function createAppShellSetupViewModel(input: {
   form: CombatSetupFormState;
+  setupMode: SetupMode;
   hasCurrentCustomSetup: boolean;
-  activeSetupIsCustom: boolean;
+  currentMonsterLabel: string;
+  setupPersistenceKind: SetupPersistenceKind;
   weaponName: string;
   ammoName: string;
   spellName: string;
@@ -198,11 +233,12 @@ export function createAppShellSetupViewModel(input: {
   lootPolicySummary: string;
 }): AppShellSetupViewModel {
   const { form } = input;
-  const setupStatus = input.activeSetupIsCustom
-    ? "Custom setup"
-    : input.hasCurrentCustomSetup
-      ? "Default setup - custom saved"
-      : "Default setup";
+  const editor = createSetupEditorContextViewModel({
+    setupMode: input.setupMode,
+    hasCurrentCustomSetup: input.hasCurrentCustomSetup,
+    currentMonsterLabel: input.currentMonsterLabel,
+    persistenceKind: input.setupPersistenceKind
+  });
   const prayerSelection = setupSelectionSummary(form.prayers, PRAYER_SELECTION_OPTIONS);
   const boostSelection = setupSelectionSummary(form.boosts, BOOST_SELECTION_OPTIONS);
   const manualOverrideCount = Object.values(form.manualOverrides).filter(
@@ -232,7 +268,7 @@ export function createAppShellSetupViewModel(input: {
     extraBoostCount: extraBoostSelectionCount(form.boosts),
     prayerSelectionSummary: prayerSelection,
     boostSelectionSummary: boostSelection,
-    setupStatus,
+    editor,
     accuracyLabel: form.combatStyle === "magic" ? "M+%" : "ACC+",
     damageLabel: form.combatStyle === "magic" ? "DMG%" : "DMG+",
     derivedAccuracyPlaceholder: formatSignedInteger(input.derivedAccuracyBonus),
@@ -287,6 +323,77 @@ export function createAppShellSetupViewModel(input: {
         context: "Loot"
       }
     ]
+  };
+}
+
+export function createSetupEditorContextViewModel(input: {
+  setupMode: SetupMode;
+  hasCurrentCustomSetup: boolean;
+  currentMonsterLabel: string;
+  persistenceKind: SetupPersistenceKind;
+}): SetupEditorContextViewModel {
+  const mode: SetupMode =
+    input.setupMode === "custom" && input.hasCurrentCustomSetup ? "custom" : "default";
+  const actions: SetupEditorActionViewModel[] =
+    mode === "custom"
+      ? [
+          { id: "edit-default", label: "Edit default setup" },
+          { id: "remove-monster", label: "Remove monster setup", tone: "danger" },
+          { id: "reset-active", label: "Reset active setup" }
+        ]
+      : input.hasCurrentCustomSetup
+        ? [
+            { id: "edit-monster", label: "Edit monster setup" },
+            { id: "remove-monster", label: "Remove monster setup", tone: "danger" },
+            { id: "reset-active", label: "Reset active setup" }
+          ]
+        : [
+            { id: "create-monster", label: "Create monster setup" },
+            { id: "reset-active", label: "Reset active setup" }
+          ];
+
+  return {
+    mode,
+    modeLabel: mode === "custom" ? "Editing custom" : "Editing default",
+    scopeDescription:
+      "Default applies to monsters without their own setup. A custom setup applies only to the current monster.",
+    compactScopeDescription:
+      "Default: monsters without their own setup. Custom: current monster only.",
+    savedCustomDescription:
+      mode === "default" && input.hasCurrentCustomSetup
+        ? `Custom setup saved for ${input.currentMonsterLabel}.`
+        : null,
+    actions,
+    persistence: setupPersistencePresentation(input.persistenceKind)
+  };
+}
+
+function setupPersistencePresentation(kind: SetupPersistenceKind): SetupPersistencePresentation {
+  if (kind === "saved") {
+    return {
+      kind,
+      label: "Saved locally",
+      description: "Changes save automatically in this browser."
+    };
+  }
+  if (kind === "session-only") {
+    return {
+      kind,
+      label: "Session only",
+      description: "Changes are kept for this session and may be lost after reload."
+    };
+  }
+  if (kind === "failed") {
+    return {
+      kind,
+      label: "Could not save",
+      description: "The latest setup change could not be written to browser storage."
+    };
+  }
+  return {
+    kind,
+    label: "Saving…",
+    description: "The latest setup change is being saved in this browser."
   };
 }
 

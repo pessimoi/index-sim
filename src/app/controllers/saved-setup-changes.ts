@@ -9,6 +9,7 @@ import {
 import type { LocalStateStorageFailure } from "../state/local-state-health";
 
 export interface SavedSetupChangesRecoveryBoundary {
+  canStartDurableWrite(ids: readonly ["duel-snapshots"]): boolean;
   prepareExternalApply(ids: readonly ["duel-snapshots"]): void;
   cancelExternalApply(ids: readonly ["duel-snapshots"]): void;
   completeExternalApply(ids: readonly ["duel-snapshots"]): void;
@@ -187,6 +188,14 @@ export class SavedSetupChangesTransactionCore {
           "Saved setup persistence needs attention. No saved setups changed. You can apply this action for this session only."
       };
     }
+    if (!input.recovery.canStartDurableWrite(DUEL_SCOPE)) {
+      return {
+        status: "session-only-available",
+        reason: "blocked",
+        message:
+          "Saved setups changed in another tab. No saved value was overwritten. Review the conflict before applying this action durably."
+      };
+    }
 
     let rawBefore: string | null;
     try {
@@ -329,6 +338,13 @@ export class SavedSetupChangesTransactionCore {
         status: "stale",
         recoveryRequired: false,
         message: "Saved setups changed after this action. Undo left the newer values unchanged."
+      };
+    }
+    if (!input.recovery.canStartDurableWrite(DUEL_SCOPE)) {
+      record.sessionOnlyAvailable = true;
+      return {
+        status: "session-only-available",
+        message: "Saved setups changed in another tab. Undo left the newer saved value unchanged."
       };
     }
 

@@ -1,4 +1,8 @@
-import type { LegacyMigrationViewModel } from "../../view-models/legacy-migration";
+import type { LegacySetupMigrationReport } from "../../state/legacy-storage-migration";
+import {
+  createLegacyMigrationViewModel,
+  type LegacyMigrationViewModel
+} from "../../view-models/legacy-migration";
 
 export interface LegacyMigrationPanelProps {
   viewModel: LegacyMigrationViewModel;
@@ -8,6 +12,24 @@ export interface LegacyMigrationPanelProps {
   onRequestClear(): void;
   onConfirmClear(): void;
   onCancelClear(): void;
+}
+
+export interface LegacyMigrationReviewProps extends Omit<LegacyMigrationPanelProps, "viewModel"> {
+  report: LegacySetupMigrationReport;
+  hasRewriteSetup: boolean;
+}
+
+export function LegacyMigrationReview({
+  report,
+  hasRewriteSetup,
+  ...actions
+}: LegacyMigrationReviewProps) {
+  return (
+    <LegacyMigrationPanel
+      viewModel={createLegacyMigrationViewModel({ report, hasRewriteSetup })}
+      {...actions}
+    />
+  );
 }
 
 export function LegacyMigrationPanel({

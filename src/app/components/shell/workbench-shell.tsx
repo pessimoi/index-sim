@@ -1,5 +1,6 @@
 import type { ReactNode, RefObject } from "react";
 import type { CombatStyle, EntityId } from "@/domain/shared";
+import type { PaneFamily, PaneLoadState } from "../../state/pane-delivery";
 import type { ActiveAssumptionsSummaryViewModel } from "../../view-models/active-assumptions";
 import type {
   ActiveAssumptionResetTarget,
@@ -11,6 +12,7 @@ import {
   PRIMARY_PRAYER_OPTIONS,
   workbenchTabLabel,
   type AppShellSetupViewModel,
+  type SetupEditorActionId,
   type WorkbenchResultViewModel,
   type WorkbenchTabId
 } from "../../view-models/app-shell";
@@ -58,12 +60,13 @@ export interface WorkbenchShellActions {
 
 export interface WorkbenchShellProps {
   activeTab: WorkbenchTabId;
+  activePaneFamily: PaneFamily;
+  activePaneLoadState: PaneLoadState;
   form: CombatSetupFormState;
   shellSetup: AppShellSetupViewModel;
   result: WorkbenchResultViewModel;
   currentMonsterLabel: string;
-  hasCurrentCustomSetup: boolean;
-  activeSetupIsCustom: boolean;
+  setupModeHeadingRef: RefObject<HTMLElement | null>;
   resetSetupButtonRef: RefObject<HTMLButtonElement | null>;
   monsterOptions: SelectOption[];
   styleOptions: SelectOption[];
@@ -86,10 +89,10 @@ function WorkbenchMetric({
 }) {
   const accessibleLabel = expandedCompactLabel(metric.label);
   return (
-    <div
-      className="metric"
-      aria-label={accessibleLabel ? `${accessibleLabel}: ${metric.value}` : undefined}
-    >
+    <div className="metric">
+      {accessibleLabel ? (
+        <span className="visually-hidden">{`${accessibleLabel}: ${metric.value}`}</span>
+      ) : null}
       <span aria-hidden={accessibleLabel ? true : undefined}>{metric.label}</span>
       <strong aria-hidden={accessibleLabel ? true : undefined} className={metric.tone}>
         {metric.value}
@@ -114,12 +117,13 @@ function WorkbenchMetric({
 
 export function WorkbenchShell({
   activeTab,
+  activePaneFamily,
+  activePaneLoadState,
   form,
   shellSetup,
   result,
   currentMonsterLabel,
-  hasCurrentCustomSetup,
-  activeSetupIsCustom,
+  setupModeHeadingRef,
   resetSetupButtonRef,
   monsterOptions,
   styleOptions,
@@ -133,6 +137,13 @@ export function WorkbenchShell({
   rail
 }: WorkbenchShellProps) {
   const setupTabLabel = workbenchTabLabel("loadout", form.combatStyle);
+  const invokeSetupAction = (actionId: SetupEditorActionId): void => {
+    if (actionId === "create-monster") actions.createCustomSetup();
+    if (actionId === "edit-monster") actions.editCustomSetup();
+    if (actionId === "edit-default") actions.editDefaultSetup();
+    if (actionId === "remove-monster") actions.removeCurrentCustomSetup();
+    if (actionId === "reset-active") actions.resetActiveSetup();
+  };
   return (
     <>
       <nav className="setup-guide-bar" aria-label="Setup quick navigation">
@@ -263,7 +274,12 @@ export function WorkbenchShell({
           <section className="setup-context-bar" aria-label="Setup context">
             <div className="setup-context-title">
               <h2>{currentMonsterLabel}</h2>
-              <span>{shellSetup.setupStatus}</span>
+              <strong ref={setupModeHeadingRef} tabIndex={-1}>
+                {shellSetup.editor.modeLabel}
+              </strong>
+              {shellSetup.editor.savedCustomDescription ? (
+                <span>{shellSetup.editor.savedCustomDescription}</span>
+              ) : null}
             </div>
             <SearchableSelectField
               label="Monster"
@@ -273,49 +289,40 @@ export function WorkbenchShell({
               searchPlaceholder="Search monsters"
               onChange={actions.selectTarget}
             />
+            <div className="setup-context-editor-details">
+              <p>
+                <span className="setup-context-scope-wide">
+                  {shellSetup.editor.scopeDescription}
+                </span>
+                <span className="setup-context-scope-compact">
+                  {shellSetup.editor.compactScopeDescription}
+                </span>
+              </p>
+              <div
+                className={`setup-persistence-status ${shellSetup.editor.persistence.kind}`}
+                aria-label="Setup saving status"
+                aria-describedby="setup-persistence-description"
+              >
+                <strong>{shellSetup.editor.persistence.label}</strong>
+                <span id="setup-persistence-description">
+                  {shellSetup.editor.persistence.description}
+                </span>
+              </div>
+            </div>
             <div className="setup-context-actions" aria-label="Setup actions">
-              <button
-                type="button"
-                aria-label="Create custom setup"
-                title="Create custom setup"
-                disabled={activeSetupIsCustom}
-                onClick={actions.createCustomSetup}
-              >
-                New
-              </button>
-              {hasCurrentCustomSetup ? (
+              {shellSetup.editor.actions.map((action) => (
                 <button
+                  key={action.id}
+                  ref={action.id === "reset-active" ? resetSetupButtonRef : undefined}
                   type="button"
-                  aria-label={activeSetupIsCustom ? "Edit default" : "Edit custom"}
-                  title={activeSetupIsCustom ? "Edit default setup" : "Edit custom setup"}
-                  onClick={activeSetupIsCustom ? actions.editDefaultSetup : actions.editCustomSetup}
+                  className={action.tone === "danger" ? "danger-button" : undefined}
+                  aria-label={action.label}
+                  title={action.label}
+                  onClick={() => invokeSetupAction(action.id)}
                 >
-                  Edit
+                  {action.label}
                 </button>
-              ) : (
-                <button type="button" aria-label="Edit default" title="Edit default setup" disabled>
-                  Edit
-                </button>
-              )}
-              <button
-                type="button"
-                className="danger-button"
-                aria-label="Remove custom setup"
-                title="Remove custom setup"
-                disabled={!hasCurrentCustomSetup}
-                onClick={actions.removeCurrentCustomSetup}
-              >
-                Remove
-              </button>
-              <button
-                ref={resetSetupButtonRef}
-                type="button"
-                aria-label="Reset active setup"
-                title="Reset active setup"
-                onClick={actions.resetActiveSetup}
-              >
-                Reset
-              </button>
+              ))}
             </div>
             <div className="setup-context-metrics">
               <MetricList items={result.contextMetrics} />
@@ -336,6 +343,9 @@ export function WorkbenchShell({
             role="tabpanel"
             aria-label="Active workbench pane"
             aria-labelledby={`workbench-tab-${activeTab}`}
+            aria-busy={activePaneLoadState === "loading" ? true : undefined}
+            data-pane-family={activePaneFamily}
+            data-pane-load-state={activePaneLoadState}
             tabIndex={-1}
           >
             <section className="dense-workbench" aria-label="Dense combat spreadsheet">
@@ -439,6 +449,7 @@ export function WorkbenchShell({
               <section
                 className="dense-metric-strip"
                 aria-label="Simulation results"
+                tabIndex={0}
                 hidden={activeTab !== "stats" && activeTab !== "compare"}
               >
                 {result.metrics.map((metric) => (

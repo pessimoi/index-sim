@@ -15,6 +15,8 @@ export interface UseHiscoresLookupInput {
   recordStorageFailure(id: LocalStateHealthItemId, reason: "save_failed" | "clear_failed"): void;
   unblockReplaced(ids: readonly LocalStateHealthItemId[]): void;
   refreshLocalStateHealth(): void;
+  canStartDurableWrite(ids: readonly LocalStateHealthItemId[]): boolean;
+  recordCurrentBaselines(ids: readonly LocalStateHealthItemId[]): void;
   dependencies?: Pick<HiscoresLookupDependencies, "fetchStatus" | "lookupPlayer">;
 }
 
@@ -38,7 +40,9 @@ export function useHiscoresLookup(input: UseHiscoresLookupInput): HiscoresLookup
         clearStorageFailures: input.clearStorageFailures,
         recordStorageFailure: input.recordStorageFailure,
         unblockReplaced: input.unblockReplaced,
-        refreshLocalStateHealth: input.refreshLocalStateHealth
+        refreshLocalStateHealth: input.refreshLocalStateHealth,
+        canStartDurableWrite: input.canStartDurableWrite,
+        recordCurrentBaselines: input.recordCurrentBaselines
       })
   );
   const snapshot = useSyncExternalStore(

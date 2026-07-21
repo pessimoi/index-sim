@@ -410,6 +410,7 @@ test("Reset active setup applies and undoes truthfully in a session-only safe ta
   await page.evaluate(() => window.sessionStorage.setItem("index-sim:saved-data-ignored", "1"));
   await page.reload();
   await expect(page.getByRole("status", { name: "Session-only safe mode" })).toBeVisible();
+  await expect(page.getByLabel("Setup saving status")).toContainText("Session only");
 
   const playerSetup = page.getByLabel("Player setup");
   await playerSetup.getByLabel("ATT", { exact: true }).fill("88");
@@ -728,33 +729,61 @@ test("creates, restores and removes monster-specific custom setups", async ({ pa
   const tabs = page.getByLabel("Workbench tabs");
   const setupContext = page.getByLabel("Setup context");
 
-  await setupContext.getByRole("button", { name: "Create custom setup" }).click();
-  await expect(setupContext).toContainText("Custom setup");
+  await expect(setupContext).toContainText("Editing default");
+  await expect(setupContext.getByLabel("Setup saving status")).toContainText("Saved locally");
+  await expect(setupContext.getByRole("button", { name: "Create monster setup" })).toBeVisible();
+  await expect(setupContext.getByRole("button", { name: /Edit/ })).toHaveCount(0);
+  await expect(setupContext.getByRole("button", { name: "Remove monster setup" })).toHaveCount(0);
+
+  const playerSetup = page.getByLabel("Player setup");
+  const attack = playerSetup.getByLabel("ATT", { exact: true });
+  await attack.fill("61");
+  await attack.press("Enter");
+  await expect(setupContext.getByLabel("Setup saving status")).toContainText("Saved locally");
+  await chooseSearchableOption(setupContext, "Monster", "Rock Crab");
+  await expect(attack).toHaveValue("61");
+  await chooseSearchableOption(setupContext, "Monster", "Hill Giant");
+  await expect(attack).toHaveValue("61");
+
+  await setupContext.getByRole("button", { name: "Create monster setup" }).click();
+  await expect(setupContext).toContainText("Editing custom");
+  await expect(setupContext.getByText("Editing custom", { exact: true })).toBeFocused();
 
   await selectCombatType(page, "melee");
   const equipmentPane = page.getByLabel("Equipment loadout");
   await chooseSearchableOption(equipmentPane, "Weapon", "Dragon halberd");
   await expectSearchableSelection(equipmentPane, "Weapon", "dragon_halberd");
 
+  await setupContext.getByRole("button", { name: "Edit default setup" }).click();
+  await expect(setupContext).toContainText("Editing default");
+  await expect(setupContext).toContainText("Custom setup saved for Hill Giant.");
+  await expect(setupContext.getByText("Editing default", { exact: true })).toBeFocused();
+  await expectSearchableSelection(equipmentPane, "Weapon", "rune_scimitar");
+
+  await setupContext.getByRole("button", { name: "Edit monster setup" }).click();
+  await expect(setupContext).toContainText("Editing custom");
+  await expect(setupContext.getByText("Editing custom", { exact: true })).toBeFocused();
+  await expectSearchableSelection(equipmentPane, "Weapon", "dragon_halberd");
+
   await chooseSearchableOption(setupContext, "Monster", "Rock Crab");
-  await expect(setupContext).toContainText("Default setup");
+  await expect(setupContext).toContainText("Editing default");
   await expectSearchableSelection(equipmentPane, "Weapon", "rune_scimitar");
 
   await chooseSearchableOption(setupContext, "Monster", "Hill Giant");
-  await expect(setupContext).toContainText("Custom setup");
+  await expect(setupContext).toContainText("Editing custom");
   await expectSearchableSelection(equipmentPane, "Weapon", "dragon_halberd");
 
   await tabs.getByRole("tab", { name: "Monsters" }).click();
   await expect(page.locator('tr[aria-selected="true"]')).toContainText("custom");
 
-  await setupContext.getByRole("button", { name: "Remove custom setup" }).click();
-  await expect(setupContext).toContainText("Default setup");
+  await setupContext.getByRole("button", { name: "Remove monster setup" }).click();
+  await expect(setupContext).toContainText("Editing default");
   await selectCombatType(page, "melee");
   await expectSearchableSelection(page.getByLabel("Equipment loadout"), "Weapon", "rune_scimitar");
   const customSetupUndo = page.getByLabel("Local state undo");
   await expect(customSetupUndo).toContainText("Removed custom setup for Hill Giant");
   await customSetupUndo.getByRole("button", { name: "Undo" }).click();
-  await expect(setupContext).toContainText("Custom setup");
+  await expect(setupContext).toContainText("Editing custom");
   await expectSearchableSelection(page.getByLabel("Equipment loadout"), "Weapon", "dragon_halberd");
   await page.waitForFunction(() => {
     const raw = window.localStorage.getItem("index-sim:rewrite-setup");
@@ -766,9 +795,31 @@ test("creates, restores and removes monster-specific custom setups", async ({ pa
       saved.data?.customSetupsByMonster?.giant?.weaponId === "dragon_halberd"
     );
   });
+  const savedEnvelope = await page.evaluate(() =>
+    JSON.parse(window.localStorage.getItem("index-sim:rewrite-setup") ?? "null")
+  );
+  expect(Object.keys(savedEnvelope).sort()).toEqual(["data", "savedAt", "version"]);
+  expect(savedEnvelope.version).toBe(REWRITE_SETUP_VERSION);
+  expect(Date.parse(savedEnvelope.savedAt)).not.toBeNaN();
+  expect(Object.keys(savedEnvelope.data).sort()).toEqual([
+    "cannonByMonster",
+    "customSetupsByMonster",
+    "defaultForm",
+    "denseCompare",
+    "form",
+    "setupMode"
+  ]);
+  expect(savedEnvelope.data.defaultForm.levels.attack).toBe(61);
 
-  await setupContext.getByRole("button", { name: "Remove custom setup" }).click();
-  await expect(setupContext).toContainText("Default setup");
+  await page.reload();
+  await expect(page.locator('[data-app-startup-state="ready"]')).toBeVisible();
+  await expect(setupContext).toContainText("Editing custom");
+  await expect(setupContext.getByLabel("Setup saving status")).toContainText("Saved locally");
+  await selectCombatType(page, "melee");
+  await expectSearchableSelection(page.getByLabel("Equipment loadout"), "Weapon", "dragon_halberd");
+
+  await setupContext.getByRole("button", { name: "Remove monster setup" }).click();
+  await expect(setupContext).toContainText("Editing default");
   await expectSearchableSelection(page.getByLabel("Equipment loadout"), "Weapon", "rune_scimitar");
   await page.waitForFunction(() => {
     const raw = window.localStorage.getItem("index-sim:rewrite-setup");
@@ -779,6 +830,40 @@ test("creates, restores and removes monster-specific custom setups", async ({ pa
       saved.data?.form?.monsterId === "giant" &&
       !saved.data?.customSetupsByMonster?.giant
     );
+  });
+});
+
+test("reports setup autosave failure and clears it after a successful retry", async ({ page }) => {
+  await page.addInitScript(() => {
+    const retryWindow = window as typeof window & { __indexSimFailSetupSave: boolean };
+    retryWindow.__indexSimFailSetupSave = true;
+    const originalSetItem = Storage.prototype.setItem;
+    Storage.prototype.setItem = function setupSaveFailure(key: string, value: string) {
+      if (key === "index-sim:rewrite-setup" && retryWindow.__indexSimFailSetupSave) {
+        throw new Error("private setup save failure");
+      }
+      return originalSetItem.call(this, key, value);
+    };
+  });
+  await page.goto("/");
+
+  const setupContext = page.getByLabel("Setup context");
+  const persistence = setupContext.getByLabel("Setup saving status");
+  await expect(persistence).toContainText("Could not save");
+  await expect(page.getByRole("complementary", { name: "Changes may not persist" })).toBeVisible();
+
+  await page.evaluate(() => {
+    (window as typeof window & { __indexSimFailSetupSave: boolean }).__indexSimFailSetupSave =
+      false;
+  });
+  const attack = page.getByLabel("Player setup").getByLabel("ATT", { exact: true });
+  await attack.fill("61");
+  await attack.press("Enter");
+
+  await expect(persistence).toContainText("Saved locally");
+  await page.waitForFunction(() => {
+    const raw = window.localStorage.getItem("index-sim:rewrite-setup");
+    return raw != null && JSON.parse(raw).data?.form?.levels?.attack === 61;
   });
 });
 

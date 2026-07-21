@@ -27,19 +27,17 @@ export interface RiskPaneActions {
   cancel(): void;
 }
 
+export interface RiskPaneProps {
+  hidden: boolean;
+  model: RiskPaneModel;
+  actions: RiskPaneActions;
+}
+
 function finiteMetric(value: number, digits = 1): string {
   return Number.isFinite(value) ? formatNumber(value, digits) : "unlimited";
 }
 
-export function RiskPane({
-  hidden,
-  model,
-  actions
-}: {
-  hidden: boolean;
-  model: RiskPaneModel;
-  actions: RiskPaneActions;
-}) {
+export function RiskPane({ hidden, model, actions }: RiskPaneProps) {
   const result = model.display?.result ?? null;
   const displayControls = model.display?.controls ?? model.controls;
   const fresh = model.display?.fresh ?? false;

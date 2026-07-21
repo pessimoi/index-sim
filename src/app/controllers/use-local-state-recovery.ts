@@ -1,5 +1,6 @@
 import { useState, useSyncExternalStore } from "react";
 import type { VersionedStorageOptions } from "@/adapters/storage";
+import type { FileExportOutcome } from "./file-export-outcome";
 import type { LocalStateHealthItemId, LocalStateStorageFailure } from "../state/local-state-health";
 import {
   LocalStateRecoveryControllerCore,
@@ -11,6 +12,8 @@ import {
 
 export interface LocalStateRecoveryController extends LocalStateRecoverySnapshot {
   shouldSkipPersist(id: LocalStateHealthItemId): boolean;
+  canStartDurableWrite(ids: readonly LocalStateHealthItemId[]): boolean;
+  recordCurrentBaselines(ids: readonly LocalStateHealthItemId[]): void;
   persist<T>(id: LocalStateHealthItemId, options: VersionedStorageOptions<T>, value: T): boolean;
   recordStorageFailure(id: LocalStateHealthItemId, reason: "save_failed" | "clear_failed"): void;
   clearStorageFailures(ids: readonly LocalStateHealthItemId[]): void;
@@ -29,7 +32,7 @@ export interface LocalStateRecoveryController extends LocalStateRecoverySnapshot
   cancelClear(): void;
   confirmClearItem(id: LocalStateHealthItemId): LocalStateRecoveryOutcome;
   confirmClearInvalid(): LocalStateRecoveryOutcome;
-  exportReport(): void;
+  exportReport(): FileExportOutcome;
   refresh(): LocalStateRecoverySnapshot["report"];
 }
 
@@ -46,6 +49,8 @@ export function useLocalStateRecovery(
   return {
     ...snapshot,
     shouldSkipPersist: controller.shouldSkipPersist,
+    canStartDurableWrite: controller.canStartDurableWrite,
+    recordCurrentBaselines: controller.recordCurrentBaselines,
     persist: controller.persist,
     recordStorageFailure: controller.recordStorageFailure,
     clearStorageFailures: controller.clearStorageFailures,

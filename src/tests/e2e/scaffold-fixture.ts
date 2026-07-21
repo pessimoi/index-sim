@@ -121,7 +121,7 @@ export async function metricSnapshot(region: Locator, labels: readonly string[])
   await expect(region).toBeVisible();
   const entries = await region.locator(".metric").evaluateAll((nodes) =>
     nodes.map((node) => ({
-      label: node.querySelector("span")?.textContent?.trim() ?? "",
+      label: node.querySelector("span:not(.visually-hidden)")?.textContent?.trim() ?? "",
       value: node.querySelector("strong")?.textContent?.trim() ?? ""
     }))
   );
@@ -229,6 +229,10 @@ export async function expectInsideBox(container: Locator, target: Locator) {
 }
 
 export function searchableCombobox(region: Page | Locator, label: string): Locator {
+  return region.getByRole("button", { name: label, exact: true });
+}
+
+export function searchableInput(region: Page | Locator, label: string): Locator {
   return region.getByRole("combobox", { name: label, exact: true });
 }
 
@@ -259,7 +263,7 @@ export async function chooseSearchableOption(
 ): Promise<Locator> {
   const combobox = searchableCombobox(region, label);
   await combobox.click();
-  const search = region.getByRole("searchbox", { name: `Search ${label} options`, exact: true });
+  const search = searchableInput(region, label);
   await search.fill(optionLabel);
   const listbox = region.getByRole("listbox", { name: `${label} options`, exact: true });
   const option = exact
@@ -292,14 +296,14 @@ export async function searchableOptionLabels(
     .evaluateAll((options) =>
       options.map((option) => option.getAttribute("aria-label") ?? option.textContent?.trim() ?? "")
     );
-  await region.getByRole("searchbox", { name: `Search ${label} options` }).press("Escape");
+  await searchableInput(region, label).press("Escape");
   return labels;
 }
 
 export async function expectPopupSearch(region: Page | Locator, label: string): Promise<void> {
   const combobox = searchableCombobox(region, label);
   await combobox.click();
-  const search = region.getByRole("searchbox", { name: `Search ${label} options`, exact: true });
+  const search = searchableInput(region, label);
   const listbox = region.getByRole("listbox", { name: `${label} options`, exact: true });
   const popover = search.locator(
     "xpath=ancestor::div[contains(@class, 'searchable-combobox-popover')]"

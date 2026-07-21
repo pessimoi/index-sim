@@ -229,7 +229,7 @@ describe("Compare and Duel panes", () => {
       "Import setups",
       "Export setups",
       'aria-label="Setup comparison view"',
-      'aria-label="Saved setup import notice"',
+      'aria-label="Saved setup transfer notice"',
       'aria-label="Saved setup import review"',
       "Merge selected setups",
       "Dismiss",

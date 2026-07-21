@@ -10,6 +10,7 @@ import {
   expectSearchableSelection,
   resultMetricSnapshot,
   searchableCombobox,
+  searchableInput,
   selectCombatType,
   test
 } from "./scaffold-fixture";
@@ -642,8 +643,16 @@ for (const viewport of MOBILE_RESULT_NAV_VIEWPORTS) {
       16
     );
 
-    const mobileMetrics = await resultSummary.locator(".metric").allTextContents();
-    const contextMetrics = await hiddenContextMetrics.locator(".metric").allTextContents();
+    const visibleMetricText = (nodes: Element[]) =>
+      nodes.map((node) => {
+        const visibleLabel = node.querySelector("span:not(.visually-hidden)")?.textContent ?? "";
+        const value = node.querySelector("strong")?.textContent ?? "";
+        return `${visibleLabel}${value}`;
+      });
+    const mobileMetrics = await resultSummary.locator(".metric").evaluateAll(visibleMetricText);
+    const contextMetrics = await hiddenContextMetrics
+      .locator(".metric")
+      .evaluateAll(visibleMetricText);
     expect(mobileMetrics.map((text) => text.trim())).toEqual(
       contextMetrics.map((text) => text.trim())
     );
@@ -777,7 +786,7 @@ for (const viewport of MOBILE_RESULT_NAV_VIEWPORTS) {
           return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
         })
       );
-    expect(setupActionBoxes).toHaveLength(4);
+    expect(setupActionBoxes).toHaveLength(2);
     expect(new Set(setupActionBoxes.map((box) => Math.round(box.y))).size).toBe(1);
     expect(setupActionBoxes.every((box) => box.height >= 40)).toBe(true);
     expect(setupActionBoxes[0]!.x).toBeGreaterThanOrEqual(0);
@@ -1016,7 +1025,7 @@ test("keeps long selected monster names readable in compact setup fields", async
   expect(guideStyle.overflowWrap).toBe("anywhere");
 });
 
-test("keeps compact setup actions, Risk controls and setup summaries readable", async ({
+test("keeps explicit setup actions, Risk controls and setup summaries readable", async ({
   page
 }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
@@ -1024,10 +1033,11 @@ test("keeps compact setup actions, Risk controls and setup summaries readable", 
   await page.goto("/");
 
   const setupActions = page.getByLabel("Setup actions");
-  await expect(setupActions.getByRole("button", { name: "Create custom setup" })).toHaveText("New");
-  await expect(setupActions.getByRole("button", { name: "Edit default" })).toHaveText("Edit");
-  await expect(setupActions.getByRole("button", { name: "Remove custom setup" })).toHaveText(
-    "Remove"
+  await expect(setupActions.getByRole("button", { name: "Create monster setup" })).toHaveText(
+    "Create monster setup"
+  );
+  await expect(setupActions.getByRole("button", { name: "Reset active setup" })).toHaveText(
+    "Reset active setup"
   );
   const actionMetrics = await setupActions.locator("button").evaluateAll((buttons) =>
     buttons.map((button) => ({
@@ -1038,7 +1048,7 @@ test("keeps compact setup actions, Risk controls and setup summaries readable", 
   );
   for (const action of actionMetrics) {
     expect(action.scrollWidth).toBeLessThanOrEqual(action.clientWidth + 1);
-    expect(action.whiteSpace).toBe("nowrap");
+    expect(action.whiteSpace).toBe("normal");
   }
 
   const tabs = page.getByLabel("Workbench tabs");
@@ -1140,9 +1150,9 @@ test("keeps search inside the dropdown and supports keyboard selection", async (
   const combobox = searchableCombobox(loadout, "Spell");
 
   await expect(combobox).toHaveText(/Fire Bolt/);
-  await expect(loadout.getByRole("searchbox", { name: "Search Spell options" })).toHaveCount(0);
+  await expect(loadout.getByRole("combobox", { name: "Spell", exact: true })).toHaveCount(0);
   await combobox.click();
-  const search = loadout.getByRole("searchbox", { name: "Search Spell options" });
+  const search = searchableInput(loadout, "Spell");
   const listbox = loadout.getByRole("listbox", { name: "Spell options" });
   await expect(search).toBeFocused();
   await expect(listbox).toBeVisible();
@@ -1155,7 +1165,7 @@ test("keeps search inside the dropdown and supports keyboard selection", async (
   await expect(listbox).toHaveCount(0);
 
   await combobox.click();
-  await loadout.getByRole("searchbox", { name: "Search Spell options" }).fill("wind strike");
+  await searchableInput(loadout, "Spell").fill("wind strike");
   await loadout
     .getByRole("listbox", { name: "Spell options" })
     .getByRole("option", { name: "Wind Strike" })
@@ -1163,7 +1173,7 @@ test("keeps search inside the dropdown and supports keyboard selection", async (
   await expectSearchableSelection(loadout, "Spell", "wind_strike");
 
   await combobox.click();
-  await loadout.getByRole("searchbox", { name: "Search Spell options" }).press("Escape");
+  await searchableInput(loadout, "Spell").press("Escape");
   await expect(combobox).toBeFocused();
   await expect(loadout.getByRole("listbox", { name: "Spell options" })).toHaveCount(0);
 });
@@ -1221,10 +1231,10 @@ test("keeps the Food dropdown search and results inside the mobile viewport", as
   const trip = page.getByRole("region", { name: "Trip assumptions" });
   const food = searchableCombobox(trip, "Food");
   await expect(food).toHaveText(/Lobster/);
-  await expect(trip.getByRole("searchbox", { name: "Search Food options" })).toHaveCount(0);
+  await expect(trip.getByRole("combobox", { name: "Food", exact: true })).toHaveCount(0);
 
   await food.click();
-  const search = trip.getByRole("searchbox", { name: "Search Food options" });
+  const search = searchableInput(trip, "Food");
   const listbox = trip.getByRole("listbox", { name: "Food options" });
   await expect(search).toBeFocused();
   await expect(listbox).toBeVisible();

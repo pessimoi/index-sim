@@ -64,10 +64,12 @@ export interface EconomyDataUndoPreparation<TLiveState> {
 }
 
 export interface EconomyDataRecoveryPort {
+  canStartDurableWrite(ids: readonly EconomyDataUndoScope[]): boolean;
   clearStorageFailures(ids: readonly EconomyDataUndoScope[]): void;
   completeExternalUndo(ids: readonly EconomyDataUndoScope[]): void;
   markPersistenceUnavailable(): void;
   prepareExternalApply(ids: readonly EconomyDataUndoScope[]): void;
+  recordCurrentBaselines(ids: readonly EconomyDataUndoScope[]): void;
   recordStorageFailure(id: EconomyDataUndoScope, reason: "save_failed" | "clear_failed"): void;
   refresh(): void;
   unblockReplaced(ids: readonly EconomyDataUndoScope[]): void;
@@ -104,7 +106,10 @@ export function commitEconomyPriceHistory(input: {
   } catch {
     return { status: "invalid", message: "Local price history could not be validated." };
   }
-  const sessionOnlyBeforeStorage = input.persistenceUnavailable || input.persistenceBlocked;
+  const sessionOnlyBeforeStorage =
+    input.persistenceUnavailable ||
+    input.persistenceBlocked ||
+    !input.recovery.canStartDurableWrite(["price-history"]);
   const preparation = input.destructive
     ? prepareEconomyDataUndo({
         scope: "price-history",
@@ -134,6 +139,7 @@ export function commitEconomyPriceHistory(input: {
       }
       persisted = true;
       input.recovery.clearStorageFailures(["price-history"]);
+      input.recovery.recordCurrentBaselines(["price-history"]);
     } catch {
       input.recovery.recordStorageFailure(
         "price-history",
@@ -356,19 +362,24 @@ export function clearEconomyPriceHistory<TLiveState>(input: {
   actionStatus: string;
   marketNotice: { tone: "success" | "neutral"; message: string };
 } {
+  const canPersist =
+    !input.persistenceUnavailable && input.recovery.canStartDurableWrite(["price-history"]);
   const preparation = prepareEconomyDataUndo({
     scope: "price-history",
     storage: input.storage,
-    persistenceUnavailable: input.persistenceUnavailable,
+    persistenceUnavailable: !canPersist,
     liveState: input.liveState
   });
-  const cleared = tryClearPersisted({ key: PRICE_HISTORY_STORAGE_KEY, storage: input.storage });
-  const persisted = cleared.status === "cleared" && !input.persistenceUnavailable;
+  const cleared = canPersist
+    ? tryClearPersisted({ key: PRICE_HISTORY_STORAGE_KEY, storage: input.storage })
+    : { status: "cleared" as const };
+  const persisted = cleared.status === "cleared" && canPersist;
   if (cleared.status === "failed") {
     input.recovery.recordStorageFailure("price-history", cleared.reason);
   } else if (persisted) {
     input.recovery.clearStorageFailures(["price-history"]);
-  } else {
+    input.recovery.recordCurrentBaselines(["price-history"]);
+  } else if (input.persistenceUnavailable) {
     input.recovery.markPersistenceUnavailable();
   }
   return {
@@ -405,18 +416,21 @@ export function saveEconomyManualPriceOverrides<TLiveState>(input: {
         liveState: input.liveState
       })
     : null;
-  let persisted = true;
-  try {
-    saveManualPriceOverrides(input.storage, input.next);
-    if (input.persistenceUnavailable) {
-      persisted = false;
-      input.recovery.markPersistenceUnavailable();
-    } else {
+  let persisted =
+    !input.persistenceUnavailable &&
+    input.recovery.canStartDurableWrite(["manual-price-overrides"]);
+  if (persisted) {
+    try {
+      saveManualPriceOverrides(input.storage, input.next);
       input.recovery.clearStorageFailures(["manual-price-overrides"]);
+      input.recovery.recordCurrentBaselines(["manual-price-overrides"]);
+    } catch {
+      persisted = false;
+      input.recovery.recordStorageFailure("manual-price-overrides", "save_failed");
     }
-  } catch {
+  } else if (input.persistenceUnavailable) {
     persisted = false;
-    input.recovery.recordStorageFailure("manual-price-overrides", "save_failed");
+    input.recovery.markPersistenceUnavailable();
   }
   input.recovery.unblockReplaced(["manual-price-overrides"]);
   input.recovery.refresh();

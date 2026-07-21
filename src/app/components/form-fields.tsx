@@ -165,12 +165,15 @@ export function SearchableSelectField({
   const labelId = useId();
   const triggerId = useId();
   const listboxId = useId();
+  const resultStatusId = useId();
+  const emptyStatusId = useId();
   const internalTriggerRef = useRef<HTMLButtonElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [expanded, setExpanded] = useState(false);
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
+  const [announcedResultCount, setAnnouncedResultCount] = useState(options.length);
   const normalizedQuery = query.trim().toLocaleLowerCase();
   const selectedOption = options.find((option) => option.id === value);
   const selectedLabel = selectedOption?.label ?? value;
@@ -189,6 +192,11 @@ export function SearchableSelectField({
     Math.min(activeIndex, Math.max(0, filteredOptions.length - 1))
   );
   const activeOption = filteredOptions[boundedActiveIndex];
+  const activeOptionOriginalIndex = activeOption
+    ? options.findIndex((option) => option.id === activeOption.id)
+    : -1;
+  const activeOptionDomId =
+    activeOptionOriginalIndex >= 0 ? `${listboxId}-option-${activeOptionOriginalIndex}` : undefined;
 
   useEffect(() => {
     if (expanded) searchInputRef.current?.focus();
@@ -198,6 +206,12 @@ export function SearchableSelectField({
     if (!expanded) return;
     optionRefs.current[boundedActiveIndex]?.scrollIntoView({ block: "nearest" });
   }, [boundedActiveIndex, expanded]);
+
+  useEffect(() => {
+    if (!expanded) return;
+    const timer = window.setTimeout(() => setAnnouncedResultCount(filteredOptions.length), 200);
+    return () => window.clearTimeout(timer);
+  }, [expanded, filteredOptions.length]);
 
   const openOptions = () => {
     if (disabled) return;
@@ -271,12 +285,12 @@ export function SearchableSelectField({
         }}
         id={triggerId}
         type="button"
-        role="combobox"
         className="searchable-combobox-trigger"
         title={selectedLabel}
         aria-label={resolvedAccessibleLabel}
         aria-labelledby={resolvedAccessibleLabel ? undefined : labelId}
         aria-controls={listboxId}
+        aria-describedby={`${triggerId}-selected-value`}
         aria-expanded={expanded}
         aria-haspopup="listbox"
         data-selected-id={value}
@@ -293,7 +307,7 @@ export function SearchableSelectField({
           }
         }}
       >
-        <span>{selectedLabel}</span>
+        <span id={`${triggerId}-selected-value`}>{selectedLabel}</span>
         <span aria-hidden="true">{expanded ? "▲" : "▼"}</span>
       </button>
       {expanded && (
@@ -302,22 +316,30 @@ export function SearchableSelectField({
             <input
               ref={searchInputRef}
               type="search"
+              role="combobox"
               value={query}
               placeholder={searchPlaceholder}
               autoComplete="off"
-              aria-label={`Search ${label} options`}
+              aria-label={resolvedAccessibleLabel}
+              aria-labelledby={resolvedAccessibleLabel ? undefined : labelId}
+              aria-expanded="true"
+              aria-autocomplete="list"
               aria-controls={listboxId}
-              aria-activedescendant={
-                activeOption ? `${listboxId}-option-${boundedActiveIndex}` : undefined
-              }
+              aria-activedescendant={activeOptionDomId}
+              aria-describedby={`${resultStatusId}${activeOption ? "" : ` ${emptyStatusId}`}`}
               onChange={(event) => {
                 setQuery(event.target.value);
                 setActiveIndex(0);
               }}
               onKeyDown={handleSearchKeyDown}
             />
-            <span className="searchable-combobox-status" role="status" aria-live="polite">
-              {formatNumber(filteredOptions.length)} of {formatNumber(options.length)} options
+            <span
+              id={resultStatusId}
+              className="searchable-combobox-status"
+              role="status"
+              aria-live="polite"
+            >
+              {formatNumber(announcedResultCount)} of {formatNumber(options.length)} options
             </span>
           </div>
           <div
@@ -327,28 +349,34 @@ export function SearchableSelectField({
             aria-label={`${label} options`}
           >
             {filteredOptions.length ? (
-              filteredOptions.map((option, index) => (
-                <button
-                  ref={(element) => {
-                    optionRefs.current[index] = element;
-                  }}
-                  id={`${listboxId}-option-${index}`}
-                  type="button"
-                  role="option"
-                  className={`searchable-combobox-option ${index === boundedActiveIndex ? "active" : ""}`}
-                  aria-label={option.label}
-                  aria-selected={option.id === value}
-                  key={option.id}
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => commitOption(option)}
-                >
-                  <span>{option.label}</span>
-                  {option.hint && <small aria-hidden="true">{option.hint}</small>}
-                  {option.id === value && <em aria-hidden="true">Selected</em>}
-                </button>
-              ))
+              filteredOptions.map((option, index) => {
+                const originalIndex = options.findIndex((candidate) => candidate.id === option.id);
+                return (
+                  <button
+                    ref={(element) => {
+                      optionRefs.current[index] = element;
+                    }}
+                    id={`${listboxId}-option-${originalIndex}`}
+                    type="button"
+                    role="option"
+                    tabIndex={-1}
+                    className={`searchable-combobox-option ${index === boundedActiveIndex ? "active" : ""}`}
+                    aria-label={option.label}
+                    aria-selected={option.id === value}
+                    key={option.id}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => commitOption(option)}
+                  >
+                    <span>{option.label}</span>
+                    {option.hint && <small aria-hidden="true">{option.hint}</small>}
+                    {option.id === value && <em aria-hidden="true">Selected</em>}
+                  </button>
+                );
+              })
             ) : (
-              <p className="searchable-combobox-empty">No matching options</p>
+              <p id={emptyStatusId} className="searchable-combobox-empty">
+                No matching options
+              </p>
             )}
           </div>
         </div>

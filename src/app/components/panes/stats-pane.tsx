@@ -121,7 +121,7 @@ export function StatsPane({
             </div>
             <span className="status-pill ready">{formatNumber(viewModel.effectiveKph)} K/hr</span>
           </div>
-          <div className="stats-summary-table-wrap">
+          <div className="stats-summary-table-wrap" tabIndex={0}>
             <table className="stats-summary-table" aria-label="Trip and banking metrics">
               <tbody>
                 {viewModel.tripBankingSummary.rows.map((row) => (

@@ -57,6 +57,7 @@ describe("app shell components", () => {
     expect(markup).toContain(">Undo</button>");
     expect(globalStatusAnnouncement(pendingUndo.label, pendingUndo)).toBe("");
     expect(globalStatusAnnouncement("Unrelated status", pendingUndo)).toBe("Unrelated status");
+    expect(globalStatusAnnouncement("Visible transfer", null, ["Visible transfer"])).toBe("");
     expect(renderToStaticMarkup(<PendingUndoStatus pendingUndo={null} onUndo={noOp} />)).toBe("");
   });
 
@@ -198,7 +199,7 @@ describe("app shell components", () => {
   it("keeps legacy key table and clear confirmation branches", () => {
     const viewModel: LegacyMigrationViewModel = {
       tone: "ready",
-      statusLabel: "1 compatible fields",
+      statusLabel: "1 compatible area",
       importReady: true,
       summaryItems: ["Legacy setup ready"],
       outcomeItems: ["Import action fixture"],
@@ -254,8 +255,10 @@ describe("app shell components", () => {
   it("keeps workbench landmarks, tab state, shell strips, children and rail in order", () => {
     const shellSetup = createAppShellSetupViewModel({
       form: DEFAULT_FORM_STATE,
+      setupMode: "default",
       hasCurrentCustomSetup: false,
-      activeSetupIsCustom: false,
+      currentMonsterLabel: "Fixture monster",
+      setupPersistenceKind: "saved",
       weaponName: "Rune scimitar",
       ammoName: "None",
       spellName: "None",
@@ -295,12 +298,13 @@ describe("app shell components", () => {
     const shellElement = (
       <WorkbenchShell
         activeTab="stats"
+        activePaneFamily="stats"
+        activePaneLoadState="ready"
         form={DEFAULT_FORM_STATE}
         shellSetup={shellSetup}
         result={result}
         currentMonsterLabel="Fixture monster"
-        hasCurrentCustomSetup={false}
-        activeSetupIsCustom={false}
+        setupModeHeadingRef={createRef<HTMLElement>()}
         resetSetupButtonRef={createRef<HTMLButtonElement>()}
         monsterOptions={[{ id: DEFAULT_FORM_STATE.monsterId, label: "Fixture monster" }]}
         styleOptions={[{ id: DEFAULT_FORM_STATE.styleId, label: "Accurate" }]}
@@ -390,7 +394,7 @@ describe("app shell components", () => {
     expect(markup).toContain("More tabs");
     expect(markup).toContain('aria-label="All workbench tabs"');
     expect(markup).toContain('aria-current="page"');
-    expect(markup.match(/aria-label="Damage per second: 4\.00"/g)).toHaveLength(3);
+    expect(markup.match(/class="visually-hidden">Damage per second: 4\.00/g)).toHaveLength(3);
     expect(markup.match(/>Effective XP\/hr<\/span>/g)).toHaveLength(2);
     expect(markup.match(/>Net GP\/hr<\/span>/g)).toHaveLength(2);
     expect(markup).toContain(
@@ -404,15 +408,26 @@ describe("app shell components", () => {
     expect(markup).toContain('aria-label="Melee setup">Melee setup</button>');
     expect(markup).not.toContain("Open loadout");
     expect(markup).toContain("View stats");
+    expect(markup).toContain("Editing default");
+    expect(markup).toContain("Default applies to monsters without their own setup");
+    expect(markup).toContain("Saved locally");
+    expect(markup).toContain("Changes save automatically in this browser.");
+    expect(markup).toContain(
+      'aria-label="Create monster setup" title="Create monster setup">Create monster setup</button>'
+    );
+    expect(markup).not.toContain('aria-label="Edit default"');
+    expect(markup).not.toContain('aria-label="Edit custom"');
+    expect(markup).not.toContain(">Edit</button>");
+    expect(markup).not.toContain("Remove monster setup");
     expect(markup).toContain('aria-label="Reset active setup" title="Reset active setup"');
     expect(markup).toContain("Effective XP/hr");
     expect(markup).toContain(">SPD</label>");
     expect(markup).toContain('aria-label="Attack speed in seconds"');
     expect(markup).toContain(">F/KL</span>");
     expect(markup).toContain('aria-label="Food per kill: 1.50"');
-    expect(markup).toContain('aria-label="Time to kill: 30.0 s"');
-    expect(markup).toContain('aria-label="Experience points per hour: 20,000"');
-    expect(markup).toContain('aria-label="Gold pieces per kill: 50"');
+    expect(markup).toContain('class="visually-hidden">Time to kill: 30.0 s');
+    expect(markup).toContain('class="visually-hidden">Experience points per hour: 20,000');
+    expect(markup).toContain('class="visually-hidden">Gold pieces per kill: 50');
     expect(markup).toContain('aria-label="Price data issue"');
     expect(markup).toContain("Price data incomplete");
     expect(markup).toContain('aria-label="Correct price for Lobster"');

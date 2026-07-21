@@ -70,6 +70,7 @@ function controller(overrides: Partial<SetupFileTransferDependencies<TestFile>> 
   const readFileText = vi.fn(async (file: TestFile) => file.text);
   const downloadJsonFile = vi.fn((fileName: string, value: unknown) => {
     downloads.push({ fileName, value });
+    return { status: "requested" as const, fileName, byteLength: JSON.stringify(value).length };
   });
   const core = new SetupFileTransferControllerCore<TestFile>({
     readFileText,
@@ -81,13 +82,13 @@ function controller(overrides: Partial<SetupFileTransferDependencies<TestFile>> 
 }
 
 describe("rewrite setup file-transfer controller", () => {
-  it("starts idle and exports the supplied setup without changing import state", () => {
+  it("starts idle and reports a requested export without changing import phase", () => {
     const { context } = createGeneratedRuntimeContext();
     const setup = setupFixture();
     const harness = controller();
 
     expect(harness.core.getSnapshot()).toEqual({ phase: "idle", notice: null, review: null });
-    harness.core.exportSetup(setup, context.gameData);
+    const outcome = harness.core.exportSetup(setup, context.gameData);
 
     expect(harness.downloads).toEqual([
       {
@@ -104,7 +105,51 @@ describe("rewrite setup file-transfer controller", () => {
         }
       }
     ]);
-    expect(harness.core.getSnapshot()).toEqual({ phase: "idle", notice: null, review: null });
+    expect(outcome).toEqual({
+      status: "requested",
+      fileName: "index-sim-rewrite-setup.json",
+      appStatus:
+        "Setup download started: index-sim-rewrite-setup.json. Check your browser downloads.",
+      notice: {
+        tone: "neutral",
+        message:
+          "Setup download started: index-sim-rewrite-setup.json. Check your browser downloads."
+      }
+    });
+    expect(harness.core.getSnapshot()).toEqual({
+      phase: "idle",
+      notice: outcome.notice,
+      review: null
+    });
+  });
+
+  it("normalizes a thrown or failed setup request and preserves an open review", async () => {
+    const { context } = createGeneratedRuntimeContext();
+    const setup = setupFixture();
+    const harness = controller({
+      downloadJsonFile: () => {
+        throw new Error("private browser failure");
+      }
+    });
+    await harness.core.prepareImport({ id: "valid", text: setupEnvelope(setup) }, context.gameData);
+    const review = harness.core.getSnapshot().review;
+
+    const outcome = harness.core.exportSetup(setup, context.gameData);
+
+    expect(outcome).toEqual({
+      status: "failed",
+      appStatus: "Setup download could not be started. Try again.",
+      notice: {
+        tone: "error",
+        message: "Setup download could not be started. Try again."
+      }
+    });
+    expect(harness.core.getSnapshot()).toMatchObject({
+      phase: "review",
+      review,
+      notice: outcome.notice
+    });
+    expect(JSON.stringify(harness.core.getSnapshot())).not.toContain("private browser failure");
   });
 
   it("prepares one validated in-memory review with resolved bounded metadata", async () => {

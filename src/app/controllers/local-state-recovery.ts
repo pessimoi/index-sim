@@ -1,8 +1,10 @@
 import {
+  loadPersisted,
   trySavePersisted,
   type KeyValueStorage,
   type VersionedStorageOptions
 } from "@/adapters/storage";
+import type { JsonDownloadRequestResult } from "@/adapters/browser";
 import {
   clearInvalidLocalState,
   clearLocalStateItem,
@@ -15,6 +17,11 @@ import {
   type LocalStateHealthReport,
   type LocalStateStorageFailure
 } from "../state/local-state-health";
+import {
+  failedFileExportOutcome,
+  requestFileExport,
+  type FileExportOutcome
+} from "./file-export-outcome";
 
 export const LOCAL_STATE_PERSISTENCE_NOTICE =
   "Local storage is unavailable. Changes may not persist after reload.";
@@ -37,6 +44,7 @@ export interface LocalStateRecoveryTransitionState {
 export interface LocalStateRecoverySnapshot {
   report: LocalStateHealthReport;
   notice: string | null;
+  exportNotice?: FileExportOutcome["notice"];
   pendingClearId: LocalStateClearPendingId;
   blockedIds: readonly LocalStateHealthItemId[];
   visible: boolean;
@@ -48,7 +56,25 @@ export interface LocalStateRecoveryDependencies {
   persistenceUnavailable?: boolean;
   persistenceNotice?: string;
   onStatus: (message: string) => void;
-  onDownload: (fileName: string, value: LocalStateHealthExport) => void;
+  onDownload: (fileName: string, value: LocalStateHealthExport) => JsonDownloadRequestResult;
+  crossTab?: {
+    checkFreshness(
+      id: LocalStateHealthItemId
+    ):
+      | { status: "ready" }
+      | { status: "external-conflict"; id: LocalStateHealthItemId }
+      | { status: "unavailable" };
+    checkFreshnessFor(
+      ids: readonly LocalStateHealthItemId[]
+    ):
+      | { status: "ready" }
+      | { status: "external-conflict"; id: LocalStateHealthItemId }
+      | { status: "unavailable" };
+    isSuspended(id: LocalStateHealthItemId): boolean;
+    recordVerifiedRaw(id: LocalStateHealthItemId, raw: string | null): void;
+    recordCurrentRaw(ids: readonly LocalStateHealthItemId[]): boolean;
+    resolveCleared(ids: readonly LocalStateHealthItemId[]): void;
+  };
   now?: () => Date;
 }
 
@@ -247,7 +273,20 @@ export class LocalStateRecoveryControllerCore {
   shouldSkipPersist = (id: LocalStateHealthItemId): boolean => {
     const result = consumeLocalStatePersistSkip(this.transition, id);
     this.transition = result.state;
-    return result.skip;
+    return result.skip || this.dependencies.crossTab?.isSuspended(id) === true;
+  };
+
+  canStartDurableWrite = (ids: readonly LocalStateHealthItemId[]): boolean => {
+    const result = this.dependencies.crossTab?.checkFreshnessFor(ids) ?? { status: "ready" };
+    if (result.status === "ready") return true;
+    if (result.status === "unavailable") this.markPersistenceUnavailable();
+    return false;
+  };
+
+  recordCurrentBaselines = (ids: readonly LocalStateHealthItemId[]): void => {
+    if (this.dependencies.crossTab && !this.dependencies.crossTab.recordCurrentRaw(ids)) {
+      this.markPersistenceUnavailable();
+    }
   };
 
   persist = <T>(
@@ -255,12 +294,42 @@ export class LocalStateRecoveryControllerCore {
     options: VersionedStorageOptions<T>,
     value: T
   ): boolean => {
+    const freshness = this.dependencies.crossTab?.checkFreshness(id);
+    if (freshness?.status === "external-conflict") return false;
+    if (freshness?.status === "unavailable") {
+      this.markPersistenceUnavailable();
+      return false;
+    }
+    const current = loadPersisted(options);
+    if (current.status === "unavailable") {
+      this.markPersistenceUnavailable();
+      return false;
+    }
+    if (current.status === "loaded") {
+      try {
+        if (JSON.stringify(current.value) === JSON.stringify(options.schema.parse(value))) {
+          let currentRaw: string | null;
+          try {
+            currentRaw = options.storage.getItem(options.key);
+          } catch {
+            this.markPersistenceUnavailable();
+            return false;
+          }
+          this.dependencies.crossTab?.recordVerifiedRaw(id, currentRaw);
+          this.clearStorageFailures([id]);
+          return true;
+        }
+      } catch {
+        // The existing save path owns schema-validation failure handling.
+      }
+    }
     const result = trySavePersisted(options, value);
     if (result.status === "saved") {
       if (this.persistenceIsUnavailable()) {
         this.markPersistenceUnavailable();
         return false;
       }
+      this.dependencies.crossTab?.recordVerifiedRaw(id, JSON.stringify(result.envelope));
       this.clearStorageFailures([id]);
       return true;
     }
@@ -279,7 +348,11 @@ export class LocalStateRecoveryControllerCore {
         reason
       })
     };
-    this.snapshot = { ...this.snapshot, notice: this.persistenceNotice() };
+    this.snapshot = {
+      ...this.snapshot,
+      notice: this.persistenceNotice(),
+      exportNotice: undefined
+    };
     this.dependencies.onStatus(this.persistenceNotice());
     this.refresh();
   };
@@ -295,7 +368,7 @@ export class LocalStateRecoveryControllerCore {
   markPersistenceUnavailable = (): void => {
     const notice = this.persistenceNotice();
     const shouldAnnounce = this.snapshot.notice !== notice;
-    this.snapshot = { ...this.snapshot, notice };
+    this.snapshot = { ...this.snapshot, notice, exportNotice: undefined };
     if (shouldAnnounce) this.dependencies.onStatus(notice);
     this.refresh();
   };
@@ -303,7 +376,7 @@ export class LocalStateRecoveryControllerCore {
   blockContextInvalid = (ids: readonly LocalStateHealthItemId[], notice: string | null): void => {
     if (ids.length === 0 && notice == null) return;
     this.transition = blockContextInvalidTransition(this.transition, ids);
-    if (notice != null) this.snapshot = { ...this.snapshot, notice };
+    if (notice != null) this.snapshot = { ...this.snapshot, notice, exportNotice: undefined };
     this.refresh();
   };
 
@@ -336,6 +409,7 @@ export class LocalStateRecoveryControllerCore {
       },
       selectedIds
     );
+    this.recordCurrentBaselines(selectedIds);
     this.refresh();
   };
 
@@ -348,6 +422,7 @@ export class LocalStateRecoveryControllerCore {
       contextInvalidIds: withoutIds(this.transition.contextInvalidIds, selectedIds),
       storageFailures: removeLocalStateStorageFailures(this.transition.storageFailures, selectedIds)
     };
+    this.recordCurrentBaselines(selectedIds);
     const report = this.currentReport();
     const restoredAttentionIds = report.items
       .filter((item) => selectedIds.includes(item.id) && localStateHealthNeedsAttention(item))
@@ -381,7 +456,7 @@ export class LocalStateRecoveryControllerCore {
       failedIds
     );
     const notice = this.persistenceNotice();
-    this.snapshot = { ...this.snapshot, notice };
+    this.snapshot = { ...this.snapshot, notice, exportNotice: undefined };
     this.dependencies.onStatus(notice);
     this.refresh();
   };
@@ -398,6 +473,7 @@ export class LocalStateRecoveryControllerCore {
 
   private applyClearResult(result: LocalStateClearResult): void {
     const clearedIds = result.clearedItems.map((item) => item.id);
+    this.dependencies.crossTab?.resolveCleared(clearedIds);
     let failures = removeLocalStateStorageFailures(this.transition.storageFailures, clearedIds);
     for (const failed of result.failedItems) {
       failures = upsertLocalStateStorageFailure(failures, {
@@ -422,7 +498,12 @@ export class LocalStateRecoveryControllerCore {
         : result.clearedItems.length > 0
           ? `Cleared ${label}`
           : `${label} had no local data to clear`;
-    this.snapshot = { ...this.snapshot, notice: message, pendingClearId: null };
+    this.snapshot = {
+      ...this.snapshot,
+      notice: message,
+      exportNotice: undefined,
+      pendingClearId: null
+    };
     this.dependencies.onStatus(message);
     this.refresh();
     return outcomeFromResult(result, message);
@@ -437,21 +518,37 @@ export class LocalStateRecoveryControllerCore {
         : result.clearedItems.length > 0
           ? `Cleared ${formatCount(result.clearedItems.length)} invalid local state keys`
           : "No invalid local state keys to clear";
-    this.snapshot = { ...this.snapshot, notice: message, pendingClearId: null };
+    this.snapshot = {
+      ...this.snapshot,
+      notice: message,
+      exportNotice: undefined,
+      pendingClearId: null
+    };
     this.dependencies.onStatus(message);
     this.refresh();
     return outcomeFromResult(result, message);
   };
 
-  exportReport = (): void => {
+  exportReport = (): FileExportOutcome => {
     const report = this.currentReport();
-    const message = "Exported local state recovery report";
-    this.dependencies.onDownload(
-      localStateHealthExportFileName(report),
-      createLocalStateHealthExport(report)
-    );
-    this.snapshot = { ...this.snapshot, report, notice: message, pendingClearId: null };
-    this.dependencies.onStatus(message);
+    let outcome: FileExportOutcome;
+    try {
+      const fileName = localStateHealthExportFileName(report);
+      const value = createLocalStateHealthExport(report);
+      outcome = requestFileExport("recovery", fileName, () =>
+        this.dependencies.onDownload(fileName, value)
+      );
+    } catch {
+      outcome = failedFileExportOutcome("recovery");
+    }
+    this.snapshot = {
+      ...this.snapshot,
+      report,
+      notice: outcome.notice.message,
+      exportNotice: outcome.notice
+    };
+    this.dependencies.onStatus(outcome.appStatus);
     this.publish(report);
+    return outcome;
   };
 }

@@ -2,6 +2,7 @@ import { useState, useSyncExternalStore } from "react";
 import { downloadJsonFile, readBrowserFileText } from "@/adapters/browser";
 import type { GameDataSnapshot } from "@/domain/shared";
 import type { SavedSetupState } from "../state/ui-state";
+import type { FileExportOutcome } from "./file-export-outcome";
 import {
   SetupFileTransferControllerCore,
   type SetupImportCandidate,
@@ -18,7 +19,7 @@ export interface SetupFileTransferController extends SetupFileTransferSnapshot {
   prepareImport(file: File, gameData: GameDataSnapshot): Promise<SetupPrepareOutcome>;
   dismissReview(reviewId: number): boolean;
   consumeReview(reviewId: number): SetupImportCandidate | null;
-  exportSetup(setup: SavedSetupState, gameData: GameDataSnapshot): void;
+  exportSetup(setup: SavedSetupState, gameData: GameDataSnapshot): FileExportOutcome;
 }
 
 export function useSetupFileTransfer(

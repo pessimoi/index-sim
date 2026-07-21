@@ -125,10 +125,8 @@ async function captureMobileNavigationLoop(page: Page, name: string) {
   const moreTabs = navigation.locator("details.workbench-more-tabs");
   await setupContext.evaluate((element) => element.scrollIntoView({ block: "start" }));
   await expect(setupContext.locator(".setup-context-actions button")).toHaveText([
-    "New",
-    "Edit",
-    "Remove",
-    "Reset"
+    "Create monster setup",
+    "Reset active setup"
   ]);
   await moreTabs.locator(":scope > summary").click();
   const popup = moreTabs.locator(".workbench-more-tabs-list");
@@ -301,11 +299,9 @@ test.describe("repository visual regression", () => {
     await bootVisualApp(page, "desktop");
     await openWorkbenchTab(page, "Economy");
     const economy = page.getByRole("region", { name: "Economy", exact: true });
-    const trendItem = economy.getByRole("combobox", { name: "Trend item", exact: true });
+    const trendItem = economy.getByRole("button", { name: "Trend item", exact: true });
     await trendItem.click();
-    await economy
-      .getByRole("searchbox", { name: "Search Trend item options", exact: true })
-      .fill("Big bones");
+    await economy.getByRole("combobox", { name: "Trend item", exact: true }).fill("Big bones");
     await economy
       .getByRole("listbox", { name: "Trend item options", exact: true })
       .getByRole("option", { name: /^Big bones(?:$|\s|\()/i })
@@ -358,8 +354,8 @@ test.describe("repository visual regression", () => {
     await bootVisualApp(page, "desktop", { settingsReview: true });
     await expect(page.getByLabel("Legacy setup migration")).toBeVisible();
     await openWorkbenchTab(page, "Settings");
-    const settings = page.getByRole("region", { name: "Live services", exact: true });
-    await expect(settings.getByLabel("Local state recovery")).toBeVisible();
+    const settings = page.getByRole("region", { name: "Settings", exact: true });
+    await expect(settings.getByLabel("Local state recovery", { exact: true })).toBeVisible();
     await expect(settings.getByLabel("Price data settings")).toBeVisible();
     await captureActivePane(page, "settings-desktop.png");
     const priceData = settings.getByLabel("Price data settings");

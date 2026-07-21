@@ -34,6 +34,7 @@ export interface MonsterSpecificLiveOutcome {
 }
 
 export interface MonsterSpecificRecoveryBoundary {
+  canStartDurableWrite(ids: readonly LocalStateHealthItemId[]): boolean;
   prepareExternalApply(ids: readonly LocalStateHealthItemId[]): void;
   cancelExternalApply(ids: readonly LocalStateHealthItemId[]): void;
   completeExternalApply(ids: readonly LocalStateHealthItemId[]): void;
@@ -211,6 +212,14 @@ export class MonsterSpecificChangesTransactionCore {
           "Saved browser data is unavailable. No changes were made. You can remove these changes for this session only."
       };
     }
+    if (!input.recovery.canStartDurableWrite(prepared.selectedIds)) {
+      return {
+        status: "session-only-available",
+        reason: "unavailable",
+        message:
+          "Saved data changed in another tab. No saved values were overwritten. Review the conflict before removing these changes durably."
+      };
+    }
     const batch = executeLocalStateBatch(input.storageAccess.storage, prepared.operations);
     if (batch.status === "unavailable") {
       input.recovery.markPersistenceUnavailable();
@@ -339,6 +348,14 @@ export class MonsterSpecificChangesTransactionCore {
       liveState: record.prior
     };
     const operations = undoOperations(record);
+    if (!input.recovery.canStartDurableWrite(record.selectedIds)) {
+      record.sessionOnlyAvailable = true;
+      return {
+        status: "session-only-available",
+        message:
+          "Saved data changed in another tab. Monster changes Undo left the newer saved values unchanged."
+      };
+    }
     const batch = executeLocalStateBatch(input.storageAccess.storage, operations);
     if (batch.status === "unavailable") {
       record.sessionOnlyAvailable = true;

@@ -24,6 +24,8 @@ export interface UsePriceSetTransferInput {
   clearStorageFailures(ids: readonly LocalStateHealthItemId[]): void;
   recordStorageFailure(id: LocalStateHealthItemId, reason: "save_failed" | "clear_failed"): void;
   markPersistenceUnavailable(): void;
+  canStartDurableWrite(ids: readonly LocalStateHealthItemId[]): boolean;
+  recordCurrentBaselines(ids: readonly LocalStateHealthItemId[]): void;
   unblockReplaced(ids: readonly LocalStateHealthItemId[]): void;
   refreshLocalStateHealth(): void;
   dependencies?: Pick<
@@ -55,6 +57,8 @@ export function usePriceSetTransfer(input: UsePriceSetTransferInput): PriceSetTr
         clearStorageFailures: input.clearStorageFailures,
         recordStorageFailure: input.recordStorageFailure,
         markPersistenceUnavailable: input.markPersistenceUnavailable,
+        canStartDurableWrite: input.canStartDurableWrite,
+        recordCurrentBaselines: input.recordCurrentBaselines,
         unblockReplaced: input.unblockReplaced,
         refreshLocalStateHealth: input.refreshLocalStateHealth,
         now: input.dependencies?.now ?? (() => new Date())

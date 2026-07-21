@@ -134,6 +134,7 @@ export function WorkspaceBackupPanel({
           tabIndex={model.notice.tone === "error" ? -1 : undefined}
           className={`inline-status ${model.notice.tone}`}
           role={model.notice.tone === "error" ? "alert" : "status"}
+          aria-label="Workspace transfer notice"
         >
           {model.notice.message}
         </p>

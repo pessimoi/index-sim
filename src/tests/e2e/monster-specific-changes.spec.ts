@@ -142,7 +142,7 @@ test("Monster-specific changes inventory, Review navigation, durable removal and
   await expect(panel).toContainText("1 monsters changed");
   await expect(panel.getByRole("heading", { name: /Dagannoth/ })).toHaveCount(0);
   await expect(
-    page.getByLabel("Setup context").getByText("Default setup", { exact: true })
+    page.getByLabel("Setup context").getByText("Editing default", { exact: true })
   ).toBeVisible();
   await page.waitForFunction(() => {
     const setupData = JSON.parse(window.localStorage.getItem("index-sim:rewrite-setup")!).data;

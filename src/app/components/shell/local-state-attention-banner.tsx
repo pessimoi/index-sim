@@ -10,7 +10,11 @@ export function LocalStateAttentionBanner({ viewModel, onReview }: LocalStateAtt
 
   const titleId = `local-state-attention-${viewModel.kind}-title`;
   return (
-    <aside className={`local-state-attention-banner ${viewModel.kind}`} aria-labelledby={titleId}>
+    <aside
+      className={`local-state-attention-banner ${viewModel.kind}`}
+      aria-labelledby={titleId}
+      aria-live={viewModel.kind === "conflict" || viewModel.kind === "mixed" ? "polite" : undefined}
+    >
       <div className="local-state-attention-copy">
         <h2 id={titleId}>{viewModel.title}</h2>
         <p>{viewModel.message}</p>
@@ -21,7 +25,7 @@ export function LocalStateAttentionBanner({ viewModel, onReview }: LocalStateAtt
         )}
       </div>
       <button type="button" onClick={onReview}>
-        Review local data
+        {viewModel.reviewLabel ?? "Review local data"}
       </button>
     </aside>
   );

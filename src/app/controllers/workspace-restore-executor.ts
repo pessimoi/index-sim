@@ -73,6 +73,7 @@ export interface WorkspaceRestoreLiveOutcome {
 }
 
 export interface WorkspaceRestoreRecoveryBoundary {
+  canStartDurableWrite(ids: readonly LocalStateHealthItemId[]): boolean;
   prepareExternalApply(ids: readonly LocalStateHealthItemId[]): void;
   cancelExternalApply(ids: readonly LocalStateHealthItemId[]): void;
   completeExternalApply(ids: readonly LocalStateHealthItemId[]): void;
@@ -202,29 +203,21 @@ function validateLogicalValue(
   return registration.codec.parse(value);
 }
 
-function serializeArea(
-  area: WorkspaceRestoreSelectedAreaPlan,
+export function createWorkspaceStorageOperation(
+  id: WorkspaceTransferAreaId,
   value: unknown,
   now: Date
 ): RawOperation {
-  const target = storageTarget(area.id);
+  const target = storageTarget(id);
   const expectedClear =
-    (area.id === "selected-price-set" && value === null) ||
-    (area.id === "manual-price-overrides" &&
+    (id === "selected-price-set" && value === null) ||
+    (id === "hiscores-last-player" && value === null) ||
+    (id === "manual-price-overrides" &&
       Object.keys(ManualPriceOverridesStateSchema.parse(value).items).length === 0);
-  if ((area.persistence.intent === "clear") !== expectedClear) {
-    throw new Error("invalid Workspace persistence intent");
-  }
-  if (
-    area.persistence.intent === "write" &&
-    canonicalJson(area.persistence.value) !== canonicalJson(value)
-  ) {
-    throw new Error("stale Workspace persistence value");
-  }
   if (expectedClear) return { ...target, intent: "clear", targetRaw: null };
 
   let targetRaw: string;
-  switch (area.id) {
+  switch (id) {
     case "rewrite-setup":
       targetRaw = persistedRaw(REWRITE_SETUP_VERSION, SavedSetupSchema, value, now);
       break;
@@ -274,6 +267,28 @@ function serializeArea(
       break;
   }
   return { ...target, intent: "write", targetRaw };
+}
+
+function serializeArea(
+  area: WorkspaceRestoreSelectedAreaPlan,
+  value: unknown,
+  now: Date
+): RawOperation {
+  const expectedClear =
+    (area.id === "selected-price-set" && value === null) ||
+    (area.id === "hiscores-last-player" && value === null) ||
+    (area.id === "manual-price-overrides" &&
+      Object.keys(ManualPriceOverridesStateSchema.parse(value).items).length === 0);
+  if ((area.persistence.intent === "clear") !== expectedClear) {
+    throw new Error("invalid Workspace persistence intent");
+  }
+  if (
+    area.persistence.intent === "write" &&
+    canonicalJson(area.persistence.value) !== canonicalJson(value)
+  ) {
+    throw new Error("stale Workspace persistence value");
+  }
+  return createWorkspaceStorageOperation(area.id, value, now);
 }
 
 function storageFailure(operation: RawOperation): LocalStateStorageFailure {
@@ -401,6 +416,14 @@ export class WorkspaceRestoreExecutorCore {
         reason: "unavailable",
         message:
           "Saved browser data is unavailable. No changes were made. You can apply this reviewed plan for the current session only."
+      };
+    }
+    if (!input.recovery.canStartDurableWrite(prepared.selectedIds)) {
+      return {
+        status: "session-only-available",
+        reason: "unavailable",
+        message:
+          "Saved data changed in another tab. No saved values were overwritten. Review the conflict before restoring durably."
       };
     }
 
@@ -540,6 +563,15 @@ export class WorkspaceRestoreExecutorCore {
       };
     }
     const operations = rawUndoOperations(record);
+    if (!input.recovery.canStartDurableWrite(record.selectedIds)) {
+      record.sessionOnlyAvailable = true;
+      return {
+        status: "session-only-available",
+        reason: "write-failed",
+        message:
+          "Saved data changed in another tab. Workspace Undo left the newer saved values unchanged."
+      };
+    }
     const batch = executeLocalStateBatch(input.storageAccess.storage, operations);
     if (batch.status === "unavailable") {
       record.sessionOnlyAvailable = true;

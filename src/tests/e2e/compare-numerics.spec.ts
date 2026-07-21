@@ -147,7 +147,7 @@ test("shows dense row markers for custom setup and per-monster loot settings", a
   const tabs = page.getByLabel("Workbench tabs");
   const setupContext = page.getByLabel("Setup context");
 
-  await setupContext.getByRole("button", { name: "Create custom setup" }).click();
+  await setupContext.getByRole("button", { name: "Create monster setup" }).click();
   await selectCombatType(page, "melee");
   const equipmentPane = page.getByLabel("Equipment loadout");
   await chooseSearchableOption(equipmentPane, "Weapon", "Dragon halberd");
@@ -425,7 +425,7 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
 
   await page.getByLabel("TARGET", { exact: true }).selectOption("green_dragon");
   const setupContext = page.getByLabel("Setup context");
-  await setupContext.getByRole("button", { name: "Create custom setup" }).click();
+  await setupContext.getByRole("button", { name: "Create monster setup" }).click();
   await selectCombatType(page, "melee");
   await expect(page.getByLabel("TYPE", { exact: true })).toHaveText("melee");
   const meleePane = page.getByLabel("Equipment loadout");

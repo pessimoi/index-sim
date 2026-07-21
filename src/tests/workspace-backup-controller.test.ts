@@ -82,7 +82,10 @@ function controller(overrides: Partial<WorkspaceFileTransferDependencies<TestFil
   const downloads: Array<{ fileName: string; value: unknown }> = [];
   const dependencies: WorkspaceFileTransferDependencies<TestFile> = {
     readFileText: vi.fn(async (file) => file.text),
-    downloadJsonFile: vi.fn((fileName, value) => downloads.push({ fileName, value })),
+    downloadJsonFile: vi.fn((fileName, value) => {
+      downloads.push({ fileName, value });
+      return { status: "requested" as const, fileName, byteLength: JSON.stringify(value).length };
+    }),
     now: () => FIXED_NOW,
     ...overrides
   };
@@ -109,6 +112,7 @@ function restoreExecution(
       current.live = outcome.liveState;
     },
     recovery: {
+      canStartDurableWrite: vi.fn(() => true),
       prepareExternalApply: vi.fn(),
       cancelExternalApply: vi.fn(),
       completeExternalApply: vi.fn(),
@@ -137,7 +141,7 @@ describe("Workspace file-transfer controller", () => {
         liveState: liveState(),
         storageAccess: createBrowserStorageAccess()
       })
-    ).toEqual({ status: "exported" });
+    ).toMatchObject({ status: "requested" });
     expect(JSON.stringify(harness.downloads[0]?.value)).not.toContain("Private Hero");
     expect((harness.downloads[0]?.value as { areas: unknown[] }).areas).toHaveLength(9);
 
@@ -154,7 +158,39 @@ describe("Workspace file-transfer controller", () => {
     expect(JSON.stringify(harness.downloads[1]?.value)).toContain("Private Hero");
     expect(harness.core.getSnapshot()).toMatchObject({
       includeLastHiscoresPlayer: true,
-      notice: { tone: "success", message: "Workspace backup downloaded." }
+      notice: {
+        tone: "neutral",
+        message:
+          "Workspace backup download started: index-sim-workspace-274-2026-07-19T16-45-00.000Z.json. Check your browser downloads."
+      }
+    });
+  });
+
+  it("reports a fixed Workspace request failure without changing export scope", () => {
+    const harness = controller({
+      downloadJsonFile: () => ({ status: "failed", reason: "dispatch" })
+    });
+    harness.core.setIncludeLastHiscoresPlayer(true);
+
+    const outcome = harness.core.exportWorkspace({
+      gameData: context.gameData,
+      liveState: liveState(),
+      storageAccess: createBrowserStorageAccess()
+    });
+
+    expect(outcome).toEqual({
+      status: "failed",
+      appStatus: "Workspace backup download could not be started. Try again.",
+      notice: {
+        tone: "error",
+        message: "Workspace backup download could not be started. Try again."
+      }
+    });
+    expect(harness.core.getSnapshot()).toMatchObject({
+      includeLastHiscoresPlayer: true,
+      phase: "idle",
+      review: null,
+      notice: outcome.notice
     });
   });
 

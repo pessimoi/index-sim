@@ -2,6 +2,7 @@ import { withGeneratedAlchAuthority } from "@/adapters/generated/price-fallback"
 import { parsePriceSetFileText } from "@/adapters/market";
 import { PRICE_SET_IMPORT_MAX_BYTES } from "@/data/schemas";
 import type { GameDataSnapshot, PriceSet } from "@/domain/shared";
+import type { JsonDownloadRequestResult } from "@/adapters/browser";
 import {
   applyManualPriceOverrides,
   type ManualPriceOverridesState
@@ -16,6 +17,7 @@ import {
   describePriceImportError,
   type PriceImportNotice
 } from "../state/price-import";
+import { requestFileExport, type FileExportOutcome } from "./file-export-outcome";
 
 export interface MarketNotice {
   tone: "neutral" | "success" | "warning" | "error";
@@ -84,20 +86,25 @@ export interface ResetPriceSetOutcome {
   marketNotice: MarketNotice;
 }
 
-export interface PriceSetActionOutcome {
-  appStatus: string;
-  marketNotice: MarketNotice;
-}
+export type PriceSetActionOutcome =
+  | (Omit<Extract<FileExportOutcome, { status: "requested" }>, "notice"> & {
+      marketNotice: MarketNotice;
+    })
+  | (Omit<Extract<FileExportOutcome, { status: "failed" }>, "notice"> & {
+      marketNotice: MarketNotice;
+    });
 
 export interface PriceSetTransferDependencies<TFile> {
   readFileText(file: TFile, maxBytes: number): Promise<string>;
-  downloadJsonFile(fileName: string, value: unknown): void;
+  downloadJsonFile(fileName: string, value: unknown): JsonDownloadRequestResult;
   saveSelectedPriceSet(priceSet: PriceSet, selectedAt: Date): void;
   clearSelectedPriceSet(): void;
   storageUnavailable: boolean;
   clearStorageFailures(ids: readonly LocalStateHealthItemId[]): void;
   recordStorageFailure(id: LocalStateHealthItemId, reason: "save_failed" | "clear_failed"): void;
   markPersistenceUnavailable(): void;
+  canStartDurableWrite(ids: readonly LocalStateHealthItemId[]): boolean;
+  recordCurrentBaselines(ids: readonly LocalStateHealthItemId[]): void;
   unblockReplaced(ids: readonly LocalStateHealthItemId[]): void;
   refreshLocalStateHealth(): void;
   now(): Date;
@@ -136,6 +143,7 @@ export class PriceSetTransferControllerCore<TFile> {
   }
 
   private persistSelected(priceSet: PriceSet, selectedAt: Date): boolean {
+    if (!this.dependencies.canStartDurableWrite(["selected-price-set"])) return false;
     try {
       this.dependencies.saveSelectedPriceSet(priceSet, selectedAt);
       if (this.dependencies.storageUnavailable) {
@@ -143,6 +151,7 @@ export class PriceSetTransferControllerCore<TFile> {
         return false;
       }
       this.dependencies.clearStorageFailures(["selected-price-set"]);
+      this.dependencies.recordCurrentBaselines(["selected-price-set"]);
       this.dependencies.refreshLocalStateHealth();
       this.update({ resetPending: false });
       return true;
@@ -213,14 +222,14 @@ export class PriceSetTransferControllerCore<TFile> {
   };
 
   exportPriceSet = (priceSet: PriceSet): PriceSetActionOutcome => {
-    this.dependencies.downloadJsonFile(priceSetExportFileName(priceSet), priceSet);
-    this.update({ resetPending: false });
+    const fileName = priceSetExportFileName(priceSet);
+    const outcome = requestFileExport("price-set", fileName, () =>
+      this.dependencies.downloadJsonFile(fileName, priceSet)
+    );
+    const { notice, ...actionOutcome } = outcome;
     return {
-      appStatus: "Exported active PriceSet",
-      marketNotice: {
-        tone: "success",
-        message: `Exported active PriceSet: ${priceSet.label}`
-      }
+      ...actionOutcome,
+      marketNotice: notice
     };
   };
 
@@ -239,18 +248,21 @@ export class PriceSetTransferControllerCore<TFile> {
       input.fallbackPriceSet,
       input.manualPriceOverrides
     );
-    let persistedReset = true;
-    try {
-      this.dependencies.clearSelectedPriceSet();
-      if (this.dependencies.storageUnavailable) {
+    let persistedReset = this.dependencies.canStartDurableWrite(["selected-price-set"]);
+    if (persistedReset) {
+      try {
+        this.dependencies.clearSelectedPriceSet();
+        if (this.dependencies.storageUnavailable) {
+          persistedReset = false;
+          this.dependencies.markPersistenceUnavailable();
+        } else {
+          this.dependencies.clearStorageFailures(["selected-price-set"]);
+          this.dependencies.recordCurrentBaselines(["selected-price-set"]);
+        }
+      } catch {
         persistedReset = false;
-        this.dependencies.markPersistenceUnavailable();
-      } else {
-        this.dependencies.clearStorageFailures(["selected-price-set"]);
+        this.dependencies.recordStorageFailure("selected-price-set", "clear_failed");
       }
-    } catch {
-      persistedReset = false;
-      this.dependencies.recordStorageFailure("selected-price-set", "clear_failed");
     }
     this.dependencies.refreshLocalStateHealth();
     this.update({ resetPending: false });

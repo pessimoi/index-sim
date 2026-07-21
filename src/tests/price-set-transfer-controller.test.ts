@@ -69,11 +69,14 @@ function harness(overrides: Partial<PriceSetTransferDependencies<TestFile>> = {}
   const clearStorageFailures = vi.fn(() => events.push("clear-failure"));
   const recordStorageFailure = vi.fn((_id, reason) => events.push(`failure:${reason}`));
   const markPersistenceUnavailable = vi.fn(() => events.push("unavailable"));
+  const canStartDurableWrite = vi.fn(() => true);
+  const recordCurrentBaselines = vi.fn();
   const unblockReplaced = vi.fn(() => events.push("unblock"));
   const refreshLocalStateHealth = vi.fn(() => events.push("refresh"));
   const downloadJsonFile = vi.fn((fileName: string, value: unknown) => {
     events.push(`download:${fileName}`);
     downloads.push({ fileName, value });
+    return { status: "requested" as const, fileName, byteLength: JSON.stringify(value).length };
   });
   const core = new PriceSetTransferControllerCore<TestFile>({
     readFileText,
@@ -84,6 +87,8 @@ function harness(overrides: Partial<PriceSetTransferDependencies<TestFile>> = {}
     clearStorageFailures,
     recordStorageFailure,
     markPersistenceUnavailable,
+    canStartDurableWrite,
+    recordCurrentBaselines,
     unblockReplaced,
     refreshLocalStateHealth,
     now: () => FIXED_NOW,
@@ -372,7 +377,7 @@ describe("PriceSet transfer controller", () => {
     });
   });
 
-  it("exports the unchanged PriceSet with a sanitized name and closes reset confirmation", () => {
+  it("exports the unchanged PriceSet with a sanitized name and preserves reset confirmation", () => {
     const test = harness();
     const priceSet = JSON.parse(
       priceSetText({ id: " / active custom ! ", label: "Export me" })
@@ -384,11 +389,41 @@ describe("PriceSet transfer controller", () => {
     expect(test.downloads).toEqual([
       { fileName: "index-sim-price-set-active-custom.json", value: priceSet }
     ]);
-    expect(test.core.getSnapshot().resetPending).toBe(false);
+    expect(test.core.getSnapshot().resetPending).toBe(true);
     expect(outcome).toEqual({
-      appStatus: "Exported active PriceSet",
-      marketNotice: { tone: "success", message: "Exported active PriceSet: Export me" }
+      status: "requested",
+      fileName: "index-sim-price-set-active-custom.json",
+      appStatus:
+        "PriceSet download started: index-sim-price-set-active-custom.json. Check your browser downloads.",
+      marketNotice: {
+        tone: "neutral",
+        message:
+          "PriceSet download started: index-sim-price-set-active-custom.json. Check your browser downloads."
+      }
     });
+  });
+
+  it("reports PriceSet request failure without closing reset or leaking a thrown error", () => {
+    const test = harness({
+      downloadJsonFile: () => {
+        throw new Error("private object URL failure");
+      }
+    });
+    const priceSet = JSON.parse(priceSetText({ id: "failed", label: "Failed" })) as PriceSet;
+    test.core.requestReset("scheduled prices");
+
+    const outcome = test.core.exportPriceSet(priceSet);
+
+    expect(outcome).toEqual({
+      status: "failed",
+      appStatus: "PriceSet download could not be started. Try again.",
+      marketNotice: {
+        tone: "error",
+        message: "PriceSet download could not be started. Try again."
+      }
+    });
+    expect(test.core.getSnapshot().resetPending).toBe(true);
+    expect(JSON.stringify(outcome)).not.toContain("private object URL failure");
   });
 
   it("notifies only real reset confirmation transitions", () => {

@@ -116,7 +116,11 @@ export function PriceTrendChart({ trend }: { trend: PriceHistoryTrendPresentatio
           </circle>
         ))}
       </svg>
-      <ol className="economy-trend-points" aria-label={`Price points for ${trend.itemLabel}`}>
+      <ol
+        className="economy-trend-points"
+        aria-label={`Price points for ${trend.itemLabel}`}
+        tabIndex={0}
+      >
         {trend.points.map((point, index) => (
           <li key={`${point.snapshotKey}-${index}`}>
             <PriceTime presentation={point.captureTime} />

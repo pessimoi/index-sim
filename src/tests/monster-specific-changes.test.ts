@@ -69,6 +69,7 @@ function allChangesLive(): MonsterSpecificLiveState {
 
 function recoveryBoundary(): MonsterSpecificRecoveryBoundary {
   return {
+    canStartDurableWrite: vi.fn(() => true),
     prepareExternalApply: vi.fn(),
     cancelExternalApply: vi.fn(),
     completeExternalApply: vi.fn(),

@@ -56,7 +56,10 @@ function controller(
       storage,
       storageUnavailable: false,
       onStatus: (message) => statuses.push(message),
-      onDownload: (fileName, value) => downloads.push({ fileName, value }),
+      onDownload: (fileName, value) => {
+        downloads.push({ fileName, value });
+        return { status: "requested", fileName, byteLength: JSON.stringify(value).length };
+      },
       now: () => FIXED_NOW,
       ...overrides
     }),
@@ -343,7 +346,7 @@ describe("local state recovery controller", () => {
     );
     const { controller: recovery, downloads } = controller(storage);
 
-    recovery.exportReport();
+    const outcome = recovery.exportReport();
 
     expect(downloads).toHaveLength(1);
     expect(downloads[0]?.fileName).toBe(
@@ -353,6 +356,44 @@ describe("local state recovery controller", () => {
     expect(serialized).toContain(MANUAL_PRICE_OVERRIDES_STORAGE_KEY);
     expect(serialized).not.toContain("private-secret-item");
     expect(serialized).not.toContain("987654");
+    expect(outcome).toMatchObject({
+      status: "requested",
+      fileName: "index-sim-local-state-health-2026-07-13T12-34-56.000Z.json",
+      appStatus:
+        "Recovery report download started: index-sim-local-state-health-2026-07-13T12-34-56.000Z.json. Check your browser downloads."
+    });
+  });
+
+  it("reports recovery export failure without clearing pending recovery state or leaking errors", () => {
+    const storage = createMemoryStorage({
+      [HIDDEN_GEAR_TIERS_STORAGE_KEY]: "{invalid"
+    });
+    const { controller: recovery, statuses } = controller(storage, {
+      onDownload: () => {
+        throw new Error("private recovery download failure");
+      }
+    });
+    recovery.beginClear("hidden-gear-tiers");
+
+    const outcome = recovery.exportReport();
+
+    expect(outcome).toEqual({
+      status: "failed",
+      appStatus: "Recovery report download could not be started. Try again.",
+      notice: {
+        tone: "error",
+        message: "Recovery report download could not be started. Try again."
+      }
+    });
+    expect(recovery.getSnapshot().pendingClearId).toBe("hidden-gear-tiers");
+    expect(recovery.getSnapshot().notice).toBe(
+      "Recovery report download could not be started. Try again."
+    );
+    expect(recovery.getSnapshot().exportNotice).toEqual(outcome.notice);
+    expect(statuses.at(-1)).toBe("Recovery report download could not be started. Try again.");
+    expect(JSON.stringify(recovery.getSnapshot())).not.toContain(
+      "private recovery download failure"
+    );
   });
 
   it("returns the manual-price ID needed for the caller-owned reset", () => {

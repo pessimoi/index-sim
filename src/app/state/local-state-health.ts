@@ -142,7 +142,7 @@ export interface LocalStateClearResult {
 
 type HealthLoadResult = LoadPersistedResult<unknown> | ReturnType<typeof loadSelectedPriceSet>;
 
-interface LocalStateHealthDescriptor {
+export interface LocalStateHealthDescriptor {
   id: LocalStateHealthItemId;
   label: string;
   key: string;

@@ -160,6 +160,7 @@ function instrumentedStorage(initial: Record<string, string> = {}): Instrumented
 
 function recoveryBoundary() {
   const recovery: WorkspaceRestoreRecoveryBoundary = {
+    canStartDurableWrite: vi.fn(() => true),
     prepareExternalApply: vi.fn(),
     cancelExternalApply: vi.fn(),
     completeExternalApply: vi.fn(),
@@ -225,7 +226,10 @@ describe("Workspace restore executor", () => {
     );
 
     expect(applied).toMatchObject({ status: "applied", mode: "durable" });
-    expect(harness.reads).toEqual(WORKSPACE_RESTORE_STORAGE_TARGETS.map((target) => target.key));
+    expect(harness.reads).toEqual([
+      ...WORKSPACE_RESTORE_STORAGE_TARGETS.map((target) => target.key),
+      ...WORKSPACE_RESTORE_STORAGE_TARGETS.map((target) => target.key)
+    ]);
     expect(harness.mutations.slice(0, 10)).toEqual(
       WORKSPACE_RESTORE_STORAGE_TARGETS.map((target) => `set:${target.key}`)
     );

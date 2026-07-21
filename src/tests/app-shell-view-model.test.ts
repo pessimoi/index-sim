@@ -14,6 +14,7 @@ import { createGeneratedRuntimeContext } from "../adapters/generated";
 import {
   WORKBENCH_TABS,
   createAppShellSetupViewModel,
+  createSetupEditorContextViewModel,
   createSharedSetupReviewViewModel,
   createWorkbenchResultViewModel,
   describeShareableSetupError,
@@ -65,8 +66,10 @@ describe("app shell view model", () => {
     });
     const viewModel = createAppShellSetupViewModel({
       form,
+      setupMode: "default",
       hasCurrentCustomSetup: true,
-      activeSetupIsCustom: false,
+      currentMonsterLabel: "Hill Giant",
+      setupPersistenceKind: "saved",
       weaponName: "Staff of air",
       ammoName: "None",
       spellName: "Fire strike",
@@ -91,7 +94,16 @@ describe("app shell view model", () => {
       extraBoostCount: 0,
       prayerSelectionSummary: "incredible + steel skin",
       boostSelectionSummary: "magic",
-      setupStatus: "Default setup - custom saved",
+      editor: {
+        mode: "default",
+        modeLabel: "Editing default",
+        savedCustomDescription: "Custom setup saved for Hill Giant.",
+        persistence: {
+          kind: "saved",
+          label: "Saved locally",
+          description: "Changes save automatically in this browser."
+        }
+      },
       accuracyLabel: "M+%",
       damageLabel: "DMG%",
       derivedAccuracyPlaceholder: "+12",
@@ -108,6 +120,79 @@ describe("app shell view model", () => {
       { label: "Prayers", value: "incredible + steel skin" },
       { label: "Boosts", value: "magic" },
       { label: "Status", value: "Requirements met", tone: "ready" }
+    ]);
+  });
+
+  it("builds exact setup mode actions and persistence states", () => {
+    const defaultOnly = createSetupEditorContextViewModel({
+      setupMode: "default",
+      hasCurrentCustomSetup: false,
+      currentMonsterLabel: "Hill Giant",
+      persistenceKind: "saving"
+    });
+    const defaultWithCustom = createSetupEditorContextViewModel({
+      setupMode: "default",
+      hasCurrentCustomSetup: true,
+      currentMonsterLabel: "Hill Giant",
+      persistenceKind: "session-only"
+    });
+    const custom = createSetupEditorContextViewModel({
+      setupMode: "custom",
+      hasCurrentCustomSetup: true,
+      currentMonsterLabel: "Hill Giant",
+      persistenceKind: "failed"
+    });
+    const inconsistent = createSetupEditorContextViewModel({
+      setupMode: "custom",
+      hasCurrentCustomSetup: false,
+      currentMonsterLabel: "Hill Giant",
+      persistenceKind: "saved"
+    });
+
+    expect(defaultOnly).toMatchObject({
+      mode: "default",
+      modeLabel: "Editing default",
+      savedCustomDescription: null,
+      persistence: { kind: "saving", label: "Saving…" }
+    });
+    expect(defaultOnly.actions.map((action) => action.label)).toEqual([
+      "Create monster setup",
+      "Reset active setup"
+    ]);
+    expect(defaultOnly.scopeDescription).toContain(
+      "Default applies to monsters without their own setup"
+    );
+    expect(defaultOnly.compactScopeDescription).toContain(
+      "Default: monsters without their own setup"
+    );
+
+    expect(defaultWithCustom).toMatchObject({
+      mode: "default",
+      modeLabel: "Editing default",
+      savedCustomDescription: "Custom setup saved for Hill Giant.",
+      persistence: { kind: "session-only", label: "Session only" }
+    });
+    expect(defaultWithCustom.actions.map((action) => action.label)).toEqual([
+      "Edit monster setup",
+      "Remove monster setup",
+      "Reset active setup"
+    ]);
+
+    expect(custom).toMatchObject({
+      mode: "custom",
+      modeLabel: "Editing custom",
+      savedCustomDescription: null,
+      persistence: { kind: "failed", label: "Could not save" }
+    });
+    expect(custom.actions.map((action) => action.label)).toEqual([
+      "Edit default setup",
+      "Remove monster setup",
+      "Reset active setup"
+    ]);
+    expect(inconsistent.mode).toBe("default");
+    expect(inconsistent.actions.map((action) => action.label)).toEqual([
+      "Create monster setup",
+      "Reset active setup"
     ]);
   });
 

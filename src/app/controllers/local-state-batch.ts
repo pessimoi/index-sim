@@ -38,6 +38,7 @@ export function restoreLocalStateBatch<Id extends string>(
       const raw = preimages.get(operation.key) ?? null;
       if (raw === null) storage.removeItem(operation.key);
       else storage.setItem(operation.key, raw);
+      if (storage.getItem(operation.key) !== raw) failures.push(operation);
     } catch {
       failures.push(operation);
     }
@@ -64,6 +65,9 @@ export function executeLocalStateBatch<Id extends string>(
     try {
       if (operation.targetRaw === null) storage.removeItem(operation.key);
       else storage.setItem(operation.key, operation.targetRaw);
+      if (storage.getItem(operation.key) !== operation.targetRaw) {
+        throw new Error("local-state postimage verification failed");
+      }
     } catch {
       return {
         status: "failed",

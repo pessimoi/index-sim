@@ -54,17 +54,14 @@ export interface LoadoutPanePresentationModel extends LoadoutPaneViewModel {
   hitDistributionComparison: HitDistributionComparisonViewModel;
 }
 
-export function LoadoutPane({
-  hidden,
-  viewModel,
-  actions,
-  weaponTriggerRef
-}: {
+export interface LoadoutPaneProps {
   hidden: boolean;
   viewModel: LoadoutPanePresentationModel;
   actions: LoadoutPaneActions;
   weaponTriggerRef?: Ref<HTMLButtonElement>;
-}) {
+}
+
+export function LoadoutPane({ hidden, viewModel, actions, weaponTriggerRef }: LoadoutPaneProps) {
   return (
     <>
       <section className="equipment-pane" aria-label="Equipment loadout" hidden={hidden}>

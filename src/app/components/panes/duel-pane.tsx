@@ -337,7 +337,7 @@ export function DuelPane({ hidden, model, actions }: DuelPaneProps) {
       {duelImportNotice && (
         <InlineImportNotice
           notice={duelImportNotice}
-          ariaLabel="Saved setup import notice"
+          ariaLabel="Saved setup transfer notice"
           className="duel-import-notice"
         />
       )}

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useId, type Ref, type RefObject } from "react";
+import { useId, type Ref, type RefObject } from "react";
 import type {
   LocalStateHealthItemId,
   LocalStateHealthReport
@@ -31,17 +31,28 @@ import { PriceTime, PriceTimeFactPair } from "../price-time";
 import type { PriceDateTimePresentation } from "../../view-models/price-time";
 import { LocalStateRecoveryPanel } from "../settings/local-state-recovery-panel";
 import {
+  CrossTabConflictPanel,
+  type CrossTabConflictPanelActions,
+  type CrossTabConflictPanelModel
+} from "../settings/cross-tab-conflict-panel";
+import {
   MonsterSpecificChangesPanel,
   type MonsterSpecificChangesPanelActions,
   type MonsterSpecificChangesPanelModel
 } from "../settings/monster-specific-changes-panel";
 import type {
   WorkspaceBackupPanelActions,
-  WorkspaceBackupPanelModel
+  WorkspaceBackupPanelModel,
+  WorkspaceBackupPanelProps
 } from "../settings/workspace-backup-panel";
 import { importPriceSetFromInput } from "./price-set-import-input";
+import { NestedPaneBoundary } from "../shell/pane-boundary";
+import { createTrackedLazyPane } from "../shell/tracked-lazy-pane";
 
-const WorkspaceBackupPanel = lazy(() => import("../settings/workspace-backup-panel"));
+const trackedWorkspaceBackupPanel = createTrackedLazyPane<WorkspaceBackupPanelProps>(
+  () => import("../settings/workspace-backup-panel")
+);
+const WorkspaceBackupPanel = trackedWorkspaceBackupPanel.Component;
 
 export type EconomySettingsPaneMode = "economy" | "settings" | "hidden";
 
@@ -79,8 +90,10 @@ export interface EconomySettingsPaneModel {
     visible: boolean;
     report: LocalStateHealthReport;
     notice: string | null;
+    exportNotice?: { tone: "neutral" | "error"; message: string };
     pendingClearId: LocalStateClearPendingId;
   };
+  crossTab?: CrossTabConflictPanelModel;
   monsterChanges: MonsterSpecificChangesPanelModel;
   workspace: WorkspaceBackupPanelModel;
 }
@@ -131,6 +144,7 @@ export interface EconomySettingsPaneActions {
     confirmClearItem(id: LocalStateHealthItemId): void;
     confirmClearInvalid(): void;
   };
+  crossTab?: CrossTabConflictPanelActions;
   monsterChanges: MonsterSpecificChangesPanelActions;
   workspace: WorkspaceBackupPanelActions;
 }
@@ -346,7 +360,7 @@ export function EconomySettingsPane({
   return (
     <section
       className={economyVisible ? "economy-pane" : "service-strip"}
-      aria-label={economyVisible ? "Economy" : "Live services"}
+      aria-label={economyVisible ? "Economy" : settingsVisible ? "Settings" : "Live services"}
       hidden={hidden}
     >
       {settingsVisible && (
@@ -394,6 +408,9 @@ export function EconomySettingsPane({
           <p className="inline-status neutral">Setup transfers do not include prices.</p>
         </section>
       )}
+      {settingsVisible && model.crossTab && actions.crossTab && (
+        <CrossTabConflictPanel model={model.crossTab} actions={actions.crossTab} />
+      )}
       {settingsVisible && (
         <MonsterSpecificChangesPanel
           model={model.monsterChanges}
@@ -401,14 +418,10 @@ export function EconomySettingsPane({
         />
       )}
       {settingsVisible && (
-        <Suspense
-          fallback={
-            <section className="service-group workspace-backup-panel" aria-label="Workspace tools">
-              <p className="inline-status neutral" role="status">
-                Loading Workspace tools…
-              </p>
-            </section>
-          }
+        <NestedPaneBoundary
+          active
+          label="Workspace tools"
+          moduleLoaded={trackedWorkspaceBackupPanel.isLoaded}
         >
           <WorkspaceBackupPanel
             model={model.workspace}
@@ -416,12 +429,13 @@ export function EconomySettingsPane({
             importInputRef={workspaceImportInputRef}
             reviewHeadingRef={workspaceReviewHeadingRef}
           />
-        </Suspense>
+        </NestedPaneBoundary>
       )}
       <LocalStateRecoveryPanel
         visible={settingsVisible && model.recovery.visible}
         report={model.recovery.report}
         notice={model.recovery.notice}
+        exportNotice={model.recovery.exportNotice}
         pendingClearId={model.recovery.pendingClearId}
         onExport={actions.recovery.exportReport}
         onBeginClear={actions.recovery.beginClear}
@@ -627,6 +641,7 @@ export function EconomySettingsPane({
             <p
               className={`inline-status ${model.marketNotice.tone}`}
               role={model.marketNotice.tone === "error" ? "alert" : "status"}
+              aria-label="Market action notice"
             >
               {model.marketNotice.message}
             </p>

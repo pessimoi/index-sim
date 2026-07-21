@@ -65,6 +65,7 @@ function createSummaryItems(report: LegacySetupMigrationReport): string[] {
   const cannonMapFound =
     report.cannonByMonster != null ||
     report.skippedFields.some((field) => field.field.startsWith("sim_input_v3.cannonByMonster"));
+  const duelSnapshotsReady = (report.duelSnapshots?.snapshots.length ?? 0) > 0;
   const duelSnapshotsFound =
     report.duelSnapshots != null ||
     report.skippedFields.some((field) => field.field.startsWith("sim_input_v3.duelSetups"));
@@ -98,7 +99,7 @@ function createSummaryItems(report: LegacySetupMigrationReport): string[] {
       : cannonMapFound
         ? "Cannon map skipped"
         : "No cannon map",
-    report.duelSnapshots != null
+    duelSnapshotsReady
       ? "Saved setups ready"
       : duelSnapshotsFound
         ? "Saved setups skipped"
@@ -131,7 +132,7 @@ function createImportPlan(report: LegacySetupMigrationReport): string[] {
   if (report.cannonByMonster != null) {
     items.push("Legacy cannon map into rewrite per-monster cannon settings");
   }
-  if (report.duelSnapshots != null) {
+  if ((report.duelSnapshots?.snapshots.length ?? 0) > 0) {
     items.push("Legacy setup comparisons into saved setup storage");
   }
   if (report.lootPrefs != null) {
@@ -257,34 +258,20 @@ function createOutcomeItems(
   return items;
 }
 
-function isImportReady(report: LegacySetupMigrationReport): boolean {
-  // Preserve the current App predicate. Duel snapshots alone intentionally do
-  // not make the button ready; the specification records that as a follow-up.
-  return (
-    report.setup != null ||
-    report.customSetupsByMonster != null ||
-    report.cannonByMonster != null ||
-    report.lootPrefs != null ||
-    report.hiddenGearTiers != null ||
-    report.denseCompareSort != null ||
-    report.irrelevantMonsterIds != null ||
-    report.hiscoresPlayer != null ||
-    report.priceSet != null
-  );
-}
-
 export function createLegacyMigrationViewModel(input: {
   report: LegacySetupMigrationReport;
   hasRewriteSetup: boolean;
 }): LegacyMigrationViewModel {
   const { report, hasRewriteSetup } = input;
   const importPlan = createImportPlan(report);
-  const importReady = isImportReady(report);
+  const importReady = importPlan.length > 0;
   const clearKeys = report.keyReview.filter((item) => item.clearDeletes).map((item) => item.key);
 
   return {
     tone: !hasRewriteSetup && report.foundKeys.includes(LEGACY_INPUT_STORAGE_KEY) ? "ready" : "",
-    statusLabel: importReady ? `${report.importedFields.length} compatible fields` : "review only",
+    statusLabel: importReady
+      ? `${formatNumber(importPlan.length)} compatible area${importPlan.length === 1 ? "" : "s"}`
+      : "review only",
     importReady,
     summaryItems: createSummaryItems(report),
     outcomeItems: createOutcomeItems(report, importPlan),

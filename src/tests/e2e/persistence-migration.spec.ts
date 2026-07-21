@@ -18,6 +18,69 @@ import {
 import type { Locator } from "./scaffold-fixture";
 import { RewriteSetupTransferEnvelopeV1Schema } from "../../app/state/setup-import";
 
+test("imports validated Duel-only legacy data from the one compatible area", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      "sim_input_v3",
+      JSON.stringify({
+        duelSetups: [
+          {
+            name: "Duel only fixture",
+            setup: {
+              combatType: "melee",
+              weapon: "dragon_longsword",
+              style: "slash"
+            }
+          }
+        ]
+      })
+    );
+  });
+
+  await page.goto("/");
+  const migration = page.getByLabel("Legacy setup migration");
+  const importButton = migration.getByRole("button", { name: "Import compatible data" });
+  await expect(migration.getByLabel("Legacy data summary")).toContainText("Saved setups ready");
+  await expect(migration.getByLabel("Legacy import and review plan")).toContainText(
+    "Legacy setup comparisons into saved setup storage"
+  );
+  await expect(migration).toContainText(
+    "Import action: 1 compatible area ready; legacy keys stay in storage."
+  );
+  await expect(migration.locator(".status-pill")).toHaveText("1 compatible area");
+  await expect(importButton).toBeEnabled();
+  await expect(page.getByLabel("TARGET", { exact: true })).toHaveValue("giant");
+
+  await importButton.click();
+
+  await expect(migration).toHaveCount(0);
+  await expectAppStatus(page, "Imported compatible legacy data");
+  await expect(page.getByLabel("TARGET", { exact: true })).toHaveValue("giant");
+  const stored = await page.evaluate(() => ({
+    legacy: window.localStorage.getItem("sim_input_v3"),
+    dismissed: window.localStorage.getItem("index-sim:legacy-migration-dismissed"),
+    duel: window.localStorage.getItem("index-sim:duel-snapshots"),
+    setup: window.localStorage.getItem("index-sim:rewrite-setup")
+  }));
+  expect(stored.legacy).toContain("Duel only fixture");
+  expect(stored.dismissed).not.toBeNull();
+  expect(stored.duel).toContain("Duel only fixture");
+  expect(stored.setup).not.toContain("dragon_longsword");
+
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Setups" }).click();
+  await expect(page.getByRole("region", { name: "Setup comparison", exact: true })).toContainText(
+    "Duel only fixture"
+  );
+
+  await page.reload();
+  await expect(page.getByLabel("Legacy setup migration")).toHaveCount(0);
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Setups" }).click();
+  await expect(page.getByRole("region", { name: "Setup comparison", exact: true })).toContainText(
+    "Duel only fixture"
+  );
+  await expect(page.getByLabel("TARGET", { exact: true })).toHaveValue("giant");
+});
+
 test("reviews and imports compatible legacy setup data", async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem(
@@ -727,6 +790,10 @@ test("keeps global actions focused and completes setup export and Import setup r
   await topbarActions.getByRole("button", { name: "Export setup" }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe("index-sim-rewrite-setup.json");
+  await expect(page.getByLabel("Setup transfer notice")).toHaveText(
+    "Setup download started: index-sim-rewrite-setup.json. Check your browser downloads."
+  );
+  await expect(topbarActions.getByRole("button", { name: "Export setup" })).toBeFocused();
   const exportedText = await readDownloadText(download);
   const exported = RewriteSetupTransferEnvelopeV1Schema.parse(JSON.parse(exportedText));
   expect(exported.kind).toBe("index-sim-rewrite-setup");
@@ -813,7 +880,7 @@ test("keeps global actions focused and completes setup export and Import setup r
   await expect(review).toContainText("active form, default form, setup mode, custom setups");
   await expect(review).toContainText("older format does not record a game revision");
   await expect(review).not.toContainText("dragon_longsword");
-  await expect(page.getByLabel("Setup context")).toContainText("Default setup");
+  await expect(page.getByLabel("Setup context")).toContainText("Editing default");
   expect(
     await page.evaluate(
       () => JSON.parse(window.localStorage.getItem("index-sim:rewrite-setup") ?? "null").data
@@ -835,7 +902,7 @@ test("keeps global actions focused and completes setup export and Import setup r
     .getByRole("button", { name: "Apply imported setup" })
     .click();
 
-  const setupNotice = page.getByLabel("Setup import notice");
+  const setupNotice = page.getByLabel("Setup transfer notice");
   await expect(setupNotice).toHaveText("Imported rewrite setup using current Revision 274 data.");
   await expect(setupNotice).toHaveAttribute("role", "status");
   await expect(setupNotice).toHaveClass(/topbar-import-notice setup-import-notice/);
@@ -850,7 +917,7 @@ test("keeps global actions focused and completes setup export and Import setup r
     "Imported rewrite setup using current Revision 274 data."
   );
   await expect(page.getByLabel("TARGET", { exact: true })).toHaveValue("giant");
-  await expect(page.getByLabel("Setup context")).toContainText("Custom setup");
+  await expect(page.getByLabel("Setup context")).toContainText("Editing custom");
 
   await tabs.getByRole("tab", { name: "Planner" }).click();
   await expect(planner.getByLabel("Attack current XP")).toHaveValue("");
@@ -887,10 +954,10 @@ test("keeps global actions focused and completes setup export and Import setup r
   const importUndo = page.getByLabel("Local state undo");
   await expect(importUndo).toContainText("Imported rewrite setup using current Revision 274 data.");
   await importUndo.getByRole("button", { name: "Undo" }).click();
-  await expect(page.getByLabel("Setup import notice")).toHaveText(
+  await expect(page.getByLabel("Setup transfer notice")).toHaveText(
     "Restored setup from before import."
   );
-  await expect(page.getByLabel("Setup context")).toContainText("Default setup");
+  await expect(page.getByLabel("Setup context")).toContainText("Editing default");
   await expect(page.getByLabel("Combat setup").getByLabel("ATT", { exact: true })).toHaveValue(
     "60"
   );
@@ -926,9 +993,9 @@ test("keeps global actions focused and completes setup export and Import setup r
   await tabs.getByRole("tab", { name: "Melee setup" }).click();
   await page
     .getByLabel("Setup context")
-    .getByRole("button", { name: "Remove custom setup" })
+    .getByRole("button", { name: "Remove monster setup" })
     .click();
-  await expect(page.getByLabel("Setup context")).toContainText("Default setup");
+  await expect(page.getByLabel("Setup context")).toContainText("Editing default");
   await expectSearchableSelection(loadout, "Weapon", "rune_scimitar");
 });
 
@@ -944,6 +1011,7 @@ test("applies and undoes an imported setup for the session when persistence fail
     };
   });
   await page.goto("/");
+  await expect(page.getByLabel("Setup saving status")).toContainText("Could not save");
 
   const importedSetup = savedSetupFromForm({
     ...DEFAULT_FORM_STATE,
@@ -972,7 +1040,7 @@ test("applies and undoes an imported setup for the session when persistence fail
     .getByRole("button", { name: "Apply imported setup" })
     .click();
 
-  await expect(page.getByLabel("Setup import notice")).toContainText(
+  await expect(page.getByLabel("Setup transfer notice")).toContainText(
     "Imported rewrite setup using current Revision 274 data for this session"
   );
   await expect(page.getByLabel("TARGET", { exact: true })).toHaveValue("dagannoth");
@@ -987,10 +1055,11 @@ test("applies and undoes an imported setup for the session when persistence fail
   await expect(page.getByLabel("Combat setup").getByLabel("ATT", { exact: true })).toHaveValue(
     "60"
   );
-  await expect(page.getByLabel("Setup import notice")).toContainText(
+  await expect(page.getByLabel("Setup transfer notice")).toContainText(
     "Restored setup from before import for this session"
   );
   await expect(page.getByRole("complementary", { name: "Changes may not persist" })).toBeVisible();
+  await expect(page.getByLabel("Setup saving status")).toContainText("Could not save");
 });
 
 test("round-trips a full PriceSet through the one advanced Market workflow", async ({ page }) => {
@@ -1029,6 +1098,12 @@ test("round-trips a full PriceSet through the one advanced Market workflow", asy
   await advancedPriceSetTools.getByRole("button", { name: "Export active PriceSet" }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(/^index-sim-price-set-.+\.json$/);
+  await expect(page.getByLabel("Market action notice")).toHaveText(
+    `PriceSet download started: ${download.suggestedFilename()}. Check your browser downloads.`
+  );
+  await expect(
+    advancedPriceSetTools.getByRole("button", { name: "Export active PriceSet" })
+  ).toBeFocused();
   const exportedText = await readDownloadText(download);
   const exported = JSON.parse(exportedText);
   expect(exported).toMatchObject({
@@ -1082,7 +1157,7 @@ test("keeps setup import failures non-fatal and retryable", async ({ page }) => 
   });
 
   await expect(page.getByLabel("Workbench shell")).toBeVisible();
-  await expect(page.getByLabel("Setup import notice")).toContainText("not valid JSON");
+  await expect(page.getByLabel("Setup transfer notice")).toContainText("not valid JSON");
   await expect(page.getByLabel("TARGET", { exact: true })).toHaveValue("dagannoth");
   expect(await resultMetricSnapshot(page)).toEqual(beforeMetrics);
   expect(await page.evaluate(() => window.localStorage.getItem("index-sim:rewrite-setup"))).toBe(
@@ -1103,7 +1178,7 @@ test("keeps setup import failures non-fatal and retryable", async ({ page }) => 
   });
 
   await expect(page.getByLabel("Workbench shell")).toBeVisible();
-  await expect(page.getByLabel("Setup import notice")).toContainText("version");
+  await expect(page.getByLabel("Setup transfer notice")).toContainText("version");
   await expect(page.getByLabel("TARGET", { exact: true })).toHaveValue("dagannoth");
   expect(await resultMetricSnapshot(page)).toEqual(beforeMetrics);
   expect(await page.evaluate(() => window.localStorage.getItem("index-sim:rewrite-setup"))).toBe(
@@ -1201,4 +1276,66 @@ test("keeps PriceSet import failures non-fatal and recoverable", async ({ page }
   );
   await expect(priceSetSummary).toContainText("Label Imported after error prices");
   await expect(historySummary).toContainText("Snapshots 1");
+});
+
+test("downloads a metadata-only recovery report with truthful request feedback", async ({
+  page
+}) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem("index-sim:hidden-gear-tiers", "{private invalid payload");
+  });
+  await page.goto("/");
+  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Settings" }).click();
+  const recovery = page.getByRole("region", { name: "Local state recovery" });
+  await expect(recovery).toBeVisible();
+
+  const downloadPromise = page.waitForEvent("download");
+  await recovery.getByRole("button", { name: "Export recovery report" }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(
+    /^index-sim-local-state-health-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.\d{3}Z\.json$/
+  );
+  await expect(recovery.getByLabel("Recovery export notice")).toHaveText(
+    `Recovery report download started: ${download.suggestedFilename()}. Check your browser downloads.`
+  );
+  await expect(recovery.getByRole("button", { name: "Export recovery report" })).toBeFocused();
+  const exportedText = await readDownloadText(download);
+  const exported = JSON.parse(exportedText) as {
+    itemCount: number;
+    attentionCount: number;
+    items: Array<{ id: string; storageKey: string; status: string }>;
+  };
+  expect(exported.itemCount).toBeGreaterThan(0);
+  expect(exported.attentionCount).toBeGreaterThan(0);
+  expect(exported.items).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        id: "hidden-gear-tiers",
+        storageKey: "index-sim:hidden-gear-tiers",
+        status: "invalid"
+      })
+    ])
+  );
+  expect(exportedText).not.toContain("private invalid payload");
+});
+
+test("keeps a synchronous browser download failure fixed, focused and recoverable", async ({
+  page
+}) => {
+  await page.addInitScript(() => {
+    URL.createObjectURL = () => {
+      throw new Error("private browser object URL failure");
+    };
+  });
+  await page.goto("/");
+  const exportButton = page.getByRole("button", { name: "Export setup" });
+
+  await exportButton.click();
+
+  const notice = page.getByLabel("Setup transfer notice");
+  await expect(notice).toHaveText("Setup download could not be started. Try again.");
+  await expect(notice).toHaveAttribute("role", "alert");
+  await expect(exportButton).toBeFocused();
+  await expect(page.getByLabel("Simulation results")).toBeVisible();
+  await expect(page.locator("body")).not.toContainText("private browser object URL failure");
 });

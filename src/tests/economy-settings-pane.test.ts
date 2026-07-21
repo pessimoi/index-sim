@@ -267,9 +267,7 @@ describe("Economy and Settings pane", () => {
       createElement(EconomySettingsPane, { model: model("settings"), actions: defaultActions })
     );
 
-    expect(markup.startsWith('<section class="service-strip" aria-label="Live services">')).toBe(
-      true
-    );
+    expect(markup.startsWith('<section class="service-strip" aria-label="Settings">')).toBe(true);
     inOrder(markup, [
       'aria-label="Calculation context"',
       "Revision 274",

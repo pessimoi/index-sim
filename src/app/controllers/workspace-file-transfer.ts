@@ -1,4 +1,5 @@
 import type { GameDataSnapshot } from "@/domain/shared";
+import type { JsonDownloadRequestResult } from "@/adapters/browser";
 import type { BrowserStorageAccess } from "../application-recovery";
 import {
   WORKSPACE_BACKUP_IMPORT_MAX_BYTES,
@@ -24,6 +25,11 @@ import type {
   WorkspaceRestoreExecutorCore,
   WorkspaceRestoreUndoOutcome
 } from "./workspace-restore-executor";
+import {
+  failedFileExportOutcome,
+  requestFileExport,
+  type FileExportOutcome
+} from "./file-export-outcome";
 
 export type {
   WorkspaceAreaReview,
@@ -73,7 +79,7 @@ export interface WorkspaceFileTransferSnapshot {
 export type WorkspacePrepareOutcome =
   { status: "review"; reviewId: number } | { status: "rejected" } | { status: "stale" };
 
-export type WorkspaceExportOutcome = { status: "exported" } | { status: "rejected" };
+export type WorkspaceExportOutcome = FileExportOutcome;
 
 export type WorkspaceRestorePlanOutcome =
   { status: "updated"; plan: WorkspaceRestorePlan } | { status: "stale" } | { status: "rejected" };
@@ -86,7 +92,7 @@ export interface WorkspaceExportInput {
 
 export interface WorkspaceFileTransferDependencies<TFile> {
   readFileText(file: TFile, maxBytes: number): Promise<string>;
-  downloadJsonFile(fileName: string, value: unknown): void;
+  downloadJsonFile(fileName: string, value: unknown): JsonDownloadRequestResult;
   now(): Date;
 }
 
@@ -179,21 +185,21 @@ export class WorkspaceFileTransferControllerCore<TFile> {
         includeLastHiscoresPlayer: this.snapshot.includeLastHiscoresPlayer,
         now: this.dependencies.now()
       } satisfies CreateWorkspaceBackupExportInput);
-      this.dependencies.downloadJsonFile(exportResult.fileName, exportResult.envelope);
+      const outcome = requestFileExport("workspace", exportResult.fileName, () =>
+        this.dependencies.downloadJsonFile(exportResult.fileName, exportResult.envelope)
+      );
       this.publish({
         ...this.snapshot,
-        notice: { tone: "success", message: "Workspace backup downloaded." }
+        notice: outcome.notice
       });
-      return { status: "exported" };
+      return outcome;
     } catch {
+      const outcome = failedFileExportOutcome("workspace");
       this.publish({
         ...this.snapshot,
-        notice: {
-          tone: "error",
-          message: "Workspace export failed. Current browser state was not changed."
-        }
+        notice: outcome.notice
       });
-      return { status: "rejected" };
+      return outcome;
     }
   };
 

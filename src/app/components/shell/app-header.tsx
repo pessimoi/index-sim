@@ -90,7 +90,7 @@ export function AppHeader({
           {setupImportNotice && (
             <InlineImportNotice
               notice={setupImportNotice}
-              ariaLabel="Setup import notice"
+              ariaLabel="Setup transfer notice"
               className="topbar-import-notice setup-import-notice"
             />
           )}

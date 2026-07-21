@@ -81,6 +81,8 @@ function median(values) {
 function summarize(samples) {
   const numericKeys = [
     "appReadyMs",
+    "shellReadyMs",
+    "initialPaneReadyMs",
     "domContentLoadedMs",
     "loadMs",
     "firstContentfulPaintMs",
@@ -88,17 +90,52 @@ function summarize(samples) {
     "transferBytes",
     "decodedBodyBytes",
     "javascriptTransferBytes",
-    "javascriptDecodedBodyBytes"
+    "javascriptDecodedBodyBytes",
+    "shellJavascriptRequestCount",
+    "shellJavascriptTransferBytes",
+    "shellJavascriptDecodedBodyBytes",
+    "initialPaneJavascriptRequestCount",
+    "initialPaneJavascriptTransferBytes",
+    "initialPaneJavascriptDecodedBodyBytes"
   ];
   return Object.fromEntries(
     numericKeys.map((key) => [key, Math.round(median(samples.map((sample) => sample[key])))])
   );
 }
 
+async function readJavaScriptCheckpoint(page, prefix) {
+  return page.evaluate((checkpointPrefix) => {
+    const checkpointMs = Math.round(globalThis.performance.now());
+    const resources = globalThis.performance
+      .getEntriesByType("resource")
+      .filter(
+        (entry) =>
+          (entry.initiatorType === "script" || entry.name.endsWith(".js")) &&
+          entry.responseEnd <= checkpointMs
+      );
+    const sum = (key) =>
+      Math.round(resources.reduce((total, entry) => total + (Number(entry[key]) || 0), 0));
+    return {
+      [`${checkpointPrefix}ReadyMs`]: checkpointMs,
+      [`${checkpointPrefix}JavascriptRequestCount`]: resources.length,
+      [`${checkpointPrefix}JavascriptTransferBytes`]: sum("transferSize"),
+      [`${checkpointPrefix}JavascriptDecodedBodyBytes`]: sum("decodedBodySize"),
+      [`${checkpointPrefix}JavaScriptPaths`]: resources.map(
+        (entry) => new globalThis.URL(entry.name).pathname
+      )
+    };
+  }, prefix);
+}
+
 async function readMetrics(page) {
-  await page.waitForLoadState("load");
   await page.locator('[data-app-startup-state="ready"]').waitFor({ state: "visible" });
-  return page.evaluate(() => {
+  const shell = await readJavaScriptCheckpoint(page, "shell");
+  await page
+    .locator('#workbench-active-panel[data-pane-load-state="ready"]')
+    .waitFor({ state: "visible" });
+  const initialPane = await readJavaScriptCheckpoint(page, "initialPane");
+  await page.waitForLoadState("load");
+  const totals = await page.evaluate(() => {
     const navigation = globalThis.performance.getEntriesByType("navigation")[0];
     const resources = globalThis.performance.getEntriesByType("resource");
     const firstContentfulPaint = globalThis.performance
@@ -128,6 +165,12 @@ async function readMetrics(page) {
       }))
     };
   });
+  return {
+    ...totals,
+    appReadyMs: shell.shellReadyMs,
+    ...shell,
+    ...initialPane
+  };
 }
 
 async function measurePair(browser, origin) {

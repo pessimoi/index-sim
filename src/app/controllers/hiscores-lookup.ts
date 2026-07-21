@@ -48,6 +48,8 @@ export interface HiscoresLookupDependencies {
   ) => void;
   unblockReplaced: (ids: readonly LocalStateHealthItemId[]) => void;
   refreshLocalStateHealth: () => void;
+  canStartDurableWrite: (ids: readonly LocalStateHealthItemId[]) => boolean;
+  recordCurrentBaselines: (ids: readonly LocalStateHealthItemId[]) => void;
 }
 
 export function hiscoresUnavailableMessage(status: HiscoresStatusResponse | null): string {
@@ -158,10 +160,12 @@ export class HiscoresLookupControllerCore {
   };
 
   private persistPlayer(player: string): boolean {
+    if (!this.dependencies.canStartDurableWrite(["hiscores-last-player"])) return false;
     let persisted = true;
     try {
       saveLastHiscoresPlayer(this.dependencies.storage, player);
       this.dependencies.clearStorageFailures(["hiscores-last-player"]);
+      this.dependencies.recordCurrentBaselines(["hiscores-last-player"]);
     } catch {
       persisted = false;
       this.dependencies.recordStorageFailure("hiscores-last-player", "save_failed");

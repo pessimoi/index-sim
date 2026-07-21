@@ -594,7 +594,7 @@ describe("Workspace restore planning", () => {
     }
     const dependencies: WorkspaceFileTransferDependencies<TestFile> = {
       readFileText: async (file) => file.text,
-      downloadJsonFile: () => undefined,
+      downloadJsonFile: (fileName) => ({ status: "requested", fileName, byteLength: 1 }),
       now: () => fixedNow
     };
     const controller = new WorkspaceFileTransferControllerCore(dependencies);
