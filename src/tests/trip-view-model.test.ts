@@ -26,7 +26,7 @@ describe("Trip view model", () => {
       "Bank time",
       "Kills/trip",
       "Trip length",
-      "Effective K/hr",
+      "Effective kills/hr",
       "Supply/kill",
       "Ammo/kill",
       "Effective net GP/hr"

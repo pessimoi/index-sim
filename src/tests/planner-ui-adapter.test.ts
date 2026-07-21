@@ -212,6 +212,16 @@ describe("planner UI adapter", () => {
           return context.gameData.items[option.id]?.provenance?.source !== "hypothetical";
         })
     ).toBe(true);
+    for (const slot of editor.slots) {
+      expect(new Set(slot.options.map((option) => option.accessibleLabel)).size).toBe(
+        slot.options.length
+      );
+      expect(slot.options.every((option) => option.accessibleLabel === option.label)).toBe(true);
+      expect(slot.options.map((option) => option.id)).toEqual(allowedPool[slot.slot]);
+    }
+    expect(
+      editor.slots.flatMap((slot) => slot.options).some((option) => option.label.includes(" — ID "))
+    ).toBe(true);
   });
 
   it("uses locked skills to keep a planner skill out of the training order", async () => {

@@ -39,6 +39,7 @@ import { WorkbenchTabNavigation } from "./workbench-tab-navigation";
 
 export interface WorkbenchShellActions {
   activateTab(tabId: WorkbenchTabId): void;
+  routeToTab(tabId: WorkbenchTabId): void;
   selectCombatStyle(combatStyle: CombatStyle): void;
   updateLevel(skill: keyof CombatSetupFormState["levels"], value: number): void;
   setStyle(styleId: EntityId): void;
@@ -152,7 +153,7 @@ export function WorkbenchShell({
             key={row.target}
             type="button"
             aria-label={row.ariaLabel}
-            onClick={() => actions.activateTab(row.target)}
+            onClick={() => actions.routeToTab(row.target)}
           >
             <span>{row.label}</span>
             <strong>{row.value}</strong>
@@ -255,14 +256,14 @@ export function WorkbenchShell({
               <button
                 type="button"
                 aria-label={setupTabLabel}
-                onClick={() => actions.activateTab("loadout")}
+                onClick={() => actions.routeToTab("loadout")}
               >
                 {setupTabLabel}
               </button>
               <button
                 type="button"
                 aria-label="View stats"
-                onClick={() => actions.activateTab("stats")}
+                onClick={() => actions.routeToTab("stats")}
               >
                 Stats
               </button>
@@ -456,7 +457,7 @@ export function WorkbenchShell({
                   <WorkbenchMetric
                     key={metric.label}
                     metric={metric}
-                    onActivateTab={actions.activateTab}
+                    onActivateTab={actions.routeToTab}
                   />
                 ))}
               </section>
@@ -471,10 +472,10 @@ export function WorkbenchShell({
                       <span>{result.netGpGuidance.message}</span>
                     </div>
                     <div className="net-gp-guidance-actions">
-                      <button type="button" onClick={() => actions.activateTab("loadout")}>
+                      <button type="button" onClick={() => actions.routeToTab("loadout")}>
                         Edit prayers &amp; boosts
                       </button>
-                      <button type="button" onClick={() => actions.activateTab("trip")}>
+                      <button type="button" onClick={() => actions.routeToTab("trip")}>
                         Review potion carry
                       </button>
                     </div>

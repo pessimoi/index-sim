@@ -23,8 +23,11 @@ import {
 } from "../app/view-models/app-shell";
 import { createDuelSnapshotId } from "../app/state/duel-snapshots";
 import { mergeLootPrefsState } from "../app/state/loot-prefs";
+import { plannerMetricLabel } from "../app/state/planner";
 import { describeDuelSnapshotsImportError } from "../app/view-models/duel";
+import { expandedCompactLabel } from "../app/view-models/presentation-language";
 import { DuelSnapshotsImportError } from "../app/state/duel-snapshots";
+import { createSharedSetupChangeReview } from "../app/state/setup-transfer-changes";
 
 const distribution: DistributionSummary = {
   p10: 10,
@@ -206,16 +209,31 @@ describe("app shell view model", () => {
       lootSettings: DEFAULT_MONSTER_LOOT_SETTINGS
     });
     envelope.context.gameDataId = "another-revision-274-snapshot";
+    const reviewed = reviewShareableSetup(envelope, context.gameData);
+    const changeReview = createSharedSetupChangeReview({
+      current: {
+        form: DEFAULT_FORM_STATE,
+        cannon: DEFAULT_CANNON_SETTINGS,
+        lootPreferences: {},
+        lootSettings: DEFAULT_MONSTER_LOOT_SETTINGS
+      },
+      incoming: reviewed.envelope.data,
+      gameData: context.gameData
+    });
     const warning = createSharedSetupReviewViewModel({
       inspection: {
         status: "ready",
-        review: { ...reviewShareableSetup(envelope, context.gameData), droppedLootRowCount: 2 }
+        review: { ...reviewed, droppedLootRowCount: 2 }
       },
-      monsters: { [envelope.data.form.monsterId]: { name: "Fixture monster" } }
+      monsters: { [envelope.data.form.monsterId]: { name: "Fixture monster" } },
+      changeReview,
+      stale: false
     });
     const invalid = createSharedSetupReviewViewModel({
       inspection: { status: "error", message: "Invalid fixture" },
-      monsters: {}
+      monsters: {},
+      changeReview: null,
+      stale: false
     });
 
     expect(warning).toMatchObject({
@@ -246,9 +264,9 @@ describe("app shell view model", () => {
       maxHit: 12,
       hitChance: 0.625,
       ttkSec: 30,
-      killsPerHour: 100,
+      effectiveKph: 60,
       effectiveXpPerHour: 25_000,
-      gpPerHour: 10_000,
+      effectiveGpPerHour: 6_000,
       effectiveNetGpPerHour: -2_000,
       supplyCostPerKill: 120,
       gpPerKill: 100,
@@ -262,10 +280,10 @@ describe("app shell view model", () => {
       "MAX HIT",
       "HIT %",
       "TTK",
-      "KILLS/HR",
-      "XP/HR",
-      "GP/HR",
-      "GP/HR NET",
+      "EFF. K/HR",
+      "EFF. XP/HR",
+      "EFF. GP/HR",
+      "EFF. NET GP/HR",
       "SUPPLY/KILL",
       "GP/KILL"
     ]);
@@ -280,9 +298,55 @@ describe("app shell view model", () => {
     });
     expect(viewModel.contextMetrics.map((metric) => metric.label)).toEqual([
       "DPS",
-      "Effective XP/hr",
-      "Net GP/hr"
+      "EFF. XP/HR",
+      "EFF. NET GP/HR"
     ]);
+    expect(viewModel.metrics.find((metric) => metric.label === "EFF. K/HR")).toMatchObject({
+      value: "60"
+    });
+    expect(viewModel.metrics.find((metric) => metric.label === "EFF. GP/HR")).toMatchObject({
+      value: "6,000"
+    });
+  });
+
+  it("rejects bare ambiguous hourly labels from primary result and comparison contracts", () => {
+    const result = createWorkbenchResultViewModel({
+      effectiveDps: 4,
+      maxHit: 10,
+      hitChance: 0.5,
+      ttkSec: 30,
+      effectiveKph: 60,
+      effectiveXpPerHour: 20_000,
+      effectiveGpPerHour: 3_000,
+      effectiveNetGpPerHour: -1_000,
+      supplyCostPerKill: 60,
+      gpPerKill: 50,
+      supplyGapPerKill: 10,
+      supplyCostsExceedLoot: true,
+      risk: null
+    });
+    const labels = [
+      ...result.contextMetrics.map((metric) => expandedCompactLabel(metric.label) ?? metric.label),
+      ...result.metrics.map((metric) => expandedCompactLabel(metric.label) ?? metric.label),
+      ...["EFF. K/HR", "EFF. XP/HR", "EFF. GP/HR", "EFF. NET GP/HR"].map(
+        (label) => expandedCompactLabel(label) ?? label
+      ),
+      "Effective net gold pieces per experience point",
+      plannerMetricLabel("xph"),
+      plannerMetricLabel("gph")
+    ];
+
+    expect(labels).not.toContain("KILLS/HR");
+    expect(labels).not.toContain("GP/HR");
+    expect(labels).not.toContain("K/hr");
+    expect(labels.filter((label) => /(?:kills|XP|gold pieces|GP).*per hour/i.test(label))).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/Effective kills per hour/i),
+        expect.stringMatching(/Effective experience points per hour/i),
+        expect.stringMatching(/Effective gross gold pieces per hour/i),
+        expect.stringMatching(/Effective net gold pieces per hour/i)
+      ])
+    );
   });
 });
 

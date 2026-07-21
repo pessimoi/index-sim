@@ -2,6 +2,13 @@ export const APP_STARTUP_STATE_ATTRIBUTE = "data-app-startup-state";
 export const APP_STARTUP_ERROR_MESSAGE =
   "The simulator could not start. Reload the page and try again.";
 
+export class ApplicationEntryLoadError extends Error {
+  constructor() {
+    super(APP_STARTUP_ERROR_MESSAGE);
+    this.name = "ApplicationEntryLoadError";
+  }
+}
+
 function startupIsPending(documentRef: Document): boolean {
   return documentRef.querySelector(`[${APP_STARTUP_STATE_ATTRIBUTE}="starting"]`) !== null;
 }

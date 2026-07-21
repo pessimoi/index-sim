@@ -33,15 +33,15 @@ const DENSE_TABLE_COLUMNS: Array<{
   { key: "ttkSec", label: "TTK", align: "right", render: (row) => formatDuration(row.ttkSec) },
   {
     key: "killsPerHour",
-    label: "K/HR",
+    label: "EFF. K/HR",
     align: "right",
-    render: (row) => formatNumber(row.killsPerHour)
+    render: (row) => formatNumber(row.effectiveKph)
   },
   {
     key: "xpPerHour",
-    label: "XP/HR",
+    label: "EFF. XP/HR",
     align: "right",
-    render: (row) => formatNumber(row.xpPerHour)
+    render: (row) => formatNumber(row.effectiveXpPerHour)
   },
   {
     key: "gpPerKill",
@@ -51,15 +51,15 @@ const DENSE_TABLE_COLUMNS: Array<{
   },
   {
     key: "gpPerHour",
-    label: "GP/HR",
+    label: "EFF. GP/HR",
     align: "right",
-    render: (row) => formatNumber(row.gpPerHour)
+    render: (row) => formatNumber(row.effectiveGpPerHour)
   },
   {
     key: "netGpPerHour",
-    label: "NET GP/HR",
+    label: "EFF. NET GP/HR",
     align: "right",
-    render: (row) => formatNumber(row.netGpPerHour)
+    render: (row) => formatNumber(row.effectiveNetGpPerHour)
   }
 ];
 
@@ -223,7 +223,9 @@ export function ComparePane({ hidden, model, actions }: ComparePaneProps) {
                   <button
                     type="button"
                     className="sort-button"
-                    aria-label={`Sort by ${expandedCompactLabel(column.label)?.toLowerCase() ?? column.label}`}
+                    aria-label={`Sort by ${
+                      expandedCompactLabel(column.label)?.toLowerCase() ?? column.label
+                    }`}
                     onClick={() => sortBy(column.key)}
                   >
                     <span aria-hidden="true">{column.label}</span>
@@ -286,6 +288,9 @@ export function ComparePane({ hidden, model, actions }: ComparePaneProps) {
                     const scaleRow = denseCompareScale[row.monsterId];
                     const scaleCell =
                       scaleRow && isDenseScaleColumn(column.key) ? scaleRow[column.key] : null;
+                    const isBest =
+                      (column.key === "killsPerHour" && scaleRow?.bestKph) ||
+                      (column.key === "gpPerHour" && scaleRow?.bestGp);
                     return (
                       <td
                         key={column.key}
@@ -303,6 +308,7 @@ export function ComparePane({ hidden, model, actions }: ComparePaneProps) {
                         ) : (
                           <span>{column.render(row)}</span>
                         )}
+                        {isBest ? <em className="dense-best-marker">best</em> : null}
                         {column.key === "monsterName" && row.markers.length > 0 && (
                           <span className="row-state-markers">
                             {row.markers.map((marker) => {

@@ -25,7 +25,7 @@ describe("saved Duel setup export", () => {
 
     expect(downloads).toEqual([
       {
-        fileName: "index-sim-saved-setups.json",
+        fileName: "2004scape-saved-setup-collection-rev-274-20260721T100000Z.json",
         value: {
           kind: "index-sim-saved-setups",
           version: 1,
@@ -40,13 +40,13 @@ describe("saved Duel setup export", () => {
     ]);
     expect(outcome).toEqual({
       status: "requested",
-      fileName: "index-sim-saved-setups.json",
+      fileName: "2004scape-saved-setup-collection-rev-274-20260721T100000Z.json",
       appStatus:
-        "Saved setup download started: index-sim-saved-setups.json. Check your browser downloads.",
+        "Saved setup collection download started: 2004scape-saved-setup-collection-rev-274-20260721T100000Z.json. Check your browser downloads.",
       notice: {
         tone: "neutral",
         message:
-          "Saved setup download started: index-sim-saved-setups.json. Check your browser downloads."
+          "Saved setup collection download started: 2004scape-saved-setup-collection-rev-274-20260721T100000Z.json. Check your browser downloads."
       }
     });
   });
@@ -64,10 +64,10 @@ describe("saved Duel setup export", () => {
 
     expect(outcome).toEqual({
       status: "failed",
-      appStatus: "Saved setup download could not be started. Try again.",
+      appStatus: "Saved setup collection download could not be started. Try again.",
       notice: {
         tone: "error",
-        message: "Saved setup download could not be started. Try again."
+        message: "Saved setup collection download could not be started. Try again."
       }
     });
     expect(JSON.stringify(outcome)).not.toContain("private saved setup failure");

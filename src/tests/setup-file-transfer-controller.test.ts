@@ -19,6 +19,7 @@ import {
 } from "../app/state/ui-state";
 
 const FIXED_NOW = new Date("2026-07-13T12:34:56.000Z");
+const CURRENT_SETUP = savedSetupFromForm(DEFAULT_FORM_STATE);
 
 interface TestFile {
   id: string;
@@ -92,7 +93,7 @@ describe("rewrite setup file-transfer controller", () => {
 
     expect(harness.downloads).toEqual([
       {
-        fileName: "index-sim-rewrite-setup.json",
+        fileName: "2004scape-combat-setup-dagannoth-lvl-74-rev-274-20260713T123456Z.json",
         value: {
           kind: REWRITE_SETUP_TRANSFER_KIND,
           version: REWRITE_SETUP_TRANSFER_VERSION,
@@ -107,13 +108,13 @@ describe("rewrite setup file-transfer controller", () => {
     ]);
     expect(outcome).toEqual({
       status: "requested",
-      fileName: "index-sim-rewrite-setup.json",
+      fileName: "2004scape-combat-setup-dagannoth-lvl-74-rev-274-20260713T123456Z.json",
       appStatus:
-        "Setup download started: index-sim-rewrite-setup.json. Check your browser downloads.",
+        "Combat setup download started: 2004scape-combat-setup-dagannoth-lvl-74-rev-274-20260713T123456Z.json. Check your browser downloads.",
       notice: {
         tone: "neutral",
         message:
-          "Setup download started: index-sim-rewrite-setup.json. Check your browser downloads."
+          "Combat setup download started: 2004scape-combat-setup-dagannoth-lvl-74-rev-274-20260713T123456Z.json. Check your browser downloads."
       }
     });
     expect(harness.core.getSnapshot()).toEqual({
@@ -131,17 +132,21 @@ describe("rewrite setup file-transfer controller", () => {
         throw new Error("private browser failure");
       }
     });
-    await harness.core.prepareImport({ id: "valid", text: setupEnvelope(setup) }, context.gameData);
+    await harness.core.prepareImport(
+      { id: "valid", text: setupEnvelope(setup) },
+      context.gameData,
+      CURRENT_SETUP
+    );
     const review = harness.core.getSnapshot().review;
 
     const outcome = harness.core.exportSetup(setup, context.gameData);
 
     expect(outcome).toEqual({
       status: "failed",
-      appStatus: "Setup download could not be started. Try again.",
+      appStatus: "Combat setup download could not be started. Try again.",
       notice: {
         tone: "error",
-        message: "Setup download could not be started. Try again."
+        message: "Combat setup download could not be started. Try again."
       }
     });
     expect(harness.core.getSnapshot()).toMatchObject({
@@ -161,7 +166,8 @@ describe("rewrite setup file-transfer controller", () => {
 
     const outcome = await harness.core.prepareImport(
       { id: "valid", text: setupEnvelope(setup) },
-      context.gameData
+      context.gameData,
+      CURRENT_SETUP
     );
 
     expect(outcome).toEqual({ status: "review", reviewId: 1 });
@@ -180,14 +186,16 @@ describe("rewrite setup file-transfer controller", () => {
           tone: "warning",
           source: null
         },
-        summary: {
-          targetLabel: context.gameData.monsters.dagannoth?.name,
-          combatStyle: "melee",
-          setupMode: "custom",
-          customSetupCount: 1,
-          cannonMonsterCount: 1,
-          denseSort: { key: "monsterName", direction: "asc" },
-          irrelevantMonsterCount: 1
+        stale: false,
+        changeReview: {
+          kind: "setup-file",
+          changeCount: expect.any(Number),
+          groups: expect.arrayContaining([
+            expect.objectContaining({ id: "active-setup-identity" }),
+            expect.objectContaining({ id: "custom-setups" }),
+            expect.objectContaining({ id: "cannon-settings" }),
+            expect.objectContaining({ id: "dense-compare" })
+          ])
         }
       }
     });
@@ -201,7 +209,8 @@ describe("rewrite setup file-transfer controller", () => {
 
     await harness.core.prepareImport(
       { id: "exact", text: JSON.stringify(exact) },
-      context.gameData
+      context.gameData,
+      CURRENT_SETUP
     );
     expect(harness.core.getSnapshot().review?.context).toMatchObject({
       match: "exact-snapshot",
@@ -212,7 +221,8 @@ describe("rewrite setup file-transfer controller", () => {
     different.context.gameRevision = 273;
     await harness.core.prepareImport(
       { id: "different", text: JSON.stringify(different) },
-      context.gameData
+      context.gameData,
+      CURRENT_SETUP
     );
     expect(harness.core.getSnapshot().review?.context).toMatchObject({
       match: "different-revision",
@@ -229,22 +239,24 @@ describe("rewrite setup file-transfer controller", () => {
 
     await harness.core.prepareImport(
       { id: "dismiss", text: setupEnvelope(setup) },
-      context.gameData
+      context.gameData,
+      CURRENT_SETUP
     );
     expect(harness.core.dismissReview(999)).toBe(false);
     expect(harness.core.dismissReview(1)).toBe(true);
-    expect(harness.core.consumeReview(1)).toBeNull();
+    expect(harness.core.consumeReview(1, CURRENT_SETUP)).toEqual({ status: "ignored" });
 
     await harness.core.prepareImport(
       { id: "consume", text: setupEnvelope(setup) },
-      context.gameData
+      context.gameData,
+      CURRENT_SETUP
     );
-    expect(harness.core.consumeReview(1)).toBeNull();
-    expect(harness.core.consumeReview(2)).toMatchObject({
-      setup,
-      context: { match: "unknown" }
+    expect(harness.core.consumeReview(1, CURRENT_SETUP)).toEqual({ status: "ignored" });
+    expect(harness.core.consumeReview(2, CURRENT_SETUP)).toMatchObject({
+      status: "accepted",
+      candidate: { setup, context: { match: "unknown" } }
     });
-    expect(harness.core.consumeReview(2)).toBeNull();
+    expect(harness.core.consumeReview(2, CURRENT_SETUP)).toEqual({ status: "ignored" });
     expect(harness.core.getSnapshot()).toEqual({ phase: "idle", notice: null, review: null });
   });
 
@@ -258,12 +270,17 @@ describe("rewrite setup file-transfer controller", () => {
     const parserFailure = controller();
 
     await expect(
-      readerFailure.core.prepareImport({ id: "reader-large", text: "" }, context.gameData)
+      readerFailure.core.prepareImport(
+        { id: "reader-large", text: "" },
+        context.gameData,
+        CURRENT_SETUP
+      )
     ).resolves.toEqual({ status: "rejected" });
     await expect(
       parserFailure.core.prepareImport(
         { id: "utf8-large", text: "é".repeat(SETUP_IMPORT_MAX_BYTES / 2 + 1) },
-        context.gameData
+        context.gameData,
+        CURRENT_SETUP
       )
     ).resolves.toEqual({ status: "rejected" });
 
@@ -330,7 +347,7 @@ describe("rewrite setup file-transfer controller", () => {
     const harness = controller();
 
     await expect(
-      harness.core.prepareImport({ id: "invalid", text }, context.gameData)
+      harness.core.prepareImport({ id: "invalid", text }, context.gameData, CURRENT_SETUP)
     ).resolves.toEqual({ status: "rejected" });
     expect(harness.core.getSnapshot()).toMatchObject({
       phase: "idle",
@@ -348,7 +365,11 @@ describe("rewrite setup file-transfer controller", () => {
       })
     });
 
-    await harness.core.prepareImport({ id: "reader-failure", text: "" }, context.gameData);
+    await harness.core.prepareImport(
+      { id: "reader-failure", text: "" },
+      context.gameData,
+      CURRENT_SETUP
+    );
     expect(harness.core.getSnapshot()).toEqual({
       phase: "idle",
       notice: { tone: "error", message: "Setup import failed. Check the file and try again." },
@@ -382,8 +403,16 @@ describe("rewrite setup file-transfer controller", () => {
     const harness = controller({
       readFileText: (file) => (file.id === "first" ? firstRead.promise : secondRead.promise)
     });
-    const firstOutcome = harness.core.prepareImport({ id: "first", text: "" }, context.gameData);
-    const secondOutcome = harness.core.prepareImport({ id: "second", text: "" }, context.gameData);
+    const firstOutcome = harness.core.prepareImport(
+      { id: "first", text: "" },
+      context.gameData,
+      CURRENT_SETUP
+    );
+    const secondOutcome = harness.core.prepareImport(
+      { id: "second", text: "" },
+      context.gameData,
+      CURRENT_SETUP
+    );
 
     secondRead.resolve(setupEnvelope(setupFixture("rock_crab")));
     await expect(secondOutcome).resolves.toEqual({ status: "review", reviewId: 2 });
@@ -402,8 +431,12 @@ describe("rewrite setup file-transfer controller", () => {
       readFileText: (file) =>
         file.id === "first" ? firstRead.promise : Promise.resolve(setupEnvelope())
     });
-    const firstOutcome = harness.core.prepareImport({ id: "first", text: "" }, context.gameData);
-    await harness.core.prepareImport({ id: "second", text: "" }, context.gameData);
+    const firstOutcome = harness.core.prepareImport(
+      { id: "first", text: "" },
+      context.gameData,
+      CURRENT_SETUP
+    );
+    await harness.core.prepareImport({ id: "second", text: "" }, context.gameData, CURRENT_SETUP);
 
     firstRead.reject(new Error("private stale error"));
     await expect(firstOutcome).resolves.toEqual({ status: "stale" });
@@ -412,5 +445,49 @@ describe("rewrite setup file-transfer controller", () => {
       notice: null,
       review: { id: 2 }
     });
+  });
+
+  it("stales only against the captured setup scope, refreshes the same candidate and blocks no-op consume", async () => {
+    const { context } = createGeneratedRuntimeContext();
+    const harness = controller();
+    const incoming = setupFixture();
+    const changedCurrent = savedSetupFromForm({
+      ...DEFAULT_FORM_STATE,
+      levels: { ...DEFAULT_FORM_STATE.levels, attack: 61 }
+    });
+
+    await harness.core.prepareImport(
+      { id: "stale", text: setupEnvelope(incoming) },
+      context.gameData,
+      CURRENT_SETUP
+    );
+    expect(harness.core.checkReviewFreshness(1, changedCurrent)).toBe(false);
+    expect(harness.core.getSnapshot().review?.stale).toBe(true);
+    expect(harness.core.consumeReview(1, changedCurrent)).toEqual({ status: "stale" });
+
+    expect(harness.core.refreshReview(1, changedCurrent, context.gameData)).toBe(true);
+    expect(harness.core.getSnapshot().review).toMatchObject({
+      id: 1,
+      stale: false,
+      setup: incoming
+    });
+    expect(harness.core.consumeReview(1, changedCurrent)).toMatchObject({ status: "accepted" });
+
+    await harness.core.prepareImport(
+      { id: "no-op", text: setupEnvelope(CURRENT_SETUP) },
+      context.gameData,
+      CURRENT_SETUP
+    );
+    expect(harness.core.getSnapshot().review?.changeReview.changeCount).toBe(0);
+    expect(harness.core.consumeReview(2, CURRENT_SETUP)).toEqual({ status: "no-changes" });
+    expect(harness.core.getSnapshot().review?.id).toBe(2);
+
+    await harness.core.prepareImport(
+      { id: "apply-race", text: setupEnvelope(incoming) },
+      context.gameData,
+      CURRENT_SETUP
+    );
+    expect(harness.core.consumeReview(3, changedCurrent)).toEqual({ status: "stale" });
+    expect(harness.core.getSnapshot().review).toMatchObject({ id: 3, stale: true });
   });
 });

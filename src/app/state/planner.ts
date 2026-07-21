@@ -345,8 +345,8 @@ export function savePlannerUiState(
 }
 
 export function plannerMetricLabel(metric: PlannerMetric): string {
-  if (metric === "gph") return "GP/hr";
+  if (metric === "gph") return "Effective net GP/hr";
   if (metric === "dps") return "DPS";
-  if (metric === "balanced") return "Balanced";
-  return "XP/hr";
+  if (metric === "balanced") return "Balanced effective XP and net GP";
+  return "Effective XP/hr";
 }

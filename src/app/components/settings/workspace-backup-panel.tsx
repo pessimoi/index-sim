@@ -69,6 +69,7 @@ export function WorkspaceBackupPanel({
   reviewHeadingRef
 }: WorkspaceBackupPanelProps) {
   const privacyHelpId = "workspace-hiscores-privacy-help";
+  const scopeHelpId = "workspace-backup-transfer-scope";
 
   return (
     <section
@@ -79,10 +80,10 @@ export function WorkspaceBackupPanel({
         <h2>Workspace backup and restore</h2>
         <span className="status-pill ready">Local JSON</span>
       </div>
-      <p className="inline-status neutral">
+      <p id={scopeHelpId} className="inline-status neutral">
         Download one versioned file containing the active local Workspace. Import prepares a
         read-only review and does not change this browser. It includes setup, Planner, Loot, saved
-        setups and local price state.
+        setups, prices and local history. Calculated output, pending reviews and Undo are excluded.
       </p>
       <div className="price-history-summary" aria-label="Workspace export context">
         <span>Game revision {model.currentRevisionLabel}</span>
@@ -106,15 +107,20 @@ export function WorkspaceBackupPanel({
         session-only and is not saved.
       </p>
       <div className="market-sync-bar">
-        <button type="button" onClick={actions.exportWorkspace}>
-          Download Workspace backup
+        <button
+          type="button"
+          aria-describedby={`${scopeHelpId} ${privacyHelpId}`}
+          onClick={actions.exportWorkspace}
+        >
+          Download full Workspace backup
         </button>
         <label className="file-button">
-          Review Workspace file
+          Review Workspace backup file
           <input
             ref={importInputRef}
             type="file"
             accept="application/json,.json"
+            aria-describedby={`${scopeHelpId} ${privacyHelpId}`}
             onChange={(event) =>
               void importWorkspaceFromInput(event, (file) =>
                 actions.restore({ kind: "prepare", file })

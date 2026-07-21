@@ -2,7 +2,6 @@ import type { ScheduledStaticPriceSnapshotStatus } from "@/adapters/market";
 import { MARKET_SOURCE_MAPPINGS } from "@/data/market-source-mapping";
 import { deriveItemPriceFreshness, type ItemPriceFreshnessDisplay } from "@/domain/economy";
 import type { GameDataSnapshot, ItemPriceMetadata, PriceSet } from "@/domain/shared";
-import type { LootBreakdownEntry } from "@/domain/trip";
 import {
   activeManualPriceOverridesForPriceSet,
   canSetManualPriceOverride,
@@ -42,7 +41,13 @@ import {
 } from "../state/local-price-history-lifecycle";
 import { formatNumber } from "./formatting";
 import type { CalculationWarningViewModel } from "./contracts";
-import { createEntityDisplayLabel, type EntityDisplayLabel } from "./presentation-language";
+import {
+  createEntityCollisionIndex,
+  createEntityDisplayLabel,
+  createRowCollisionLabels,
+  type EntityCollisionIndex,
+  type EntityDisplayLabel
+} from "./presentation-language";
 import {
   createPriceTimeContext,
   presentPriceDateTime,
@@ -92,6 +97,7 @@ export interface CurrentPriceNoticePresentation {
 export interface PriceDataSelectOption {
   id: string;
   label: string;
+  accessibleLabel?: string;
   displayLabel?: EntityDisplayLabel;
 }
 
@@ -322,6 +328,14 @@ export function createPriceItemLabels(
   );
 }
 
+function itemCollisionIndex(itemLabels: Readonly<Record<string, string>>): EntityCollisionIndex {
+  return createEntityCollisionIndex({
+    items: Object.fromEntries(
+      Object.entries(itemLabels).map(([itemId, name]) => [itemId, { name }])
+    )
+  });
+}
+
 function comparePriceNotices(left: PriceDataNotice, right: PriceDataNotice): number {
   const priority =
     (PRICE_WARNING_PRIORITY[left.code] ?? Number.MAX_SAFE_INTEGER) -
@@ -340,10 +354,31 @@ function priceNoticeId(...parts: string[]): string {
 export function createCurrentPriceNoticePresentation(input: {
   warnings: readonly CalculationWarningViewModel[];
   gameData: Pick<GameDataSnapshot, "items">;
-  lootBreakdown: readonly Pick<LootBreakdownEntry, "rowId" | "name">[];
+  lootBreakdown: readonly {
+    rowId: string;
+    name: string;
+    key?: string;
+    chance?: number;
+    qtyAvg?: number;
+  }[];
   editableItemIds?: ReadonlySet<string>;
 }): CurrentPriceNoticePresentation {
-  const lootLabelByRowId = new Map(input.lootBreakdown.map((row) => [row.rowId, row.name]));
+  const collisionIndex = createEntityCollisionIndex({ items: input.gameData.items });
+  const lootLabelByRowId = createRowCollisionLabels(
+    input.lootBreakdown.map((row, sourceOrder) => ({
+      stableId: row.rowId,
+      baseLabel: createEntityDisplayLabel({
+        technicalId: row.key ?? null,
+        gameDataName: row.key ? input.gameData.items[row.key]?.name : null,
+        rowSourceName: row.name,
+        collisionIndex,
+        entityKind: "item"
+      }).name,
+      sourceOrder,
+      quantityLabel: row.qtyAvg == null ? null : formatNumber(row.qtyAvg, 1),
+      chanceLabel: row.chance == null ? null : `${formatNumber(row.chance * 100, 2)}%`
+    }))
+  );
   const notices: PriceDataNotice[] = [];
   const seen = new Set<string>();
 
@@ -358,11 +393,19 @@ export function createCurrentPriceNoticePresentation(input: {
           : warning.itemId
             ? null
             : "Price data";
-    const itemDisplayLabel = createEntityDisplayLabel({
+    const resolvedEntityLabel = createEntityDisplayLabel({
       technicalId: warning.itemId ?? null,
       gameDataName: warning.itemId ? input.gameData.items[warning.itemId]?.name : null,
-      rowSourceName
+      rowSourceName,
+      collisionIndex,
+      entityKind: "item"
     });
+    const contextualRowLabel = context?.lootRowId
+      ? lootLabelByRowId.get(context.lootRowId)
+      : undefined;
+    const itemDisplayLabel = contextualRowLabel
+      ? { ...resolvedEntityLabel, name: contextualRowLabel }
+      : resolvedEntityLabel;
     const itemLabel = itemDisplayLabel.name;
     const consumer = context?.consumer ?? "loot";
     const affectsCurrentResult = context?.affectsCurrentResult ?? true;
@@ -556,13 +599,21 @@ export function createManualPriceEditorPresentation(input: {
   const activeOverrides = input.basePriceSet
     ? activeManualPriceOverridesForPriceSet(input.manualPriceOverrides, input.basePriceSet)
     : DEFAULT_MANUAL_PRICE_OVERRIDES_STATE;
+  const collisionIndex = itemCollisionIndex(input.itemLabels);
   const itemOptions = Object.keys(input.basePriceSet?.itemPrices ?? {})
     .map((itemId) => {
       const displayLabel = createEntityDisplayLabel({
         technicalId: itemId,
-        gameDataName: input.itemLabels[itemId]
+        gameDataName: input.itemLabels[itemId],
+        collisionIndex,
+        entityKind: "item"
       });
-      return { id: itemId, label: displayLabel.name, displayLabel };
+      return {
+        id: itemId,
+        label: displayLabel.name,
+        accessibleLabel: displayLabel.name,
+        displayLabel
+      };
     })
     .sort((left, right) => left.label.localeCompare(right.label));
   const itemId = itemOptions.some((option) => option.id === input.selectedItemId)
@@ -580,7 +631,12 @@ export function createManualPriceEditorPresentation(input: {
   const activeCount = Object.keys(activeOverrides.items).length;
   const itemDisplayLabel =
     itemOptions.find((option) => option.id === itemId)?.displayLabel ??
-    createEntityDisplayLabel({ technicalId: itemId || null });
+    createEntityDisplayLabel({
+      technicalId: itemId || null,
+      gameDataName: input.itemLabels[itemId],
+      collisionIndex,
+      entityKind: "item"
+    });
 
   return {
     itemOptions,
@@ -708,6 +764,7 @@ export function createEconomyHistoryPresentation(input: {
   timeZone?: string;
 }): EconomyHistoryAnalysisPresentation {
   const { analysisState } = input.sources;
+  const collisionIndex = itemCollisionIndex(input.itemLabels);
   const exactTimeContext = createPriceTimeContext(new Date(0), input.timeZone ?? "UTC");
   const snapshotTimes = presentPriceDateTimeOccurrences(
     analysisState.snapshots.map((snapshot) => snapshot.capturedAt),
@@ -730,7 +787,9 @@ export function createEconomyHistoryPresentation(input: {
       itemId,
       createEntityDisplayLabel({
         technicalId: itemId,
-        gameDataName: input.itemLabels[itemId]
+        gameDataName: input.itemLabels[itemId],
+        collisionIndex,
+        entityKind: "item"
       })
     ])
   );
@@ -748,6 +807,7 @@ export function createEconomyHistoryPresentation(input: {
     .map((itemId) => ({
       id: itemId,
       label: itemDisplayLabels[itemId]!.name,
+      accessibleLabel: itemDisplayLabels[itemId]!.name,
       displayLabel: itemDisplayLabels[itemId]
     }))
     .sort((left, right) => left.label.localeCompare(right.label));
@@ -916,6 +976,7 @@ export function createSelectedPriceItemPresentation(input: {
   freshnessNow: Date;
   timeContext?: PriceTimeContext;
 }): SelectedPriceItemPresentation {
+  const collisionIndex = itemCollisionIndex(input.itemLabels ?? {});
   const metadata = input.itemId
     ? (input.activePriceSet?.itemPriceMetadata?.[input.itemId] ?? null)
     : null;
@@ -928,7 +989,9 @@ export function createSelectedPriceItemPresentation(input: {
     itemId: input.itemId,
     itemDisplayLabel: createEntityDisplayLabel({
       technicalId: input.itemId || null,
-      gameDataName: input.itemLabels?.[input.itemId]
+      gameDataName: input.itemLabels?.[input.itemId],
+      collisionIndex,
+      entityKind: "item"
     }),
     price: input.itemId ? (input.activePriceSet?.itemPrices[input.itemId] ?? null) : null,
     metadata,

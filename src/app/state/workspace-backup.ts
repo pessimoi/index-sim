@@ -7,6 +7,7 @@ import {
 import { DataReliabilityError, parseJsonWithDuplicateKeyCheck } from "@/data/reliability";
 import type { GameDataSnapshot, PriceSet } from "@/domain/shared";
 import type { BrowserStorageAccess } from "../application-recovery";
+import { createTransferArtifactFileName } from "../transfer-artifact-file-name";
 import {
   DUEL_SNAPSHOTS_VERSION,
   DuelSnapshotsStateSchema,
@@ -460,21 +461,6 @@ export function parseWorkspaceBackupText(
   };
 }
 
-function safeFileNameSegment(value: string | number, fallback: string): string {
-  const safe = String(value)
-    .replace(/[^A-Za-z0-9._-]+/g, "-")
-    .replace(/^[._-]+|[._-]+$/g, "")
-    .slice(0, 80);
-  return safe || fallback;
-}
-
-export function createWorkspaceBackupFileName(
-  gameRevision: number | string,
-  exportedAt: string
-): string {
-  return `index-sim-workspace-${safeFileNameSegment(gameRevision, "revision")}-${safeFileNameSegment(exportedAt, "export")}.json`;
-}
-
 function validateStorageAccess(access: BrowserStorageAccess): void {
   if (
     !access ||
@@ -486,6 +472,26 @@ function validateStorageAccess(access: BrowserStorageAccess): void {
   ) {
     throw new WorkspaceBackupError("invalid_export");
   }
+}
+
+function canonicalizeWorkspaceValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalizeWorkspaceValue);
+  if (value === null || typeof value !== "object") return value;
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, child]) => [key, canonicalizeWorkspaceValue(child)])
+  );
+}
+
+export function createWorkspaceAreaFingerprint<K extends WorkspaceTransferAreaId>(
+  id: K,
+  value: WorkspaceLiveState[K]
+): string {
+  if (id === "hiscores-last-player" && value === null) return "null";
+  const registration = WORKSPACE_AREA_REGISTRY[id];
+  const parsed = registration.codec.parse(value as never);
+  return JSON.stringify(canonicalizeWorkspaceValue(parsed));
 }
 
 export interface CreateWorkspaceBackupExportInput {
@@ -510,7 +516,8 @@ export function createWorkspaceBackupExport(
   validateStorageAccess(input.storageAccess);
 
   try {
-    const exportedAt = (input.now ?? new Date()).toISOString();
+    const now = input.now ?? new Date();
+    const exportedAt = now.toISOString();
     const context = createSetupTransferContext(input.gameData);
     const areas: WorkspaceAreaRecordV1[] = WORKSPACE_REQUIRED_AREA_IDS.map((id) => {
       const registration = WORKSPACE_AREA_REGISTRY[id];
@@ -547,7 +554,11 @@ export function createWorkspaceBackupExport(
       envelope,
       text,
       byteSize: parsed.byteSize,
-      fileName: createWorkspaceBackupFileName(context.gameRevision, exportedAt)
+      fileName: createTransferArtifactFileName({
+        artifact: "workspace-backup",
+        revision: context.gameRevision,
+        now
+      })
     };
   } catch (error) {
     if (error instanceof WorkspaceBackupError) throw error;

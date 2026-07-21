@@ -42,6 +42,7 @@ export function AppHeader({
   onExportSetup,
   onShareSetup
 }: AppHeaderProps) {
+  const setupScopeHelpId = "combat-setup-transfer-scope";
   return (
     <>
       <a
@@ -66,18 +67,23 @@ export function AppHeader({
         </div>
         <HiscoresPanel {...hiscores} />
         <div className="actions">
+          <p id={setupScopeHelpId} className="transfer-scope-copy">
+            Combat setup files replace setup, custom-monster, cannon and Dense preferences. They are
+            not full Workspace backups and do not include loot or prices.
+          </p>
           <label className="file-button">
-            Import setup
+            Review combat setup file
             <input
               ref={setupImportInputRef}
               type="file"
               accept="application/json,.json"
+              aria-describedby={setupScopeHelpId}
               disabled={setupImportPhase === "reading"}
               onChange={(event) => void importSelectedFile(event, onImportSetup)}
             />
           </label>
-          <button type="button" onClick={onExportSetup}>
-            Export setup
+          <button type="button" aria-describedby={setupScopeHelpId} onClick={onExportSetup}>
+            Export combat setup
           </button>
           <button ref={shareButtonRef} type="button" onClick={onShareSetup}>
             Share setup

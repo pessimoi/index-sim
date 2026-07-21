@@ -16,14 +16,16 @@ export type FileExportOutcome =
     };
 
 const FILE_EXPORT_LABELS: Record<FileExportArtifact, string> = {
-  setup: "Setup",
-  "saved-setup": "Saved setup",
+  setup: "Combat setup",
+  "saved-setup": "Saved setup collection",
   "price-set": "PriceSet",
   workspace: "Workspace backup",
   recovery: "Recovery report"
 };
 
-export function failedFileExportOutcome(artifact: FileExportArtifact): FileExportOutcome {
+export function failedFileExportOutcome(
+  artifact: FileExportArtifact
+): Extract<FileExportOutcome, { status: "failed" }> {
   const message = `${FILE_EXPORT_LABELS[artifact]} download could not be started. Try again.`;
   return { status: "failed", appStatus: message, notice: { tone: "error", message } };
 }

@@ -245,14 +245,18 @@ describe("shareable setup browser URL adapter", () => {
       {
         origin: "https://example.test",
         pathname: "/sim/",
-        search: "?mode=test",
-        hash: "#setup=abc&pane=trip"
+        search: "?pane=planner&index_sim_safe_session=1&mode=test",
+        hash: "#setup=abc&note=trip"
       },
       { replaceState }
     );
 
     expect(payload).toBe("abc");
-    expect(replaceState).toHaveBeenCalledWith(null, "", "/sim/?mode=test#pane=trip");
+    expect(replaceState).toHaveBeenCalledWith(
+      null,
+      "",
+      "/sim/?pane=planner&index_sim_safe_session=1&mode=test#note=trip"
+    );
   });
 
   it("bounds an oversized setup fragment before URLSearchParams parsing", () => {

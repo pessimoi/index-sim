@@ -4,6 +4,7 @@ export interface SelectOptionViewModel {
   id: EntityId;
   label: string;
   hint?: string;
+  accessibleLabel?: string;
 }
 
 export interface CalculationWarningViewModel {

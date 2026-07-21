@@ -110,9 +110,17 @@ export function LocalStateRecoveryPanel({
         <span>Needs attention {formatNumber(report.attentionCount)}</span>
         <span>Report {report.generatedAt}</span>
       </div>
+      <p id="local-state-recovery-report-scope" className="inline-status neutral">
+        This report helps diagnose local-state health. It contains no raw saved values and cannot
+        restore the Workspace.
+      </p>
       <div className="market-sync-bar">
-        <button type="button" onClick={onExport}>
-          Export recovery report
+        <button
+          type="button"
+          aria-describedby="local-state-recovery-report-scope"
+          onClick={onExport}
+        >
+          Export metadata-only recovery report
         </button>
         {pendingClearId === "invalid-all" ? (
           <>

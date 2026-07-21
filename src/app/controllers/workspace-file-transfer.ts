@@ -7,7 +7,8 @@ import {
   createWorkspaceBackupExport,
   parseWorkspaceBackupText,
   type CreateWorkspaceBackupExportInput,
-  type WorkspaceLiveState
+  type WorkspaceLiveState,
+  type WorkspaceTransferAreaId
 } from "../state/workspace-backup";
 import type {
   WorkspacePrepareImportContext,
@@ -79,7 +80,11 @@ export interface WorkspaceFileTransferSnapshot {
 export type WorkspacePrepareOutcome =
   { status: "review"; reviewId: number } | { status: "rejected" } | { status: "stale" };
 
-export type WorkspaceExportOutcome = FileExportOutcome;
+export type WorkspaceExportOutcome =
+  | (Extract<FileExportOutcome, { status: "requested" }> & {
+      includedAreaIds: readonly WorkspaceTransferAreaId[];
+    })
+  | Extract<FileExportOutcome, { status: "failed" }>;
 
 export type WorkspaceRestorePlanOutcome =
   { status: "updated"; plan: WorkspaceRestorePlan } | { status: "stale" } | { status: "rejected" };
@@ -192,7 +197,12 @@ export class WorkspaceFileTransferControllerCore<TFile> {
         ...this.snapshot,
         notice: outcome.notice
       });
-      return outcome;
+      return outcome.status === "requested"
+        ? {
+            ...outcome,
+            includedAreaIds: exportResult.envelope.areas.map((area) => area.id)
+          }
+        : outcome;
     } catch {
       const outcome = failedFileExportOutcome("workspace");
       this.publish({

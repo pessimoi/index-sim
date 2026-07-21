@@ -17,9 +17,19 @@ import {
   type SharedSetupReviewViewModel
 } from "../app/view-models/app-shell";
 import type { LegacyMigrationViewModel } from "../app/view-models/legacy-migration";
+import type { SetupTransferChangeReview } from "../app/state/setup-transfer-changes";
 
 const noOp = () => undefined;
 const asyncNoOp = async () => undefined;
+const emptySharedChangeReview: SetupTransferChangeReview = {
+  kind: "shared-link",
+  currentFingerprint: "current",
+  incomingFingerprint: "incoming",
+  changeCount: 1,
+  groups: [],
+  includedScope: ["Active setup"],
+  excludedScope: ["Prices"]
+};
 
 function inOrder(markup: string, fragments: readonly string[]): void {
   let previous = -1;
@@ -112,14 +122,18 @@ describe("app shell components", () => {
       'class="topbar"',
       "Revision 274",
       'aria-label="Hiscores"',
-      "Import setup",
-      "Export setup",
+      "Review combat setup file",
+      "Export combat setup",
       "Share setup",
       "Setup fixture",
       "Share fixture"
     ]);
     expect(markup).toContain('href="#workbench-active-panel"');
     expect(markup).toContain('aria-label="Active game data: Revision 274"');
+    expect(markup).toContain(
+      "Combat setup files replace setup, custom-monster, cannon and Dense preferences. They are not full Workspace backups and do not include loot or prices."
+    );
+    expect(markup.match(/aria-describedby="combat-setup-transfer-scope"/g)).toHaveLength(2);
     expect(markup.match(/accept="application\/json,.json"/g)).toHaveLength(1);
     expect(markup).not.toContain("Import prices");
   });
@@ -155,7 +169,9 @@ describe("app shell components", () => {
     );
 
     expect(markup).toContain("Reviewing setup file…");
-    expect(markup).toContain('type="file" accept="application/json,.json" disabled=""');
+    expect(markup).toContain(
+      'type="file" accept="application/json,.json" aria-describedby="combat-setup-transfer-scope" disabled=""'
+    );
     expect(markup).not.toContain('<button type="button" disabled=""');
   });
 
@@ -170,10 +186,13 @@ describe("app shell components", () => {
       contextMessage:
         "Created with another Revision 274 snapshot. Available ids are compatible, but results may differ.",
       contextTone: "warning",
-      droppedLootWarning: "2 stale loot choices will be skipped."
+      droppedLootWarning: "2 stale loot choices will be skipped.",
+      stale: false,
+      canLoad: true,
+      changeReview: emptySharedChangeReview
     };
     const readyMarkup = renderToStaticMarkup(
-      <SharedSetupReview viewModel={ready} onLoad={noOp} onDismiss={noOp} />
+      <SharedSetupReview viewModel={ready} onLoad={noOp} onRefresh={noOp} onDismiss={noOp} />
     );
     const errorMarkup = renderToStaticMarkup(
       <SharedSetupReview
@@ -184,6 +203,28 @@ describe("app shell components", () => {
           message: "Invalid fixture"
         }}
         onLoad={noOp}
+        onRefresh={noOp}
+        onDismiss={noOp}
+      />
+    );
+    const staleMarkup = renderToStaticMarkup(
+      <SharedSetupReview
+        viewModel={{ ...ready, stale: true, canLoad: false, statusLabel: "Refresh required" }}
+        onLoad={noOp}
+        onRefresh={noOp}
+        onDismiss={noOp}
+      />
+    );
+    const noOpMarkup = renderToStaticMarkup(
+      <SharedSetupReview
+        viewModel={{
+          ...ready,
+          statusLabel: "No changes",
+          canLoad: false,
+          changeReview: { ...emptySharedChangeReview, changeCount: 0 }
+        }}
+        onLoad={noOp}
+        onRefresh={noOp}
         onDismiss={noOp}
       />
     );
@@ -191,6 +232,11 @@ describe("app shell components", () => {
     expect(readyMarkup).toContain('class="shared-setup-strip warning"');
     expect(readyMarkup).toContain("Load setup");
     expect(readyMarkup).toContain('aria-label="Shared setup summary"');
+    expect(readyMarkup).toContain("Included in this link");
+    expect(staleMarkup).toContain("Refresh comparison");
+    expect(staleMarkup).not.toContain(">Load setup</button>");
+    expect(noOpMarkup).toContain("This link has no applicable changes.");
+    expect(noOpMarkup).toContain('<button type="button" disabled="">Load setup</button>');
     expect(errorMarkup).toContain('<p role="alert">Invalid fixture</p>');
     expect(errorMarkup).not.toContain("Load setup");
     expect(errorMarkup).toContain("Dismiss");
@@ -278,9 +324,9 @@ describe("app shell components", () => {
       maxHit: 10,
       hitChance: 0.5,
       ttkSec: 30,
-      killsPerHour: 100,
+      effectiveKph: 60,
       effectiveXpPerHour: 20_000,
-      gpPerHour: 5_000,
+      effectiveGpPerHour: 3_000,
       effectiveNetGpPerHour: -1_000,
       supplyCostPerKill: 60,
       gpPerKill: 50,
@@ -346,6 +392,7 @@ describe("app shell components", () => {
         setupReview={null}
         actions={{
           activateTab: noOp,
+          routeToTab: noOp,
           selectCombatStyle: noOp,
           updateLevel: noOp,
           setStyle: noOp,
@@ -395,8 +442,8 @@ describe("app shell components", () => {
     expect(markup).toContain('aria-label="All workbench tabs"');
     expect(markup).toContain('aria-current="page"');
     expect(markup.match(/class="visually-hidden">Damage per second: 4\.00/g)).toHaveLength(3);
-    expect(markup.match(/>Effective XP\/hr<\/span>/g)).toHaveLength(2);
-    expect(markup.match(/>Net GP\/hr<\/span>/g)).toHaveLength(2);
+    expect(markup.match(/>EFF\. XP\/HR<\/span>/g)).toHaveLength(3);
+    expect(markup.match(/>EFF\. NET GP\/HR<\/span>/g)).toHaveLength(3);
     expect(markup).toContain(
       'id="workbench-tab-stats" type="button" role="tab" class="active" aria-selected="true"'
     );
@@ -420,13 +467,17 @@ describe("app shell components", () => {
     expect(markup).not.toContain(">Edit</button>");
     expect(markup).not.toContain("Remove monster setup");
     expect(markup).toContain('aria-label="Reset active setup" title="Reset active setup"');
-    expect(markup).toContain("Effective XP/hr");
+    expect(markup).toContain("EFF. XP/HR");
     expect(markup).toContain(">SPD</label>");
     expect(markup).toContain('aria-label="Attack speed in seconds"');
     expect(markup).toContain(">F/KL</span>");
     expect(markup).toContain('aria-label="Food per kill: 1.50"');
     expect(markup).toContain('class="visually-hidden">Time to kill: 30.0 s');
-    expect(markup).toContain('class="visually-hidden">Experience points per hour: 20,000');
+    expect(markup).toContain(
+      'class="visually-hidden">Effective experience points per hour: 20,000'
+    );
+    expect(markup).toContain('class="visually-hidden">Effective kills per hour: 60');
+    expect(markup).toContain('class="visually-hidden">Effective gross gold pieces per hour: 3,000');
     expect(markup).toContain('class="visually-hidden">Gold pieces per kill: 50');
     expect(markup).toContain('aria-label="Price data issue"');
     expect(markup).toContain("Price data incomplete");

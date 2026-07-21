@@ -142,7 +142,7 @@ export function CannonPane({
                   { label: "Balls/hr", value: formatNumber(output.ballsPerHour) },
                   { label: "Balls/kill", value: formatNumber(output.ballsPerKill, 2) },
                   {
-                    label: "Cannon Ranged XP/hr",
+                    label: "On-site cannon Ranged XP/hr",
                     value: formatNumber(output.rangedXpPerHour),
                     tone: "teal"
                   },
@@ -157,7 +157,7 @@ export function CannonPane({
                     tone: "gold"
                   },
                   {
-                    label: "Ball cost/hr",
+                    label: "On-site ball cost/hr",
                     value: formatNumber(output.ballCostPerHour),
                     tone: "gold"
                   },
@@ -178,7 +178,7 @@ export function CannonPane({
                     tone: "gold"
                   },
                   {
-                    label: "K/hr uplift",
+                    label: "On-site kills/hr uplift",
                     value:
                       output.kphNoCannon > 0
                         ? `${formatNumber(
@@ -201,7 +201,7 @@ export function CannonPane({
                   { label: "Sparse link", value: sparseSummary },
                   { label: "Inventory reserve", value: reserveSummary },
                   {
-                    label: "Trip sparse K/hr",
+                    label: "Trip on-site sparse cap (kills/hr)",
                     value: tripSparseEnabled ? formatNumber(tripSparseMaxKph) : "-"
                   }
                 ]}
@@ -215,14 +215,14 @@ export function CannonPane({
                   { label: "Cannon DPS", value: "0.00" },
                   { label: "Cannon only DPS", value: "0.00" },
                   { label: "Balls/hr", value: "0" },
-                  { label: "Cannon Ranged XP/hr", value: "0" },
+                  { label: "On-site cannon Ranged XP/hr", value: "0" },
                   { label: "Effective XP/hr", value: formatNumber(effectiveXpPerHour) },
                   {
                     label: "Effective net GP/hr",
                     value: formatNumber(effectiveNetGpPerHour),
                     tone: "gold"
                   },
-                  { label: "Ball cost/hr", value: "0" },
+                  { label: "On-site ball cost/hr", value: "0" },
                   { label: "Cannonballs/trip", value: "-" },
                   { label: "Accuracy rule", value: "-" },
                   { label: "XP rule", value: "-" },

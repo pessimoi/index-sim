@@ -30,14 +30,14 @@ test("Workspace backup export opens a zero-mutation review and Dismiss returns f
   );
 
   const downloadWorkspaceButton = panel.getByRole("button", {
-    name: "Download Workspace backup"
+    name: "Download full Workspace backup"
   });
   const downloadPromise = page.waitForEvent("download");
   await downloadWorkspaceButton.focus();
   await downloadWorkspaceButton.press("Enter");
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(
-    /^index-sim-workspace-274-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.\d{3}Z\.json$/
+    /^2004scape-workspace-backup-rev-274-\d{8}T\d{6}Z\.json$/
   );
   await expect(panel.getByLabel("Workspace transfer notice")).toHaveText(
     `Workspace backup download started: ${download.suggestedFilename()}. Check your browser downloads.`
@@ -62,7 +62,7 @@ test("Workspace backup export opens a zero-mutation review and Dismiss returns f
   expect(exported.areas.map((area) => area.id)).not.toContain("hiscores-last-player");
   expect(exportedText).not.toContain("Private Fixture Hero");
 
-  const importInput = panel.getByLabel("Review Workspace file");
+  const importInput = panel.getByLabel("Review Workspace backup file");
   await importInput.setInputFiles({
     name: "workspace-review.json",
     mimeType: "application/json",
@@ -124,7 +124,7 @@ test("workspace multi-area Replace applies one durable transaction and one Undo 
   );
 
   const downloadPromise = page.waitForEvent("download");
-  await panel.getByRole("button", { name: "Download Workspace backup" }).click();
+  await panel.getByRole("button", { name: "Download full Workspace backup" }).click();
   const workspace = JSON.parse(await readDownloadText(await downloadPromise)) as {
     areas: Array<{ id: string; data: unknown }>;
   };
@@ -158,7 +158,7 @@ test("workspace multi-area Replace applies one durable transaction and one Undo 
     lobster: { price: 4321, updatedAt: "2026-07-19T18:30:00.000Z" }
   };
 
-  await panel.getByLabel("Review Workspace file").setInputFiles({
+  await panel.getByLabel("Review Workspace backup file").setInputFiles({
     name: "workspace-replace.json",
     mimeType: "application/json",
     buffer: Buffer.from(JSON.stringify(workspace))
@@ -205,7 +205,7 @@ test("workspace restore mixed Merge preview retains unrelated current rows and s
 
   const panel = page.getByRole("region", { name: "Workspace backup and restore" });
   const downloadPromise = page.waitForEvent("download");
-  await panel.getByRole("button", { name: "Download Workspace backup" }).click();
+  await panel.getByRole("button", { name: "Download full Workspace backup" }).click();
   const workspace = JSON.parse(await readDownloadText(await downloadPromise)) as {
     context: { gameDataId: string; gameRevision: number };
     areas: Array<{ id: string; version: number; data: unknown }>;
@@ -250,7 +250,7 @@ test("workspace restore mixed Merge preview retains unrelated current rows and s
     }
   ];
 
-  await panel.getByLabel("Review Workspace file").setInputFiles({
+  await panel.getByLabel("Review Workspace backup file").setInputFiles({
     name: "workspace-mixed-merge.json",
     mimeType: "application/json",
     buffer: Buffer.from(JSON.stringify(workspace))
@@ -309,7 +309,7 @@ test("workspace restore warns on a different Revision and disables incompatible 
   await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Settings" }).click();
   const panel = page.getByRole("region", { name: "Workspace backup and restore" });
   const downloadPromise = page.waitForEvent("download");
-  await panel.getByRole("button", { name: "Download Workspace backup" }).click();
+  await panel.getByRole("button", { name: "Download full Workspace backup" }).click();
   const workspace = JSON.parse(await readDownloadText(await downloadPromise)) as {
     context: { gameDataId: string; gameRevision: number };
     areas: Array<{
@@ -322,7 +322,7 @@ test("workspace restore warns on a different Revision and disables incompatible 
   const setup = workspace.areas.find((area) => area.id === "rewrite-setup")!;
   setup.data.form!.monsterId = "removed_monster";
 
-  await panel.getByLabel("Review Workspace file").setInputFiles({
+  await panel.getByLabel("Review Workspace backup file").setInputFiles({
     name: "workspace-different-revision.json",
     mimeType: "application/json",
     buffer: Buffer.from(JSON.stringify(workspace))
@@ -350,7 +350,7 @@ test("workspace storage failure changes nothing until explicit session-only Appl
   const panel = page.getByRole("region", { name: "Workspace backup and restore" });
   await page.waitForFunction(() => window.localStorage.getItem("index-sim:rewrite-setup") !== null);
   const downloadPromise = page.waitForEvent("download");
-  await panel.getByRole("button", { name: "Download Workspace backup" }).click();
+  await panel.getByRole("button", { name: "Download full Workspace backup" }).click();
   const workspace = JSON.parse(await readDownloadText(await downloadPromise)) as {
     areas: Array<{ id: string; data: unknown }>;
   };
@@ -358,7 +358,7 @@ test("workspace storage failure changes nothing until explicit session-only Appl
     form: { levels: { attack: number } };
   };
   setup.form.levels.attack = 66;
-  await panel.getByLabel("Review Workspace file").setInputFiles({
+  await panel.getByLabel("Review Workspace backup file").setInputFiles({
     name: "workspace-storage-failure.json",
     mimeType: "application/json",
     buffer: Buffer.from(JSON.stringify(workspace))

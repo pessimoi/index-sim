@@ -12,12 +12,18 @@ import {
   appendAcceptedPriceSetToHistory,
   type BrowserPriceHistoryState
 } from "../state/price-history";
+import { createSetupTransferContext } from "../state/setup-transfer-context";
+import { createTransferArtifactFileName } from "../transfer-artifact-file-name";
 import {
   createPriceImportSuccessNotice,
   describePriceImportError,
   type PriceImportNotice
 } from "../state/price-import";
-import { requestFileExport, type FileExportOutcome } from "./file-export-outcome";
+import {
+  failedFileExportOutcome,
+  requestFileExport,
+  type FileExportOutcome
+} from "./file-export-outcome";
 
 export interface MarketNotice {
   tone: "neutral" | "success" | "warning" | "error";
@@ -108,11 +114,6 @@ export interface PriceSetTransferDependencies<TFile> {
   unblockReplaced(ids: readonly LocalStateHealthItemId[]): void;
   refreshLocalStateHealth(): void;
   now(): Date;
-}
-
-function priceSetExportFileName(priceSet: PriceSet): string {
-  const safeId = priceSet.id.replace(/[^a-z0-9._-]+/gi, "-").replace(/^-+|-+$/g, "");
-  return `index-sim-price-set-${safeId || "active"}.json`;
 }
 
 export class PriceSetTransferControllerCore<TFile> {
@@ -221,11 +222,22 @@ export class PriceSetTransferControllerCore<TFile> {
     }
   };
 
-  exportPriceSet = (priceSet: PriceSet): PriceSetActionOutcome => {
-    const fileName = priceSetExportFileName(priceSet);
-    const outcome = requestFileExport("price-set", fileName, () =>
-      this.dependencies.downloadJsonFile(fileName, priceSet)
-    );
+  exportPriceSet = (priceSet: PriceSet, gameData: GameDataSnapshot): PriceSetActionOutcome => {
+    let outcome: FileExportOutcome;
+    try {
+      const now = this.dependencies.now();
+      const fileName = createTransferArtifactFileName({
+        artifact: "price-set",
+        context: priceSet.id,
+        revision: createSetupTransferContext(gameData).gameRevision,
+        now
+      });
+      outcome = requestFileExport("price-set", fileName, () =>
+        this.dependencies.downloadJsonFile(fileName, priceSet)
+      );
+    } catch {
+      outcome = failedFileExportOutcome("price-set");
+    }
     const { notice, ...actionOutcome } = outcome;
     return {
       ...actionOutcome,

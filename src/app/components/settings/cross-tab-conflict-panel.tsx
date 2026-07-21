@@ -115,7 +115,7 @@ export function CrossTabConflictPanel({
       ) : null}
       <div className="market-sync-bar">
         <button type="button" onClick={actions.exportWorkspace}>
-          Download Workspace backup
+          Download full Workspace backup
         </button>
         <button type="button" onClick={actions.refresh}>
           Refresh review

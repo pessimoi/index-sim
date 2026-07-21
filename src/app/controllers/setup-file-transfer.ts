@@ -9,9 +9,20 @@ import {
 import { REWRITE_SETUP_VERSION, type SavedSetupState } from "../state/ui-state";
 import {
   compareSetupTransferContext,
+  createSetupTransferContext,
   type SetupTransferContextReview
 } from "../state/setup-transfer-context";
-import { requestFileExport, type FileExportOutcome } from "./file-export-outcome";
+import { createTransferArtifactFileName } from "../transfer-artifact-file-name";
+import {
+  createSetupFileChangeReview,
+  setupFileReviewMatchesCurrent,
+  type SetupTransferChangeReview
+} from "../state/setup-transfer-changes";
+import {
+  failedFileExportOutcome,
+  requestFileExport,
+  type FileExportOutcome
+} from "./file-export-outcome";
 
 export interface SetupFileTransferNotice {
   tone: "neutral" | "error";
@@ -23,15 +34,8 @@ export interface SetupImportReview {
   id: number;
   setup: SavedSetupState;
   context: SetupTransferContextReview;
-  summary: {
-    targetLabel: string;
-    combatStyle: SavedSetupState["form"]["combatStyle"];
-    setupMode: SavedSetupState["setupMode"];
-    customSetupCount: number;
-    cannonMonsterCount: number;
-    denseSort: SavedSetupState["denseCompare"]["sort"];
-    irrelevantMonsterCount: number;
-  };
+  changeReview: SetupTransferChangeReview;
+  stale: boolean;
 }
 
 export interface SetupImportCandidate {
@@ -47,6 +51,12 @@ export interface SetupFileTransferSnapshot {
 
 export type SetupPrepareOutcome =
   { status: "review"; reviewId: number } | { status: "rejected" } | { status: "stale" };
+
+export type SetupReviewConsumeOutcome =
+  | { status: "accepted"; candidate: SetupImportCandidate }
+  | { status: "stale" }
+  | { status: "no-changes" }
+  | { status: "ignored" };
 
 export interface SetupFileTransferDependencies<TFile> {
   readFileText(file: TFile, maxBytes: number): Promise<string>;
@@ -119,6 +129,7 @@ export function describeSetupFileTransferError(error: unknown): SetupFileTransfe
 function createSetupImportReview(
   id: number,
   setup: SavedSetupState,
+  currentSetup: SavedSetupState,
   gameData: GameDataSnapshot,
   context: SetupTransferContextReview
 ): SetupImportReview {
@@ -126,15 +137,12 @@ function createSetupImportReview(
     id,
     setup,
     context,
-    summary: {
-      targetLabel: gameData.monsters[setup.form.monsterId]!.name,
-      combatStyle: setup.form.combatStyle,
-      setupMode: setup.setupMode,
-      customSetupCount: Object.keys(setup.customSetupsByMonster).length,
-      cannonMonsterCount: Object.keys(setup.cannonByMonster).length,
-      denseSort: setup.denseCompare.sort,
-      irrelevantMonsterCount: setup.denseCompare.irrelevantMonsterIds.length
-    }
+    changeReview: createSetupFileChangeReview({
+      current: currentSetup,
+      incoming: setup,
+      gameData
+    }),
+    stale: false
   };
 }
 
@@ -161,7 +169,11 @@ export class SetupFileTransferControllerCore<TFile> {
     for (const listener of this.listeners) listener();
   }
 
-  prepareImport = async (file: TFile, gameData: GameDataSnapshot): Promise<SetupPrepareOutcome> => {
+  prepareImport = async (
+    file: TFile,
+    gameData: GameDataSnapshot,
+    currentSetup: SavedSetupState
+  ): Promise<SetupPrepareOutcome> => {
     const attemptId = ++this.latestAttemptId;
     this.publish({ phase: "reading", notice: null, review: null });
     try {
@@ -171,6 +183,7 @@ export class SetupFileTransferControllerCore<TFile> {
       const review = createSetupImportReview(
         attemptId,
         parsed.data,
+        currentSetup,
         gameData,
         compareSetupTransferContext(parsed.context, gameData)
       );
@@ -189,24 +202,72 @@ export class SetupFileTransferControllerCore<TFile> {
     return true;
   };
 
-  consumeReview = (reviewId: number): SetupImportCandidate | null => {
-    if (this.snapshot.phase !== "review" || this.snapshot.review?.id !== reviewId) return null;
-    const candidate = {
-      setup: this.snapshot.review.setup,
-      context: this.snapshot.review.context
+  checkReviewFreshness = (reviewId: number, currentSetup: SavedSetupState): boolean => {
+    const review = this.snapshot.review;
+    if (this.snapshot.phase !== "review" || review?.id !== reviewId) return false;
+    if (review.stale) return false;
+    if (setupFileReviewMatchesCurrent(review.changeReview, currentSetup)) return true;
+    this.publish({ ...this.snapshot, review: { ...review, stale: true } });
+    return false;
+  };
+
+  refreshReview = (
+    reviewId: number,
+    currentSetup: SavedSetupState,
+    gameData: GameDataSnapshot
+  ): boolean => {
+    const review = this.snapshot.review;
+    if (this.snapshot.phase !== "review" || review?.id !== reviewId) return false;
+    this.publish({
+      ...this.snapshot,
+      review: createSetupImportReview(
+        review.id,
+        review.setup,
+        currentSetup,
+        gameData,
+        review.context
+      )
+    });
+    return true;
+  };
+
+  consumeReview = (reviewId: number, currentSetup: SavedSetupState): SetupReviewConsumeOutcome => {
+    const review = this.snapshot.review;
+    if (this.snapshot.phase !== "review" || review?.id !== reviewId) {
+      return { status: "ignored" };
+    }
+    if (review.stale || !setupFileReviewMatchesCurrent(review.changeReview, currentSetup)) {
+      if (!review.stale) this.publish({ ...this.snapshot, review: { ...review, stale: true } });
+      return { status: "stale" };
+    }
+    if (review.changeReview.changeCount === 0) return { status: "no-changes" };
+    const candidate: SetupImportCandidate = {
+      setup: review.setup,
+      context: review.context
     };
     this.publish({ phase: "idle", notice: null, review: null });
-    return candidate;
+    return { status: "accepted", candidate };
   };
 
   exportSetup = (setup: SavedSetupState, gameData: GameDataSnapshot): FileExportOutcome => {
-    const fileName = "index-sim-rewrite-setup.json";
-    const outcome = requestFileExport("setup", fileName, () =>
-      this.dependencies.downloadJsonFile(
-        fileName,
-        createRewriteSetupTransferEnvelope(setup, gameData, this.dependencies.now())
-      )
-    );
+    let outcome: FileExportOutcome;
+    try {
+      const now = this.dependencies.now();
+      const fileName = createTransferArtifactFileName({
+        artifact: "combat-setup",
+        context: gameData.monsters[setup.form.monsterId]?.name ?? "",
+        revision: createSetupTransferContext(gameData).gameRevision,
+        now
+      });
+      outcome = requestFileExport("setup", fileName, () =>
+        this.dependencies.downloadJsonFile(
+          fileName,
+          createRewriteSetupTransferEnvelope(setup, gameData, now)
+        )
+      );
+    } catch {
+      outcome = failedFileExportOutcome("setup");
+    }
     this.publish({ ...this.snapshot, notice: outcome.notice });
     return outcome;
   };

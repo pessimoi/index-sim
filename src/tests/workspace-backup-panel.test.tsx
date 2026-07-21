@@ -175,11 +175,18 @@ describe("Workspace backup Settings panel", () => {
     expect(markup).toContain('aria-label="Workspace backup and restore"');
     expect(markup).toContain("Download one versioned file containing the active local Workspace");
     expect(markup).toContain("read-only review and does not change this browser");
+    expect(markup).toContain(
+      "It includes setup, Planner, Loot, saved setups, prices and local history. Calculated output, pending reviews and Undo are excluded."
+    );
+    expect(markup).toContain("Required areas 9");
+    expect(markup).toContain("Download full Workspace backup");
+    expect(markup).toContain("Review Workspace backup file");
     expect(markup).toContain("Include last Hiscores player name");
     expect(markup).not.toMatch(/type="checkbox"[^>]*checked/);
     expect(markup).toContain("may identify a game character to anyone receiving the file");
     expect(markup).toContain("session-only and is not saved");
     expect(markup).toContain('accept="application/json,.json"');
+    expect(markup.match(/aria-describedby="[^"]+ [^"]+"/g)).toHaveLength(2);
     expect(markup).not.toContain("Apply");
   });
 
@@ -286,7 +293,7 @@ describe("Workspace backup Settings panel", () => {
           element.type === "button" &&
           (element.props as { children?: ReactNode }).children === label
       )!;
-    (button("Download Workspace backup").props as { onClick(): void }).onClick();
+    (button("Download full Workspace backup").props as { onClick(): void }).onClick();
     (button("Dismiss").props as { onClick(): void }).onClick();
 
     const fileInput = all.find(

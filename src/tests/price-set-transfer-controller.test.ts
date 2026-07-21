@@ -384,21 +384,24 @@ describe("PriceSet transfer controller", () => {
     ) as PriceSet;
     test.core.requestReset("scheduled prices");
 
-    const outcome = test.core.exportPriceSet(priceSet);
+    const outcome = test.core.exportPriceSet(priceSet, gameData());
 
     expect(test.downloads).toEqual([
-      { fileName: "index-sim-price-set-active-custom.json", value: priceSet }
+      {
+        fileName: "2004scape-price-set-active-custom-rev-274-20260713T141516Z.json",
+        value: priceSet
+      }
     ]);
     expect(test.core.getSnapshot().resetPending).toBe(true);
     expect(outcome).toEqual({
       status: "requested",
-      fileName: "index-sim-price-set-active-custom.json",
+      fileName: "2004scape-price-set-active-custom-rev-274-20260713T141516Z.json",
       appStatus:
-        "PriceSet download started: index-sim-price-set-active-custom.json. Check your browser downloads.",
+        "PriceSet download started: 2004scape-price-set-active-custom-rev-274-20260713T141516Z.json. Check your browser downloads.",
       marketNotice: {
         tone: "neutral",
         message:
-          "PriceSet download started: index-sim-price-set-active-custom.json. Check your browser downloads."
+          "PriceSet download started: 2004scape-price-set-active-custom-rev-274-20260713T141516Z.json. Check your browser downloads."
       }
     });
   });
@@ -412,7 +415,7 @@ describe("PriceSet transfer controller", () => {
     const priceSet = JSON.parse(priceSetText({ id: "failed", label: "Failed" })) as PriceSet;
     test.core.requestReset("scheduled prices");
 
-    const outcome = test.core.exportPriceSet(priceSet);
+    const outcome = test.core.exportPriceSet(priceSet, gameData());
 
     expect(outcome).toEqual({
       status: "failed",

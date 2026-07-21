@@ -34,6 +34,7 @@ import {
 } from "../state/ui-state";
 import type { CalculationWarningViewModel, SelectOptionViewModel } from "./contracts";
 import { formatNumber } from "./formatting";
+import { createEntityCollisionIndex, createEntityDisplayLabel } from "./presentation-language";
 
 export type SetupRequirementSkill = Extract<keyof SkillRequirements, PlannerSkill>;
 
@@ -790,24 +791,34 @@ export function weaponOptions(
   gameData: GameDataSnapshot,
   combatStyle: CombatStyle
 ): SelectOptionViewModel[] {
+  const collisionIndex = createEntityCollisionIndex(gameData);
   return Object.entries(gameData.weapons)
     .filter(([, weapon]) => weapon.type === combatStyle)
-    .map(([id, weapon]) => ({
-      id,
-      label: weapon.name,
-      hint: [
-        `speed ${weapon.speed}`,
-        weapon.twoHand ? "2h" : null,
-        weapon.sub ?? weapon.wclass ?? null,
-        combatStyle === "melee"
-          ? `acc ${weapon.accBonus}, str ${weapon.dmgBonus}`
-          : combatStyle === "ranged"
-            ? `rng ${weapon.accBonus}`
-            : `magic ${weapon.accBonus}`
-      ]
-        .filter(Boolean)
-        .join(", ")
-    }))
+    .map(([id, weapon]) => {
+      const label = createEntityDisplayLabel({
+        technicalId: id,
+        gameDataName: weapon.name,
+        collisionIndex,
+        entityKind: "item"
+      }).name;
+      return {
+        id,
+        label,
+        accessibleLabel: label,
+        hint: [
+          `speed ${weapon.speed}`,
+          weapon.twoHand ? "2h" : null,
+          weapon.sub ?? weapon.wclass ?? null,
+          combatStyle === "melee"
+            ? `acc ${weapon.accBonus}, str ${weapon.dmgBonus}`
+            : combatStyle === "ranged"
+              ? `rng ${weapon.accBonus}`
+              : `magic ${weapon.accBonus}`
+        ]
+          .filter(Boolean)
+          .join(", ")
+      };
+    })
     .sort((left, right) => left.label.localeCompare(right.label));
 }
 
@@ -815,32 +826,52 @@ export function ammoOptions(
   gameData: GameDataSnapshot,
   kind?: GameDataSnapshot["ammo"][string]["kind"]
 ): SelectOptionViewModel[] {
+  const collisionIndex = createEntityCollisionIndex(gameData);
   return [
     { id: "none", label: "None" },
     ...Object.entries(gameData.ammo)
       .filter(([, ammo]) => !kind || ammo.kind === kind)
-      .map(([id, ammo]) => ({
-        id,
-        label: ammo.name,
-        hint: [ammo.kind, `range ${signedBonus(ammo.rangeBonus)}`].filter(Boolean).join(", ")
-      }))
+      .map(([id, ammo]) => {
+        const label = createEntityDisplayLabel({
+          technicalId: id,
+          gameDataName: ammo.name,
+          collisionIndex,
+          entityKind: "item"
+        }).name;
+        return {
+          id,
+          label,
+          accessibleLabel: label,
+          hint: [ammo.kind, `range ${signedBonus(ammo.rangeBonus)}`].filter(Boolean).join(", ")
+        };
+      })
       .sort((left, right) => left.label.localeCompare(right.label))
   ];
 }
 
 export function spellOptions(gameData: GameDataSnapshot): SelectOptionViewModel[] {
+  const collisionIndex = createEntityCollisionIndex(gameData);
   return Object.entries(gameData.spells)
-    .map(([id, spell]) => ({
-      id,
-      label: spell.name,
-      hint: [
-        spell.lvl == null ? null : `lvl ${spell.lvl}`,
-        `base ${spell.base}`,
-        spell.god ? "god" : null
-      ]
-        .filter(Boolean)
-        .join(", ")
-    }))
+    .map(([id, spell]) => {
+      const label = createEntityDisplayLabel({
+        technicalId: id,
+        gameDataName: spell.name,
+        collisionIndex,
+        entityKind: "item"
+      }).name;
+      return {
+        id,
+        label,
+        accessibleLabel: label,
+        hint: [
+          spell.lvl == null ? null : `lvl ${spell.lvl}`,
+          `base ${spell.base}`,
+          spell.god ? "god" : null
+        ]
+          .filter(Boolean)
+          .join(", ")
+      };
+    })
     .sort((left, right) => left.label.localeCompare(right.label));
 }
 
@@ -848,12 +879,17 @@ export function equipmentSlotOptions(
   gameData: GameDataSnapshot,
   slot: EquipmentSlot
 ): SelectOptionViewModel[] {
+  const collisionIndex = createEntityCollisionIndex(gameData);
   return Object.entries(gameData.equipment[slot] ?? {})
-    .map(([id, item]) => ({
-      id,
-      label: item.name,
-      hint: equipmentHint(item)
-    }))
+    .map(([id, item]) => {
+      const label = createEntityDisplayLabel({
+        technicalId: id,
+        gameDataName: item.name,
+        collisionIndex,
+        entityKind: "item"
+      }).name;
+      return { id, label, accessibleLabel: label, hint: equipmentHint(item) };
+    })
     .sort((left, right) => {
       if (left.id === "none") return -1;
       if (right.id === "none") return 1;

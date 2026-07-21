@@ -96,8 +96,8 @@ async function captureMobileResultLoop(page: Page, name: string) {
   await expect(summary).toBeVisible();
   await expect(summary.locator(".metric")).toContainText([
     "DPS3.05",
-    "Effective XP/hr21,573",
-    "Net GP/hr-81,544"
+    "EFF. XP/HR21,573",
+    "EFF. NET GP/HR-81,544"
   ]);
   const [playerBox, summaryBox, activeBox] = await Promise.all([
     playerSetup.boundingBox(),

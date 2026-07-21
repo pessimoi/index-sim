@@ -326,14 +326,17 @@ describe("Economy and Settings pane", () => {
     );
     expect(markup).toContain("Importing replaces the complete local base PriceSet");
     expect(markup).toContain("Missing items are not merged from the committed snapshot");
+    expect(markup).toContain(
+      "A PriceSet file contains its validated item prices, metadata, provenance and compatible alchValues field. Manual item prices and price history are separate browser-local state."
+    );
     expect(markup).toContain("Use <strong>Manual item price</strong>");
     expect(markup).toContain("a PriceSet JSON exported by this app, up to 1 MB");
     expect(markup).toContain("High alch values always come from current game data");
     expect(markup).toContain("File format");
     expect(markup).toContain("complete replacement map, not a patch");
     expect(markup).toContain('accept="application/json,.json"');
-    expect(markup).toMatch(/aria-describedby="[^"]+ [^"]+"/);
-    inOrder(markup, ["Export active PriceSet", "Import full PriceSet", "Reset imported PriceSet"]);
+    expect(markup.match(/aria-describedby="[^"]+ [^"]+ [^"]+"/g)).toHaveLength(2);
+    inOrder(markup, ["Export active PriceSet", "Review PriceSet file", "Reset imported PriceSet"]);
     expect(markup).not.toContain("Import prices");
     expect(markup).not.toContain("Import PriceSet");
     expect(markup).not.toContain("Reset local price override");
@@ -341,7 +344,7 @@ describe("Economy and Settings pane", () => {
       createElement(EconomySettingsPane, { model: model("settings"), actions: defaultActions })
     );
     expect(settingsMarkup).not.toContain("Advanced PriceSet tools");
-    expect(settingsMarkup).not.toContain("Import full PriceSet");
+    expect(settingsMarkup).not.toContain("Review PriceSet file");
   });
 
   it("keeps the hidden shared service strip mounted without detailed Market content", () => {

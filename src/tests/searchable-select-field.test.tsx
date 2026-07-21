@@ -65,6 +65,42 @@ function renderFixture(onChange: (value: string) => void = () => undefined): voi
   act(() => root.render(<Harness />));
 }
 
+function renderCollisionFixture(onChange: (value: string) => void): void {
+  function Harness() {
+    const [value, setValue] = useState("loop_half_key");
+    return (
+      <SearchableSelectField
+        label="Item"
+        value={value}
+        options={[
+          {
+            id: "loop_half_key",
+            label: "Half of a key — loop half",
+            accessibleLabel: "Half of a key — loop half",
+            hint: "Key half"
+          },
+          {
+            id: "tooth_half_key",
+            label: "Half of a key — tooth half",
+            accessibleLabel: "Half of a key — tooth half",
+            hint: "Key half"
+          },
+          {
+            id: "dragonhide_black",
+            label: "Dragonhide — black",
+            accessibleLabel: "Dragonhide — black"
+          }
+        ]}
+        onChange={(nextValue) => {
+          setValue(nextValue);
+          onChange(nextValue);
+        }}
+      />
+    );
+  }
+  act(() => root.render(<Harness />));
+}
+
 function trigger(): HTMLButtonElement {
   const element = container.querySelector(".searchable-combobox-trigger");
   if (!(element instanceof HTMLButtonElement)) throw new Error("Missing searchable trigger");
@@ -154,5 +190,37 @@ describe("SearchableSelectField accessibility contract", () => {
     key(search, "Enter");
     expect(changes).toEqual([]);
     expect(document.activeElement).toBe(search);
+  });
+
+  it("keeps colliding visible and accessible option names unique and searchable by every identity", () => {
+    const changes: string[] = [];
+    renderCollisionFixture((value) => changes.push(value));
+    expect(trigger().textContent).toContain("Half of a key — loop half");
+
+    act(() => trigger().click());
+    const names = [...container.querySelectorAll<HTMLElement>('[role="option"]')].map((option) =>
+      option.getAttribute("aria-label")
+    );
+    expect(names).toEqual([
+      "Half of a key — loop half",
+      "Half of a key — tooth half",
+      "Dragonhide — black"
+    ]);
+    expect(new Set(names).size).toBe(names.length);
+    expect(container.querySelector(".searchable-combobox-option small")?.textContent).toBe(
+      "Key half"
+    );
+
+    typeSearch(input(), "tooth half");
+    expect(container.querySelectorAll('[role="option"]')).toHaveLength(1);
+    key(input(), "Enter");
+    expect(changes).toEqual(["tooth_half_key"]);
+    expect(trigger().dataset.selectedId).toBe("tooth_half_key");
+
+    act(() => trigger().click());
+    typeSearch(input(), "dragonhide_black");
+    expect(container.querySelectorAll('[role="option"]')).toHaveLength(1);
+    key(input(), "Enter");
+    expect(changes).toEqual(["tooth_half_key", "dragonhide_black"]);
   });
 });

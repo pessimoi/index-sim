@@ -35,7 +35,11 @@ describe("application startup guard", () => {
       indexHtml.indexOf("/src/app/main.tsx")
     );
     expect(mainSource).toContain("<ApplicationErrorBoundary>");
-    expect(mainSource).toContain("<App />");
+    expect(mainSource).toContain("export const AppEntry = lazy(() =>");
+    expect(mainSource).toContain('import("./App")');
+    expect(mainSource).toContain("throw new ApplicationEntryLoadError()");
+    expect(mainSource).toContain('data-app-startup-state="starting"');
+    expect(mainSource).toContain("<AppEntry />");
   });
 
   it("replaces pending startup content with one sanitized error state", () => {

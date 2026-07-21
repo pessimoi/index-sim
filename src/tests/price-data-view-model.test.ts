@@ -576,6 +576,82 @@ describe("price-data view model", () => {
     ).toBe("Not applicable");
   });
 
+  it("keeps colliding Economy identities unique while price selection stays exact-id based", () => {
+    const itemPrices = {
+      loop_half_key: 11,
+      tooth_half_key: 12,
+      dragonhide_black: 80,
+      dragonhide_blue: 40,
+      dragonhide_green: 20,
+      dragonhide_red: 60,
+      guam_leaf: 3,
+      herb_guam: 4
+    };
+    const itemLabels = {
+      loop_half_key: "Half of a key",
+      tooth_half_key: "Half of a key",
+      dragonhide_black: "Dragonhide",
+      dragonhide_blue: "Dragonhide",
+      dragonhide_green: "Dragonhide",
+      dragonhide_red: "Dragonhide",
+      guam_leaf: "Guam leaf",
+      herb_guam: "Guam leaf"
+    };
+    const prices = priceSet({ itemPrices, itemPriceMetadata: undefined, alchValues: {} });
+    const presentation = createManualPriceEditorPresentation({
+      activePriceSet: prices,
+      basePriceSet: prices,
+      itemLabels,
+      manualPriceOverrides: DEFAULT_MANUAL_PRICE_OVERRIDES_STATE,
+      selectedItemId: "tooth_half_key",
+      draft: null
+    });
+    const labelsById = Object.fromEntries(
+      presentation.itemOptions.map((option) => [option.id, option.label])
+    );
+
+    expect(labelsById).toMatchObject({
+      loop_half_key: "Half of a key — loop half",
+      tooth_half_key: "Half of a key — tooth half",
+      dragonhide_black: "Dragonhide — black",
+      dragonhide_blue: "Dragonhide — blue",
+      dragonhide_green: "Dragonhide — green",
+      dragonhide_red: "Dragonhide — red",
+      guam_leaf: "Guam leaf — ID guam_leaf",
+      herb_guam: "Guam leaf — ID herb_guam"
+    });
+    expect(new Set(presentation.itemOptions.map((option) => option.accessibleLabel)).size).toBe(
+      presentation.itemOptions.length
+    );
+    expect(presentation).toMatchObject({
+      itemId: "tooth_half_key",
+      itemLabel: "Half of a key — tooth half",
+      basePrice: 12,
+      activePrice: 12
+    });
+
+    const notices = createCurrentPriceNoticePresentation({
+      warnings: ["loop_half_key", "tooth_half_key"].map((itemId) => ({
+        code: "missing-price",
+        severity: "warning" as const,
+        message: "fixture",
+        itemId,
+        priceContext: { consumer: "supply" as const, affectsCurrentResult: true }
+      })),
+      gameData: {
+        items: Object.fromEntries(
+          Object.entries(itemLabels).map(([id, name]) => [id, { id, name }])
+        )
+      },
+      lootBreakdown: [],
+      editableItemIds: new Set(Object.keys(itemPrices))
+    });
+    expect(notices.issues.map((notice) => [notice.itemLabel, notice.action?.itemId])).toEqual([
+      ["Half of a key — loop half", "loop_half_key"],
+      ["Half of a key — tooth half", "tooth_half_key"]
+    ]);
+  });
+
   it("disables a new manual override at the storage cap without blocking an existing row", () => {
     const items = Object.fromEntries(
       Array.from({ length: MANUAL_PRICE_OVERRIDES_MAX_ITEMS }, (_, index) => [

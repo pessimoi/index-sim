@@ -5,10 +5,10 @@ import type { SavedSetupState } from "../state/ui-state";
 import type { FileExportOutcome } from "./file-export-outcome";
 import {
   SetupFileTransferControllerCore,
-  type SetupImportCandidate,
   type SetupFileTransferDependencies,
   type SetupFileTransferSnapshot,
-  type SetupPrepareOutcome
+  type SetupPrepareOutcome,
+  type SetupReviewConsumeOutcome
 } from "./setup-file-transfer";
 
 export interface UseSetupFileTransferInput {
@@ -16,9 +16,19 @@ export interface UseSetupFileTransferInput {
 }
 
 export interface SetupFileTransferController extends SetupFileTransferSnapshot {
-  prepareImport(file: File, gameData: GameDataSnapshot): Promise<SetupPrepareOutcome>;
+  prepareImport(
+    file: File,
+    gameData: GameDataSnapshot,
+    currentSetup: SavedSetupState
+  ): Promise<SetupPrepareOutcome>;
   dismissReview(reviewId: number): boolean;
-  consumeReview(reviewId: number): SetupImportCandidate | null;
+  checkReviewFreshness(reviewId: number, currentSetup: SavedSetupState): boolean;
+  refreshReview(
+    reviewId: number,
+    currentSetup: SavedSetupState,
+    gameData: GameDataSnapshot
+  ): boolean;
+  consumeReview(reviewId: number, currentSetup: SavedSetupState): SetupReviewConsumeOutcome;
   exportSetup(setup: SavedSetupState, gameData: GameDataSnapshot): FileExportOutcome;
 }
 
@@ -45,6 +55,8 @@ export function useSetupFileTransfer(
     ...snapshot,
     prepareImport: controller.prepareImport,
     dismissReview: controller.dismissReview,
+    checkReviewFreshness: controller.checkReviewFreshness,
+    refreshReview: controller.refreshReview,
     consumeReview: controller.consumeReview,
     exportSetup: controller.exportSetup
   };

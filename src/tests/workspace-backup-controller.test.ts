@@ -141,18 +141,35 @@ describe("Workspace file-transfer controller", () => {
         liveState: liveState(),
         storageAccess: createBrowserStorageAccess()
       })
-    ).toMatchObject({ status: "requested" });
+    ).toMatchObject({
+      status: "requested",
+      includedAreaIds: [
+        "rewrite-setup",
+        "planner-ui",
+        "loot-prefs",
+        "loot-settings",
+        "hidden-gear-tiers",
+        "duel-snapshots",
+        "price-history",
+        "selected-price-set",
+        "manual-price-overrides"
+      ]
+    });
     expect(JSON.stringify(harness.downloads[0]?.value)).not.toContain("Private Hero");
     expect((harness.downloads[0]?.value as { areas: unknown[] }).areas).toHaveLength(9);
 
     harness.core.setIncludeLastHiscoresPlayer(true);
-    harness.core.exportWorkspace({
+    const sensitiveOutcome = harness.core.exportWorkspace({
       gameData: context.gameData,
       liveState: liveState(),
       storageAccess: createBrowserStorageAccess()
     });
+    expect(sensitiveOutcome).toMatchObject({
+      status: "requested",
+      includedAreaIds: expect.arrayContaining(["hiscores-last-player"])
+    });
     expect(harness.downloads[1]?.fileName).toBe(
-      "index-sim-workspace-274-2026-07-19T16-45-00.000Z.json"
+      "2004scape-workspace-backup-rev-274-20260719T164500Z.json"
     );
     expect((harness.downloads[1]?.value as { areas: unknown[] }).areas).toHaveLength(10);
     expect(JSON.stringify(harness.downloads[1]?.value)).toContain("Private Hero");
@@ -161,7 +178,7 @@ describe("Workspace file-transfer controller", () => {
       notice: {
         tone: "neutral",
         message:
-          "Workspace backup download started: index-sim-workspace-274-2026-07-19T16-45-00.000Z.json. Check your browser downloads."
+          "Workspace backup download started: 2004scape-workspace-backup-rev-274-20260719T164500Z.json. Check your browser downloads."
       }
     });
   });

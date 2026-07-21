@@ -30,10 +30,10 @@ test("targeted Reset restores Cannon without changing linked Trip scarce values"
   const output = page.locator('[aria-label="Cannon output"]');
   await expect(output).toContainText("Balls/hr");
   await expect(output).toContainText("Cannon only DPS");
-  await expect(output).toContainText("Cannon Ranged XP/hr");
+  await expect(output).toContainText("On-site cannon Ranged XP/hr");
   await expect(output).toContainText("Effective XP/hr");
   await expect(output).toContainText("Effective net GP/hr");
-  await expect(output).toContainText("Ball cost/hr");
+  await expect(output).toContainText("On-site ball cost/hr");
   await expect(output).toContainText("Accuracy rule");
   await expect(output).toContainText("XP rule");
   await expect(output).toContainText("Supply impact");
@@ -128,7 +128,7 @@ test("targeted Reset restores scarce spot and safespot without changing their ne
   await expect(summary).toContainText("Scarce status");
   await expect(summary).toContainText("Reserve parts");
   await expect(summary).toContainText("Potion parts");
-  await expect(summary).toContainText("Effective K/hr");
+  await expect(summary).toContainText("Effective kills/hr");
   await page.waitForFunction(() => {
     const saved = window.localStorage.getItem("index-sim:rewrite-setup") ?? "";
     return (
@@ -261,7 +261,7 @@ test("updates trip food, banking and inventory reserve controls across styles", 
   await expect(summary).toContainText("Food count");
   await expect(summary).toContainText(/Auto [0-9]+/);
   await expect(summary).toContainText("Loot capacity");
-  await expect(summary).toContainText("Effective K/hr");
+  await expect(summary).toContainText("Effective kills/hr");
 
   await chooseSearchableOption(trip, "Food", "Swordfish");
   await trip.getByLabel("Bank time").selectOption("manual");
@@ -810,9 +810,9 @@ test("matches browser-rendered numeric snapshots for loot action and trip overri
       DPS: "3.05",
       "MAX HIT": "16.4",
       "HIT %": "88.9%",
-      "XP/HR": "21,573",
-      "GP/HR NET": "-19,906",
-      "KILLS/HR": "235",
+      "EFF. XP/HR": "21,573",
+      "EFF. NET GP/HR": "-19,906",
+      "EFF. K/HR": "154",
       "GP/KILL": "918",
       "SUPPLY/KILL": "1,047"
     },
@@ -823,7 +823,7 @@ test("matches browser-rendered numeric snapshots for loot action and trip overri
       "Food count": "Manual 4",
       "Food/kill": "0.50",
       "Kills/trip": "6.1",
-      "Effective K/hr": "45",
+      "Effective kills/hr": "45",
       "Recoil/kill": "4.5 dmg",
       "Recoil GP/kill": "94"
     },
@@ -831,9 +831,9 @@ test("matches browser-rendered numeric snapshots for loot action and trip overri
       DPS: "2.59",
       "MAX HIT": "16.4",
       "HIT %": "75.5%",
-      "XP/HR": "20,093",
-      "GP/HR NET": "-52,744",
-      "KILLS/HR": "80",
+      "EFF. XP/HR": "20,093",
+      "EFF. NET GP/HR": "-52,744",
+      "EFF. K/HR": "45",
       "GP/KILL": "1,900",
       "SUPPLY/KILL": "3,065"
     }
@@ -876,7 +876,7 @@ test("matches browser-rendered numeric snapshots for imported price sets", async
   await advancedPriceSetTools.locator(":scope > summary").click();
   await advancedPriceSetTools
     .locator("label.file-button")
-    .filter({ hasText: "Import full PriceSet" })
+    .filter({ hasText: "Review PriceSet file" })
     .locator('input[type="file"]')
     .setInputFiles({
       name: "manual-browser-snapshot-prices.json",
@@ -906,9 +906,9 @@ test("matches browser-rendered numeric snapshots for imported price sets", async
       DPS: "3.05",
       "MAX HIT": "16.4",
       "HIT %": "88.9%",
-      "XP/HR": "21,573",
-      "GP/HR NET": "-169,821",
-      "KILLS/HR": "235",
+      "EFF. XP/HR": "21,573",
+      "EFF. NET GP/HR": "-169,821",
+      "EFF. K/HR": "154",
       "GP/KILL": "82",
       "SUPPLY/KILL": "1,184"
     }

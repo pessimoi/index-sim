@@ -349,9 +349,9 @@ test("reviews and imports compatible legacy setup data", async ({ page }) => {
       DPS: "3.06",
       "MAX HIT": "14.0",
       "HIT %": "78.7%",
-      "XP/HR": "17,756",
-      "GP/HR NET": "-263,827",
-      "KILLS/HR": "109",
+      "EFF. XP/HR": "17,756",
+      "EFF. NET GP/HR": "-263,827",
+      "EFF. K/HR": "51",
       "GP/KILL": "122",
       "SUPPLY/KILL": "5,292"
     }
@@ -533,7 +533,7 @@ test("surfaces a version-mismatched saved setup without overwriting it", async (
   const setupInput = page
     .locator(".topbar")
     .locator("label.file-button")
-    .filter({ hasText: "Import setup" })
+    .filter({ hasText: "Review combat setup file" })
     .locator('input[type="file"]');
   await setupInput.setInputFiles({
     name: "dismissed-compatible-setup.json",
@@ -775,25 +775,27 @@ test("does not overwrite an existing rewrite setup before import action", async 
   });
 });
 
-test("keeps global actions focused and completes setup export and Import setup review/Undo", async ({
+test("reviews every setup transfer change across file, shared-link and saved-row Load", async ({
   page
 }) => {
   await page.goto("/");
   const topbarActions = page.locator(".topbar > .actions");
-  await expect(topbarActions.getByRole("button", { name: "Export setup" })).toBeVisible();
+  await expect(topbarActions.getByRole("button", { name: "Export combat setup" })).toBeVisible();
   const transferControls = topbarActions.locator("label.file-button, button");
   expect(
     (await transferControls.allTextContents()).map((text) => text.trim().replace(/\s+/g, " "))
-  ).toEqual(["Import setup", "Export setup", "Share setup"]);
+  ).toEqual(["Review combat setup file", "Export combat setup", "Share setup"]);
 
-  const exportSetupButton = topbarActions.getByRole("button", { name: "Export setup" });
+  const exportSetupButton = topbarActions.getByRole("button", { name: "Export combat setup" });
   const downloadPromise = page.waitForEvent("download");
   await exportSetupButton.focus();
   await exportSetupButton.press("Enter");
   const download = await downloadPromise;
-  expect(download.suggestedFilename()).toBe("index-sim-rewrite-setup.json");
+  expect(download.suggestedFilename()).toMatch(
+    /^2004scape-combat-setup-hill-giant-rev-274-\d{8}T\d{6}Z\.json$/
+  );
   await expect(page.getByLabel("Setup transfer notice")).toHaveText(
-    "Setup download started: index-sim-rewrite-setup.json. Check your browser downloads."
+    `Combat setup download started: ${download.suggestedFilename()}. Check your browser downloads.`
   );
   await expect(exportSetupButton).toBeFocused();
   const exportedText = await readDownloadText(download);
@@ -840,6 +842,11 @@ test("keeps global actions focused and completes setup export and Import setup r
     weaponId: "dragon_longsword",
     levels: { ...defaultForm.levels, attack: 77, strength: 78 }
   }).form;
+  const dagannothForm = savedSetupFromForm({
+    ...defaultForm,
+    monsterId: "dagannoth",
+    levels: { ...defaultForm.levels, attack: 81, strength: 82 }
+  }).form;
   const importedSetup = savedSetupFromForm(
     customForm,
     {
@@ -849,14 +856,17 @@ test("keeps global actions focused and completes setup export and Import setup r
       showIrrelevant: true,
       irrelevantMonsterIds: ["rock_crab"]
     },
-    { giant: { enabled: true, targets: 4, respawnSec: 45 } },
-    { giant: customForm },
+    {
+      giant: { enabled: true, targets: 4, respawnSec: 45 },
+      dagannoth: { enabled: true, targets: 6, respawnSec: 30 }
+    },
+    { giant: customForm, dagannoth: dagannothForm },
     defaultForm,
     "custom"
   );
   const setupInput = topbarActions
     .locator("label.file-button")
-    .filter({ hasText: "Import setup" })
+    .filter({ hasText: "Review combat setup file" })
     .locator('input[type="file"]');
   const importedFile = {
     name: "rewrite-setup.json",
@@ -873,15 +883,61 @@ test("keeps global actions focused and completes setup export and Import setup r
 
   const review = page.getByLabel("Setup import review");
   await expect(review).toBeVisible();
+  const reviewGroups = review.locator(
+    ".setup-import-change-groups > details.setup-import-change-group"
+  );
+  await expect(reviewGroups).toHaveCount(13);
+  expect(
+    await reviewGroups.locator(":scope > summary > span:first-child").allTextContents()
+  ).toEqual([
+    "Transfer context",
+    "Active setup identity",
+    "Player levels",
+    "Active combat loadout",
+    "Other combat-style loadouts",
+    "Prayers, boosts and special attack",
+    "Manual combat overrides",
+    "Trip, supplies and banking",
+    "Planner targets",
+    "Default setup",
+    "Monster-specific custom setups",
+    "Monster-specific cannon settings",
+    "Dense Compare preferences"
+  ]);
   await expect(review).toContainText("Hill Giant");
+  await expect(review).toContainText("Dagannoth");
   await expect(review).toContainText("Melee");
   await expect(review).toContainText("Custom");
-  await expect(review).toContainText("Custom setups0 → 1");
-  await expect(review).toContainText("Cannon settings0 → 1");
-  await expect(review).toContainText("Monster, ascending");
-  await expect(review).toContainText("active form, default form, setup mode, custom setups");
+  await expect(review).toContainText("Current");
+  await expect(review).toContainText("Incoming");
+  await expect(review).toContainText("Included in this file (5)");
+  await expect(review).toContainText("Not included (6)");
+  await expect(review).toContainText("Monster-specific custom setups");
+  await expect(review).toContainText("Monster-specific cannon settings");
+  await expect(review).toContainText("Sort field");
+  await expect(review).toContainText("Monster");
+  await expect(review).toContainText("Ascending");
   await expect(review).toContainText("older format does not record a game revision");
   await expect(review).not.toContainText("dragon_longsword");
+  await expect(review).not.toContainText("currentFingerprint");
+  await expect(review).not.toContainText("incomingFingerprint");
+  const customSetupGroup = reviewGroups.nth(10);
+  const customSetupEntries = customSetupGroup.locator(".setup-import-collection-trigger");
+  await expect(customSetupEntries).toHaveCount(2);
+  await expect(customSetupGroup.locator(".setup-import-collection-content")).toHaveCount(0);
+  await customSetupEntries.filter({ hasText: "Dagannoth" }).click();
+  await expect(customSetupGroup.locator(".setup-import-collection-content")).toHaveCount(1);
+  await expect(customSetupGroup.locator(".setup-import-collection-content")).toContainText("81");
+  await customSetupEntries.filter({ hasText: "Hill Giant" }).click();
+  await expect(customSetupGroup.locator(".setup-import-collection-content")).toHaveCount(1);
+  await expect(customSetupGroup.locator(".setup-import-collection-content")).toContainText(
+    "Dragon longsword"
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expectPageWidthContained(page);
+  await page.setViewportSize({ width: 844, height: 390 });
+  await expectPageWidthContained(page);
+  await page.setViewportSize({ width: 1280, height: 720 });
   await expect(page.getByLabel("Setup context")).toContainText("Editing default");
   expect(
     await page.evaluate(
@@ -899,10 +955,48 @@ test("keeps global actions focused and completes setup export and Import setup r
   ).toEqual(setupBeforeImport);
 
   await setupInput.setInputFiles(importedFile);
-  await page
-    .getByLabel("Setup import review")
-    .getByRole("button", { name: "Apply imported setup" })
-    .click();
+  const liveReview = page.getByLabel("Setup import review");
+  const economyTab = tabs.getByRole("tab", { name: "Economy" });
+  await economyTab.focus();
+  await economyTab.press("Enter");
+  const manualPrice = page.getByRole("region", { name: "Manual item price", exact: true });
+  const manualPriceItem = manualPrice.getByRole("button", {
+    name: "Manual price item",
+    exact: true
+  });
+  await manualPriceItem.focus();
+  await manualPriceItem.press("Enter");
+  await manualPrice
+    .getByRole("combobox", { name: "Manual price item", exact: true })
+    .fill("Lobster");
+  const lobsterOption = manualPrice.getByRole("option", { name: "Lobster", exact: true });
+  await lobsterOption.focus();
+  await lobsterOption.press("Enter");
+  await manualPrice.getByLabel("Manual price", { exact: true }).fill("270");
+  const applyPrice = manualPrice.getByRole("button", { name: "Apply price" });
+  await applyPrice.focus();
+  await applyPrice.press("Enter");
+  await expect(liveReview.getByRole("button", { name: "Apply imported setup" })).toBeEnabled();
+  await expect(liveReview.getByRole("button", { name: "Refresh comparison" })).toHaveCount(0);
+
+  const meleeSetupTab = tabs.getByRole("tab", { name: "Melee setup" });
+  await meleeSetupTab.focus();
+  await meleeSetupTab.press("Enter");
+  const attackLevel = page.getByLabel("Combat setup").getByLabel("ATT", { exact: true });
+  await attackLevel.fill("61");
+  await expect(liveReview).toContainText("Current setup changed after this review was prepared.");
+  await expect(liveReview.getByRole("button", { name: "Apply imported setup" })).toHaveCount(0);
+  await attackLevel.fill("60");
+  const refreshComparison = liveReview.getByRole("button", { name: "Refresh comparison" });
+  await refreshComparison.focus();
+  await refreshComparison.press("Enter");
+  await expect(liveReview.getByRole("button", { name: "Apply imported setup" })).toBeEnabled();
+  await expect(liveReview).not.toContainText(
+    "Current setup changed after this review was prepared."
+  );
+  const applyImportedSetup = liveReview.getByRole("button", { name: "Apply imported setup" });
+  await applyImportedSetup.focus();
+  await applyImportedSetup.press("Enter");
 
   const setupNotice = page.getByLabel("Setup transfer notice");
   await expect(setupNotice).toHaveText("Imported rewrite setup using current Revision 274 data.");
@@ -924,7 +1018,7 @@ test("keeps global actions focused and completes setup export and Import setup r
   await tabs.getByRole("tab", { name: "Planner" }).click();
   await expect(planner.getByLabel("Attack current XP")).toHaveValue("");
   await expect(planner.getByLabel("Attack target")).toHaveValue("77");
-  await expect(planner).toContainText("Attack XP uses Auto");
+  await expect(planner).toContainText("the level 77 floor");
   await expect(planner).toContainText("Attack target is now 77");
   await tabs.getByRole("tab", { name: "Melee setup" }).click();
   const loadout = page.getByRole("region", { name: "Equipment loadout", exact: true });
@@ -984,6 +1078,16 @@ test("keeps global actions focused and completes setup export and Import setup r
   });
   const exactReview = page.getByLabel("Setup import review");
   await expect(exactReview).toContainText("Created with this exact Revision 274 data snapshot.");
+  await expect(exactReview).toContainText("No changes. This file matches the current setup.");
+  await expect(exactReview.getByRole("button", { name: "Apply imported setup" })).toBeDisabled();
+  await expect(page.getByLabel("Local state undo")).toHaveCount(0);
+  const setupBeforeNoOp = await page.evaluate(() =>
+    window.localStorage.getItem("index-sim:rewrite-setup")
+  );
+  expect(await page.evaluate(() => window.localStorage.getItem("index-sim:rewrite-setup"))).toBe(
+    setupBeforeNoOp
+  );
+  await expect(page.getByLabel("Local state undo")).toHaveCount(0);
   await exactReview.getByRole("button", { name: "Dismiss" }).click();
 
   await setupInput.setInputFiles(importedFile);
@@ -999,6 +1103,145 @@ test("keeps global actions focused and completes setup export and Import setup r
     .click();
   await expect(page.getByLabel("Setup context")).toContainText("Editing default");
   await expectSearchableSelection(loadout, "Weapon", "rune_scimitar");
+
+  // Shared link: the same exhaustive form registry plus target-owned cannon and loot context.
+  const sharedAttack = page.getByLabel("Combat setup").getByLabel("ATT", { exact: true });
+  await sharedAttack.fill("55");
+  await page.waitForFunction(() => {
+    const raw = window.localStorage.getItem("index-sim:rewrite-setup");
+    return raw != null && JSON.parse(raw).data.form.levels.attack === 55;
+  });
+  await topbarActions.getByRole("button", { name: "Share setup" }).click();
+  const shareDialog = page.getByRole("dialog", { name: "Share setup" });
+  const sharedLink = await shareDialog.getByLabel("Setup link").inputValue();
+  await shareDialog.getByRole("button", { name: "Done" }).click();
+  await sharedAttack.fill("56");
+  await page.waitForFunction(() => {
+    const raw = window.localStorage.getItem("index-sim:rewrite-setup");
+    return raw != null && JSON.parse(raw).data.form.levels.attack === 56;
+  });
+  await page.goto("about:blank");
+  await page.goto(sharedLink);
+
+  const sharedReview = page.getByLabel("Shared setup review");
+  await expect(sharedReview).toBeVisible();
+  const sharedGroups = sharedReview.locator(
+    ".setup-import-change-groups > details.setup-import-change-group"
+  );
+  await expect(sharedGroups).toHaveCount(11);
+  expect(
+    await sharedGroups.locator(":scope > summary > span:first-child").allTextContents()
+  ).toEqual([
+    "Active setup identity",
+    "Player levels",
+    "Active combat loadout",
+    "Other combat-style loadouts",
+    "Prayers, boosts and special attack",
+    "Manual combat overrides",
+    "Trip, supplies and banking",
+    "Planner targets",
+    "Current-monster cannon",
+    "Current-monster loot actions",
+    "Current-monster loot settings"
+  ]);
+  await expect(sharedReview).toContainText("Included in this link (4)");
+  await expect(sharedReview).toContainText("Not included (6)");
+  await expect(sharedReview).toContainText("Recipient PriceSet, manual prices and price history");
+  await expect(sharedReview).toContainText("Current");
+  await expect(sharedReview).toContainText("Incoming");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expectPageWidthContained(page);
+  await page.setViewportSize({ width: 1280, height: 720 });
+
+  const sharedTabs = page.getByLabel("Workbench tabs");
+  await sharedTabs.getByRole("tab", { name: "Economy" }).click();
+  const sharedManualPrice = page.getByRole("region", { name: "Manual item price", exact: true });
+  await sharedManualPrice.getByRole("button", { name: "Manual price item", exact: true }).click();
+  await sharedManualPrice
+    .getByRole("combobox", { name: "Manual price item", exact: true })
+    .fill("Lobster");
+  await sharedManualPrice.getByRole("option", { name: "Lobster", exact: true }).click();
+  await sharedManualPrice.getByLabel("Manual price", { exact: true }).fill("271");
+  await sharedManualPrice.getByRole("button", { name: "Apply price" }).click();
+  await expect(sharedReview.getByRole("button", { name: "Load setup" })).toBeEnabled();
+  await expect(sharedReview.getByRole("button", { name: "Refresh comparison" })).toHaveCount(0);
+
+  await sharedTabs.getByRole("tab", { name: "Melee setup" }).click();
+  const sharedLiveAttack = page.getByLabel("Combat setup").getByLabel("ATT", { exact: true });
+  await sharedLiveAttack.fill("57");
+  await expect(sharedReview).toContainText("Refresh before loading");
+  const refreshShared = sharedReview.getByRole("button", { name: "Refresh comparison" });
+  await refreshShared.focus();
+  await refreshShared.press("Enter");
+  const loadShared = sharedReview.getByRole("button", { name: "Load setup" });
+  await loadShared.focus();
+  await loadShared.press("Enter");
+  await expect(sharedLiveAttack).toHaveValue("55");
+  const sharedUndo = page.getByLabel("Local state undo");
+  await expect(sharedUndo).toContainText("Loaded shared setup");
+  await sharedUndo.getByRole("button", { name: "Undo" }).click();
+  await expect(sharedLiveAttack).toHaveValue("57");
+
+  await sharedLiveAttack.fill("55");
+  await page.waitForFunction(() => {
+    const raw = window.localStorage.getItem("index-sim:rewrite-setup");
+    return raw != null && JSON.parse(raw).data.form.levels.attack === 55;
+  });
+  await page.goto("about:blank");
+  await page.goto(sharedLink);
+  const noOpSharedReview = page.getByLabel("Shared setup review");
+  await expect(noOpSharedReview).toContainText("This link has no applicable changes.");
+  await expect(noOpSharedReview.getByRole("button", { name: "Load setup" })).toBeDisabled();
+  await expect(page.getByLabel("Local state undo")).toHaveCount(0);
+  await noOpSharedReview.getByRole("button", { name: "Dismiss" }).click();
+  await expect(page.getByRole("button", { name: "Share setup" })).toBeFocused();
+
+  // Saved row: Load review uses the form registry; calculated Review diff stays separate.
+  const savedTabs = page.getByLabel("Workbench tabs");
+  await savedTabs.getByRole("tab", { name: "Setups" }).click();
+  const duelPane = page.getByRole("region", { name: "Setup comparison", exact: true });
+  await duelPane.getByRole("button", { name: "Save current setup" }).click();
+  await savedTabs.getByRole("tab", { name: "Melee setup" }).click();
+  const savedLiveAttack = page.getByLabel("Combat setup").getByLabel("ATT", { exact: true });
+  await savedLiveAttack.fill("58");
+  await savedTabs.getByRole("tab", { name: "Setups" }).click();
+  const savedLoadTrigger = duelPane.getByRole("button", { name: /^Load saved setup/ }).first();
+  await savedLoadTrigger.focus();
+  await savedLoadTrigger.press("Enter");
+  const savedLoadReview = duelPane.getByLabel(/^Review Load for /);
+  await expect(savedLoadReview).toBeVisible();
+  await expect(savedLoadReview.locator(".setup-import-change-groups > details")).toHaveCount(8);
+  await expect(savedLoadReview).toContainText("Included in this Load (1)");
+  await expect(savedLoadReview).toContainText("Calculated Duel impact remains in the separate");
+  await expect(savedLoadReview).toContainText("Current target selection");
+  await expect(duelPane.getByRole("button", { name: /^Review differences for / })).toBeVisible();
+  await savedLoadReview.getByRole("button", { name: "Dismiss" }).click();
+  await expect(savedLoadTrigger).toBeFocused();
+  await savedLoadTrigger.press("Enter");
+
+  await savedTabs.getByRole("tab", { name: "Melee setup" }).click();
+  await savedLiveAttack.fill("59");
+  await savedTabs.getByRole("tab", { name: "Setups" }).click();
+  await expect(savedLoadReview).toContainText("Refresh before loading");
+  const refreshSaved = savedLoadReview.getByRole("button", { name: "Refresh comparison" });
+  await refreshSaved.focus();
+  await refreshSaved.press("Enter");
+  await page.setViewportSize({ width: 844, height: 390 });
+  await expectPageWidthContained(page);
+  await page.setViewportSize({ width: 1280, height: 720 });
+  const confirmSaved = savedLoadReview.getByRole("button", { name: "Load saved setup" });
+  await confirmSaved.focus();
+  await confirmSaved.press("Enter");
+  await expect(savedLiveAttack).toHaveValue("55");
+  await expect(page.getByLabel("Local state undo")).toContainText("Loaded saved setup");
+
+  await savedLoadTrigger.press("Enter");
+  const noOpSavedReview = duelPane.getByLabel(/^Review Load for /);
+  await expect(noOpSavedReview).toContainText("This saved setup has no applicable changes.");
+  await expect(noOpSavedReview.getByRole("button", { name: "Load saved setup" })).toBeDisabled();
+  await noOpSavedReview.getByRole("button", { name: "Dismiss" }).click();
+  await page.getByLabel("Local state undo").getByRole("button", { name: "Undo" }).click();
+  await expect(savedLiveAttack).toHaveValue("59");
 });
 
 test("applies and undoes an imported setup for the session when persistence fails", async ({
@@ -1023,7 +1266,7 @@ test("applies and undoes an imported setup for the session when persistence fail
   const setupInput = page
     .locator(".topbar")
     .locator("label.file-button")
-    .filter({ hasText: "Import setup" })
+    .filter({ hasText: "Review combat setup file" })
     .locator('input[type="file"]');
   await setupInput.setInputFiles({
     name: "session-setup.json",
@@ -1049,6 +1292,9 @@ test("applies and undoes an imported setup for the session when persistence fail
   await expect(page.getByLabel("Combat setup").getByLabel("ATT", { exact: true })).toHaveValue(
     "77"
   );
+  await expect(page.getByRole("status", { name: "Unsaved session-only changes" })).toContainText(
+    "A browser save could not be completed"
+  );
   const undo = page.getByLabel("Local state undo");
   await expect(undo).toContainText("Changes may not persist after reload");
   await undo.getByRole("button", { name: "Undo" }).click();
@@ -1060,6 +1306,7 @@ test("applies and undoes an imported setup for the session when persistence fail
   await expect(page.getByLabel("Setup transfer notice")).toContainText(
     "Restored setup from before import for this session"
   );
+  await expect(page.getByRole("status", { name: "Unsaved session-only changes" })).toHaveCount(0);
   await expect(page.getByRole("complementary", { name: "Changes may not persist" })).toBeVisible();
   await expect(page.getByLabel("Setup saving status")).toContainText("Could not save");
 });
@@ -1103,7 +1350,9 @@ test("round-trips a full PriceSet through the one advanced Market workflow", asy
   await exportPriceSetButton.focus();
   await exportPriceSetButton.press("Enter");
   const download = await downloadPromise;
-  expect(download.suggestedFilename()).toMatch(/^index-sim-price-set-.+\.json$/);
+  expect(download.suggestedFilename()).toMatch(
+    /^2004scape-price-set-[a-z0-9-]+-rev-274-\d{8}T\d{6}Z\.json$/
+  );
   await expect(page.getByLabel("Market action notice")).toHaveText(
     `PriceSet download started: ${download.suggestedFilename()}. Check your browser downloads.`
   );
@@ -1121,7 +1370,7 @@ test("round-trips a full PriceSet through the one advanced Market workflow", asy
 
   const priceSetInput = advancedPriceSetTools
     .locator("label.file-button")
-    .filter({ hasText: "Import full PriceSet" })
+    .filter({ hasText: "Review PriceSet file" })
     .locator('input[type="file"]');
   await priceSetInput.setInputFiles({
     name: "exported-price-set.json",
@@ -1151,7 +1400,7 @@ test("keeps setup import failures non-fatal and retryable", async ({ page }) => 
   const setupInput = page
     .locator(".topbar")
     .locator("label.file-button")
-    .filter({ hasText: "Import setup" })
+    .filter({ hasText: "Review combat setup file" })
     .locator('input[type="file"]');
 
   await setupInput.setInputFiles({
@@ -1216,7 +1465,7 @@ test("keeps PriceSet import failures non-fatal and recoverable", async ({ page }
   await advancedPriceSetTools.locator(":scope > summary").click();
   const priceSetInput = advancedPriceSetTools
     .locator("label.file-button")
-    .filter({ hasText: "Import full PriceSet" })
+    .filter({ hasText: "Review PriceSet file" })
     .locator('input[type="file"]');
 
   await priceSetInput.setInputFiles({
@@ -1293,13 +1542,15 @@ test("downloads a metadata-only recovery report with truthful request feedback",
   const recovery = page.getByRole("region", { name: "Local state recovery" });
   await expect(recovery).toBeVisible();
 
-  const exportRecoveryButton = recovery.getByRole("button", { name: "Export recovery report" });
+  const exportRecoveryButton = recovery.getByRole("button", {
+    name: "Export metadata-only recovery report"
+  });
   const downloadPromise = page.waitForEvent("download");
   await exportRecoveryButton.focus();
   await exportRecoveryButton.press("Enter");
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(
-    /^index-sim-local-state-health-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.\d{3}Z\.json$/
+    /^2004scape-local-state-recovery-report-\d{8}T\d{6}Z\.json$/
   );
   await expect(recovery.getByLabel("Recovery export notice")).toHaveText(
     `Recovery report download started: ${download.suggestedFilename()}. Check your browser downloads.`
@@ -1334,7 +1585,7 @@ test("keeps a synchronous browser download failure fixed, focused and recoverabl
     };
   });
   await page.goto("/");
-  const exportButton = page.getByRole("button", { name: "Export setup" });
+  const exportButton = page.getByRole("button", { name: "Export combat setup" });
 
   await exportButton.focus();
   await exportButton.press("Enter");

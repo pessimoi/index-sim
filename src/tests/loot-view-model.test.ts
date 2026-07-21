@@ -1,4 +1,5 @@
 import { loadBundledLegacyContext } from "../adapters/legacy-runtime";
+import { createGeneratedRuntimeContext } from "../adapters/generated";
 import { simulateFullSimulation } from "../domain/simulation";
 import { DEFAULT_FORM_STATE, formToSimulationRequest } from "../app/state/ui-state";
 import { createFullSimulationInput } from "../app/view-models/simulation-input";
@@ -282,5 +283,58 @@ describe("Loot view model", () => {
       direction: "desc"
     });
     expect(rows.map((row) => row.label)).toEqual(sourceLabels);
+  });
+
+  it("disambiguates repeated Coins rows before sorting while preserving exact row ids and math", () => {
+    const { context } = createGeneratedRuntimeContext();
+    const form = { ...DEFAULT_FORM_STATE, monsterId: "hobgoblin_armed" };
+    const request = formToSimulationRequest(form, context.gameData);
+    const fullInput = createFullSimulationInput(form, request, {}, {});
+    const baseline = simulateFullSimulation(fullInput, context);
+    const baselinePresentation = createLootPresentationViewModel({
+      form,
+      context,
+      tripInput: { ...fullInput, combat: baseline.combat },
+      trip: baseline.trip,
+      lootPrefs: {}
+    });
+    const coins = baselinePresentation.actionableRows.filter((row) => row.key === "coins");
+
+    expect(coins).toHaveLength(7);
+    expect(new Set(coins.map((row) => row.rowId)).size).toBe(7);
+    expect(coins.map((row) => row.name)).toEqual([
+      "Coins — qty 15.0 · chance 26.56%",
+      "Coins — qty 5.0 · chance 9.38%",
+      "Coins — qty 28.0 · chance 3.13%",
+      "Coins — qty 62.0 · chance 3.13%",
+      "Coins — qty 42.0 · chance 2.34%",
+      "Coins — qty 1.0 · chance 2.34%",
+      "Coins — qty 1.0 · chance 0.78%"
+    ]);
+    expect(new Set(coins.map((row) => row.name)).size).toBe(7);
+    const labelsById = new Map(coins.map((row) => [row.rowId, row.name]));
+    for (const row of sortLootTableRows(baselinePresentation.actionableRows, {
+      key: "drop",
+      direction: "desc"
+    }).filter((candidate) => candidate.key === "coins")) {
+      expect(row.name).toBe(labelsById.get(row.rowId));
+    }
+
+    const selectedRow = coins[0]!;
+    const prefs = { [selectedRow.rowId]: "skip" as const };
+    const changed = simulateFullSimulation({ ...fullInput, lootPrefs: prefs }, context);
+    const changedPresentation = createLootPresentationViewModel({
+      form,
+      context,
+      tripInput: { ...fullInput, combat: changed.combat },
+      trip: changed.trip,
+      lootPrefs: prefs
+    });
+    const changedCoins = changedPresentation.actionableRows.filter((row) => row.key === "coins");
+
+    expect(changedCoins.find((row) => row.rowId === selectedRow.rowId)?.pref).toBe("skip");
+    expect(changedCoins.find((row) => row.rowId !== selectedRow.rowId)?.pref).toBe("loot");
+    expect(changed.trip.gpPerKill).toBeCloseTo(baseline.trip.gpPerKill - selectedRow.evGp, 10);
+    expect(changedCoins.map((row) => row.price)).toEqual(coins.map((row) => row.price));
   });
 });

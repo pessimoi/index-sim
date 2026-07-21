@@ -33,8 +33,10 @@ export function paneFamilyForTab(tabId: WorkbenchTabId): PaneFamily {
   return PANE_FAMILY_BY_TAB[tabId];
 }
 
-export function createInitialRequestedPaneFamilies(): ReadonlySet<PaneFamily> {
-  return new Set<PaneFamily>(["compare"]);
+export function createInitialRequestedPaneFamilies(
+  initialTab: WorkbenchTabId = "compare"
+): ReadonlySet<PaneFamily> {
+  return new Set<PaneFamily>([paneFamilyForTab(initialTab)]);
 }
 
 export function requestPaneFamily(
@@ -46,11 +48,13 @@ export function requestPaneFamily(
   return new Set([...current, family]);
 }
 
-export function createInitialPaneLoadStates(): Record<PaneFamily, PaneLoadState> {
-  return {
+export function createInitialPaneLoadStates(
+  initialTab: WorkbenchTabId = "compare"
+): Record<PaneFamily, PaneLoadState> {
+  const states: Record<PaneFamily, PaneLoadState> = {
     stats: "ready",
     loadout: "not-requested",
-    compare: "loading",
+    compare: "not-requested",
     duel: "not-requested",
     loot: "not-requested",
     trip: "not-requested",
@@ -59,4 +63,7 @@ export function createInitialPaneLoadStates(): Record<PaneFamily, PaneLoadState>
     planner: "not-requested",
     "economy-settings": "not-requested"
   };
+  const family = paneFamilyForTab(initialTab);
+  if (family !== "stats") states[family] = "loading";
+  return states;
 }

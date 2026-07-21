@@ -117,7 +117,7 @@ test("presents price dates semantically and preserves compatible date precision"
   await tools.locator(":scope > summary").click();
   const importInput = tools
     .locator("label.file-button")
-    .filter({ hasText: "Import full PriceSet" })
+    .filter({ hasText: "Review PriceSet file" })
     .locator('input[type="file"]');
   await importInput.setInputFiles({
     name: "date-only-prices.json",
@@ -436,7 +436,7 @@ test("keeps manual item drafts and unavailable overrides scoped across base chan
   await advancedPriceSetTools.locator(":scope > summary").click();
   await advancedPriceSetTools
     .locator("label.file-button")
-    .filter({ hasText: "Import full PriceSet" })
+    .filter({ hasText: "Review PriceSet file" })
     .locator('input[type="file"]')
     .setInputFiles({
       name: "big-bones-only.json",
@@ -1117,7 +1117,7 @@ test("Economy destructive Undo restores imported PriceSet reset without history 
   await tools.locator(":scope > summary").click();
   await tools
     .locator("label.file-button")
-    .filter({ hasText: "Import full PriceSet" })
+    .filter({ hasText: "Review PriceSet file" })
     .locator('input[type="file"]')
     .setInputFiles({
       name: "economy-undo-price-set.json",

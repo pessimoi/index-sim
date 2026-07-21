@@ -4,7 +4,12 @@ import { formatNumber } from "../view-models/formatting";
 import { expandedCompactLabel } from "../view-models/presentation-language";
 import { useNumericDraftField } from "./use-numeric-draft-field";
 
-export type SelectOption = { id: string; label: string; hint?: string };
+export type SelectOption = {
+  id: string;
+  label: string;
+  hint?: string;
+  accessibleLabel?: string;
+};
 
 function assignRef<T>(ref: Ref<T> | undefined, value: T | null): void {
   if (typeof ref === "function") ref(value);
@@ -177,6 +182,7 @@ export function SearchableSelectField({
   const normalizedQuery = query.trim().toLocaleLowerCase();
   const selectedOption = options.find((option) => option.id === value);
   const selectedLabel = selectedOption?.label ?? value;
+  const selectedAccessibleLabel = selectedOption?.accessibleLabel ?? selectedLabel;
   const resolvedAccessibleLabel = accessibleLabel ?? expandedCompactLabel(label) ?? undefined;
   const filteredOptions =
     normalizedQuery.length === 0
@@ -307,7 +313,7 @@ export function SearchableSelectField({
           }
         }}
       >
-        <span id={`${triggerId}-selected-value`}>{selectedLabel}</span>
+        <span id={`${triggerId}-selected-value`}>{selectedAccessibleLabel}</span>
         <span aria-hidden="true">{expanded ? "▲" : "▼"}</span>
       </button>
       {expanded && (
@@ -361,14 +367,14 @@ export function SearchableSelectField({
                     role="option"
                     tabIndex={-1}
                     className={`searchable-combobox-option ${index === boundedActiveIndex ? "active" : ""}`}
-                    aria-label={option.label}
+                    aria-label={option.accessibleLabel ?? option.label}
                     aria-selected={option.id === value}
                     key={option.id}
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => commitOption(option)}
                   >
                     <span>{option.label}</span>
-                    {option.hint && <small aria-hidden="true">{option.hint}</small>}
+                    {option.hint && <small>{option.hint}</small>}
                     {option.id === value && <em aria-hidden="true">Selected</em>}
                   </button>
                 );

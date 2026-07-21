@@ -982,6 +982,24 @@ describe("versioned rewrite persistence", () => {
     }
   });
 
+  it.each(["killsPerHour", "gpPerHour"] as const)(
+    "keeps the persisted Dense %s sort id compatible with effective rate columns",
+    (key) => {
+      const parsed = SavedSetupEnvelopeSchema.parse({
+        version: REWRITE_SETUP_VERSION,
+        savedAt: "2026-07-05T12:00:00.000Z",
+        data: {
+          form: DEFAULT_FORM_STATE,
+          denseCompare: {
+            sort: { key, direction: "desc" }
+          }
+        }
+      });
+
+      expect(parsed.data.denseCompare.sort).toEqual({ key, direction: "desc" });
+    }
+  );
+
   it("defaults newly modeled trip controls for existing rewrite setup envelopes", () => {
     const parsed = SavedSetupEnvelopeSchema.parse({
       version: REWRITE_SETUP_VERSION,

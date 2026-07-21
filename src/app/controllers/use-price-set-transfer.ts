@@ -16,7 +16,7 @@ import {
   type ResetPriceSetInput,
   type ResetPriceSetOutcome
 } from "./price-set-transfer";
-import type { PriceSet } from "@/domain/shared";
+import type { GameDataSnapshot, PriceSet } from "@/domain/shared";
 
 export interface UsePriceSetTransferInput {
   storage: KeyValueStorage;
@@ -37,7 +37,7 @@ export interface UsePriceSetTransferInput {
 export interface PriceSetTransferController extends PriceSetTransferSnapshot {
   acceptPriceSet(input: AcceptPriceSetInput): AcceptedPriceSetOutcome;
   importFile(file: File, input: ImportPriceSetFileInput): Promise<PriceSetFileImportOutcome>;
-  exportPriceSet(priceSet: PriceSet): PriceSetActionOutcome;
+  exportPriceSet(priceSet: PriceSet, gameData: GameDataSnapshot): PriceSetActionOutcome;
   requestReset(fallbackLabel: string): MarketNotice;
   cancelReset(): void;
   resetToFallback(input: ResetPriceSetInput): ResetPriceSetOutcome;

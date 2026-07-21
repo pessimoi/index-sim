@@ -231,7 +231,7 @@ test("updates results when the combat style changes", async ({ page }) => {
   await expect(tabs.getByRole("tab", { name: "Magic setup" })).toHaveCount(0);
   await expect(page.getByLabel("TARGET", { exact: true })).toHaveValue("giant");
   await expect(
-    page.getByLabel("Setup context").getByText("Effective XP/hr", { exact: true })
+    page.getByLabel("Setup context").getByText("EFF. XP/HR", { exact: true })
   ).toBeVisible();
 
   await tabs.getByRole("tab", { name: "Monsters" }).click();

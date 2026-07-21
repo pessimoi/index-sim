@@ -237,6 +237,7 @@ function AdvancedPriceSetTools({
 }) {
   const replacementHelpId = useId();
   const formatHelpId = useId();
+  const scopeHelpId = useId();
 
   return (
     <details className="advanced-price-set-tools" aria-label="Advanced PriceSet tools">
@@ -246,6 +247,10 @@ function AdvancedPriceSetTools({
           Importing replaces the complete local base PriceSet in this browser. Missing items are not
           merged from the committed snapshot. Use <strong>Manual item price</strong> for individual
           corrections.
+        </p>
+        <p id={scopeHelpId}>
+          A PriceSet file contains its validated item prices, metadata, provenance and compatible
+          alchValues field. Manual item prices and price history are separate browser-local state.
         </p>
         <p id={formatHelpId}>
           Accepted file: a PriceSet JSON exported by this app, up to 1 MB. High alch values always
@@ -286,16 +291,17 @@ function AdvancedPriceSetTools({
           <button
             type="button"
             disabled={!model.prices.active.available}
+            aria-describedby={`${scopeHelpId} ${replacementHelpId} ${formatHelpId}`}
             onClick={actions.prices.exportActivePriceSet}
           >
             Export active PriceSet
           </button>
           <label className="file-button">
-            Import full PriceSet
+            Review PriceSet file
             <input
               type="file"
               accept="application/json,.json"
-              aria-describedby={`${replacementHelpId} ${formatHelpId}`}
+              aria-describedby={`${scopeHelpId} ${replacementHelpId} ${formatHelpId}`}
               onChange={(event) =>
                 void importPriceSetFromInput(event, actions.prices.importPriceSet)
               }

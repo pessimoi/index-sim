@@ -1,4 +1,14 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore
+} from "react";
 import { PendingUndoStatus, type PendingUndo } from "./components/app-presenters";
 import type { ShareSetupDialogState } from "./components/share-setup-dialog";
 import { globalStatusAnnouncement } from "./view-models/global-status";
@@ -70,6 +80,11 @@ import { createCrossTabKeepOperation } from "./controllers/cross-tab-persistence
 import { useSetupFileTransfer } from "./controllers/use-setup-file-transfer";
 import { usePriceSetTransfer } from "./controllers/use-price-set-transfer";
 import { useWorkspaceFileTransfer } from "./controllers/use-workspace-file-transfer";
+import {
+  SessionOnlyExitProtectionCore,
+  type NonDurableReason
+} from "./controllers/session-only-exit-protection";
+import { useSessionOnlyBeforeUnload } from "./controllers/use-session-only-before-unload";
 import type { EconomyDataUndoRecord, EconomyDataUndoScope } from "./controllers/economy-data-undo";
 import {
   MonsterSpecificChangesTransactionCore,
@@ -139,6 +154,13 @@ import {
   compareSetupTransferContext,
   type SetupTransferContextReview
 } from "./state/setup-transfer-context";
+import {
+  createSavedRowSetupChangeReview,
+  createSharedSetupChangeReview,
+  savedRowReviewMatches,
+  sharedSetupReviewMatchesCurrent,
+  type SetupTransferChangeReview
+} from "./state/setup-transfer-changes";
 import {
   DEFAULT_LOOT_PREFS_STATE,
   LOOT_PREFS_STORAGE_KEY,
@@ -335,6 +357,14 @@ import {
   type PaneFamily,
   type PaneLoadState
 } from "./state/pane-delivery";
+import {
+  createWorkbenchPaneUrl,
+  formatWorkbenchDocumentTitle,
+  parseWorkbenchPaneUrl,
+  removeInvalidWorkbenchPane,
+  workbenchHistoryMutationForSource,
+  type WorkbenchActivationSource
+} from "./state/workbench-browser-context";
 import {
   createSavedSetupMergeReviewViewModel,
   defaultDuelSnapshotName,
@@ -629,6 +659,12 @@ export function App() {
   const [priceTimeZone] = useState(resolveBrowserPriceTimeZone);
   const [readyToPersist, setReadyToPersist] = useState(false);
   const [status, setStatus] = useState("Loading source-backed runtime data");
+  const [sessionOnlyExitProtection] = useState(() => new SessionOnlyExitProtectionCore());
+  const sessionOnlyExitProtectionSnapshot = useSyncExternalStore(
+    sessionOnlyExitProtection.subscribe,
+    sessionOnlyExitProtection.getSnapshot,
+    sessionOnlyExitProtection.getSnapshot
+  );
   const crossTabConflicts = useCrossTabConflicts({
     storage,
     enabled: readyToPersist && !localPersistenceUnavailable
@@ -640,7 +676,18 @@ export function App() {
     persistenceNotice: savedDataIgnoredForSession ? SAFE_SESSION_NOTICE : undefined,
     onStatus: setStatus,
     onDownload: downloadJsonFile,
-    crossTab: crossTabConflicts
+    crossTab: crossTabConflicts,
+    durability: {
+      defaultNonDurableReason: savedDataIgnoredForSession
+        ? "saved-data-ignored"
+        : localStorageAccessUnavailable
+          ? "storage-unavailable"
+          : undefined,
+      recordDurable: sessionOnlyExitProtection.recordDurable,
+      recordDurableIds: sessionOnlyExitProtection.recordDurableIds,
+      recordNonDurable: sessionOnlyExitProtection.recordNonDurable,
+      recordNonDurableIds: sessionOnlyExitProtection.recordNonDurableIds
+    }
   });
   const persistLocalState = localStateRecovery.persist;
   const refreshLocalStateRecovery = localStateRecovery.refresh;
@@ -688,8 +735,16 @@ export function App() {
     return parsed.success ? parsed.data : null;
   }, [hiscores.player]);
   const [fatalError, setFatalError] = useState<string | null>(null);
-  const [receivedShareableSetupPayload] = useState(captureBrowserShareableSetupFragment);
+  const [receivedShareableSetupPayload, setReceivedShareableSetupPayload] = useState(
+    captureBrowserShareableSetupFragment
+  );
   const [shareReviewDismissed, setShareReviewDismissed] = useState(false);
+  const [shareComparisonBaseline, setShareComparisonBaseline] = useState(() => ({
+    form,
+    cannonByMonster,
+    lootPrefsByMonster,
+    lootSettingsByMonster
+  }));
   const [shareDialog, setShareDialog] = useState<ShareSetupDialogState | null>(null);
   const [shareCreateNotice, setShareCreateNotice] = useState<string | null>(null);
   const [setupImportNotice, setSetupImportNotice] = useState<InlineNoticeViewModel | null>(null);
@@ -698,6 +753,13 @@ export function App() {
     id: number;
     plan: SavedSetupMergePlan;
     context: SetupTransferContextReview;
+  } | null>(null);
+  const duelLoadReviewIdRef = useRef(0);
+  const [duelLoadReview, setDuelLoadReview] = useState<{
+    id: number;
+    snapshotId: string;
+    snapshotName: string;
+    changeReview: SetupTransferChangeReview;
   } | null>(null);
   const [duelSessionOnlyRequest, setDuelSessionOnlyRequest] = useState<{
     request: SavedSetupChangeRequest;
@@ -762,21 +824,42 @@ export function App() {
   const [pendingUndo, setPendingUndo] = useState<PendingUndo | null>(null);
   const [activeSetupReset, setActiveSetupReset] = useState(INITIAL_ACTIVE_SETUP_RESET_STATE);
   const [respectLoadoutRequirements, setRespectLoadoutRequirements] = useState(true);
-  const [activeTab, setActiveTab] = useState<WorkbenchTabId>("compare");
-  const [requestedPaneFamilies, setRequestedPaneFamilies] = useState<ReadonlySet<PaneFamily>>(
-    createInitialRequestedPaneFamilies
+  const [initialWorkbenchPane] = useState(() =>
+    parseWorkbenchPaneUrl(
+      typeof window === "undefined" ? "https://workbench.invalid/" : window.location.href
+    )
   );
-  const [paneLoadStates, setPaneLoadStates] = useState<Record<PaneFamily, PaneLoadState>>(
-    createInitialPaneLoadStates
+  const [activeTab, setActiveTab] = useState<WorkbenchTabId>(initialWorkbenchPane.pane);
+  const activeTabRef = useRef<WorkbenchTabId>(initialWorkbenchPane.pane);
+  const [requestedPaneFamilies, setRequestedPaneFamilies] = useState<ReadonlySet<PaneFamily>>(() =>
+    createInitialRequestedPaneFamilies(initialWorkbenchPane.pane)
   );
-  const activateWorkbenchTab = useCallback((tabId: WorkbenchTabId): void => {
-    const family = paneFamilyForTab(tabId);
-    setRequestedPaneFamilies((current) => requestPaneFamily(current, tabId));
-    setPaneLoadStates((current) =>
-      current[family] === "not-requested" ? { ...current, [family]: "loading" } : current
-    );
-    setActiveTab(tabId);
-  }, []);
+  const [paneLoadStates, setPaneLoadStates] = useState<Record<PaneFamily, PaneLoadState>>(() =>
+    createInitialPaneLoadStates(initialWorkbenchPane.pane)
+  );
+  const historyFocusTabRef = useRef<WorkbenchTabId | null>(null);
+  const lastFocusedInsidePaneTabRef = useRef<WorkbenchTabId | null>(null);
+  const activateWorkbenchTab = useCallback(
+    (tabId: WorkbenchTabId, source: WorkbenchActivationSource): void => {
+      const family = paneFamilyForTab(tabId);
+      setRequestedPaneFamilies((current) => requestPaneFamily(current, tabId));
+      setPaneLoadStates((current) =>
+        current[family] === "not-requested" ? { ...current, [family]: "loading" } : current
+      );
+      if (activeTabRef.current === tabId) return;
+
+      const mutation = workbenchHistoryMutationForSource(source);
+      if (typeof window !== "undefined" && mutation !== "none") {
+        const url = createWorkbenchPaneUrl(window.location.href, tabId);
+        const state = { kind: "workbench-pane", version: 1, pane: tabId } as const;
+        if (mutation === "push") window.history.pushState(state, "", url);
+        if (mutation === "replace") window.history.replaceState(state, "", url);
+      }
+      activeTabRef.current = tabId;
+      setActiveTab(tabId);
+    },
+    []
+  );
   const updatePaneLoadState = useCallback((family: PaneFamily, state: PaneLoadState): void => {
     setPaneLoadStates((current) =>
       current[family] === state ? current : { ...current, [family]: state }
@@ -845,10 +928,69 @@ export function App() {
       nextPaneFocusIdRef.current += 1;
       pendingPaneFocusRef.current = { id: nextPaneFocusIdRef.current, tabId, target };
       setPaneFocusRevision(nextPaneFocusIdRef.current);
-      activateWorkbenchTab(tabId);
+      activateWorkbenchTab(tabId, "routed-action");
     },
     [activateWorkbenchTab]
   );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (initialWorkbenchPane.status === "invalid") {
+      const current = parseWorkbenchPaneUrl(window.location.href);
+      if (current.status === "invalid") {
+        window.history.replaceState(
+          { kind: "workbench-pane", version: 1, pane: current.pane },
+          "",
+          removeInvalidWorkbenchPane(window.location.href)
+        );
+      }
+    }
+
+    const handleFocusIn = (event: FocusEvent): void => {
+      const panel = document.getElementById("workbench-active-panel");
+      if (event.target instanceof Node && panel?.contains(event.target)) {
+        lastFocusedInsidePaneTabRef.current = activeTabRef.current;
+        return;
+      }
+      if (event.target === document.body || event.target === document.documentElement) return;
+      lastFocusedInsidePaneTabRef.current = null;
+    };
+    const handlePopState = (): void => {
+      const parsed = parseWorkbenchPaneUrl(window.location.href);
+      if (parsed.pane !== activeTabRef.current) {
+        const activeElement = document.activeElement;
+        const panel = document.getElementById("workbench-active-panel");
+        const focusWasInsidePane =
+          (activeElement instanceof HTMLElement && panel?.contains(activeElement)) ||
+          lastFocusedInsidePaneTabRef.current === activeTabRef.current;
+        historyFocusTabRef.current = focusWasInsidePane ? parsed.pane : null;
+        lastFocusedInsidePaneTabRef.current = null;
+      }
+      activateWorkbenchTab(parsed.pane, "history");
+    };
+    document.addEventListener("focusin", handleFocusIn);
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      document.removeEventListener("focusin", handleFocusIn);
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, [activateWorkbenchTab, initialWorkbenchPane.status]);
+
+  useEffect(() => {
+    if (historyFocusTabRef.current !== activeTab) return;
+    let focusFrame = 0;
+    const renderFrame = window.requestAnimationFrame(() => {
+      focusFrame = window.requestAnimationFrame(() => {
+        if (historyFocusTabRef.current !== activeTab) return;
+        document.getElementById(`workbench-tab-${activeTab}`)?.focus({ preventScroll: true });
+        historyFocusTabRef.current = null;
+      });
+    });
+    return () => {
+      window.cancelAnimationFrame(renderFrame);
+      window.cancelAnimationFrame(focusFrame);
+    };
+  }, [activeTab]);
 
   useEffect(() => {
     const request = pendingPaneFocusRef.current;
@@ -1347,6 +1489,69 @@ export function App() {
       return { status: "error", message: describeShareableSetupError(error) };
     }
   }, [context, receivedShareableSetupPayload]);
+  const sharedSetupChangeStates = useMemo(() => {
+    if (!context || receivedShareableSetupInspection?.status !== "ready") return null;
+    const incoming = receivedShareableSetupInspection.review.envelope.data;
+    const monster = context.gameData.monsters[incoming.form.monsterId];
+    const validLootRowIds = monster ? lootPreferenceKeysForMonster(monster) : [];
+    return {
+      current: {
+        form,
+        cannon: cannonByMonster[incoming.form.monsterId] ?? DEFAULT_CANNON_SETTINGS,
+        lootPreferences: selectLootPrefsForMonster(
+          lootPrefsForGameData,
+          incoming.form.monsterId,
+          validLootRowIds
+        ),
+        lootSettings: lootSettingsForMonster(lootSettingsByMonster, incoming.form.monsterId)
+      },
+      incoming: {
+        form: incoming.form,
+        cannon: incoming.cannon,
+        lootPreferences: incoming.lootPreferences,
+        lootSettings: incoming.lootSettings
+      }
+    };
+  }, [
+    cannonByMonster,
+    context,
+    form,
+    lootPrefsForGameData,
+    lootSettingsByMonster,
+    receivedShareableSetupInspection
+  ]);
+
+  const sharedSetupBaselineState = useMemo(() => {
+    if (!context || !sharedSetupChangeStates) return null;
+    const monsterId = sharedSetupChangeStates.incoming.form.monsterId;
+    const monster = context.gameData.monsters[monsterId];
+    return {
+      form: shareComparisonBaseline.form,
+      cannon: shareComparisonBaseline.cannonByMonster[monsterId] ?? DEFAULT_CANNON_SETTINGS,
+      lootPreferences: selectLootPrefsForMonster(
+        shareComparisonBaseline.lootPrefsByMonster,
+        monsterId,
+        monster ? lootPreferenceKeysForMonster(monster) : []
+      ),
+      lootSettings: lootSettingsForMonster(shareComparisonBaseline.lootSettingsByMonster, monsterId)
+    };
+  }, [context, shareComparisonBaseline, sharedSetupChangeStates]);
+  const shareChangeReview = useMemo(
+    () =>
+      context && sharedSetupChangeStates && sharedSetupBaselineState
+        ? createSharedSetupChangeReview({
+            current: sharedSetupBaselineState,
+            incoming: sharedSetupChangeStates.incoming,
+            gameData: context.gameData
+          })
+        : null,
+    [context, sharedSetupBaselineState, sharedSetupChangeStates]
+  );
+
+  const sharedSetupChangeReviewStale =
+    shareChangeReview !== null &&
+    sharedSetupChangeStates !== null &&
+    !sharedSetupReviewMatchesCurrent(shareChangeReview, sharedSetupChangeStates.current);
   const priceHistoryItemLabels = useMemo(
     () => createPriceItemLabels(context?.gameData ?? null),
     [context]
@@ -1454,6 +1659,20 @@ export function App() {
         : null,
     [cannonByMonster, context, currentLootPrefs, form, lootSettingsByMonster]
   );
+  const appReadyForDocumentTitle = Boolean(context && viewModel && derivedViewModel);
+  const documentTitleTarget = context?.gameData.monsters[form.monsterId]?.name ?? null;
+  useEffect(() => {
+    if (!appReadyForDocumentTitle || typeof document === "undefined") return;
+    const previousTitle = document.title;
+    document.title = formatWorkbenchDocumentTitle({
+      pane: activeTab,
+      combatStyle: form.combatStyle,
+      targetLabel: documentTitleTarget
+    });
+    return () => {
+      document.title = previousTitle;
+    };
+  }, [activeTab, appReadyForDocumentTitle, documentTitleTarget, form.combatStyle]);
   const compareCalculation = useCompareCalculation({
     active: activeTab === "compare",
     form,
@@ -1700,6 +1919,14 @@ export function App() {
     [cannonByMonster, customSetupsByMonster, defaultForm, denseCompare, form, setupMode]
   );
   const captureCurrentRewriteSetup = (): SavedSetupState => currentRewriteSetup;
+  const activeSetupImportReview = setupFileTransfer.review;
+  const checkSetupImportReviewFreshness = setupFileTransfer.checkReviewFreshness;
+
+  useEffect(() => {
+    const review = activeSetupImportReview;
+    if (!review || review.stale) return;
+    checkSetupImportReviewFreshness(review.id, currentRewriteSetup);
+  }, [activeSetupImportReview, checkSetupImportReviewFreshness, currentRewriteSetup]);
 
   const currentMonsterSpecificLiveState = useMemo<MonsterSpecificLiveState>(
     () => ({
@@ -1734,18 +1961,61 @@ export function App() {
     [context, currentRewriteSetup, form.monsterId, lootPrefsForGameData, lootSettingsByMonster]
   );
 
-  const captureCurrentWorkspaceLiveState = (): WorkspaceLiveState => ({
-    "rewrite-setup": captureCurrentRewriteSetup(),
-    "planner-ui": plannerState,
-    "loot-prefs": lootPrefsForGameData,
-    "loot-settings": lootSettingsByMonster,
-    "hidden-gear-tiers": hiddenGearTiers,
-    "duel-snapshots": duelSnapshots,
-    "price-history": priceHistory,
-    "selected-price-set": activePriceSetOrigin === "selected" ? basePriceSet : null,
-    "manual-price-overrides": manualPriceOverrides,
-    "hiscores-last-player": lastHiscoresPlayerState
-  });
+  const currentWorkspaceLiveState = useMemo<WorkspaceLiveState>(
+    () => ({
+      "rewrite-setup": currentRewriteSetup,
+      "planner-ui": plannerState,
+      "loot-prefs": lootPrefsForGameData,
+      "loot-settings": lootSettingsByMonster,
+      "hidden-gear-tiers": hiddenGearTiers,
+      "duel-snapshots": duelSnapshots,
+      "price-history": priceHistory,
+      "selected-price-set": activePriceSetOrigin === "selected" ? basePriceSet : null,
+      "manual-price-overrides": manualPriceOverrides,
+      "hiscores-last-player": lastHiscoresPlayerState
+    }),
+    [
+      activePriceSetOrigin,
+      basePriceSet,
+      currentRewriteSetup,
+      duelSnapshots,
+      hiddenGearTiers,
+      lastHiscoresPlayerState,
+      lootPrefsForGameData,
+      lootSettingsByMonster,
+      manualPriceOverrides,
+      plannerState,
+      priceHistory
+    ]
+  );
+  const captureCurrentWorkspaceLiveState = (): WorkspaceLiveState => currentWorkspaceLiveState;
+  const globalNonDurableReason: NonDurableReason | null = savedDataIgnoredForSession
+    ? "saved-data-ignored"
+    : localStorageAccessUnavailable
+      ? "storage-unavailable"
+      : null;
+
+  useLayoutEffect(() => {
+    if (!readyToPersist) return;
+    sessionOnlyExitProtection.initialize(currentWorkspaceLiveState, globalNonDurableReason);
+  }, [
+    currentWorkspaceLiveState,
+    globalNonDurableReason,
+    readyToPersist,
+    sessionOnlyExitProtection
+  ]);
+
+  useEffect(() => {
+    if (!readyToPersist || !sessionOnlyExitProtection.getSnapshot().initialized) return;
+    sessionOnlyExitProtection.reconcileCurrent(currentWorkspaceLiveState, globalNonDurableReason);
+  }, [
+    currentWorkspaceLiveState,
+    globalNonDurableReason,
+    readyToPersist,
+    sessionOnlyExitProtection,
+    sessionOnlyExitProtectionSnapshot.revision
+  ]);
+  useSessionOnlyBeforeUnload(sessionOnlyExitProtectionSnapshot.armed);
 
   const applyRewriteSetupState = (setup: SavedSetupState): void => {
     setForm(normalizeFormState(setup.form));
@@ -2314,7 +2584,11 @@ export function App() {
     if (!context) return;
     setSetupImportNotice(null);
     setStatus("Reviewing setup file");
-    const outcome = await setupFileTransfer.prepareImport(file, context.gameData);
+    const outcome = await setupFileTransfer.prepareImport(
+      file,
+      context.gameData,
+      captureCurrentRewriteSetup()
+    );
     if (outcome.status === "review") setStatus("Setup ready for review");
     if (outcome.status === "rejected") setStatus("Setup import failed");
   };
@@ -2325,9 +2599,28 @@ export function App() {
     window.queueMicrotask(() => setupImportInputRef.current?.focus());
   };
 
+  const refreshSetupImportReview = (reviewId: number): void => {
+    if (!context) return;
+    if (
+      !setupFileTransfer.refreshReview(reviewId, captureCurrentRewriteSetup(), context.gameData)
+    ) {
+      return;
+    }
+    setStatus("Refreshed imported setup comparison");
+  };
+
   const applySetupImportReview = (reviewId: number): void => {
-    const candidate = setupFileTransfer.consumeReview(reviewId);
-    if (!candidate) return;
+    const outcome = setupFileTransfer.consumeReview(reviewId, captureCurrentRewriteSetup());
+    if (outcome.status === "stale") {
+      setStatus("Setup review needs refresh");
+      return;
+    }
+    if (outcome.status === "no-changes") {
+      setStatus("Imported setup has no changes");
+      return;
+    }
+    if (outcome.status === "ignored") return;
+    const candidate = outcome.candidate;
     const previousSetup = captureCurrentRewriteSetup();
     const persisted = persistAndApplyRewriteSetup(candidate.setup);
     const contextSuffix =
@@ -2694,11 +2987,11 @@ export function App() {
   const setCombatStyle = (combatStyle: CombatStyle) =>
     setFormSafe((current) => switchCombatStyleLoadout(current, combatStyle));
   const selectCombatStyle = (combatStyle: CombatStyle) => {
-    activateWorkbenchTab("loadout");
+    activateWorkbenchTab("loadout", "routed-action");
     setCombatStyle(combatStyle);
   };
   const reviewLocalState = () => {
-    activateWorkbenchTab("settings");
+    activateWorkbenchTab("settings", "routed-action");
     setLocalStateReviewRequest((request) => request + 1);
   };
   const selectedCrossTabConflictIds = (): CrossTabAreaId[] => {
@@ -2810,7 +3103,7 @@ export function App() {
   };
   const navigateFromSettings = (intent: SettingsNavigationIntent) => {
     if (intent.kind !== "review-price-data-in-economy") return;
-    activateWorkbenchTab("economy");
+    activateWorkbenchTab("economy", "routed-action");
     setEconomyReviewRequest((request) => request + 1);
   };
   const reviewPriceData = () => {
@@ -2819,11 +3112,17 @@ export function App() {
   };
 
   const exportWorkspace = () => {
-    workspaceFileTransfer.exportWorkspace({
+    const liveState = captureCurrentWorkspaceLiveState();
+    const outcome = workspaceFileTransfer.exportWorkspace({
       gameData: context.gameData,
-      liveState: captureCurrentWorkspaceLiveState(),
+      liveState,
       storageAccess: browserStorageAccess
     });
+    if (outcome.status === "requested") {
+      sessionOnlyExitProtection.acknowledgeBackup(outcome.includedAreaIds, liveState);
+    } else {
+      sessionOnlyExitProtection.recordBackupFailure();
+    }
   };
 
   const dismissWorkspaceReview = (reviewId: number): void => {
@@ -2913,7 +3212,7 @@ export function App() {
         });
       }
     }
-    activateWorkbenchTab("economy");
+    activateWorkbenchTab("economy", "routed-action");
     const id = nextPriceItemReviewRequestRef.current + 1;
     nextPriceItemReviewRequestRef.current = id;
     setPriceItemReviewRequest({ id, action });
@@ -2971,10 +3270,10 @@ export function App() {
   const reviewActiveAssumption = (tab: ActiveAssumptionReviewTarget) => {
     if (tab === "melee" || tab === "ranged" || tab === "magic") {
       setCombatStyle(tab);
-      activateWorkbenchTab("loadout");
+      activateWorkbenchTab("loadout", "routed-action");
       return;
     }
-    activateWorkbenchTab(tab);
+    activateWorkbenchTab(tab, "routed-action");
   };
 
   const updateLevel = (skill: keyof CombatSetupFormState["levels"], value: number) =>
@@ -3097,7 +3396,7 @@ export function App() {
             : "compare";
     monsterReviewIdRef.current += 1;
     setMonsterSpecificReviewRequest({ id: monsterReviewIdRef.current, monsterId, kind });
-    activateWorkbenchTab(destination);
+    activateWorkbenchTab(destination, "routed-action");
   };
 
   const reviewMonsterSpecificRemoval = (monsterId: string): void => {
@@ -3403,9 +3702,9 @@ export function App() {
         ? "session-only-available"
         : "failed";
   };
-  const loadDuelSnapshot = (snapshotId: string) => {
+  const applyDuelSnapshotLoad = (snapshotId: string): boolean => {
     const snapshot = duelSnapshots.snapshots.find((candidate) => candidate.id === snapshotId);
-    if (!snapshot) return;
+    if (!snapshot) return false;
     const previousSetup = captureCurrentRewriteSetup();
     const nextForm = normalizeFormState({ ...snapshot.form, monsterId: form.monsterId });
     commitFormState(nextForm);
@@ -3417,12 +3716,73 @@ export function App() {
         ? restoreLabel
         : `${restoreLabel} for this session. Changes may not persist after reload.`;
     });
+    return true;
+  };
+  const loadDuelSnapshot = (snapshotId: string) => {
+    if (!context) return;
+    const snapshot = duelSnapshots.snapshots.find((candidate) => candidate.id === snapshotId);
+    if (!snapshot) return;
+    const incoming = normalizeFormState({ ...snapshot.form, monsterId: form.monsterId });
+    duelLoadReviewIdRef.current += 1;
+    setDuelLoadReview({
+      id: duelLoadReviewIdRef.current,
+      snapshotId,
+      snapshotName: snapshot.name,
+      changeReview: createSavedRowSetupChangeReview({
+        current: form,
+        incoming,
+        gameData: context.gameData
+      })
+    });
+  };
+  const refreshDuelSnapshotLoad = (snapshotId: string) => {
+    if (!context) return;
+    const snapshot = duelSnapshots.snapshots.find((candidate) => candidate.id === snapshotId);
+    if (!snapshot) {
+      setDuelLoadReview(null);
+      setStatus("That saved setup is no longer available.");
+      return;
+    }
+    const incoming = normalizeFormState({ ...snapshot.form, monsterId: form.monsterId });
+    duelLoadReviewIdRef.current += 1;
+    setDuelLoadReview({
+      id: duelLoadReviewIdRef.current,
+      snapshotId,
+      snapshotName: snapshot.name,
+      changeReview: createSavedRowSetupChangeReview({
+        current: form,
+        incoming,
+        gameData: context.gameData
+      })
+    });
+    setStatus(`Refreshed Load comparison for ${snapshot.name}.`);
+  };
+  const confirmDuelSnapshotLoad = (snapshotId: string) => {
+    const candidate = duelLoadReview;
+    if (!candidate || candidate.snapshotId !== snapshotId) return;
+    const snapshot = duelSnapshots.snapshots.find((item) => item.id === snapshotId);
+    if (!snapshot) {
+      setDuelLoadReview(null);
+      setStatus("That saved setup is no longer available.");
+      return;
+    }
+    const incoming = normalizeFormState({ ...snapshot.form, monsterId: form.monsterId });
+    if (!savedRowReviewMatches(candidate.changeReview, form, incoming)) {
+      setStatus("Saved setup Load comparison is stale. Refresh it before loading.");
+      return;
+    }
+    if (candidate.changeReview.changeCount === 0) {
+      setStatus("Saved setup has no applicable changes.");
+      return;
+    }
+    if (applyDuelSnapshotLoad(snapshotId)) setDuelLoadReview(null);
   };
   const deleteDuelSnapshot = (snapshotId: string) => {
     invalidateSavedSetupUndo();
     const snapshot = duelSnapshots.snapshots.find((candidate) => candidate.id === snapshotId);
     const previousDuelSnapshots = duelSnapshots;
     setDuelSnapshots((current) => removeDuelSnapshot(current, snapshotId));
+    setDuelLoadReview((current) => (current?.snapshotId === snapshotId ? null : current));
     const label = snapshot ? `Deleted saved setup: ${snapshot.name}` : "Deleted saved setup";
     const restoreLabel = snapshot
       ? `Restored saved setup: ${snapshot.name}`
@@ -3556,7 +3916,21 @@ export function App() {
     );
   };
   const loadReceivedShareableSetup = () => {
-    if (receivedShareableSetupInspection?.status !== "ready") return;
+    if (
+      receivedShareableSetupInspection?.status !== "ready" ||
+      !shareChangeReview ||
+      !sharedSetupChangeStates
+    ) {
+      return;
+    }
+    if (!sharedSetupReviewMatchesCurrent(shareChangeReview, sharedSetupChangeStates.current)) {
+      setStatus("Shared setup comparison is stale. Refresh it before loading.");
+      return;
+    }
+    if (shareChangeReview.changeCount === 0) {
+      setStatus("Shared setup has no applicable changes.");
+      return;
+    }
     const previousDefaultForm = defaultForm;
     const previousSetupMode = setupMode;
     const previousActiveTab = activeTab;
@@ -3575,8 +3949,9 @@ export function App() {
     setCannonByMonster(applied.state.cannonByMonster);
     setLootPrefsByMonster(applied.state.lootPrefsByMonster);
     setLootSettingsByMonster(applied.state.lootSettingsByMonster);
-    activateWorkbenchTab("loadout");
+    activateWorkbenchTab("loadout", "routed-action");
     setShareReviewDismissed(true);
+    setReceivedShareableSetupPayload(null);
     localStateRecovery.unblockReplaced(["rewrite-setup", "loot-prefs", "loot-settings"]);
     const monsterName =
       context.gameData.monsters[applied.state.form.monsterId]?.name ?? applied.state.form.monsterId;
@@ -3594,9 +3969,24 @@ export function App() {
         setCannonByMonster(applied.undo.cannonByMonster);
         setLootPrefsByMonster(applied.undo.lootPrefsByMonster);
         setLootSettingsByMonster(applied.undo.lootSettingsByMonster);
-        activateWorkbenchTab(previousActiveTab);
+        activateWorkbenchTab(previousActiveTab, "internal-restore");
       }
     );
+  };
+  const refreshReceivedShareableSetupReview = () => {
+    if (!context || !sharedSetupChangeStates) return;
+    setShareComparisonBaseline({
+      form,
+      cannonByMonster,
+      lootPrefsByMonster,
+      lootSettingsByMonster
+    });
+    setStatus("Refreshed shared setup comparison.");
+  };
+  const dismissReceivedShareableSetupReview = () => {
+    setShareReviewDismissed(true);
+    setReceivedShareableSetupPayload(null);
+    window.queueMicrotask(() => shareSetupButtonRef.current?.focus());
   };
   const currentCannonOutput = viewModel.trip.cannon;
   const cannonEnabled = currentCannon.enabled === true;
@@ -4072,7 +4462,7 @@ export function App() {
   };
   const exportActivePriceSet = () => {
     if (!activePriceSet) return;
-    const outcome = priceSetTransfer.exportPriceSet(activePriceSet);
+    const outcome = priceSetTransfer.exportPriceSet(activePriceSet, context.gameData);
     setStatus(outcome.appStatus);
     setMarketNotice(outcome.marketNotice);
   };
@@ -4145,7 +4535,9 @@ export function App() {
   const sharedSetupReviewViewModel = visibleShareableSetupInspection
     ? createSharedSetupReviewViewModel({
         inspection: visibleShareableSetupInspection,
-        monsters: context.gameData.monsters
+        monsters: context.gameData.monsters,
+        changeReview: shareChangeReview,
+        stale: sharedSetupChangeReviewStale
       })
     : null;
   const workbenchResultViewModel = createWorkbenchResultViewModel({
@@ -4153,9 +4545,9 @@ export function App() {
     maxHit: viewModel.combat.maxHit,
     hitChance: viewModel.combat.hitChance,
     ttkSec: viewModel.combat.ttkSec,
-    killsPerHour: viewModel.trip.killsPerHour,
+    effectiveKph: viewModel.trip.effectiveKph,
     effectiveXpPerHour: viewModel.effectiveXpPerHour,
-    gpPerHour: viewModel.trip.gpPerHour,
+    effectiveGpPerHour: viewModel.trip.effectiveGpPerHour,
     effectiveNetGpPerHour: viewModel.trip.effectiveNetGpPerHour,
     supplyCostPerKill: viewModel.trip.supply.supplyCostPerKill,
     gpPerKill: viewModel.trip.gpPerKill,
@@ -4174,7 +4566,7 @@ export function App() {
     crossTabConflicts
   );
   const setupImportReviewViewModel = setupFileTransfer.review
-    ? buildSetupImportReviewViewModel(setupFileTransfer.review, captureCurrentRewriteSetup())
+    ? buildSetupImportReviewViewModel(setupFileTransfer.review)
     : null;
   const activeSetupResetViewState = activeSetupReset.candidate
     ? invalidateStaleActiveSetupReset(activeSetupReset, captureCurrentRewriteSetup())
@@ -4188,6 +4580,22 @@ export function App() {
         }),
         contextTone: duelImportReview.context.tone,
         contextMessage: duelImportReview.context.message
+      }
+    : null;
+  const duelLoadReviewSnapshot = duelLoadReview
+    ? duelSnapshots.snapshots.find((snapshot) => snapshot.id === duelLoadReview.snapshotId)
+    : null;
+  const duelLoadReviewIncoming = duelLoadReviewSnapshot
+    ? normalizeFormState({ ...duelLoadReviewSnapshot.form, monsterId: form.monsterId })
+    : null;
+  const duelLoadReviewViewModel = duelLoadReview
+    ? {
+        ...duelLoadReview,
+        snapshotName: duelLoadReviewSnapshot?.name ?? duelLoadReview.snapshotName,
+        stale:
+          !duelLoadReviewIncoming ||
+          !savedRowReviewMatches(duelLoadReview.changeReview, form, duelLoadReviewIncoming),
+        sourceMissing: duelLoadReviewSnapshot === undefined
       }
     : null;
 
@@ -4219,24 +4627,35 @@ export function App() {
         onExportSetup={exportCurrentSetup}
         onShareSetup={openShareSetupDialog}
       />
-      {savedDataIgnoredForSession && <SafeSessionNotice />}
+      {(savedDataIgnoredForSession ||
+        sessionOnlyExitProtectionSnapshot.sessionOnlyChangeCount > 0) && (
+        <SafeSessionNotice
+          guard={sessionOnlyExitProtectionSnapshot}
+          onDownloadWorkspace={exportWorkspace}
+        />
+      )}
       {setupImportReviewViewModel && (
         <Suspense fallback={<p role="status">Loading setup review…</p>}>
           <SetupImportReview
             viewModel={setupImportReviewViewModel}
             onApply={applySetupImportReview}
+            onRefresh={refreshSetupImportReview}
             onDismiss={dismissSetupImportReview}
           />
         </Suspense>
       )}
-      {localStateAttentionViewModel.visible && (
-        <Suspense fallback={<p role="status">Loading local data notice…</p>}>
-          <LocalStateAttentionBanner
-            viewModel={localStateAttentionViewModel}
-            onReview={reviewLocalState}
-          />
-        </Suspense>
-      )}
+      {localStateAttentionViewModel.visible &&
+        !(
+          sessionOnlyExitProtectionSnapshot.sessionOnlyChangeCount > 0 &&
+          localStateAttentionViewModel.kind === "persistence"
+        ) && (
+          <Suspense fallback={<p role="status">Loading local data notice…</p>}>
+            <LocalStateAttentionBanner
+              viewModel={localStateAttentionViewModel}
+              onReview={reviewLocalState}
+            />
+          </Suspense>
+        )}
       <span className="visually-hidden" role="status" aria-live="polite">
         {globalStatusAnnouncement(status, pendingUndo, [
           setupFileTransfer.notice?.message,
@@ -4263,7 +4682,8 @@ export function App() {
           <SharedSetupReview
             viewModel={sharedSetupReviewViewModel}
             onLoad={loadReceivedShareableSetup}
-            onDismiss={() => setShareReviewDismissed(true)}
+            onRefresh={refreshReceivedShareableSetupReview}
+            onDismiss={dismissReceivedShareableSetupReview}
           />
         </Suspense>
       )}
@@ -4313,7 +4733,8 @@ export function App() {
           ) : null
         }
         actions={{
-          activateTab: activateWorkbenchTab,
+          activateTab: (tabId) => activateWorkbenchTab(tabId, "user"),
+          routeToTab: (tabId) => activateWorkbenchTab(tabId, "routed-action"),
           selectCombatStyle,
           updateLevel,
           setStyle: (styleId) => setFormSafe((current) => updateForm(current, { styleId })),
@@ -4364,8 +4785,7 @@ export function App() {
               sourceBreakdown: viewModel.statsSourceBreakdown,
               combatRollDetail: viewModel.combatRollDetail,
               xpRouting: viewModel.xpRouting,
-              tripBankingSummary: viewModel.tripBankingSummary,
-              effectiveKph: viewModel.trip.effectiveKph
+              tripBankingSummary: viewModel.tripBankingSummary
             }}
           />
         </PaneBoundary>
@@ -4509,7 +4929,7 @@ export function App() {
               }}
               actions={{
                 updateTrip,
-                openRisk: () => activateWorkbenchTab("risk")
+                openRisk: () => activateWorkbenchTab("risk", "routed-action")
               }}
             />
           </PaneBoundary>
@@ -4602,6 +5022,7 @@ export function App() {
                 duelMatrixSort,
                 duelImportNotice,
                 duelImportReview: duelImportReviewViewModel,
+                duelLoadReview: duelLoadReviewViewModel,
                 duelSessionOnlyAvailable: duelSessionOnlyRequest !== null,
                 duelChangeRevision
               }}
@@ -4617,6 +5038,12 @@ export function App() {
                 applyDuelSessionOnlyChange,
                 commitDuelSnapshotName,
                 loadDuelSnapshot,
+                refreshDuelSnapshotLoad,
+                confirmDuelSnapshotLoad,
+                dismissDuelSnapshotLoad: (snapshotId) =>
+                  setDuelLoadReview((current) =>
+                    current?.snapshotId === snapshotId ? null : current
+                  ),
                 deleteDuelSnapshot,
                 showCurrentDuelTarget,
                 showDuelMonsterMatrix,

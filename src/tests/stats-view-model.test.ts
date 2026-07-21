@@ -371,11 +371,30 @@ describe("rewrite UI view models", () => {
       numericValue: result.combat.attackTicks
     });
     expect(metrics.get("ttk")?.numericValue).toBe(result.combat.ttkSec);
-    expect(metrics.get("kills-per-hour")?.numericValue).toBe(result.trip.killsPerHour);
+    expect(metrics.get("kills-per-hour")).toMatchObject({
+      label: "On-site kills/hr",
+      numericValue: result.trip.killsPerHour,
+      note: "Current combat-site kill rate before Trip banking and travel efficiency."
+    });
     expect(metrics.get("gp-per-kill")?.numericValue).toBe(result.trip.gpPerKill);
+    expect(result.tripBankingSummary.headline).toEqual({
+      label: "Effective kills/hr",
+      value: formatNumber(result.trip.effectiveKph)
+    });
+    expect(
+      result.tripBankingSummary.rows.find((row) => row.id === "effective-kills-hour")
+    ).toMatchObject({
+      label: "Effective kills/hr",
+      numericValue: result.trip.effectiveKph
+    });
+    expect(result.tripBankingSummary.rows.find((row) => row.id === "net-gp-hour")).toMatchObject({
+      label: "Effective net GP/hr",
+      numericValue: result.trip.effectiveNetGpPerHour
+    });
     expect(result.combatRollDetail.notes.join("\n")).toContain(
       "Roll and hit metrics describe the normal player attack."
     );
+    expect(result.combatRollDetail.notes.join("\n")).toContain("on-site kills/hr");
   }, 15_000);
 
   it("builds ranged Stats combat roll detail without melee-only assumptions", async () => {

@@ -30,9 +30,9 @@ const RESULT_NUMERIC_LABELS = [
   "DPS",
   "MAX HIT",
   "HIT %",
-  "XP/HR",
-  "GP/HR NET",
-  "KILLS/HR",
+  "EFF. XP/HR",
+  "EFF. NET GP/HR",
+  "EFF. K/HR",
   "GP/KILL",
   "SUPPLY/KILL"
 ] as const;
@@ -42,10 +42,10 @@ export const ALL_FIXTURE_NUMERIC_LABELS = [
   "MAX HIT",
   "HIT %",
   "TTK",
-  "KILLS/HR",
-  "XP/HR",
-  "GP/HR",
-  "GP/HR NET",
+  "EFF. K/HR",
+  "EFF. XP/HR",
+  "EFF. GP/HR",
+  "EFF. NET GP/HR",
   "SUPPLY/KILL",
   "GP/KILL"
 ] as const;
@@ -94,15 +94,15 @@ export const CANNON_NUMERIC_LABELS = [
   "Cannon only DPS",
   "Balls/hr",
   "Balls/kill",
-  "Cannon Ranged XP/hr",
+  "On-site cannon Ranged XP/hr",
   "Effective XP/hr",
   "Effective net GP/hr",
-  "Ball cost/hr",
+  "On-site ball cost/hr",
   "Ball cost/kill",
   "Ball price",
   "Cannonballs/trip",
   "Ball GP/trip",
-  "K/hr uplift"
+  "On-site kills/hr uplift"
 ] as const;
 
 export const TRIP_NUMERIC_LABELS = [
@@ -112,7 +112,7 @@ export const TRIP_NUMERIC_LABELS = [
   "Food count",
   "Food/kill",
   "Kills/trip",
-  "Effective K/hr",
+  "Effective kills/hr",
   "Recoil/kill",
   "Recoil GP/kill"
 ] as const;
@@ -145,10 +145,10 @@ export function allFixtureExpectedMetrics(vm: ReturnType<typeof createSimulation
     "MAX HIT": formatNumber(vm.combat.maxHit, 1),
     "HIT %": `${formatNumber(vm.combat.hitChance * 100, 1)}%`,
     TTK: formatDuration(vm.combat.ttkSec),
-    "KILLS/HR": formatNumber(vm.trip.killsPerHour),
-    "XP/HR": formatNumber(vm.effectiveXpPerHour),
-    "GP/HR": formatNumber(vm.trip.gpPerHour),
-    "GP/HR NET": formatNumber(vm.trip.effectiveNetGpPerHour),
+    "EFF. K/HR": formatNumber(vm.trip.effectiveKph),
+    "EFF. XP/HR": formatNumber(vm.effectiveXpPerHour),
+    "EFF. GP/HR": formatNumber(vm.trip.effectiveGpPerHour),
+    "EFF. NET GP/HR": formatNumber(vm.trip.effectiveNetGpPerHour),
     "SUPPLY/KILL": formatNumber(vm.trip.supply.supplyCostPerKill),
     "GP/KILL": formatNumber(vm.trip.gpPerKill)
   };
@@ -173,18 +173,24 @@ export async function denseNumericSnapshot(table: Locator, rowName: RegExp) {
   ).toHaveText("Current", { timeout: 30_000 });
   const row = table.getByRole("row", { name: rowName });
   await expect(row).toBeVisible();
-  const cells = (await row.locator("td").allTextContents()).map((text) => text.trim());
-  expect(cells).toHaveLength(10);
+  const cells = row.locator("td");
+  expect(await cells.count()).toBe(10);
+  const value = async (index: number): Promise<string> => {
+    const cell = cells.nth(index);
+    const scaled = cell.locator(".dense-scale-number");
+    const valueNode = (await scaled.count()) > 0 ? scaled : cell.locator(":scope > span").first();
+    return ((await valueNode.textContent()) ?? "").trim();
+  };
   return {
-    hit: cells[1],
-    max: cells[2],
-    dps: cells[3],
-    ttk: cells[4],
-    killsPerHour: cells[5],
-    xpPerHour: cells[6],
-    gpPerKill: cells[7],
-    gpPerHour: cells[8],
-    netGpPerHour: cells[9]
+    hit: await value(1),
+    max: await value(2),
+    dps: await value(3),
+    ttk: await value(4),
+    killsPerHour: await value(5),
+    xpPerHour: await value(6),
+    gpPerKill: await value(7),
+    gpPerHour: await value(8),
+    netGpPerHour: await value(9)
   };
 }
 

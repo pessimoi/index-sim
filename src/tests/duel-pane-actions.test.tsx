@@ -13,6 +13,7 @@ import {
 import { createDuelSnapshot } from "../app/state/duel-snapshots";
 import { createSavedSetupMergePlan } from "../app/state/saved-setup-merge";
 import { DEFAULT_FORM_STATE } from "../app/state/ui-state";
+import { createSavedRowSetupChangeReview } from "../app/state/setup-transfer-changes";
 import {
   DEFAULT_DUEL_COMPARISON_SORT_STATE,
   DEFAULT_DUEL_MATRIX_SORT_STATE,
@@ -86,6 +87,7 @@ function model(changeRevision = 0): DuelPaneModel {
     duelMatrixSort: DEFAULT_DUEL_MATRIX_SORT_STATE,
     duelImportNotice: null,
     duelImportReview: null,
+    duelLoadReview: null,
     duelSessionOnlyAvailable: false,
     duelChangeRevision: changeRevision
   };
@@ -106,6 +108,9 @@ function actions(
     applyDuelSessionOnlyChange: vi.fn(),
     commitDuelSnapshotName: commit,
     loadDuelSnapshot: vi.fn(),
+    refreshDuelSnapshotLoad: vi.fn(),
+    confirmDuelSnapshotLoad: vi.fn(),
+    dismissDuelSnapshotLoad: vi.fn(),
     deleteDuelSnapshot: vi.fn(),
     showCurrentDuelTarget: vi.fn(),
     showDuelMonsterMatrix: vi.fn(),
@@ -276,5 +281,103 @@ describe("Duel saved setup actions", () => {
     });
     expect(actionValue.dismissDuelSnapshotsImport).toHaveBeenCalledWith(9);
     expect(document.activeElement).toBe(container.querySelector('input[type="file"]'));
+  });
+
+  it("keeps saved-row Load review separate, stale-aware, no-op safe and focus-returning", async () => {
+    const comparisonModel = model();
+    const row = comparisonModel.duelComparison!.snapshotRows[1]!;
+    const incoming = {
+      ...DEFAULT_FORM_STATE,
+      levels: { ...DEFAULT_FORM_STATE.levels, attack: 80 }
+    };
+    const changeReview = createSavedRowSetupChangeReview({
+      current: DEFAULT_FORM_STATE,
+      incoming,
+      gameData: context.gameData
+    });
+    const actionValue = actions();
+    render(
+      {
+        ...comparisonModel,
+        duelLoadReview: {
+          id: 1,
+          snapshotId: row.snapshotId!,
+          snapshotName: row.displayName,
+          changeReview,
+          stale: false,
+          sourceMissing: false
+        }
+      },
+      actionValue
+    );
+
+    expect(document.activeElement).toBe(container.querySelector(".duel-load-review h3"));
+    expect(container.textContent).toContain("Calculated Duel impact remains in the separate");
+    expect(container.textContent).toContain("Player levels");
+    const confirm = Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find(
+      (button) => button.textContent === "Load saved setup"
+    )!;
+    act(() => confirm.click());
+    expect(actionValue.confirmDuelSnapshotLoad).toHaveBeenCalledWith(row.snapshotId);
+
+    await act(async () => {
+      Array.from(container.querySelectorAll<HTMLButtonElement>("button"))
+        .find((button) => button.textContent === "Dismiss")!
+        .click();
+      await Promise.resolve();
+    });
+    expect(actionValue.dismissDuelSnapshotLoad).toHaveBeenCalledWith(row.snapshotId);
+    expect(document.activeElement).toBe(
+      container.querySelector(`button[aria-label="Load saved setup ${row.displayName}"]`)
+    );
+
+    render(
+      {
+        ...comparisonModel,
+        duelLoadReview: {
+          id: 2,
+          snapshotId: row.snapshotId!,
+          snapshotName: row.displayName,
+          changeReview,
+          stale: true,
+          sourceMissing: false
+        }
+      },
+      actionValue
+    );
+    const refresh = Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find(
+      (button) => button.textContent === "Refresh comparison"
+    )!;
+    act(() => refresh.click());
+    expect(actionValue.refreshDuelSnapshotLoad).toHaveBeenCalledWith(row.snapshotId);
+    expect(
+      Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find(
+        (button) => button.textContent === "Load saved setup"
+      )
+    ).toBeUndefined();
+
+    const noOpReview = createSavedRowSetupChangeReview({
+      current: DEFAULT_FORM_STATE,
+      incoming: DEFAULT_FORM_STATE,
+      gameData: context.gameData
+    });
+    render(
+      {
+        ...comparisonModel,
+        duelLoadReview: {
+          id: 3,
+          snapshotId: comparisonModel.duelComparison!.snapshotRows[0]!.snapshotId!,
+          snapshotName: "Duplicate (1 of 2)",
+          changeReview: noOpReview,
+          stale: false,
+          sourceMissing: false
+        }
+      },
+      actionValue
+    );
+    const disabledLoad = Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find(
+      (button) => button.textContent === "Load saved setup"
+    )!;
+    expect(disabledLoad.disabled).toBe(true);
   });
 });

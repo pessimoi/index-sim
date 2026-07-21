@@ -49,6 +49,9 @@ const duelActions: DuelPaneActions = {
   applyDuelSessionOnlyChange: noOp,
   commitDuelSnapshotName: () => "renamed",
   loadDuelSnapshot: noOp,
+  refreshDuelSnapshotLoad: noOp,
+  confirmDuelSnapshotLoad: noOp,
+  dismissDuelSnapshotLoad: noOp,
   deleteDuelSnapshot: noOp,
   showCurrentDuelTarget: noOp,
   showDuelMonsterMatrix: noOp,
@@ -112,9 +115,11 @@ describe("Compare and Duel panes", () => {
     ]);
     expect(markup).toContain('aria-sort="descending"');
     expect(markup).toContain('aria-label="Sort by time to kill"');
-    expect(markup).toContain('aria-label="Sort by experience points per hour"');
+    expect(markup).toContain('aria-label="Sort by effective kills per hour"');
+    expect(markup).toContain('aria-label="Sort by effective experience points per hour"');
     expect(markup).toContain('aria-label="Sort by gold pieces per kill"');
-    expect(markup).toContain('aria-label="Sort by net gold pieces per hour"');
+    expect(markup).toContain('aria-label="Sort by effective gross gold pieces per hour"');
+    expect(markup).toContain('aria-label="Sort by effective net gold pieces per hour"');
     expect(markup).toContain(`data-monster-id="${DEFAULT_FORM_STATE.monsterId}"`);
     expect(markup).toContain('aria-selected="true"');
     expect(markup).toContain('tabindex="0"');
@@ -211,6 +216,7 @@ describe("Compare and Duel panes", () => {
         contextMessage:
           "This older format does not record a game revision. It will use the current Revision 274 data."
       },
+      duelLoadReview: null,
       duelSessionOnlyAvailable: false,
       duelChangeRevision: 0
     };
@@ -226,8 +232,8 @@ describe("Compare and Duel panes", () => {
       'aria-label="Saved setup controls"',
       "Save current setup",
       "Manage saved setups",
-      "Import setups",
-      "Export setups",
+      "Review saved setup collection",
+      "Export saved setup collection",
       'aria-label="Setup comparison view"',
       'aria-label="Saved setup transfer notice"',
       'aria-label="Saved setup import review"',
@@ -238,6 +244,10 @@ describe("Compare and Duel panes", () => {
       'aria-label="Calculated impact"'
     ]);
     expect(markup).toContain('aria-expanded="true"');
+    expect(markup).toContain(
+      "This file contains the saved comparison collection only. It does not replace the active setup until you later load an individual saved row."
+    );
+    expect(markup.match(/aria-describedby="saved-setup-collection-scope"/g)).toHaveLength(2);
     expect(markup).toContain('aria-sort="none"');
     expect(markup).toContain("Hide diff");
     expect(markup).toContain("Saved setup compared with live");
@@ -310,6 +320,7 @@ describe("Compare and Duel panes", () => {
       duelMatrixSort: DEFAULT_DUEL_MATRIX_SORT_STATE,
       duelImportNotice: null,
       duelImportReview: null,
+      duelLoadReview: null,
       duelSessionOnlyAvailable: false,
       duelChangeRevision: 0
     };

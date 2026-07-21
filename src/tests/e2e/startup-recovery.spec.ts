@@ -1,8 +1,6 @@
-import { expect, test } from "./scaffold-fixture";
+import { expect, expectPageWidthContained, readDownloadText, test } from "./scaffold-fixture";
 
-test("recovers a ready-pane render failure without changing saved browser data", async ({
-  page
-}) => {
+test("protects session-only changes before leaving after safe recovery", async ({ page }) => {
   const localStorageSnapshot = () =>
     page.evaluate(() =>
       JSON.stringify(
@@ -53,5 +51,92 @@ test("recovers a ready-pane render failure without changing saved browser data",
   expect(await localStorageSnapshot()).toBe(savedBeforeFailure);
 
   await page.getByLabel("TARGET", { exact: true }).selectOption("lesser_demon");
+  const guard = page.getByRole("status", { name: "Unsaved session-only changes" });
+  await expect(guard).toContainText("Affected Workspace areas: 1");
+  await expect(guard).toContainText("Saved browser data is ignored in this tab");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expectPageWidthContained(page);
+  await expect(guard.getByRole("button", { name: "Download full Workspace backup" })).toBeVisible();
+  await page.setViewportSize({ width: 844, height: 390 });
+  await expectPageWidthContained(page);
+  await page.setViewportSize({ width: 1280, height: 720 });
+  expect(await localStorageSnapshot()).toBe(savedBeforeFailure);
+
+  expect(
+    await page.evaluate(() => {
+      const event = new Event("beforeunload", { cancelable: true });
+      window.dispatchEvent(event);
+      return event.defaultPrevented;
+    })
+  ).toBe(true);
+
+  const dialogPromise = page.waitForEvent("dialog");
+  const reloadAttempt = page.evaluate(() => window.location.reload()).catch(() => undefined);
+  const dialog = await dialogPromise;
+  expect(dialog.type()).toBe("beforeunload");
+  await dialog.dismiss();
+  await reloadAttempt;
+  await expect(page.locator('[data-app-startup-state="ready"]')).toBeVisible();
+  expect(await localStorageSnapshot()).toBe(savedBeforeFailure);
+
+  const downloadPromise = page.waitForEvent("download");
+  await guard.getByRole("button", { name: "Download full Workspace backup" }).click();
+  const download = await downloadPromise;
+  const workspace = JSON.parse(await readDownloadText(download)) as {
+    areas: Array<{ id: string }>;
+  };
+  expect(workspace.areas.map((area) => area.id)).toEqual([
+    "rewrite-setup",
+    "planner-ui",
+    "loot-prefs",
+    "loot-settings",
+    "hidden-gear-tiers",
+    "duel-snapshots",
+    "price-history",
+    "selected-price-set",
+    "manual-price-overrides"
+  ]);
+  const backedUp = page.getByRole("status", { name: "Session-only changes backed up" });
+  await expect(backedUp).toContainText("saving the file cannot be verified");
+  expect(
+    await page.evaluate(() => {
+      const event = new Event("beforeunload", { cancelable: true });
+      window.dispatchEvent(event);
+      return event.defaultPrevented;
+    })
+  ).toBe(false);
+  expect(await localStorageSnapshot()).toBe(savedBeforeFailure);
+
+  await page.getByLabel("Player", { exact: true }).fill("Private Hero");
+  await expect(guard).toContainText("Affected Workspace areas: 1");
+  const omittedDownloadPromise = page.waitForEvent("download");
+  await guard.getByRole("button", { name: "Download full Workspace backup" }).click();
+  const omittedWorkspace = JSON.parse(await readDownloadText(await omittedDownloadPromise)) as {
+    areas: Array<{ id: string }>;
+  };
+  expect(omittedWorkspace.areas.map((area) => area.id)).not.toContain("hiscores-last-player");
+  await expect(guard).toContainText("The last Hiscores player was not included");
+
+  await page.getByRole("tab", { name: "Settings" }).click();
+  const workspacePanel = page.getByLabel("Workspace backup and restore");
+  await workspacePanel.getByLabel("Include last Hiscores player name").check();
+  const includedDownloadPromise = page.waitForEvent("download");
+  await guard.getByRole("button", { name: "Download full Workspace backup" }).click();
+  const includedWorkspace = JSON.parse(await readDownloadText(await includedDownloadPromise)) as {
+    areas: Array<{ id: string }>;
+  };
+  expect(includedWorkspace.areas.map((area) => area.id)).toContain("hiscores-last-player");
+  await expect(guard).toHaveCount(0);
+  expect(await localStorageSnapshot()).toBe(savedBeforeFailure);
+
+  await page.getByLabel("Player", { exact: true }).fill("Private Hero 2");
+  await expect(guard).toBeVisible();
+  expect(
+    await page.evaluate(() => {
+      const event = new Event("beforeunload", { cancelable: true });
+      window.dispatchEvent(event);
+      return event.defaultPrevented;
+    })
+  ).toBe(true);
   expect(await localStorageSnapshot()).toBe(savedBeforeFailure);
 });

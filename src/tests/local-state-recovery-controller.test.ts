@@ -100,6 +100,50 @@ describe("local state recovery controller", () => {
     expect(statuses).toEqual([]);
   });
 
+  it("publishes typed durable and session-only area outcomes to the exit guard", () => {
+    const storage = createMemoryStorage();
+    const recordDurable = vi.fn();
+    const recordNonDurable = vi.fn();
+    const recordNonDurableIds = vi.fn();
+    const { controller: recovery } = controller(storage, {
+      durability: {
+        defaultNonDurableReason: "saved-data-ignored",
+        recordDurable,
+        recordDurableIds: vi.fn(),
+        recordNonDurable,
+        recordNonDurableIds
+      }
+    });
+    const options = {
+      key: PLANNER_UI_STORAGE_KEY,
+      version: PLANNER_UI_VERSION,
+      schema: PlannerUiStateSchema,
+      storage
+    };
+    const planner = PlannerUiStateSchema.parse({ metric: "dps" });
+
+    expect(recovery.persist("planner-ui", options, planner)).toBe(true);
+    expect(recordDurable).toHaveBeenCalledWith("planner-ui", planner);
+
+    recovery.recordStorageFailure("planner-ui", "save_failed");
+    expect(recordNonDurableIds).toHaveBeenCalledWith(["planner-ui"], "session-only-write");
+
+    const session = controller(createMemoryStorage(), {
+      persistenceUnavailable: true,
+      durability: {
+        defaultNonDurableReason: "saved-data-ignored",
+        recordDurable,
+        recordDurableIds: vi.fn(),
+        recordNonDurable,
+        recordNonDurableIds
+      }
+    }).controller;
+    expect(
+      session.persist("planner-ui", { ...options, storage: createMemoryStorage() }, planner)
+    ).toBe(false);
+    expect(recordNonDurable).toHaveBeenCalledWith("planner-ui", planner, "saved-data-ignored");
+  });
+
   it("blocks initial invalid and version-mismatched state", () => {
     const storage = createMemoryStorage({
       [HIDDEN_GEAR_TIERS_STORAGE_KEY]: "{",
@@ -350,7 +394,7 @@ describe("local state recovery controller", () => {
 
     expect(downloads).toHaveLength(1);
     expect(downloads[0]?.fileName).toBe(
-      "index-sim-local-state-health-2026-07-13T12-34-56.000Z.json"
+      "2004scape-local-state-recovery-report-20260713T123456Z.json"
     );
     const serialized = JSON.stringify(downloads[0]?.value);
     expect(serialized).toContain(MANUAL_PRICE_OVERRIDES_STORAGE_KEY);
@@ -358,9 +402,9 @@ describe("local state recovery controller", () => {
     expect(serialized).not.toContain("987654");
     expect(outcome).toMatchObject({
       status: "requested",
-      fileName: "index-sim-local-state-health-2026-07-13T12-34-56.000Z.json",
+      fileName: "2004scape-local-state-recovery-report-20260713T123456Z.json",
       appStatus:
-        "Recovery report download started: index-sim-local-state-health-2026-07-13T12-34-56.000Z.json. Check your browser downloads."
+        "Recovery report download started: 2004scape-local-state-recovery-report-20260713T123456Z.json. Check your browser downloads."
     });
   });
 
@@ -442,6 +486,11 @@ describe("local state recovery controller", () => {
     expect(initialMarkup).toContain(
       'id="local-state-recovery-heading" tabindex="-1">Local state recovery'
     );
+    expect(initialMarkup).toContain(
+      "This report helps diagnose local-state health. It contains no raw saved values and cannot restore the Workspace."
+    );
+    expect(initialMarkup).toContain("Export metadata-only recovery report");
+    expect(initialMarkup).toContain('aria-describedby="local-state-recovery-report-scope"');
     expect(itemPendingMarkup).toContain("Confirm clear Hidden gear tiers");
     expect(itemPendingMarkup).toContain("Cancel");
     expect(allPendingMarkup).toContain("Confirm clear invalid local data");

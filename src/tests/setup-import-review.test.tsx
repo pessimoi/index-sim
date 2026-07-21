@@ -1,54 +1,105 @@
 import { renderToStaticMarkup } from "react-dom/server";
+import { createGeneratedRuntimeContext } from "../adapters/generated";
 import { SetupImportReview } from "../app/components/shell/setup-import-review";
+import { createSetupFileChangeReview } from "../app/state/setup-transfer-changes";
 import { DEFAULT_FORM_STATE, savedSetupFromForm } from "../app/state/ui-state";
 import { buildSetupImportReviewViewModel } from "../app/view-models/setup-import-review";
 
-describe("setup import review", () => {
-  it("shows only resolved metadata, bounded count changes and the complete consequence", () => {
-    const current = savedSetupFromForm(DEFAULT_FORM_STATE);
-    const viewModel = buildSetupImportReviewViewModel(
-      {
-        id: 7,
-        context: {
-          match: "same-revision",
-          tone: "warning",
-          message:
-            "Created with another Revision 274 snapshot. Available ids are compatible, but results may differ.",
-          current: { gameDataId: "current", gameRevision: 274 },
-          source: { gameDataId: "other", gameRevision: 274 }
+function reviewFixture(options: { stale?: boolean; noChanges?: boolean } = {}) {
+  const { context } = createGeneratedRuntimeContext();
+  const current = savedSetupFromForm(DEFAULT_FORM_STATE);
+  const incoming = options.noChanges
+    ? current
+    : savedSetupFromForm(
+        {
+          ...DEFAULT_FORM_STATE,
+          levels: { ...DEFAULT_FORM_STATE.levels, attack: 73 },
+          trip: { ...DEFAULT_FORM_STATE.trip, bankSeconds: 30 },
+          plannerTargets: { ...DEFAULT_FORM_STATE.plannerTargets, attack: 75 }
         },
-        summary: {
-          targetLabel: "Dagannoth",
-          combatStyle: "ranged",
-          setupMode: "custom",
-          customSetupCount: 2,
-          cannonMonsterCount: 1,
-          denseSort: { key: "netGpPerHour", direction: "desc" },
-          irrelevantMonsterCount: 3
-        }
-      },
-      current
-    );
+        undefined,
+        undefined,
+        undefined,
+        DEFAULT_FORM_STATE
+      );
+  return buildSetupImportReviewViewModel({
+    id: 7,
+    stale: options.stale ?? false,
+    context: {
+      match: "same-revision",
+      tone: "warning",
+      message:
+        "Created with another Revision 274 snapshot. Available ids are compatible, but results may differ.",
+      current: { gameDataId: "current", gameRevision: 274 },
+      source: { gameDataId: "other", gameRevision: 274 }
+    },
+    changeReview: createSetupFileChangeReview({
+      current,
+      incoming,
+      gameData: context.gameData
+    })
+  });
+}
+
+describe("setup import review", () => {
+  it("renders complete grouped current-to-incoming disclosure without private implementation values", () => {
+    const viewModel = reviewFixture();
     const markup = renderToStaticMarkup(
-      <SetupImportReview viewModel={viewModel} onApply={() => {}} onDismiss={() => {}} />
+      <SetupImportReview
+        viewModel={viewModel}
+        onApply={() => {}}
+        onRefresh={() => {}}
+        onDismiss={() => {}}
+      />
     );
 
-    expect(viewModel.rows).toEqual([
-      { label: "Target", value: "Dagannoth" },
-      { label: "Combat style", value: "Ranged" },
-      { label: "Setup mode", value: "Custom" },
-      { label: "Custom setups", value: "0 → 2" },
-      { label: "Cannon settings", value: "0 → 1" },
-      { label: "Dense sort", value: "Net GP/hr, descending" },
-      { label: "Hidden / irrelevant", value: "0 → 3" }
-    ]);
+    expect(viewModel.artifactLabel).toBe("Combat setup file");
+    expect(viewModel.changeSummary).toBe("3 changed fields");
+    expect(viewModel.groups).toHaveLength(13);
     expect(markup).toContain('aria-label="Setup import review"');
+    expect(markup).toContain("Included in this file (5)");
+    expect(markup).toContain("Not included (6)");
+    expect(markup).toContain("Current");
+    expect(markup).toContain("Incoming");
+    expect(markup).toContain("Player levels");
+    expect(markup).toContain("Trip, supplies and banking");
+    expect(markup).toContain("Planner targets");
     expect(markup).toContain("Apply imported setup");
     expect(markup).toContain("Dismiss");
     expect(markup).toContain("another Revision 274 snapshot");
-    expect(markup).toContain("active form, default form, setup mode, custom setups");
-    expect(markup).not.toContain("rune_scimitar");
+    expect(markup).not.toContain("currentFingerprint");
+    expect(markup).not.toContain("incomingFingerprint");
     expect(markup).not.toContain("savedAt");
     expect(markup).not.toContain("index-sim:rewrite-setup");
+  });
+
+  it("blocks stale and no-op review actions with truthful alternatives", () => {
+    const stale = reviewFixture({ stale: true });
+    const noOp = reviewFixture({ noChanges: true });
+    const staleMarkup = renderToStaticMarkup(
+      <SetupImportReview
+        viewModel={stale}
+        onApply={() => {}}
+        onRefresh={() => {}}
+        onDismiss={() => {}}
+      />
+    );
+    const noOpMarkup = renderToStaticMarkup(
+      <SetupImportReview
+        viewModel={noOp}
+        onApply={() => {}}
+        onRefresh={() => {}}
+        onDismiss={() => {}}
+      />
+    );
+
+    expect(stale.canApply).toBe(false);
+    expect(staleMarkup).toContain("Current setup changed after this review was prepared.");
+    expect(staleMarkup).toContain("Refresh comparison");
+    expect(staleMarkup).not.toContain("Apply imported setup");
+    expect(noOp.noChanges).toBe(true);
+    expect(noOpMarkup).toContain("No changes. This file matches the current setup.");
+    expect(noOpMarkup).toContain('disabled=""');
+    expect(noOpMarkup).not.toContain("Refresh comparison");
   });
 });

@@ -85,6 +85,12 @@ describe("full simulation result contract", () => {
     );
     expect(full.rates.ttkSec).toBe(trip.ttkSec);
     expect(full.rates.ttkSec).not.toBe(combat.ttkSec);
+    expect(full.rates.killsPerHour).toBeCloseTo(356.795683, 5);
+    expect(full.rates.effectiveKph).toBeCloseTo(350.022327, 5);
+    expect(full.rates.killsPerHour).not.toBe(full.rates.effectiveKph);
+    expect(full.rates.gpPerHour).toBeCloseTo(31_138.335147, 5);
+    expect(full.rates.effectiveGpPerHour).toBeCloseTo(30_547.21, 1);
+    expect(full.rates.gpPerHour).not.toBe(full.rates.effectiveGpPerHour);
     expect(full.rates.effectiveNetGpPerHour).toBe(trip.effectiveNetGpPerHour);
     expect(full.debug.combatXpDamageFraction).toBe(trip.combatXpDamageFraction);
   });

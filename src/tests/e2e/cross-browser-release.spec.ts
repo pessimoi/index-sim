@@ -219,33 +219,64 @@ test("CB-05 invalid local state recovery stays bounded and actionable", async ({
 
 test("CB-06 setup import and setup plus Workspace downloads dispatch", async ({ page }) => {
   await page.goto("/");
-  const exportSetupButton = page.getByRole("button", { name: "Export setup" });
+  await expect(page.locator(".topbar > .actions")).toContainText(
+    "Combat setup files replace setup, custom-monster, cannon and Dense preferences. They are not full Workspace backups and do not include loot or prices."
+  );
+  const exportSetupButton = page.getByRole("button", { name: "Export combat setup" });
   const setupDownloadPromise = page.waitForEvent("download");
   await exportSetupButton.focus();
   await exportSetupButton.press("Enter");
   const setupDownload = await setupDownloadPromise;
   await expect(exportSetupButton).toBeFocused();
   const setupText = await readDownloadText(setupDownload);
-  expect(setupDownload.suggestedFilename()).toBe("index-sim-rewrite-setup.json");
-  await page.getByLabel("Import setup").setInputFiles({
-    name: "cross-browser-setup.json",
+  expect(setupDownload.suggestedFilename()).toMatch(
+    /^2004scape-combat-setup-hill-giant-rev-274-\d{8}T\d{6}Z\.json$/
+  );
+  await page.getByLabel("Review combat setup file").setInputFiles({
+    name: "index-sim-rewrite-setup.json",
     mimeType: "application/json",
     buffer: Buffer.from(setupText)
   });
   await expect(page.getByRole("region", { name: "Setup import review" })).toBeVisible();
 
-  await page.getByRole("tab", { name: "Settings" }).click();
+  const settingsTab = page.getByRole("tab", { name: "Settings" });
+  await settingsTab.focus();
+  await settingsTab.press("Enter");
   const workspace = page.getByLabel("Workspace backup and restore");
+  await expect(workspace).toContainText(
+    "Download one versioned file containing the active local Workspace. Import prepares a read-only review and does not change this browser. It includes setup, Planner, Loot, saved setups, prices and local history. Calculated output, pending reviews and Undo are excluded."
+  );
   const exportWorkspaceButton = workspace.getByRole("button", {
-    name: "Download Workspace backup"
+    name: "Download full Workspace backup"
   });
   const workspaceDownloadPromise = page.waitForEvent("download");
   await exportWorkspaceButton.focus();
   await exportWorkspaceButton.press("Enter");
   const workspaceDownload = await workspaceDownloadPromise;
   await expect(exportWorkspaceButton).toBeFocused();
-  expect(workspaceDownload.suggestedFilename()).toMatch(/^index-sim-workspace-274-.+\.json$/);
+  expect(workspaceDownload.suggestedFilename()).toMatch(
+    /^2004scape-workspace-backup-rev-274-\d{8}T\d{6}Z\.json$/
+  );
   expect(JSON.parse(await readDownloadText(workspaceDownload)).kind).toBe("index-sim-workspace");
+
+  await page.evaluate(() => window.sessionStorage.setItem("index-sim:saved-data-ignored", "1"));
+  await page.reload();
+  await expect(page.getByRole("status", { name: "Session-only safe mode" })).toBeVisible();
+  const attack = page.getByLabel("Player setup").getByLabel("ATT", { exact: true });
+  await attack.fill("61");
+  await attack.press("Enter");
+  const sessionGuard = page.getByRole("status", { name: "Unsaved session-only changes" });
+  await expect(sessionGuard).toContainText("Affected Workspace areas: 1");
+  const sessionDownloadPromise = page.waitForEvent("download");
+  await sessionGuard.getByRole("button", { name: "Download full Workspace backup" }).click();
+  const sessionDownload = await sessionDownloadPromise;
+  const sessionWorkspace = JSON.parse(await readDownloadText(sessionDownload)) as {
+    areas: Array<{ id: string }>;
+  };
+  expect(sessionWorkspace.areas.map((area) => area.id)).toContain("rewrite-setup");
+  await expect(page.getByRole("status", { name: "Session-only changes backed up" })).toContainText(
+    "saving the file cannot be verified"
+  );
 });
 
 test("CB-07 Share hash, dialog, clipboard fallback and focus return work", async ({
@@ -333,6 +364,17 @@ test("CB-09 skip link, tabs, Dense rows and popup keyboard stay operable", async
   await monsters.focus();
   await page.keyboard.press("ArrowRight");
   await expect(tabs.getByRole("tab", { name: "Setups" })).toBeFocused();
+  await expect(page).toHaveURL(/[?&]pane=duel(?:[&#]|$)/);
+  await page.goBack();
+  await expect(monsters).toHaveAttribute("aria-selected", "true");
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveTitle("Monsters · Hill Giant · 2004scape Combat Simulator");
+  await page.goForward();
+  await expect(tabs.getByRole("tab", { name: "Setups" })).toHaveAttribute("aria-selected", "true");
+  await expect(page).toHaveURL(/[?&]pane=duel(?:[&#]|$)/);
+  await page.reload();
+  await expect(tabs.getByRole("tab", { name: "Setups" })).toHaveAttribute("aria-selected", "true");
+  await expect(page).toHaveTitle("Setups · Hill Giant · 2004scape Combat Simulator");
   await monsters.click();
   const row = page.getByRole("table", { name: "All monsters" }).locator('tbody tr[tabindex="0"]');
   await row.focus();

@@ -63,7 +63,12 @@ export const ACCESSIBILITY_JOURNEYS = [
       "Edit a required level to an invalid value and review its error",
       "Filter Weapon options, select with Enter and dismiss with Escape"
     ],
-    linkedTests: ["numeric-input.spec.ts", "loadout.spec.ts", "shell-accessibility.spec.ts"],
+    linkedTests: [
+      "numeric-input.spec.ts",
+      "loadout.spec.ts",
+      "shell-accessibility.spec.ts",
+      "entity-label-collisions.spec.ts"
+    ],
     exception: null
   },
   {
@@ -140,7 +145,11 @@ export const ACCESSIBILITY_JOURNEYS = [
       "Read loot composition and disclose nested data",
       "Edit Food and review Trip output"
     ],
-    linkedTests: ["cannon-trip-loot.spec.ts", "shell-accessibility.spec.ts"],
+    linkedTests: [
+      "cannon-trip-loot.spec.ts",
+      "shell-accessibility.spec.ts",
+      "entity-label-collisions.spec.ts"
+    ],
     exception: null
   },
   {
@@ -197,7 +206,11 @@ export const ACCESSIBILITY_JOURNEYS = [
     announcements: ["Manual price and transfer actions each produce one primary outcome"],
     scanCheckpoints: ["Economy overview", "manual price validation"],
     manualSteps: ["Read provenance and trend values", "Trigger and correct a manual-price error"],
-    linkedTests: ["integrations-economy.spec.ts", "shell-accessibility.spec.ts"],
+    linkedTests: [
+      "integrations-economy.spec.ts",
+      "shell-accessibility.spec.ts",
+      "entity-label-collisions.spec.ts"
+    ],
     exception: null
   },
   {

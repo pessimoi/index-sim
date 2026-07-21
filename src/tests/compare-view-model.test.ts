@@ -22,7 +22,7 @@ describe("rewrite UI view models", () => {
 
     expect(rows).toHaveLength(monsterCount);
     expect(rows.length).toBeGreaterThan(8);
-    expect(rows[0]?.xpPerHour).toBeGreaterThanOrEqual(rows[1]?.xpPerHour ?? 0);
+    expect(rows[0]?.effectiveXpPerHour).toBeGreaterThanOrEqual(rows[1]?.effectiveXpPerHour ?? 0);
 
     const activeRow = rows.find((row) => row.isActiveTarget);
     expect(activeRow).toMatchObject({
@@ -36,13 +36,26 @@ describe("rewrite UI view models", () => {
     expect(activeRow?.maxHit).toBeGreaterThan(0);
     expect(activeRow?.dps).toBeGreaterThan(0);
     expect(activeRow?.ttkSec).toBeGreaterThan(0);
-    expect(activeRow?.killsPerHour).toBeGreaterThan(0);
+    expect(activeRow?.effectiveKph).toBeGreaterThan(0);
     expect(activeRow?.gpPerKill).toBeGreaterThanOrEqual(0);
-    expect(Number.isFinite(activeRow?.gpPerHour)).toBe(true);
-    expect(Number.isFinite(activeRow?.netGpPerHour)).toBe(true);
+    expect(Number.isFinite(activeRow?.effectiveGpPerHour)).toBe(true);
+    expect(Number.isFinite(activeRow?.effectiveNetGpPerHour)).toBe(true);
     expect(activeRow?.dps).toBe(activeVm.result.rates.effectiveDps);
-    expect(activeRow?.xpPerHour).toBe(activeVm.result.xp.effectiveXpPerHour);
-    expect(activeRow?.netGpPerHour).toBe(activeVm.result.rates.effectiveNetGpPerHour);
+    expect(activeRow?.effectiveKph).toBe(activeVm.result.rates.effectiveKph);
+    expect(activeRow?.effectiveXpPerHour).toBe(activeVm.result.xp.effectiveXpPerHour);
+    expect(activeRow?.effectiveGpPerHour).toBe(activeVm.result.rates.effectiveGpPerHour);
+    expect(activeRow?.effectiveNetGpPerHour).toBe(activeVm.result.rates.effectiveNetGpPerHour);
+    expect(activeRow?.effectiveKph).not.toBe(activeVm.result.rates.killsPerHour);
+    expect(activeRow?.effectiveGpPerHour).not.toBe(activeVm.result.rates.gpPerHour);
+    const scales = createDenseCompareScaleModel(rows);
+    const killsBestRows = rows.filter((row) => scales[row.monsterId].bestKph);
+    const grossGpBestRows = rows.filter((row) => scales[row.monsterId].bestGp);
+    expect(killsBestRows.length).toBeGreaterThan(0);
+    expect(grossGpBestRows.length).toBeGreaterThan(0);
+    expect(killsBestRows[0]?.effectiveKph).toBe(Math.max(...rows.map((row) => row.effectiveKph)));
+    expect(grossGpBestRows[0]?.effectiveGpPerHour).toBe(
+      Math.max(...rows.map((row) => row.effectiveGpPerHour))
+    );
   }, 15_000);
 
   it("uses monster-specific custom setup snapshots in dense compare rows", async () => {
@@ -72,8 +85,8 @@ describe("rewrite UI view models", () => {
     });
     expect(rockCrabRow?.markers.map((marker) => marker.id)).toContain("custom");
     expect(rockCrabRow?.dps).toBe(customVm.result.rates.effectiveDps);
-    expect(rockCrabRow?.xpPerHour).toBe(customVm.result.xp.effectiveXpPerHour);
-    expect(rockCrabRow?.netGpPerHour).toBe(customVm.result.rates.effectiveNetGpPerHour);
+    expect(rockCrabRow?.effectiveXpPerHour).toBe(customVm.result.xp.effectiveXpPerHour);
+    expect(rockCrabRow?.effectiveNetGpPerHour).toBe(customVm.result.rates.effectiveNetGpPerHour);
     expect(rows.find((row) => row.monsterId === DEFAULT_FORM_STATE.monsterId)?.hasCustomSetup).toBe(
       false
     );
@@ -148,6 +161,22 @@ describe("rewrite UI view models", () => {
     expect(invalidSortRows.map((row) => row.monsterId)).toEqual(
       defaultRows.map((row) => row.monsterId)
     );
+    const oldKillsPreference = sortDenseCompareRows(defaultRows, {
+      key: "killsPerHour",
+      direction: "desc"
+    });
+    const oldGrossGpPreference = sortDenseCompareRows(defaultRows, {
+      key: "gpPerHour",
+      direction: "desc"
+    });
+    expect(oldKillsPreference.map((row) => row.effectiveKph)).toEqual(
+      [...oldKillsPreference.map((row) => row.effectiveKph)].sort((left, right) => right - left)
+    );
+    expect(oldGrossGpPreference.map((row) => row.effectiveGpPerHour)).toEqual(
+      [...oldGrossGpPreference.map((row) => row.effectiveGpPerHour)].sort(
+        (left, right) => right - left
+      )
+    );
   }, 15_000);
 
   it("filters dense compare rows by monster name and keeps the current target visible", async () => {
@@ -188,8 +217,8 @@ describe("rewrite UI view models", () => {
   it("scales dense compare XP and net GP affordances against the visible rows", () => {
     const row = (
       monsterId: string,
-      xpPerHour: number,
-      netGpPerHour: number
+      effectiveXpPerHour: number,
+      effectiveNetGpPerHour: number
     ): DenseCompareRowViewModel => ({
       monsterId,
       monsterName: monsterId,
@@ -205,11 +234,11 @@ describe("rewrite UI view models", () => {
       maxHit: 0,
       dps: 0,
       ttkSec: 0,
-      killsPerHour: 0,
-      xpPerHour,
+      effectiveKph: 0,
+      effectiveXpPerHour,
       gpPerKill: 0,
-      gpPerHour: 0,
-      netGpPerHour,
+      effectiveGpPerHour: 0,
+      effectiveNetGpPerHour,
       bound: "none"
     });
     const rows = [

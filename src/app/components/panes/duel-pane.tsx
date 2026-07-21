@@ -16,12 +16,15 @@ import type {
   DuelViewMode,
   SavedSetupMergeReviewViewModel
 } from "../../view-models/duel";
+import { expandedCompactLabel } from "../../view-models/presentation-language";
+import type { SetupTransferChangeReview } from "../../state/setup-transfer-changes";
+import { SetupChangeReviewDetails } from "../shell/setup-import-review";
 
 const DUEL_MATRIX_METRICS: ReadonlyArray<{ id: DuelMatrixMetricId; label: string }> = [
   { id: "dps", label: "DPS" },
-  { id: "effectiveXpPerHour", label: "XP/hr" },
-  { id: "effectiveNetGpPerHour", label: "Net GP/hr" },
-  { id: "gpPerXp", label: "GP/XP" }
+  { id: "effectiveXpPerHour", label: "EFF. XP/HR" },
+  { id: "effectiveNetGpPerHour", label: "EFF. NET GP/HR" },
+  { id: "gpPerXp", label: "NET GP/XP" }
 ];
 
 const DUEL_COMPARISON_COLUMNS: ReadonlyArray<{
@@ -33,10 +36,26 @@ const DUEL_COMPARISON_COLUMNS: ReadonlyArray<{
   { label: "Loadout", sortKey: "loadout" },
   { label: "Max", sortKey: "maxHit", numeric: true },
   { label: "DPS", sortKey: "dps", numeric: true },
-  { label: "XP/hr", sortKey: "effectiveXpPerHour", numeric: true },
-  { label: "Net GP/hr", sortKey: "effectiveNetGpPerHour", numeric: true },
-  { label: "GP/XP", sortKey: "gpPerXp", numeric: true },
-  { label: "K/hr", sortKey: "killsPerHour", numeric: true }
+  {
+    label: "EFF. XP/HR",
+    sortKey: "effectiveXpPerHour",
+    numeric: true
+  },
+  {
+    label: "EFF. NET GP/HR",
+    sortKey: "effectiveNetGpPerHour",
+    numeric: true
+  },
+  {
+    label: "NET GP/XP",
+    sortKey: "gpPerXp",
+    numeric: true
+  },
+  {
+    label: "EFF. K/HR",
+    sortKey: "effectiveKph",
+    numeric: true
+  }
 ];
 
 function gpPerXpDisplay(value: number | null): string {
@@ -49,7 +68,9 @@ function duelDeltaDisplay(value: number | null, digits = 0): string {
 }
 
 function duelMatrixMetricLabel(metricId: DuelMatrixMetricId): string {
-  return DUEL_MATRIX_METRICS.find((metric) => metric.id === metricId)?.label ?? metricId;
+  const label = DUEL_MATRIX_METRICS.find((metric) => metric.id === metricId)?.label;
+  if (metricId === "gpPerXp") return "Effective net gold pieces per experience point";
+  return (label && expandedCompactLabel(label)) ?? label ?? metricId;
 }
 
 function duelMatrixMetricDisplay(metricId: DuelMatrixMetricId, value: number | null): string {
@@ -110,6 +131,14 @@ export interface DuelPaneModel {
         contextMessage: string;
       })
     | null;
+  duelLoadReview: {
+    id: number;
+    snapshotId: string;
+    snapshotName: string;
+    changeReview: SetupTransferChangeReview;
+    stale: boolean;
+    sourceMissing: boolean;
+  } | null;
   duelSessionOnlyAvailable: boolean;
   duelChangeRevision: number;
 }
@@ -140,6 +169,9 @@ export interface DuelPaneActions {
     | "session-only-available"
     | "failed";
   loadDuelSnapshot(snapshotId: string): void;
+  refreshDuelSnapshotLoad(snapshotId: string): void;
+  confirmDuelSnapshotLoad(snapshotId: string): void;
+  dismissDuelSnapshotLoad(snapshotId: string): void;
   deleteDuelSnapshot(snapshotId: string): void;
   showCurrentDuelTarget(): void;
   showDuelMonsterMatrix(): void;
@@ -173,6 +205,7 @@ export function DuelPane({ hidden, model, actions }: DuelPaneProps) {
     duelMatrixSort,
     duelImportNotice,
     duelImportReview,
+    duelLoadReview,
     duelSessionOnlyAvailable,
     duelChangeRevision
   } = model;
@@ -190,6 +223,9 @@ export function DuelPane({ hidden, model, actions }: DuelPaneProps) {
     applyDuelSessionOnlyChange,
     commitDuelSnapshotName,
     loadDuelSnapshot,
+    refreshDuelSnapshotLoad,
+    confirmDuelSnapshotLoad,
+    dismissDuelSnapshotLoad,
     deleteDuelSnapshot,
     showCurrentDuelTarget,
     showDuelMonsterMatrix,
@@ -202,7 +238,10 @@ export function DuelPane({ hidden, model, actions }: DuelPaneProps) {
   } = actions;
   const importInputRef = useRef<HTMLInputElement>(null);
   const reviewHeadingRef = useRef<HTMLHeadingElement>(null);
+  const loadReviewHeadingRef = useRef<HTMLHeadingElement>(null);
+  const loadReviewTriggersRef = useRef(new Map<string, HTMLButtonElement>());
   const handledReviewIdRef = useRef(0);
+  const handledLoadReviewIdRef = useRef(0);
   const renameInputRef = useRef<HTMLInputElement>(null);
   const renameTriggersRef = useRef(new Map<string, HTMLButtonElement>());
   const previousChangeRevisionRef = useRef(duelChangeRevision);
@@ -223,6 +262,15 @@ export function DuelPane({ hidden, model, actions }: DuelPaneProps) {
     });
     return () => window.cancelAnimationFrame(frameId);
   }, [duelImportReview, hidden]);
+
+  useEffect(() => {
+    if (hidden || !duelLoadReview || handledLoadReviewIdRef.current === duelLoadReview.id) return;
+    const frameId = window.requestAnimationFrame(() => {
+      loadReviewHeadingRef.current?.focus({ preventScroll: true });
+      handledLoadReviewIdRef.current = duelLoadReview.id;
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }, [duelLoadReview, hidden]);
 
   useEffect(() => {
     if (!renameEditorSnapshotId) return;
@@ -262,6 +310,10 @@ export function DuelPane({ hidden, model, actions }: DuelPaneProps) {
     setRenameEditor((current) => (current ? { ...current, error: errors[result] } : current));
   };
 
+  const restoreLoadTriggerFocus = (snapshotId: string): void => {
+    window.queueMicrotask(() => loadReviewTriggersRef.current.get(snapshotId)?.focus());
+  };
+
   return (
     <section className="duel-pane" aria-label="Setup comparison" hidden={hidden}>
       <div className="table-toolbar duel-toolbar">
@@ -284,16 +336,17 @@ export function DuelPane({ hidden, model, actions }: DuelPaneProps) {
             <details className="duel-manage-setups">
               <summary>Manage saved setups</summary>
               <div className="duel-manage-setups-panel">
-                <p>
-                  Saved automatically in this browser. Import and export are only for backup or
-                  transfer.
+                <p id="saved-setup-collection-scope">
+                  This file contains the saved comparison collection only. It does not replace the
+                  active setup until you later load an individual saved row.
                 </p>
                 <label className="file-button">
-                  Import setups
+                  Review saved setup collection
                   <input
                     ref={importInputRef}
                     type="file"
                     accept="application/json,.json"
+                    aria-describedby="saved-setup-collection-scope"
                     onChange={async (event) => {
                       const file = event.target.files?.[0];
                       if (!file) return;
@@ -305,8 +358,13 @@ export function DuelPane({ hidden, model, actions }: DuelPaneProps) {
                     }}
                   />
                 </label>
-                <button type="button" onClick={exportDuelSnapshots} disabled={snapshotCount === 0}>
-                  Export setups
+                <button
+                  type="button"
+                  aria-describedby="saved-setup-collection-scope"
+                  onClick={exportDuelSnapshots}
+                  disabled={snapshotCount === 0}
+                >
+                  Export saved setup collection
                 </button>
               </div>
             </details>
@@ -582,6 +640,11 @@ export function DuelPane({ hidden, model, actions }: DuelPaneProps) {
                     <button
                       type="button"
                       className="sort-button"
+                      aria-label={`Sort by ${
+                        column.sortKey === "gpPerXp"
+                          ? "Effective net gold pieces per experience point"
+                          : (expandedCompactLabel(column.label) ?? column.label)
+                      }`}
                       onClick={() => sortDuelComparisonBy(column.sortKey)}
                     >
                       <span>{column.label}</span>
@@ -601,6 +664,8 @@ export function DuelPane({ hidden, model, actions }: DuelPaneProps) {
               {duelComparisonRows.map((row) => {
                 const diffId = `duel-diff-${row.snapshotId ?? "live"}`;
                 const diffExpanded = row.snapshotId === expandedDuelDiffId;
+                const loadReviewExpanded = row.snapshotId === duelLoadReview?.snapshotId;
+                const loadReviewId = `duel-load-review-${row.snapshotId ?? "live"}`;
                 return (
                   <Fragment key={row.id}>
                     <tr className={duelRowClass(row)}>
@@ -711,9 +776,10 @@ export function DuelPane({ hidden, model, actions }: DuelPaneProps) {
                         {row.best.gpPerXp && <em>best</em>}
                         <small>{duelDeltaDisplay(row.deltas.gpPerXp, 2)}</small>
                       </td>
-                      <td className="numeric">
-                        <span>{formatNumber(row.killsPerHour)}</span>
-                        <small>{duelDeltaDisplay(row.deltas.killsPerHour)}</small>
+                      <td className={`numeric ${row.best.effectiveKph ? "best" : ""}`}>
+                        <span>{formatNumber(row.effectiveKph)}</span>
+                        {row.best.effectiveKph && <em>best</em>}
+                        <small>{duelDeltaDisplay(row.deltas.effectiveKph)}</small>
                       </td>
                       <td>
                         {row.snapshotId ? (
@@ -728,11 +794,21 @@ export function DuelPane({ hidden, model, actions }: DuelPaneProps) {
                               {diffExpanded ? "Hide diff" : "Review diff"}
                             </button>
                             <button
+                              ref={(element) => {
+                                if (!row.snapshotId) return;
+                                if (element) {
+                                  loadReviewTriggersRef.current.set(row.snapshotId, element);
+                                } else {
+                                  loadReviewTriggersRef.current.delete(row.snapshotId);
+                                }
+                              }}
                               type="button"
                               aria-label={`Load saved setup ${row.displayName}`}
+                              aria-expanded={loadReviewExpanded}
+                              aria-controls={loadReviewId}
                               onClick={() => loadDuelSnapshot(row.snapshotId!)}
                             >
-                              Load
+                              {loadReviewExpanded ? "Reviewing Load" : "Load"}
                             </button>
                             <button
                               type="button"
@@ -747,6 +823,101 @@ export function DuelPane({ hidden, model, actions }: DuelPaneProps) {
                         )}
                       </td>
                     </tr>
+                    {row.snapshotId && loadReviewExpanded && duelLoadReview && (
+                      <tr className="duel-load-review-row">
+                        <td colSpan={9}>
+                          <section
+                            id={loadReviewId}
+                            className="setup-import-review duel-load-review"
+                            aria-label={`Review Load for ${row.displayName}`}
+                          >
+                            <span className="visually-hidden" role="status" aria-live="polite">
+                              Saved setup ready for Load review.
+                            </span>
+                            <div className="setup-import-review-heading">
+                              <div>
+                                <span className="eyebrow">Saved setup Load</span>
+                                <h3 ref={loadReviewHeadingRef} tabIndex={-1}>
+                                  Review {duelLoadReview.snapshotName}
+                                </h3>
+                              </div>
+                              <span
+                                className={`status-pill ${
+                                  duelLoadReview.stale
+                                    ? "warning"
+                                    : duelLoadReview.changeReview.changeCount > 0
+                                      ? "ready"
+                                      : "neutral"
+                                }`}
+                              >
+                                {duelLoadReview.stale
+                                  ? "Refresh required"
+                                  : duelLoadReview.changeReview.changeCount > 0
+                                    ? "Ready to load"
+                                    : "No changes"}
+                              </span>
+                            </div>
+                            <p>
+                              {duelLoadReview.changeReview.changeCount} applicable setup field
+                              {duelLoadReview.changeReview.changeCount === 1 ? "" : "s"} changed.
+                            </p>
+                            {duelLoadReview.stale && (
+                              <p className="inline-status warning" role="alert">
+                                {duelLoadReview.sourceMissing
+                                  ? "This saved setup no longer exists. Dismiss this review."
+                                  : "The active setup or this saved row changed. Refresh before loading."}
+                              </p>
+                            )}
+                            {!duelLoadReview.stale &&
+                              duelLoadReview.changeReview.changeCount === 0 && (
+                                <p className="inline-status neutral">
+                                  This saved setup has no applicable changes.
+                                </p>
+                              )}
+                            <SetupChangeReviewDetails
+                              groups={duelLoadReview.changeReview.groups}
+                              includedScope={duelLoadReview.changeReview.includedScope}
+                              excludedScope={duelLoadReview.changeReview.excludedScope}
+                              includedLabel="Included in this Load"
+                            />
+                            <p>Calculated Duel impact remains in the separate Review diff panel.</p>
+                            <div className="setup-import-review-actions">
+                              {duelLoadReview.stale && !duelLoadReview.sourceMissing && (
+                                <button
+                                  type="button"
+                                  className="primary-action"
+                                  onClick={() => refreshDuelSnapshotLoad(row.snapshotId!)}
+                                >
+                                  Refresh comparison
+                                </button>
+                              )}
+                              {!duelLoadReview.stale && (
+                                <button
+                                  type="button"
+                                  className="primary-action"
+                                  disabled={duelLoadReview.changeReview.changeCount === 0}
+                                  onClick={() => {
+                                    confirmDuelSnapshotLoad(row.snapshotId!);
+                                    restoreLoadTriggerFocus(row.snapshotId!);
+                                  }}
+                                >
+                                  Load saved setup
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  dismissDuelSnapshotLoad(row.snapshotId!);
+                                  restoreLoadTriggerFocus(row.snapshotId!);
+                                }}
+                              >
+                                Dismiss
+                              </button>
+                            </div>
+                          </section>
+                        </td>
+                      </tr>
+                    )}
                     {row.setupDiff && diffExpanded && (
                       <tr className="duel-diff-row">
                         <td colSpan={9}>
@@ -787,15 +958,15 @@ export function DuelPane({ hidden, model, actions }: DuelPaneProps) {
                                 <dd>{duelDeltaDisplay(row.deltas.killsPerTrip, 1)}</dd>
                               </div>
                               <div>
-                                <dt>Kills/hr</dt>
-                                <dd>{duelDeltaDisplay(row.deltas.killsPerHour, 1)}</dd>
+                                <dt>Effective kills/hr</dt>
+                                <dd>{duelDeltaDisplay(row.deltas.effectiveKph, 1)}</dd>
                               </div>
                               <div>
-                                <dt>XP/hr</dt>
+                                <dt>Effective XP/hr</dt>
                                 <dd>{duelDeltaDisplay(row.deltas.effectiveXpPerHour)}</dd>
                               </div>
                               <div>
-                                <dt>Net GP/hr</dt>
+                                <dt>Effective net GP/hr</dt>
                                 <dd>{duelDeltaDisplay(row.deltas.effectiveNetGpPerHour)}</dd>
                               </div>
                               <div>
@@ -870,10 +1041,11 @@ export function DuelPane({ hidden, model, actions }: DuelPaneProps) {
                   type="button"
                   className={duelMatrixMetric === metric.id ? "active" : undefined}
                   aria-pressed={duelMatrixMetric === metric.id}
+                  aria-label={duelMatrixMetricLabel(metric.id)}
                   onClick={() => setDuelMatrixMetric(metric.id)}
                   key={metric.id}
                 >
-                  {metric.label}
+                  <span aria-hidden="true">{metric.label}</span>
                 </button>
               ))}
             </div>

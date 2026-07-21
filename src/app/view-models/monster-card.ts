@@ -16,6 +16,7 @@ import {
 import { formatNumber } from "./formatting";
 import { signedBonus, styleOptions } from "./loadout";
 import {
+  createEntityCollisionIndex,
   createEntityDisplayLabel,
   formatSemanticUnitValue,
   type EntityDisplayLabel
@@ -308,7 +309,16 @@ export function createMonsterCardViewModel(
 }
 
 export function monsterOptions(gameData: GameDataSnapshot) {
+  const collisionIndex = createEntityCollisionIndex(gameData);
   return Object.values(gameData.monsters)
-    .map((monster) => ({ id: monster.id, label: monster.name }))
+    .map((monster) => {
+      const label = createEntityDisplayLabel({
+        technicalId: monster.id,
+        gameDataName: monster.name,
+        collisionIndex,
+        entityKind: "monster"
+      }).name;
+      return { id: monster.id, label, accessibleLabel: label };
+    })
     .sort((left, right) => left.label.localeCompare(right.label));
 }

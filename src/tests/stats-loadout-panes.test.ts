@@ -61,8 +61,7 @@ describe("Stats and Loadout panes", () => {
           sourceBreakdown: simulation.statsSourceBreakdown,
           combatRollDetail: simulation.combatRollDetail,
           xpRouting: simulation.xpRouting,
-          tripBankingSummary: simulation.tripBankingSummary,
-          effectiveKph: simulation.trip.effectiveKph
+          tripBankingSummary: simulation.tripBankingSummary
         }
       })
     );

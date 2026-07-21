@@ -1,6 +1,7 @@
 import { createElement, isValidElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { loadBundledLegacyContext } from "../adapters/legacy-runtime";
+import { createGeneratedRuntimeContext } from "../adapters/generated";
 import { LootPane, type LootPaneActions } from "../app/components/panes/loot-pane";
 import { DEFAULT_FORM_STATE } from "../app/state/ui-state";
 import { lootSettingsForMonster } from "../app/state/loot-settings";
@@ -336,5 +337,34 @@ describe("Loot pane", () => {
     expect(button).toBeDefined();
     (button!.props as { onClick(): void }).onClick();
     expect(calls).toEqual([expected!.action]);
+  });
+
+  it("renders unique repeated-row action names without changing their exact keys", () => {
+    const { context } = createGeneratedRuntimeContext();
+    const form = { ...DEFAULT_FORM_STATE, monsterId: "hobgoblin_armed" };
+    const simulation = createSimulationViewModel(form, context);
+    const coins = simulation.loot.actionableRows.filter((row) => row.key === "coins");
+    const tree = LootPane({
+      hidden: false,
+      model: {
+        presentation: simulation.loot,
+        settings: lootSettingsForMonster({}, form.monsterId),
+        notice: null,
+        gpPerKill: simulation.trip.gpPerKill,
+        effectiveNetGpPerHour: simulation.trip.effectiveNetGpPerHour,
+        sort: { key: "drop", direction: "desc" },
+        nestedSort: DEFAULT_LOOT_NESTED_TABLE_SORT_STATE
+      },
+      actions
+    });
+    const actionNames = elements(tree)
+      .filter((element) => element.type === "select")
+      .map((element) => (element.props as { "aria-label"?: string })["aria-label"])
+      .filter((label): label is string => label?.startsWith("Action for Coins") === true);
+
+    expect(coins).toHaveLength(7);
+    expect([...actionNames].sort()).toEqual(coins.map((row) => `Action for ${row.name}`).sort());
+    expect(new Set(actionNames).size).toBe(7);
+    expect(new Set(coins.map((row) => row.rowId)).size).toBe(7);
   });
 });

@@ -1,3 +1,4 @@
+import type { Locator } from "@playwright/test";
 import {
   ALL_FIXTURE_NUMERIC_LABELS,
   CANNON_NUMERIC_LABELS,
@@ -24,6 +25,133 @@ import {
   selectCombatType,
   test
 } from "./scaffold-fixture";
+
+function parsedFormattedNumber(value: string): number {
+  return Number(value.replaceAll(",", "").replace(/[^0-9.-]/g, ""));
+}
+
+async function directDenseCellValue(row: Locator, columnIndex: number): Promise<string> {
+  return (
+    (await row.locator("td").nth(columnIndex).locator(":scope > span").first().textContent()) ?? ""
+  ).trim();
+}
+
+test("keeps effective hourly rates aligned across primary surfaces", async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.goto("/");
+  const tabs = page.getByLabel("Workbench tabs");
+
+  await tabs.getByRole("tab", { name: "Trip" }).click();
+  const trip = page.locator('section[aria-label="Trip assumptions"]');
+  const tripSummary = page.getByLabel("Trip summary", { exact: true });
+  await trip.getByLabel("Bank time").selectOption("manual");
+  await trip.getByLabel("Bank sec").fill("600");
+  await trip.getByLabel("Food mode").selectOption("manual");
+  await trip.getByLabel("Food count").fill("2");
+  await trip.getByLabel("Food per kill override").selectOption("on");
+  await trip.getByLabel("Food/kill").fill("0.5");
+
+  const tripBefore = (await metricSnapshot(tripSummary, ["Effective kills/hr"]))[
+    "Effective kills/hr"
+  ];
+  await tabs.getByRole("tab", { name: "Stats" }).click();
+  const onSiteMetric = page.getByRole("listitem", { name: /^On-site kills\/hr:/ });
+  const onSiteBefore = ((await onSiteMetric.locator("strong").textContent()) ?? "").trim();
+  const resultBefore = await resultMetricSnapshot(page);
+  const resultGrossBefore = (
+    await metricSnapshot(page.getByLabel("Simulation results"), ["EFF. GP/HR"])
+  )["EFF. GP/HR"];
+  expect(resultBefore["EFF. K/HR"]).toBe(tripBefore);
+  expect(resultBefore["EFF. K/HR"]).not.toBe(onSiteBefore);
+  await expect(onSiteMetric).toContainText("before Trip banking and travel efficiency");
+  await expect(page.getByRole("row", { name: /^Effective kills\/hr/ })).toContainText(tripBefore);
+
+  await tabs.getByRole("tab", { name: "Monsters" }).click();
+  const table = page.getByRole("table", { name: "All monsters" });
+  await expect.poll(async () => table.locator("tbody tr").count()).toBeGreaterThan(8);
+  const activeBefore = table.locator('tbody tr[aria-selected="true"]');
+  await expect(activeBefore).toBeVisible();
+  expect(await directDenseCellValue(activeBefore, 5)).toBe(resultBefore["EFF. K/HR"]);
+  expect(await directDenseCellValue(activeBefore, 8)).toBe(resultGrossBefore);
+
+  for (const [name, columnIndex] of [
+    ["Sort by effective kills per hour", 5],
+    ["Sort by effective gross gold pieces per hour", 8]
+  ] as const) {
+    const sortButton = table.getByRole("button", { name });
+    await sortButton.click();
+    await expect(sortButton.locator("xpath=ancestor::th")).toHaveAttribute(
+      "aria-sort",
+      "descending"
+    );
+    const values = await table
+      .locator(`tbody tr td:nth-child(${columnIndex + 1}) > span`)
+      .allTextContents();
+    const numericValues = values.map(parsedFormattedNumber);
+    expect(numericValues.every(Number.isFinite)).toBe(true);
+    expect(numericValues).toEqual([...numericValues].sort((left, right) => right - left));
+  }
+
+  await tabs.getByRole("tab", { name: "Setups" }).click();
+  const duel = page.getByRole("region", { name: "Setup comparison", exact: true });
+  await duel.getByRole("button", { name: "Save current setup" }).click();
+  const savedTable = duel.getByRole("table", { name: "Setup comparison table" });
+  const savedRowsBefore = savedTable.locator("tbody > tr");
+  await expect(savedRowsBefore).toHaveCount(2);
+  await expect(savedRowsBefore.nth(0).locator("td").nth(7)).toContainText(tripBefore);
+  await expect(savedRowsBefore.nth(1).locator("td").nth(7)).toContainText(tripBefore);
+
+  await tabs.getByRole("tab", { name: "Trip" }).click();
+  await trip.getByLabel("Bank sec").fill("1200");
+  await expect
+    .poll(async () => {
+      const snapshot = await metricSnapshot(tripSummary, ["Effective kills/hr"]);
+      return snapshot["Effective kills/hr"];
+    })
+    .not.toBe(tripBefore);
+  const tripAfter = (await metricSnapshot(tripSummary, ["Effective kills/hr"]))[
+    "Effective kills/hr"
+  ];
+
+  await tabs.getByRole("tab", { name: "Stats" }).click();
+  await expect(onSiteMetric.locator("strong")).toHaveText(onSiteBefore);
+  const resultAfter = await resultMetricSnapshot(page);
+  const resultGrossAfter = (
+    await metricSnapshot(page.getByLabel("Simulation results"), ["EFF. GP/HR"])
+  )["EFF. GP/HR"];
+  expect(resultAfter["EFF. K/HR"]).toBe(tripAfter);
+  expect(resultAfter["EFF. K/HR"]).not.toBe(resultBefore["EFF. K/HR"]);
+  expect(resultGrossAfter).not.toBe(resultGrossBefore);
+
+  await tabs.getByRole("tab", { name: "Monsters" }).click();
+  const activeAfter = table.locator('tbody tr[aria-selected="true"]');
+  await expect.poll(async () => directDenseCellValue(activeAfter, 5)).toBe(tripAfter);
+  expect(await directDenseCellValue(activeAfter, 8)).toBe(resultGrossAfter);
+
+  await tabs.getByRole("tab", { name: "Setups" }).click();
+  const killsSort = savedTable.getByRole("button", { name: "Sort by Effective kills per hour" });
+  await killsSort.click();
+  await expect(killsSort.locator("xpath=ancestor::th")).toHaveAttribute("aria-sort", "descending");
+  const sortedRows = savedTable.locator("tbody > tr");
+  await expect(sortedRows.first()).toContainText("best");
+  await expect(sortedRows.first().locator("td").nth(7)).toContainText(tripBefore);
+  await expect(sortedRows.nth(1).locator("td").nth(7)).toContainText(tripAfter);
+  await expect(sortedRows.first().locator("td").nth(7).locator("small")).not.toHaveText("+0");
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const mobileResult = page.getByLabel("Mobile result summary");
+  await expect(mobileResult).toBeVisible();
+  await expect(
+    mobileResult.getByText(`Effective experience points per hour: ${resultAfter["EFF. XP/HR"]}`, {
+      exact: true
+    })
+  ).toBeAttached();
+  await expect(
+    mobileResult.getByText(`Effective net gold pieces per hour: ${resultAfter["EFF. NET GP/HR"]}`, {
+      exact: true
+    })
+  ).toBeAttached();
+});
 
 test("sorts the full monster table and selects a target row", async ({ page }) => {
   await page.goto("/");
@@ -266,7 +394,7 @@ test("matches browser-rendered dense numeric snapshots", async ({ page }) => {
       .getByRole("row", { name: /Dagannoth \(lvl 74\)/ })
       .locator("td")
       .nth(5)
-  ).toHaveText("325");
+  ).toHaveText("174");
   const cannonRanged = await denseNumericSnapshot(table, /Dagannoth \(lvl 74\)/);
   const cannonRangedResults = await resultMetricSnapshot(page);
 
@@ -284,19 +412,19 @@ test("matches browser-rendered dense numeric snapshots", async ({ page }) => {
       max: "16.4",
       dps: "3.05",
       ttk: "12.8 s",
-      killsPerHour: "235",
+      killsPerHour: "154",
       xpPerHour: "21,573",
       gpPerKill: "518",
-      gpPerHour: "121,532",
+      gpPerHour: "79,792",
       netGpPerHour: "-81,544"
     },
     defaultMeleeResults: {
       DPS: "3.05",
       "MAX HIT": "16.4",
       "HIT %": "88.9%",
-      "XP/HR": "21,573",
-      "GP/HR NET": "-81,544",
-      "KILLS/HR": "235",
+      "EFF. XP/HR": "21,573",
+      "EFF. NET GP/HR": "-81,544",
+      "EFF. K/HR": "154",
       "GP/KILL": "518",
       "SUPPLY/KILL": "1,047"
     },
@@ -305,19 +433,19 @@ test("matches browser-rendered dense numeric snapshots", async ({ page }) => {
       max: "10.0",
       dps: "1.96",
       ttk: "45.6 s",
-      killsPerHour: "73",
+      killsPerHour: "42",
       xpPerHour: "14,525",
       gpPerKill: "649",
-      gpPerHour: "47,551",
+      gpPerHour: "27,085",
       netGpPerHour: "-181,854"
     },
     rangedSafespotResults: {
       DPS: "1.96",
       "MAX HIT": "10.0",
       "HIT %": "70.6%",
-      "XP/HR": "14,525",
-      "GP/HR NET": "-181,854",
-      "KILLS/HR": "73",
+      "EFF. XP/HR": "14,525",
+      "EFF. NET GP/HR": "-181,854",
+      "EFF. K/HR": "42",
       "GP/KILL": "649",
       "SUPPLY/KILL": "5,006"
     },
@@ -326,19 +454,19 @@ test("matches browser-rendered dense numeric snapshots", async ({ page }) => {
       max: "10.0",
       dps: "2.24",
       ttk: "8.6 s",
-      killsPerHour: "325",
+      killsPerHour: "174",
       xpPerHour: "37,083",
       gpPerKill: "99",
-      gpPerHour: "32,195",
+      gpPerHour: "17,200",
       netGpPerHour: "-475,907"
     },
     cannonRangedResults: {
       DPS: "2.24",
       "MAX HIT": "10.0",
       "HIT %": "80.7%",
-      "XP/HR": "37,083",
-      "GP/HR NET": "-475,907",
-      "KILLS/HR": "325",
+      "EFF. XP/HR": "37,083",
+      "EFF. NET GP/HR": "-475,907",
+      "EFF. K/HR": "174",
       "GP/KILL": "99",
       "SUPPLY/KILL": "2,838"
     },
@@ -348,15 +476,15 @@ test("matches browser-rendered dense numeric snapshots", async ({ page }) => {
       "Cannon only DPS": "7.41",
       "Balls/hr": "1,875",
       "Balls/kill": "4.46",
-      "Cannon Ranged XP/hr": "45,401",
+      "On-site cannon Ranged XP/hr": "45,401",
       "Effective XP/hr": "37,083",
       "Effective net GP/hr": "-475,907",
-      "Ball cost/hr": "749,830",
+      "On-site ball cost/hr": "749,830",
       "Ball cost/kill": "1,785",
       "Ball price": "400",
       "Cannonballs/trip": "69",
       "Ball GP/trip": "27,743",
-      "K/hr uplift": "214.6%"
+      "On-site kills/hr uplift": "214.6%"
     }
   });
 });
@@ -400,7 +528,7 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
       .getByRole("row", { name: /Dagannoth \(lvl 74\)/ })
       .locator("td")
       .nth(5)
-  ).toHaveText("325");
+  ).toHaveText("174");
   const rangedCannon = await denseNumericSnapshot(table, /Dagannoth \(lvl 74\)/);
   const rangedCannonResults = await resultMetricSnapshot(page);
   await expectActiveDenseRow(table, /Dagannoth \(lvl 74\)/);
@@ -445,7 +573,7 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
   const customLootSettingsResults = await resultMetricSnapshot(page);
   await expectActiveDenseRow(table, /Green Dragon/);
 
-  await table.getByRole("button", { name: "Sort by net gold pieces per hour" }).click();
+  await table.getByRole("button", { name: "Sort by effective net gold pieces per hour" }).click();
   await page.getByLabel("Monster filter").fill("rock crab");
   const forcedTargetRow = table.getByRole("row", { name: /Green Dragon/ });
   await expect(forcedTargetRow).toBeVisible();
@@ -476,19 +604,19 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
       max: "16.4",
       dps: "3.05",
       ttk: "12.8 s",
-      killsPerHour: "235",
+      killsPerHour: "154",
       xpPerHour: "21,573",
       gpPerKill: "518",
-      gpPerHour: "121,532",
+      gpPerHour: "79,792",
       netGpPerHour: "-81,544"
     },
     meleeBaselineResults: {
       DPS: "3.05",
       "MAX HIT": "16.4",
       "HIT %": "88.9%",
-      "XP/HR": "21,573",
-      "GP/HR NET": "-81,544",
-      "KILLS/HR": "235",
+      "EFF. XP/HR": "21,573",
+      "EFF. NET GP/HR": "-81,544",
+      "EFF. K/HR": "154",
       "GP/KILL": "518",
       "SUPPLY/KILL": "1,047"
     },
@@ -497,19 +625,19 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
       max: "16.4",
       dps: "2.81",
       ttk: "23.2 s",
-      killsPerHour: "140",
+      killsPerHour: "75",
       xpPerHour: "18,290",
       gpPerKill: "516",
-      gpPerHour: "72,344",
+      gpPerHour: "38,649",
       netGpPerHour: "-95,351"
     },
     meleeAlchRelevantResults: {
       DPS: "2.81",
       "MAX HIT": "16.4",
       "HIT %": "82.1%",
-      "XP/HR": "18,290",
-      "GP/HR NET": "-95,351",
-      "KILLS/HR": "140",
+      "EFF. XP/HR": "18,290",
+      "EFF. NET GP/HR": "-95,351",
+      "EFF. K/HR": "75",
       "GP/KILL": "516",
       "SUPPLY/KILL": "1,788"
     },
@@ -518,19 +646,19 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
       max: "10.0",
       dps: "1.96",
       ttk: "45.6 s",
-      killsPerHour: "73",
+      killsPerHour: "42",
       xpPerHour: "14,525",
       gpPerKill: "649",
-      gpPerHour: "47,551",
+      gpPerHour: "27,085",
       netGpPerHour: "-181,854"
     },
     rangedSafespotResults: {
       DPS: "1.96",
       "MAX HIT": "10.0",
       "HIT %": "70.6%",
-      "XP/HR": "14,525",
-      "GP/HR NET": "-181,854",
-      "KILLS/HR": "73",
+      "EFF. XP/HR": "14,525",
+      "EFF. NET GP/HR": "-181,854",
+      "EFF. K/HR": "42",
       "GP/KILL": "649",
       "SUPPLY/KILL": "5,006"
     },
@@ -539,19 +667,19 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
       max: "10.0",
       dps: "2.24",
       ttk: "8.6 s",
-      killsPerHour: "325",
+      killsPerHour: "174",
       xpPerHour: "37,083",
       gpPerKill: "99",
-      gpPerHour: "32,195",
+      gpPerHour: "17,200",
       netGpPerHour: "-475,907"
     },
     rangedCannonResults: {
       DPS: "2.24",
       "MAX HIT": "10.0",
       "HIT %": "80.7%",
-      "XP/HR": "37,083",
-      "GP/HR NET": "-475,907",
-      "KILLS/HR": "325",
+      "EFF. XP/HR": "37,083",
+      "EFF. NET GP/HR": "-475,907",
+      "EFF. K/HR": "174",
       "GP/KILL": "99",
       "SUPPLY/KILL": "2,838"
     },
@@ -560,19 +688,19 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
       max: "20.0",
       dps: "1.19",
       ttk: "1 min 33 s",
-      killsPerHour: "37",
+      killsPerHour: "15",
       xpPerHour: "21,210",
       gpPerKill: "6,598",
-      gpPerHour: "246,010",
+      gpPerHour: "95,749",
       netGpPerHour: "-479,079"
     },
     magicSafespotResults: {
       DPS: "1.19",
       "MAX HIT": "20.0",
       "HIT %": "35.7%",
-      "XP/HR": "21,210",
-      "GP/HR NET": "-479,079",
-      "KILLS/HR": "37",
+      "EFF. XP/HR": "21,210",
+      "EFF. NET GP/HR": "-479,079",
+      "EFF. K/HR": "15",
       "GP/KILL": "6,598",
       "SUPPLY/KILL": "39,610"
     },
@@ -581,19 +709,19 @@ test("matches release-path dense numeric snapshots", async ({ page }) => {
       max: "22.9",
       dps: "1.97",
       ttk: "40.9 s",
-      killsPerHour: "67",
+      killsPerHour: "28",
       xpPerHour: "8,443",
       gpPerKill: "6,168",
-      gpPerHour: "415,739",
+      gpPerHour: "173,590",
       netGpPerHour: "71,308"
     },
     customLootSettingsResults: {
       DPS: "1.97",
       "MAX HIT": "22.9",
       "HIT %": "72.4%",
-      "XP/HR": "8,443",
-      "GP/HR NET": "71,308",
-      "KILLS/HR": "67",
+      "EFF. XP/HR": "8,443",
+      "EFF. NET GP/HR": "71,308",
+      "EFF. K/HR": "28",
       "GP/KILL": "6,168",
       "SUPPLY/KILL": "3,634"
     }

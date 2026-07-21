@@ -11,6 +11,7 @@ import { createTrackedLazyPane } from "../app/components/shell/tracked-lazy-pane
 import {
   LAZY_PANE_FAMILIES,
   PANE_FAMILY_BY_TAB,
+  createInitialPaneLoadStates,
   createInitialRequestedPaneFamilies,
   paneFamilyForTab,
   requestPaneFamily,
@@ -48,6 +49,18 @@ describe("pane delivery registry", () => {
   it("requests only Compare initially and adds shared families idempotently", () => {
     const initial = createInitialRequestedPaneFamilies();
     expect([...initial]).toEqual(["compare"]);
+
+    expect([...createInitialRequestedPaneFamilies("planner")]).toEqual(["planner"]);
+    expect([...createInitialRequestedPaneFamilies("settings")]).toEqual(["economy-settings"]);
+    expect(createInitialPaneLoadStates("planner")).toMatchObject({
+      stats: "ready",
+      compare: "not-requested",
+      planner: "loading"
+    });
+    expect(createInitialPaneLoadStates("stats")).toMatchObject({
+      stats: "ready",
+      compare: "not-requested"
+    });
 
     const withRisk = requestPaneFamily(initial, "risk");
     expect([...withRisk]).toEqual(["compare", "risk"]);

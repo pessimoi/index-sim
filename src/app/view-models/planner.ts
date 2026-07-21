@@ -41,7 +41,12 @@ import {
   type CombatSetupFormState
 } from "../state/ui-state";
 import { formatNumber } from "./formatting";
-import { createEntityDisplayLabel, type EntityDisplayLabel } from "./presentation-language";
+import {
+  createEntityCollisionIndex,
+  createEntityDisplayLabel,
+  type EntityCollisionIndex,
+  type EntityDisplayLabel
+} from "./presentation-language";
 import {
   friendlyPriceWarningCopy,
   isMoneyWarningCode,
@@ -119,6 +124,7 @@ export interface PlannerUnlockRowViewModel {
 export interface PlannerGearPoolOptionViewModel {
   id: EntityId;
   label: string;
+  accessibleLabel?: string;
   hint: string;
   selected: boolean;
 }
@@ -342,11 +348,20 @@ export function plannerAllowedPool(
 function plannerPoolItemLabel(
   context: SimulationContext,
   slot: PlannerGearSlot,
-  itemId: EntityId
+  itemId: EntityId,
+  collisionIndex: EntityCollisionIndex
 ): string {
   if (itemId === "none") return "None";
-  if (slot === "weapon") return context.gameData.weapons[itemId]?.name ?? itemId;
-  return context.gameData.equipment[slot as EquipmentSlot]?.[itemId]?.name ?? itemId;
+  const sourceName =
+    slot === "weapon"
+      ? context.gameData.weapons[itemId]?.name
+      : context.gameData.equipment[slot as EquipmentSlot]?.[itemId]?.name;
+  return createEntityDisplayLabel({
+    technicalId: itemId,
+    gameDataName: sourceName,
+    collisionIndex,
+    entityKind: "item"
+  }).name;
 }
 
 function plannerPoolItemHint(
@@ -371,17 +386,22 @@ export function createPlannerGearPoolEditorViewModel(
   plannerUiState: PlannerUiState
 ): PlannerGearPoolEditorViewModel {
   const allowedPool = plannerAllowedPool(form.combatStyle, context);
+  const collisionIndex = createEntityCollisionIndex(context.gameData);
   const state = cleanPlannerUiStateForPool(plannerUiState, allowedPool);
   const effectivePool = effectivePlannerGearPool(state, allowedPool);
   const slots = PLANNER_GEAR_SLOTS.map((slot): PlannerGearPoolSlotViewModel => {
     const itemIds = allowedPool[slot] ?? [];
     const selected = new Set(effectivePool[slot] ?? []);
-    const options = itemIds.map((itemId) => ({
-      id: itemId,
-      label: plannerPoolItemLabel(context, slot, itemId),
-      hint: plannerPoolItemHint(context, slot, itemId),
-      selected: selected.has(itemId)
-    }));
+    const options = itemIds.map((itemId) => {
+      const label = plannerPoolItemLabel(context, slot, itemId, collisionIndex);
+      return {
+        id: itemId,
+        label,
+        accessibleLabel: label,
+        hint: plannerPoolItemHint(context, slot, itemId),
+        selected: selected.has(itemId)
+      };
+    });
     return {
       slot,
       label: SLOT_LABEL[slot],
@@ -550,10 +570,30 @@ function trainingOrderRow(phase: PlannerPhase, index: number): PlannerTrainingOr
   };
 }
 
-function unlockRow(unlock: PlannerTransition, index: number): PlannerUnlockRowViewModel {
+function plannerTransitionItemName(
+  unlock: PlannerTransition,
+  context: Pick<SimulationContext, "gameData"> | undefined,
+  collisionIndex: EntityCollisionIndex | undefined
+): string {
+  if (!context || !collisionIndex) return unlock.name;
+  return createEntityDisplayLabel({
+    technicalId: unlock.itemId,
+    gameDataName: context.gameData.items[unlock.itemId]?.name,
+    rowSourceName: unlock.name,
+    collisionIndex,
+    entityKind: "item"
+  }).name;
+}
+
+function unlockRow(
+  unlock: PlannerTransition,
+  index: number,
+  context?: Pick<SimulationContext, "gameData">,
+  collisionIndex?: EntityCollisionIndex
+): PlannerUnlockRowViewModel {
   return {
     id: `${index}:${unlock.slot}:${unlock.itemId}:${unlock.level}`,
-    itemName: unlock.name,
+    itemName: plannerTransitionItemName(unlock, context, collisionIndex),
     slotLabel: SLOT_LABEL[unlock.slot],
     type: unlock.type,
     skillLabel: SKILL_LABEL[unlock.skill],
@@ -566,10 +606,15 @@ function unlockRow(unlock: PlannerTransition, index: number): PlannerUnlockRowVi
   };
 }
 
-function timelineEvent(unlock: PlannerTransition, index: number): PlannerTimelineEventViewModel {
+function timelineEvent(
+  unlock: PlannerTransition,
+  index: number,
+  context?: Pick<SimulationContext, "gameData">,
+  collisionIndex?: EntityCollisionIndex
+): PlannerTimelineEventViewModel {
   return {
     id: `${index}:${unlock.slot}:${unlock.itemId}:${unlock.cumXp}`,
-    itemName: unlock.name,
+    itemName: plannerTransitionItemName(unlock, context, collisionIndex),
     slotLabel: SLOT_LABEL[unlock.slot],
     type: unlock.type,
     skillLabel: SKILL_LABEL[unlock.skill],
@@ -777,6 +822,7 @@ export function createPlannerNoticePresentation(
   context?: Pick<SimulationContext, "gameData" | "priceSet">
 ): PlannerNoticePresentation {
   const indexed = indexPlannerWarnings(plan);
+  const collisionIndex = context ? createEntityCollisionIndex(context.gameData) : undefined;
   if (plan.truncated) {
     indexed.unshift({
       identity: "planner-truncated|warning|synthetic",
@@ -804,7 +850,9 @@ export function createPlannerNoticePresentation(
     const itemDisplayLabel = entry.warning.itemId
       ? createEntityDisplayLabel({
           technicalId: entry.warning.itemId,
-          gameDataName: context?.gameData.items[entry.warning.itemId]?.name
+          gameDataName: context?.gameData.items[entry.warning.itemId]?.name,
+          collisionIndex,
+          entityKind: "item"
         })
       : undefined;
     const priceCopy = isMoneyWarningCode(entry.warning.code)
@@ -847,7 +895,10 @@ export function createPlannerPanelViewModel(
   plan: PlannerPlan,
   context?: Pick<SimulationContext, "gameData" | "priceSet">
 ): PlannerPanelViewModel {
-  const timeline = plan.unlocks.map(timelineEvent);
+  const collisionIndex = context ? createEntityCollisionIndex(context.gameData) : undefined;
+  const timeline = plan.unlocks.map((unlock, index) =>
+    timelineEvent(unlock, index, context, collisionIndex)
+  );
   return {
     summary: {
       totalXp: plan.totalXp,
@@ -861,7 +912,7 @@ export function createPlannerPanelViewModel(
       truncated: plan.truncated
     },
     trainingOrder: plan.phases.map(trainingOrderRow),
-    unlocks: plan.unlocks.map(unlockRow),
+    unlocks: plan.unlocks.map((unlock, index) => unlockRow(unlock, index, context, collisionIndex)),
     timeline,
     chart: createPlannerChartViewModel(plan),
     notices: createPlannerNoticePresentation(plan, context),

@@ -19,7 +19,9 @@ import {
   ApplicationFailureScreen,
   SafeSessionNotice
 } from "../app/components/shell/application-error-boundary";
+import { APP_STARTUP_ERROR_MESSAGE, ApplicationEntryLoadError } from "../app/startup-guard-core";
 import { RUNTIME_BOOTSTRAP_ERROR_MESSAGE } from "../app/controllers/runtime-bootstrap";
+import type { SessionOnlyExitProtectionSnapshot } from "../app/controllers/session-only-exit-protection";
 
 interface RecoveryWindowFixture {
   windowRef: ApplicationRecoveryWindow;
@@ -67,6 +69,10 @@ function ReadyPane({ fail }: { fail: boolean }) {
     throw error;
   }
   return <main data-app-startup-state="ready">Ready pane</main>;
+}
+
+function FailedEntryPane(): null {
+  throw new ApplicationEntryLoadError();
 }
 
 class LifecyclePane extends Component<{ fail: boolean }> {
@@ -156,6 +162,27 @@ describe("application error boundary", () => {
       await act(async () => buttons[1]?.click());
       expect(reload).toHaveBeenCalledOnce();
       expect(openSafely).toHaveBeenCalledOnce();
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  it("reports a lazy entry load failure as the fixed sanitized startup error", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      await act(async () => {
+        root.render(
+          <ApplicationErrorBoundary>
+            <FailedEntryPane />
+          </ApplicationErrorBoundary>
+        );
+      });
+
+      const alert = container.querySelector<HTMLElement>('[role="alert"]');
+      expect(alert?.textContent).toContain(APP_STARTUP_ERROR_MESSAGE);
+      expect(alert?.textContent).not.toContain(APPLICATION_RENDER_ERROR_MESSAGE);
+      expect(container.querySelector('[data-app-startup-state="error"]')).not.toBeNull();
     } finally {
       consoleError.mockRestore();
     }
@@ -280,5 +307,40 @@ describe("session-only saved-data recovery", () => {
     expect(markup).toContain("Session-only safe mode");
     expect(markup).toContain(SAFE_SESSION_NOTICE);
     expect(markup).not.toContain(SAFE_SESSION_STORAGE_KEY);
+  });
+
+  it("composes dirty-session risk, direct backup, area count and privacy guidance", () => {
+    const download = vi.fn();
+    const guard: SessionOnlyExitProtectionSnapshot = {
+      revision: 1,
+      initialized: true,
+      armed: true,
+      sessionOnlyChangeCount: 2,
+      affectedAreas: [
+        { id: "rewrite-setup", label: "Rewrite setup", reason: "saved-data-ignored" },
+        {
+          id: "hiscores-last-player",
+          label: "Hiscores last player",
+          reason: "saved-data-ignored"
+        }
+      ],
+      reasons: ["saved-data-ignored"],
+      backupOutcome: {
+        status: "requested",
+        message:
+          "Workspace backup download started for the current changes. Check your browser downloads; saving the file cannot be verified."
+      },
+      sensitiveAreaOmitted: true
+    };
+    const markup = renderToStaticMarkup(
+      <SafeSessionNotice guard={guard} onDownloadWorkspace={download} />
+    );
+
+    expect(markup).toContain('aria-label="Unsaved session-only changes"');
+    expect(markup).toContain("Affected Workspace areas: 2");
+    expect(markup).toContain("Download full Workspace backup");
+    expect(markup).toContain("saving the file cannot be verified");
+    expect(markup).toContain("The last Hiscores player was not included");
+    expect(markup).not.toContain("Private Hero");
   });
 });

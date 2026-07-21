@@ -50,7 +50,9 @@ test("another tab cannot overwrite a newer setup and both reviewed resolutions s
   await expect(review).toBeVisible();
   await expect(heading).toBeFocused();
   await expect(review.getByRole("row", { name: /Rewrite setup.*Changed.*Paused/ })).toBeVisible();
-  await expect(review.getByRole("button", { name: "Download Workspace backup" })).toBeVisible();
+  await expect(
+    review.getByRole("button", { name: "Download full Workspace backup" })
+  ).toBeVisible();
   await expect(review).not.toContainText("savedAt");
 
   await review.getByRole("button", { name: "Use saved data" }).click();

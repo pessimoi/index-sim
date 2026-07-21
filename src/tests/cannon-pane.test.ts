@@ -87,10 +87,10 @@ describe("Cannon pane", () => {
       "Cannon DPS",
       "Cannon only DPS",
       "Balls/hr",
-      "Cannon Ranged XP/hr",
+      "On-site cannon Ranged XP/hr",
       "Effective XP/hr",
       "Effective net GP/hr",
-      "Ball cost/hr",
+      "On-site ball cost/hr",
       "Cannonballs/trip",
       "Accuracy rule",
       "XP rule",
@@ -102,7 +102,7 @@ describe("Cannon pane", () => {
     expect(markup).toContain("<strong>0.00</strong>");
     expect(markup).toContain("<strong>12,345</strong>");
     expect(markup).toContain('<strong class="gold">-679</strong>');
-    expect(markup).not.toContain("Trip sparse K/hr");
+    expect(markup).not.toContain("Trip on-site sparse cap (kills/hr)");
   });
 
   it("renders respawn-bound output, precision, tones and presentation summaries", () => {
@@ -135,21 +135,21 @@ describe("Cannon pane", () => {
       "Cannon only DPS",
       "Balls/hr",
       "Balls/kill",
-      "Cannon Ranged XP/hr",
+      "On-site cannon Ranged XP/hr",
       "Effective XP/hr",
       "Effective net GP/hr",
-      "Ball cost/hr",
+      "On-site ball cost/hr",
       "Ball cost/kill",
       "Ball price",
       "Cannonballs/trip",
       "Ball GP/trip",
-      "K/hr uplift",
+      "On-site kills/hr uplift",
       "Accuracy rule",
       "XP rule",
       "Supply impact",
       "Sparse link",
       "Inventory reserve",
-      "Trip sparse K/hr"
+      "Trip on-site sparse cap (kills/hr)"
     ]);
     for (const value of [
       "3.3",

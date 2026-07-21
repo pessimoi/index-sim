@@ -90,7 +90,7 @@ export interface DuelComparisonRowDeltasViewModel {
   hitChance: number;
   ttkSec: number;
   killsPerTrip: number;
-  killsPerHour: number;
+  effectiveKph: number;
   effectiveXpPerHour: number;
   effectiveNetGpPerHour: number;
   gpPerXp: number | null;
@@ -120,6 +120,7 @@ export interface DuelSetupDiffViewModel {
 }
 
 export interface DuelComparisonBestMarkersViewModel {
+  effectiveKph: boolean;
   effectiveXpPerHour: boolean;
   effectiveNetGpPerHour: boolean;
   gpPerXp: boolean;
@@ -141,7 +142,7 @@ export interface DuelComparisonRowViewModel {
   hitChance: number;
   ttkSec: number;
   killsPerTrip: number;
-  killsPerHour: number;
+  effectiveKph: number;
   effectiveXpPerHour: number;
   effectiveNetGpPerHour: number;
   gpPerXp: number | null;
@@ -171,7 +172,7 @@ export type DuelComparisonSortKey =
   | "effectiveXpPerHour"
   | "effectiveNetGpPerHour"
   | "gpPerXp"
-  | "killsPerHour";
+  | "effectiveKph";
 
 export interface DuelComparisonSortState {
   key: DuelComparisonSortKey | null;
@@ -303,7 +304,7 @@ export function sortDuelComparisonRows(
           effectiveXpPerHour: (row) => row.effectiveXpPerHour,
           effectiveNetGpPerHour: (row) => row.effectiveNetGpPerHour,
           gpPerXp: (row) => row.gpPerXp,
-          killsPerHour: (row) => row.killsPerHour
+          effectiveKph: (row) => row.effectiveKph
         };
         compared = compareNullableNumbers(
           numericValues[key](left.row),
@@ -409,7 +410,7 @@ function duelBaseRowFromSimulation(
     hitChance: result.combat.hitChance,
     ttkSec: result.rates.ttkSec,
     killsPerTrip: result.trip.trip.killsPerTrip,
-    killsPerHour: result.rates.killsPerHour,
+    effectiveKph: result.rates.effectiveKph,
     effectiveXpPerHour: result.xp.effectiveXpPerHour,
     effectiveNetGpPerHour: result.rates.effectiveNetGpPerHour,
     gpPerXp: gpPerXpValue(result.rates.effectiveNetGpPerHour, result.xp.effectiveXpPerHour),
@@ -882,6 +883,7 @@ export function createDuelComparisonViewModel(
   const baseRows = [liveBaseRow, ...snapshotBaseRows];
   const bestEffectiveXpPerHour = finiteBest(baseRows.map((row) => row.effectiveXpPerHour));
   const bestEffectiveNetGpPerHour = finiteBest(baseRows.map((row) => row.effectiveNetGpPerHour));
+  const bestEffectiveKph = finiteBest(baseRows.map((row) => row.effectiveKph));
   const bestGpPerXp = finiteBest(baseRows.map((row) => row.gpPerXp));
   const rows = baseRows.map((row, index) => ({
     ...row,
@@ -892,7 +894,7 @@ export function createDuelComparisonViewModel(
       hitChance: row.hitChance - liveBaseRow.hitChance,
       ttkSec: row.ttkSec - liveBaseRow.ttkSec,
       killsPerTrip: row.killsPerTrip - liveBaseRow.killsPerTrip,
-      killsPerHour: row.killsPerHour - liveBaseRow.killsPerHour,
+      effectiveKph: row.effectiveKph - liveBaseRow.effectiveKph,
       effectiveXpPerHour: row.effectiveXpPerHour - liveBaseRow.effectiveXpPerHour,
       effectiveNetGpPerHour: row.effectiveNetGpPerHour - liveBaseRow.effectiveNetGpPerHour,
       gpPerXp:
@@ -902,6 +904,7 @@ export function createDuelComparisonViewModel(
       supplyCostPerHour: row.supplyCostPerHour - liveBaseRow.supplyCostPerHour
     },
     best: {
+      effectiveKph: isBestDuelValue(row.effectiveKph, bestEffectiveKph, baseRows.length, 0.5),
       effectiveXpPerHour: isBestDuelValue(
         row.effectiveXpPerHour,
         bestEffectiveXpPerHour,
@@ -1002,9 +1005,9 @@ export function createDuelMatrixViewModel(
       const row = result.rowsByMonster.get(monster.id);
       return {
         dps: row?.dps ?? null,
-        effectiveXpPerHour: row?.xpPerHour ?? null,
-        effectiveNetGpPerHour: row?.netGpPerHour ?? null,
-        gpPerXp: row ? gpPerXpValue(row.netGpPerHour, row.xpPerHour) : null
+        effectiveXpPerHour: row?.effectiveXpPerHour ?? null,
+        effectiveNetGpPerHour: row?.effectiveNetGpPerHour ?? null,
+        gpPerXp: row ? gpPerXpValue(row.effectiveNetGpPerHour, row.effectiveXpPerHour) : null
       };
     });
     const best = {

@@ -75,9 +75,12 @@ describe("rewrite UI view models", () => {
     expect(duel.liveRow.dps).toBe(liveVm.result.rates.effectiveDps);
     expect(duel.liveRow.effectiveXpPerHour).toBe(liveVm.result.xp.effectiveXpPerHour);
     expect(duel.liveRow.effectiveNetGpPerHour).toBe(liveVm.result.rates.effectiveNetGpPerHour);
+    expect(duel.liveRow.effectiveKph).toBe(liveVm.result.rates.effectiveKph);
+    expect(duel.liveRow.effectiveKph).not.toBe(liveVm.result.rates.killsPerHour);
     expect(snapshotRow.dps).toBe(snapshotVm.result.rates.effectiveDps);
     expect(snapshotRow.effectiveXpPerHour).toBe(snapshotVm.result.xp.effectiveXpPerHour);
     expect(snapshotRow.effectiveNetGpPerHour).toBe(snapshotVm.result.rates.effectiveNetGpPerHour);
+    expect(snapshotRow.effectiveKph).toBe(snapshotVm.result.rates.effectiveKph);
     expect(snapshotRow.deltas.dps).toBeCloseTo(snapshotRow.dps - duel.liveRow.dps);
     expect(duel.liveRow.setupDiff).toBeNull();
     expect(snapshotRow.setupDiff).toMatchObject({
@@ -114,12 +117,16 @@ describe("rewrite UI view models", () => {
       hitChance: snapshotRow.hitChance - duel.liveRow.hitChance,
       ttkSec: snapshotRow.ttkSec - duel.liveRow.ttkSec,
       killsPerTrip: snapshotRow.killsPerTrip - duel.liveRow.killsPerTrip,
-      killsPerHour: snapshotRow.killsPerHour - duel.liveRow.killsPerHour,
+      effectiveKph: snapshotRow.effectiveKph - duel.liveRow.effectiveKph,
       supplyCostPerHour: snapshotRow.supplyCostPerHour - duel.liveRow.supplyCostPerHour
     });
     expect(
       duel.rows.some(
-        (row) => row.best.effectiveXpPerHour || row.best.effectiveNetGpPerHour || row.best.gpPerXp
+        (row) =>
+          row.best.effectiveKph ||
+          row.best.effectiveXpPerHour ||
+          row.best.effectiveNetGpPerHour ||
+          row.best.gpPerXp
       )
     ).toBe(true);
     expect(JSON.stringify(snapshot)).not.toContain("effectiveXpPerHour");

@@ -17,7 +17,13 @@ import {
 import { formatNumber } from "./formatting";
 import type { ItemPriceHistoryContext, PriceDataNotice } from "./price-data";
 import type { PriceDateTimePresentation } from "./price-time";
-import { createEntityDisplayLabel, type EntityDisplayLabel } from "./presentation-language";
+import {
+  createEntityCollisionIndex,
+  createEntityDisplayLabel,
+  createRowCollisionLabels,
+  type EntityCollisionIndex,
+  type EntityDisplayLabel
+} from "./presentation-language";
 import { createFullSimulationInput } from "./simulation-input";
 
 export interface LootActionImpactViewModel {
@@ -53,6 +59,7 @@ export interface LootValueCompositionViewModel {
 }
 
 export interface LootExpandedRowViewModel {
+  sourceOrder: number;
   label: string;
   displayLabel: EntityDisplayLabel;
   key: string | null;
@@ -346,6 +353,7 @@ function stringField(record: Record<string, unknown>, key: string): string | nul
 function expandedRows(
   drop: LootBreakdownEntry,
   gameData: SimulationContext["gameData"],
+  collisionIndex: EntityCollisionIndex,
   priceNotices: readonly PriceDataNotice[] = []
 ): LootExpandedRowViewModel[] {
   if (!Array.isArray(drop._expand)) return [];
@@ -364,9 +372,12 @@ function expandedRows(
     const displayLabel = createEntityDisplayLabel({
       technicalId: key,
       gameDataName: key ? gameData.items[key]?.name : null,
-      rowSourceName
+      rowSourceName,
+      collisionIndex,
+      entityKind: "item"
     });
     return {
+      sourceOrder: index,
       label: displayLabel.name,
       displayLabel,
       key,
@@ -406,7 +417,7 @@ function expandedRows(
     drop.pref !== "bury" &&
     drop.pref !== "skip";
 
-  return normalized.map((row, index) => {
+  const resolvedRows = normalized.map((row, index) => {
     const weightChance = row.weight !== null && totalWeight > 0 ? row.weight / totalWeight : null;
     const share =
       canDeriveWeightedShare && weightedValues[index] > 0
@@ -420,6 +431,19 @@ function expandedRows(
       shareOfParentPct: share === null ? null : share * 100
     };
   });
+  const labels = createRowCollisionLabels(
+    resolvedRows.map((row) => ({
+      stableId: String(row.sourceOrder),
+      baseLabel: row.label,
+      sourceOrder: row.sourceOrder,
+      quantityLabel: row.qtyLabel,
+      chanceLabel: row.chance === null ? null : `${formatNumber(row.chance * 100, 2)}%`
+    }))
+  );
+  return resolvedRows.map((row) => ({
+    ...row,
+    label: labels.get(String(row.sourceOrder)) ?? row.label
+  }));
 }
 
 function lootValueDetails(drop: LootBreakdownEntry): LootDropValueDetailViewModel[] {
@@ -572,22 +596,34 @@ function actionImpactNotes(
 
 function createLootValueComposition(
   trip: TripLootSupplyResult,
-  gameData: SimulationContext["gameData"]
+  gameData: SimulationContext["gameData"],
+  collisionIndex: EntityCollisionIndex
 ): LootValueCompositionViewModel {
   const positiveDrops = trip.lootBreakdown
-    .map((drop) => ({ drop, contribution: effectiveDropEvGp(drop) }))
+    .map((drop, sourceOrder) => ({ drop, sourceOrder, contribution: effectiveDropEvGp(drop) }))
     .filter((entry) => entry.contribution > 0)
     .sort((left, right) => right.contribution - left.contribution);
   const positiveGpPerKill = positiveDrops.reduce((sum, entry) => sum + entry.contribution, 0);
   const visibleDrops = positiveDrops.slice(0, 8);
   const hiddenDrops = positiveDrops.slice(8);
+  const rowLabels = createRowCollisionLabels(
+    visibleDrops.map(({ drop, sourceOrder }) => ({
+      stableId: drop.rowId,
+      baseLabel: createEntityDisplayLabel({
+        technicalId: drop.key ?? null,
+        gameDataName: drop.key ? gameData.items[drop.key]?.name : null,
+        rowSourceName: drop.name,
+        collisionIndex,
+        entityKind: "item"
+      }).name,
+      sourceOrder,
+      quantityLabel: formatNumber(drop.qtyAvg, 1),
+      chanceLabel: `${formatNumber(drop.chance * 100, 2)}%`
+    }))
+  );
   const rows: LootValueCompositionRowViewModel[] = visibleDrops.map(({ drop, contribution }) => ({
     rowId: drop.rowId,
-    name: createEntityDisplayLabel({
-      technicalId: drop.key ?? null,
-      gameDataName: drop.key ? gameData.items[drop.key]?.name : null,
-      rowSourceName: drop.name
-    }).name,
+    name: rowLabels.get(drop.rowId) ?? drop.name,
     action: drop.pref,
     actionLabel: lootActionLabel(drop.pref),
     gpPerKill: contribution,
@@ -643,6 +679,7 @@ function createLootRows(
   context: SimulationContext,
   currentTrip: TripLootSupplyResult,
   lootPrefs: Record<string, LootAction | string | undefined>,
+  collisionIndex: EntityCollisionIndex,
   lootPriceHistoryByItem: Readonly<Record<string, ItemPriceHistoryContext | undefined>> = {},
   priceNoticesByLootRowId: Readonly<Record<string, readonly PriceDataNotice[]>> = {}
 ): Omit<LootSummaryViewModel, "valueComposition"> & { rows: LootDropRowViewModel[] } {
@@ -650,7 +687,7 @@ function createLootRows(
   const defaultRows = new Map(defaultTrip.lootBreakdown.map((drop) => [drop.rowId, drop]));
   const natureRuneCost = context.priceSet.itemPrices.naturerune ?? NATURE_RUNE_FALLBACK;
 
-  const rows = currentTrip.lootBreakdown.map((drop) => {
+  const unresolvedRows = currentTrip.lootBreakdown.map((drop, sourceOrder) => {
     const defaultDrop = defaultRows.get(drop.rowId) ?? drop;
     const availableActions = availableLootActions(
       defaultDrop,
@@ -677,7 +714,7 @@ function createLootRows(
     });
     const selectedImpact = actionImpacts.find((impact) => impact.action === drop.pref);
     const rowPriceNotices = priceNoticesByLootRowId[drop.rowId] ?? [];
-    const expandedPriceRows = expandedRows(drop, context.gameData, rowPriceNotices);
+    const expandedPriceRows = expandedRows(drop, context.gameData, collisionIndex, rowPriceNotices);
     const nestedPriceItemIds = new Set(
       expandedPriceRows.flatMap((detail) =>
         detail.priceNotices.flatMap((notice) => notice.itemId ?? [])
@@ -687,10 +724,13 @@ function createLootRows(
     const displayLabel = createEntityDisplayLabel({
       technicalId: drop.key ?? null,
       gameDataName: drop.key ? context.gameData.items[drop.key]?.name : null,
-      rowSourceName: drop.name
+      rowSourceName: drop.name,
+      collisionIndex,
+      entityKind: "item"
     });
 
     return {
+      sourceOrder,
       rowId: drop.rowId,
       name: displayLabel.name,
       displayLabel,
@@ -733,6 +773,24 @@ function createLootRows(
       )
     };
   });
+  const rowLabels = createRowCollisionLabels(
+    unresolvedRows.map((row) => ({
+      stableId: row.rowId,
+      baseLabel: row.name,
+      sourceOrder: row.sourceOrder,
+      quantityLabel: formatNumber(row.qtyAvg, 1),
+      chanceLabel: `${formatNumber(row.chance * 100, 2)}%`
+    }))
+  );
+  const rows: LootDropRowViewModel[] = unresolvedRows.map(({ sourceOrder, ...row }) => {
+    void sourceOrder;
+    const name = rowLabels.get(row.rowId) ?? row.name;
+    return {
+      ...row,
+      name,
+      historyContext: { ...row.historyContext, itemLabel: name }
+    };
+  });
 
   return {
     rows,
@@ -753,6 +811,7 @@ export function createLootPresentationViewModel(input: {
   priceNoticesByLootRowId?: Readonly<Record<string, readonly PriceDataNotice[]>>;
   includeRows?: boolean;
 }): LootPresentationViewModel {
+  const collisionIndex = createEntityCollisionIndex(input.context.gameData);
   const settings = lootSettingsForMonster(input.lootSettingsByMonster ?? {}, input.form.monsterId);
   const monster = input.context.gameData.monsters[input.form.monsterId];
   const derivedOverheadSec = monster ? defaultOverhead(monster) : 2;
@@ -772,6 +831,7 @@ export function createLootPresentationViewModel(input: {
           input.context,
           input.trip,
           input.lootPrefs,
+          collisionIndex,
           input.lootPriceHistoryByItem,
           input.priceNoticesByLootRowId
         );
@@ -787,7 +847,11 @@ export function createLootPresentationViewModel(input: {
       defaultEffectiveNetGpPerHour: rowResult.defaultEffectiveNetGpPerHour,
       currentDeltaNetGpPerHour: rowResult.currentDeltaNetGpPerHour,
       overrideCount: rowResult.overrideCount,
-      valueComposition: createLootValueComposition(input.trip, input.context.gameData)
+      valueComposition: createLootValueComposition(
+        input.trip,
+        input.context.gameData,
+        collisionIndex
+      )
     },
     highAlchEnabled,
     overheadMode,

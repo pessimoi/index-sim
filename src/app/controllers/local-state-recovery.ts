@@ -22,6 +22,7 @@ import {
   requestFileExport,
   type FileExportOutcome
 } from "./file-export-outcome";
+import { createTransferArtifactFileName } from "../transfer-artifact-file-name";
 
 export const LOCAL_STATE_PERSISTENCE_NOTICE =
   "Local storage is unavailable. Changes may not persist after reload.";
@@ -57,6 +58,21 @@ export interface LocalStateRecoveryDependencies {
   persistenceNotice?: string;
   onStatus: (message: string) => void;
   onDownload: (fileName: string, value: LocalStateHealthExport) => JsonDownloadRequestResult;
+  durability?: {
+    readonly defaultNonDurableReason?:
+      "saved-data-ignored" | "storage-unavailable" | "session-only-write";
+    recordDurable(id: LocalStateHealthItemId, value: unknown): void;
+    recordDurableIds(ids: readonly LocalStateHealthItemId[]): void;
+    recordNonDurable(
+      id: LocalStateHealthItemId,
+      value: unknown,
+      reason: "saved-data-ignored" | "storage-unavailable" | "session-only-write"
+    ): void;
+    recordNonDurableIds(
+      ids: readonly LocalStateHealthItemId[],
+      reason: "saved-data-ignored" | "storage-unavailable" | "session-only-write"
+    ): void;
+  };
   crossTab?: {
     checkFreshness(
       id: LocalStateHealthItemId
@@ -184,11 +200,6 @@ export function removeLocalStateStorageFailures(
   return failures.filter((failure) => !ids.includes(failure.id));
 }
 
-export function localStateHealthExportFileName(report: LocalStateHealthReport): string {
-  const safeTimestamp = report.generatedAt.replace(/[^0-9A-Za-z._-]+/g, "-");
-  return `index-sim-local-state-health-${safeTimestamp}.json`;
-}
-
 function formatCount(value: number): string {
   return value.toLocaleString("en-US", {
     maximumFractionDigits: 0,
@@ -284,6 +295,7 @@ export class LocalStateRecoveryControllerCore {
   };
 
   recordCurrentBaselines = (ids: readonly LocalStateHealthItemId[]): void => {
+    this.dependencies.durability?.recordDurableIds(ids);
     if (this.dependencies.crossTab && !this.dependencies.crossTab.recordCurrentRaw(ids)) {
       this.markPersistenceUnavailable();
     }
@@ -297,11 +309,13 @@ export class LocalStateRecoveryControllerCore {
     const freshness = this.dependencies.crossTab?.checkFreshness(id);
     if (freshness?.status === "external-conflict") return false;
     if (freshness?.status === "unavailable") {
+      this.dependencies.durability?.recordNonDurable(id, value, "storage-unavailable");
       this.markPersistenceUnavailable();
       return false;
     }
     const current = loadPersisted(options);
     if (current.status === "unavailable") {
+      this.dependencies.durability?.recordNonDurable(id, value, "storage-unavailable");
       this.markPersistenceUnavailable();
       return false;
     }
@@ -316,6 +330,16 @@ export class LocalStateRecoveryControllerCore {
             return false;
           }
           this.dependencies.crossTab?.recordVerifiedRaw(id, currentRaw);
+          if (this.persistenceIsUnavailable()) {
+            this.dependencies.durability?.recordNonDurable(
+              id,
+              value,
+              this.dependencies.durability.defaultNonDurableReason ?? "session-only-write"
+            );
+            this.markPersistenceUnavailable();
+            return false;
+          }
+          this.dependencies.durability?.recordDurable(id, value);
           this.clearStorageFailures([id]);
           return true;
         }
@@ -326,13 +350,20 @@ export class LocalStateRecoveryControllerCore {
     const result = trySavePersisted(options, value);
     if (result.status === "saved") {
       if (this.persistenceIsUnavailable()) {
+        this.dependencies.durability?.recordNonDurable(
+          id,
+          value,
+          this.dependencies.durability.defaultNonDurableReason ?? "session-only-write"
+        );
         this.markPersistenceUnavailable();
         return false;
       }
       this.dependencies.crossTab?.recordVerifiedRaw(id, JSON.stringify(result.envelope));
+      this.dependencies.durability?.recordDurable(id, value);
       this.clearStorageFailures([id]);
       return true;
     }
+    this.dependencies.durability?.recordNonDurable(id, value, "session-only-write");
     this.recordStorageFailure(id, result.reason);
     return false;
   };
@@ -341,6 +372,7 @@ export class LocalStateRecoveryControllerCore {
     id: LocalStateHealthItemId,
     reason: LocalStateStorageFailure["reason"]
   ): void => {
+    this.dependencies.durability?.recordNonDurableIds([id], "session-only-write");
     this.transition = {
       ...this.transition,
       storageFailures: upsertLocalStateStorageFailure(this.transition.storageFailures, {
@@ -445,6 +477,7 @@ export class LocalStateRecoveryControllerCore {
       nextFailures = upsertLocalStateStorageFailure(nextFailures, failure);
       failedIds.push(failure.id);
     }
+    this.dependencies.durability?.recordNonDurableIds(failedIds, "session-only-write");
     this.transition = cancelExternalLocalStateApplyTransition(
       {
         ...this.transition,
@@ -533,7 +566,10 @@ export class LocalStateRecoveryControllerCore {
     const report = this.currentReport();
     let outcome: FileExportOutcome;
     try {
-      const fileName = localStateHealthExportFileName(report);
+      const fileName = createTransferArtifactFileName({
+        artifact: "local-state-recovery-report",
+        now: report.generatedAt
+      });
       const value = createLocalStateHealthExport(report);
       outcome = requestFileExport("recovery", fileName, () =>
         this.dependencies.onDownload(fileName, value)

@@ -119,7 +119,10 @@ export function StatsPane({
               <h2>Trip &amp; banking</h2>
               <span className="section-subtitle">Current effective-rate inputs</span>
             </div>
-            <span className="status-pill ready">{formatNumber(viewModel.effectiveKph)} K/hr</span>
+            <span className="status-pill ready">
+              {viewModel.tripBankingSummary.headline.value}{" "}
+              {viewModel.tripBankingSummary.headline.label}
+            </span>
           </div>
           <div className="stats-summary-table-wrap" tabIndex={0}>
             <table className="stats-summary-table" aria-label="Trip and banking metrics">

@@ -130,6 +130,10 @@ export interface StatsTripBankingSummaryRowViewModel {
 }
 
 export interface StatsTripBankingSummaryViewModel {
+  headline: {
+    label: "Effective kills/hr";
+    value: string;
+  };
   rows: StatsTripBankingSummaryRowViewModel[];
 }
 
@@ -188,7 +192,6 @@ export interface StatsPaneViewModel {
   combatRollDetail: StatsCombatRollDetailViewModel;
   xpRouting: XpRoutingViewModel;
   tripBankingSummary: StatsTripBankingSummaryViewModel;
-  effectiveKph: number;
 }
 
 const XP_SKILL_LABELS: Record<CombatXpKey, string> = {
@@ -586,13 +589,13 @@ export function createStatsSourceBreakdownViewModel(input: {
       ),
       statsSourceMetric(
         "cannon-ranged-xp-hr",
-        "Cannon Ranged XP/hr",
+        "On-site cannon Ranged XP/hr",
         cannon.rangedXpPerHour,
         formatNumber(cannon.rangedXpPerHour)
       ),
       statsSourceMetric(
         "ball-cost-hour",
-        "Ball cost/hr",
+        "On-site ball cost/hr",
         cannon.ballCostPerHour,
         formatNumber(cannon.ballCostPerHour)
       ),
@@ -687,6 +690,10 @@ export function createTripBankingSummaryViewModel(
   const currentBound = trip.trip.scarce.respawnBound ? "respawn-bound" : trip.trip.bound;
 
   return {
+    headline: {
+      label: "Effective kills/hr",
+      value: formatNumber(trip.effectiveKph)
+    },
     rows: [
       statsTripRow({
         id: "kills-trip",
@@ -722,7 +729,7 @@ export function createTripBankingSummaryViewModel(
       }),
       statsTripRow({
         id: "net-gp-hour",
-        label: "Net GP/hr",
+        label: "Effective net GP/hr",
         value: formatNumber(trip.effectiveNetGpPerHour),
         numericValue: trip.effectiveNetGpPerHour,
         note: "After trip and banking efficiency.",
@@ -1151,10 +1158,10 @@ export function createStatsCombatRollDetailViewModel(input: {
     }),
     statsCombatRollMetric({
       id: "kills-per-hour",
-      label: "Kills/hr",
+      label: "On-site kills/hr",
       value: formatOptionalNumber(killsPerHour),
       numericValue: killsPerHour,
-      note: "Current whole-result kill rate after Trip and banking effects.",
+      note: "Current combat-site kill rate before Trip banking and travel efficiency.",
       tone: "gold"
     }),
     statsCombatRollMetric({
@@ -1174,7 +1181,7 @@ export function createStatsCombatRollDetailViewModel(input: {
     metrics,
     notes: [
       "Roll and hit metrics describe the normal player attack.",
-      "TTK, kills/hr and GP/kill mirror the current composed simulation result.",
+      "TTK, on-site kills/hr and GP/kill mirror the current composed simulation result.",
       ...(hasFallback
         ? ["Some values are unavailable from the current result and are shown as fallbacks."]
         : [])

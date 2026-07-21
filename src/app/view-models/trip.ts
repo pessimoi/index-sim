@@ -372,7 +372,7 @@ export function createTripPaneViewModel(input: {
           { label: "Scarce spot", value: yesNo(policy.scarceSpot) },
           { label: "Scarce status", value: scarceStatus },
           {
-            label: "Spot max K/hr",
+            label: "Spot max kills/hr",
             value: policy.scarceSpot ? formatNumber(trip.scarce.maxKph) : "-"
           }
         ]
@@ -410,7 +410,7 @@ export function createTripPaneViewModel(input: {
               ? `${formatNumber(trip.tripMinutes, 1)} min`
               : "-"
           },
-          { label: "Effective K/hr", value: formatNumber(result.effectiveKph) },
+          { label: "Effective kills/hr", value: formatNumber(result.effectiveKph) },
           {
             label: "Supply/kill",
             value: formatNumber(result.supply.supplyCostPerKill),

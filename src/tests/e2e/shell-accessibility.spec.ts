@@ -264,7 +264,7 @@ test("renders scheduled price status and keeps local PriceSet overrides separate
   await expect(advancedPriceSetTools).toContainText("Missing items are not merged");
   await advancedPriceSetTools
     .locator("label.file-button")
-    .filter({ hasText: "Import full PriceSet" })
+    .filter({ hasText: "Review PriceSet file" })
     .locator('input[type="file"]')
     .setInputFiles({
       name: "disabled-market-prices.json",
@@ -371,8 +371,8 @@ test("shows Stats XP routing and trip summary plus setup damage distribution", a
   await playerSidebar.getByRole("button", { name: "melee", exact: true }).click();
   await expect(activePlayerSetup.getByRole("button", { name: "Melee setup" })).toBeVisible();
   await expect(setupContext).toContainText("DPS");
-  await expect(setupContext).toContainText("Effective XP/hr");
-  await expect(setupContext).toContainText("Net GP/hr");
+  await expect(setupContext).toContainText("EFF. XP/HR");
+  await expect(setupContext).toContainText("EFF. NET GP/HR");
 
   await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Stats" }).click();
 
@@ -416,7 +416,7 @@ test("shows Stats XP routing and trip summary plus setup damage distribution", a
   await expect(combatRollMetrics).toContainText("Attack speed");
   await expect(combatRollMetrics).toContainText("Attack cycle");
   await expect(combatRollMetrics).toContainText("TTK");
-  await expect(combatRollMetrics).toContainText("Kills/hr");
+  await expect(combatRollMetrics).toContainText("On-site kills/hr");
   await expect(combatRollMetrics).toContainText("GP/kill");
 
   const xpRouting = analysis.getByRole("region", { name: "XP routing", exact: true });
@@ -509,8 +509,8 @@ test("shows Stats XP routing and trip summary plus setup damage distribution", a
   await expect(cannonDetail).toContainText("Cannon DPS");
   await expect(cannonDetail).toContainText("Balls/hr");
   await expect(cannonDetail).toContainText("Balls/kill");
-  await expect(cannonDetail).toContainText("Cannon Ranged XP/hr");
-  await expect(cannonDetail).toContainText("Ball cost/hr");
+  await expect(cannonDetail).toContainText("On-site cannon Ranged XP/hr");
+  await expect(cannonDetail).toContainText("On-site ball cost/hr");
   await expect(cannonDetail).toContainText("Ball cost/kill");
   await expect(cannonDetail).toContainText("Cannonballs/trip");
   const resetCurrentMonsterCannon = assumptions.getByRole("button", {
@@ -658,8 +658,8 @@ for (const viewport of MOBILE_RESULT_NAV_VIEWPORTS) {
     );
     expect(mobileMetrics.map((text) => text.replace(/\s+/g, " ").trim())).toEqual([
       expect.stringMatching(/^DPS/),
-      expect.stringMatching(/^Effective XP\/hr/),
-      expect.stringMatching(/^Net GP\/hr/)
+      expect.stringMatching(/^EFF\. XP\/HR/),
+      expect.stringMatching(/^EFF\. NET GP\/HR/)
     ]);
 
     const summaryBefore = await resultSummary.locator(".metric strong").allTextContents();

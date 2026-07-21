@@ -12,6 +12,7 @@ import {
   type SetupSelectionOption
 } from "../state/ui-state";
 import { ShareableSetupError, type ShareableSetupReview } from "../state/shareable-setup";
+import type { SetupTransferChangeReview } from "../state/setup-transfer-changes";
 import type { SelectOptionViewModel } from "./contracts";
 import { formatDuration, formatNumber } from "./formatting";
 import { formatRiskRange } from "./risk";
@@ -130,13 +131,16 @@ export type SharedSetupReviewViewModel =
   | {
       status: "ready";
       tone: "ready" | "warning";
-      statusLabel: "Ready to load";
+      statusLabel: "Ready to load" | "Refresh required" | "No changes";
       targetLine: string;
       cannonLabel: "Cannon on" | "Cannon off";
       lootChoiceLabel: string;
       contextMessage: string;
       contextTone: "ready" | "warning";
       droppedLootWarning: string | null;
+      stale: boolean;
+      canLoad: boolean;
+      changeReview: SetupTransferChangeReview;
     };
 
 export interface WorkbenchMetricViewModel {
@@ -418,6 +422,8 @@ export function describeShareableSetupError(error: unknown): string {
 export function createSharedSetupReviewViewModel(input: {
   inspection: ShareableSetupInspection;
   monsters: Readonly<Record<string, { name: string } | undefined>>;
+  changeReview: SetupTransferChangeReview | null;
+  stale: boolean;
 }): SharedSetupReviewViewModel {
   if (input.inspection.status === "error") {
     return {
@@ -428,13 +434,26 @@ export function createSharedSetupReviewViewModel(input: {
     };
   }
 
+  if (!input.changeReview) {
+    return {
+      status: "error",
+      tone: "error",
+      statusLabel: "Invalid",
+      message: "Shared setup comparison could not be prepared."
+    };
+  }
+
   const { review } = input.inspection;
   const { data } = review.envelope;
   const droppedLootCount = review.droppedLootRowCount;
   return {
     status: "ready",
     tone: review.context.tone === "warning" || droppedLootCount > 0 ? "warning" : "ready",
-    statusLabel: "Ready to load",
+    statusLabel: input.stale
+      ? "Refresh required"
+      : input.changeReview.changeCount === 0
+        ? "No changes"
+        : "Ready to load",
     targetLine: `${input.monsters[data.form.monsterId]?.name ?? data.form.monsterId} · ${data.form.combatStyle}`,
     cannonLabel: data.cannon.enabled ? "Cannon on" : "Cannon off",
     lootChoiceLabel: `${formatNumber(Object.keys(data.lootPreferences).length)} loot choices`,
@@ -443,7 +462,10 @@ export function createSharedSetupReviewViewModel(input: {
     droppedLootWarning:
       droppedLootCount > 0
         ? `${formatNumber(droppedLootCount)} stale loot choices will be skipped.`
-        : null
+        : null,
+    stale: input.stale,
+    canLoad: !input.stale && input.changeReview.changeCount > 0,
+    changeReview: input.changeReview
   };
 }
 
@@ -452,9 +474,9 @@ export function createWorkbenchResultViewModel(input: {
   maxHit: number;
   hitChance: number;
   ttkSec: number;
-  killsPerHour: number;
+  effectiveKph: number;
   effectiveXpPerHour: number;
-  gpPerHour: number;
+  effectiveGpPerHour: number;
   effectiveNetGpPerHour: number;
   supplyCostPerKill: number;
   gpPerKill: number;
@@ -470,8 +492,16 @@ export function createWorkbenchResultViewModel(input: {
   return {
     contextMetrics: [
       { label: "DPS", value: formatNumber(input.effectiveDps, 2), tone: "teal" },
-      { label: "Effective XP/hr", value: formatNumber(input.effectiveXpPerHour), tone: "teal" },
-      { label: "Net GP/hr", value: formatNumber(input.effectiveNetGpPerHour), tone: "gold" }
+      {
+        label: "EFF. XP/HR",
+        value: formatNumber(input.effectiveXpPerHour),
+        tone: "teal"
+      },
+      {
+        label: "EFF. NET GP/HR",
+        value: formatNumber(input.effectiveNetGpPerHour),
+        tone: "gold"
+      }
     ],
     metrics: [
       { label: "DPS", value: formatNumber(input.effectiveDps, 2), tone: "teal" },
@@ -483,11 +513,21 @@ export function createWorkbenchResultViewModel(input: {
         detail: risk ? `P10/50/90 ${formatRiskRange(risk.killTimeSeconds, 1, " s")}` : undefined,
         reviewTarget: risk ? "risk" : undefined
       },
-      { label: "KILLS/HR", value: formatNumber(input.killsPerHour) },
-      { label: "XP/HR", value: formatNumber(input.effectiveXpPerHour), tone: "teal" },
-      { label: "GP/HR", value: formatNumber(input.gpPerHour) },
       {
-        label: "GP/HR NET",
+        label: "EFF. K/HR",
+        value: formatNumber(input.effectiveKph)
+      },
+      {
+        label: "EFF. XP/HR",
+        value: formatNumber(input.effectiveXpPerHour),
+        tone: "teal"
+      },
+      {
+        label: "EFF. GP/HR",
+        value: formatNumber(input.effectiveGpPerHour)
+      },
+      {
+        label: "EFF. NET GP/HR",
         value: formatNumber(input.effectiveNetGpPerHour),
         tone: "gold",
         detail: risk

@@ -613,7 +613,7 @@ export function LootPane({ hidden, model, actions }: LootPaneProps) {
                             <tbody>
                               {sortLootNestedTableRows(row.expandedRows, model.nestedSort).map(
                                 (detail) => (
-                                  <tr key={`${row.rowId}-${detail.label}`}>
+                                  <tr key={`${row.rowId}-nested-${detail.sourceOrder}`}>
                                     <td>{detail.label}</td>
                                     <td>
                                       <TechnicalDetails

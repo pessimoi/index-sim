@@ -40,7 +40,7 @@ describe("CrossTabConflictPanel", () => {
 
     expect(markup).toContain("Data changed in another tab");
     expect(markup).toContain("Current values are still active");
-    expect(markup).toContain("Download Workspace backup");
+    expect(markup).toContain("Download full Workspace backup");
     expect(markup).toContain("Invalid or unsupported saved data");
     expect(markup).toContain('disabled=""');
     expect(markup).not.toContain("savedAt");

@@ -6,6 +6,74 @@ export interface EntityDisplayLabel {
   source: EntityDisplayLabelSource;
 }
 
+export type EntityCatalogKind = "item" | "monster";
+
+type NamedEntityCatalog = Readonly<Record<string, { name: string }>>;
+
+export interface EntityCollisionCatalog {
+  items?: NamedEntityCatalog;
+  monsters?: NamedEntityCatalog;
+}
+
+export interface EntityCollisionIndex {
+  item: ReadonlyMap<string, readonly string[]>;
+  monster: ReadonlyMap<string, readonly string[]>;
+}
+
+const REVIEWED_ENTITY_DESCRIPTORS = {
+  loop_half_key: "loop half",
+  tooth_half_key: "tooth half",
+  dragonhide_black: "black",
+  dragonhide_blue: "blue",
+  dragonhide_green: "green",
+  dragonhide_red: "red"
+} as const satisfies Readonly<Record<string, string>>;
+
+export type ReviewedEntityDescriptorId = keyof typeof REVIEWED_ENTITY_DESCRIPTORS;
+
+export const ENTITY_SEMANTIC_DESCRIPTORS: Readonly<Record<ReviewedEntityDescriptorId, string>> =
+  REVIEWED_ENTITY_DESCRIPTORS;
+
+export function normalizeEntityCollisionName(name: string): string {
+  return name.trim().replace(/\s+/gu, " ").toLocaleLowerCase();
+}
+
+function collisionGroups(catalog: NamedEntityCatalog | undefined): ReadonlyMap<string, string[]> {
+  const indexed = new Map<string, string[]>();
+  for (const [id, entity] of Object.entries(catalog ?? {})) {
+    const normalizedName = normalizeEntityCollisionName(entity.name);
+    if (!normalizedName) continue;
+    const ids = indexed.get(normalizedName);
+    if (ids) ids.push(id);
+    else indexed.set(normalizedName, [id]);
+  }
+  return indexed;
+}
+
+export function createEntityCollisionIndex(catalog: EntityCollisionCatalog): EntityCollisionIndex {
+  return {
+    item: collisionGroups(catalog.items),
+    monster: collisionGroups(catalog.monsters)
+  };
+}
+
+function disambiguateEntityName(input: {
+  baseName: string;
+  technicalId: string | null;
+  collisionIndex?: EntityCollisionIndex;
+  entityKind?: EntityCatalogKind;
+}): string {
+  if (!input.technicalId || !input.collisionIndex || !input.entityKind) return input.baseName;
+  const collisionIds = input.collisionIndex[input.entityKind].get(
+    normalizeEntityCollisionName(input.baseName)
+  );
+  if (!collisionIds || collisionIds.length < 2 || !collisionIds.includes(input.technicalId)) {
+    return input.baseName;
+  }
+  const descriptor = ENTITY_SEMANTIC_DESCRIPTORS[input.technicalId as ReviewedEntityDescriptorId];
+  return `${input.baseName} — ${descriptor ?? `ID ${input.technicalId}`}`;
+}
+
 export function humanizeTechnicalId(technicalId: string): string {
   const words = technicalId.replaceAll("_", " ").trim().replace(/\s+/g, " ");
   return words ? words.charAt(0).toUpperCase() + words.slice(1) : "Unknown item";
@@ -15,20 +83,81 @@ export function createEntityDisplayLabel(input: {
   technicalId: string | null;
   gameDataName?: string | null;
   rowSourceName?: string | null;
+  collisionIndex?: EntityCollisionIndex;
+  entityKind?: EntityCatalogKind;
 }): EntityDisplayLabel {
   const gameDataName = input.gameDataName?.trim();
   if (gameDataName) {
-    return { name: gameDataName, technicalId: input.technicalId, source: "game-data" };
+    return {
+      name: disambiguateEntityName({ ...input, baseName: gameDataName }),
+      technicalId: input.technicalId,
+      source: "game-data"
+    };
   }
   const rowSourceName = input.rowSourceName?.trim();
   if (rowSourceName) {
-    return { name: rowSourceName, technicalId: input.technicalId, source: "row-source" };
+    return {
+      name: disambiguateEntityName({ ...input, baseName: rowSourceName }),
+      technicalId: input.technicalId,
+      source: "row-source"
+    };
   }
   return {
     name: input.technicalId ? humanizeTechnicalId(input.technicalId) : "Unknown item",
     technicalId: input.technicalId,
     source: "fallback"
   };
+}
+
+export interface RowCollisionLabelInput {
+  stableId: string;
+  baseLabel: string;
+  sourceOrder: number;
+  quantityLabel?: string | null;
+  chanceLabel?: string | null;
+}
+
+export function createRowCollisionLabels(
+  rows: readonly RowCollisionLabelInput[]
+): ReadonlyMap<string, string> {
+  const labels = new Map(rows.map((row) => [row.stableId, row.baseLabel]));
+  const groups = new Map<string, RowCollisionLabelInput[]>();
+  for (const row of rows) {
+    const key = normalizeEntityCollisionName(row.baseLabel);
+    const group = groups.get(key);
+    if (group) group.push(row);
+    else groups.set(key, [row]);
+  }
+
+  for (const sourceGroup of groups.values()) {
+    if (sourceGroup.length < 2) continue;
+    const group = [...sourceGroup].sort(
+      (left, right) =>
+        left.sourceOrder - right.sourceOrder || left.stableId.localeCompare(right.stableId)
+    );
+    const candidates = group.map((row) => {
+      const context = [
+        row.quantityLabel ? `qty ${row.quantityLabel}` : null,
+        row.chanceLabel ? `chance ${row.chanceLabel}` : null
+      ].filter((value): value is string => value !== null);
+      return `${row.baseLabel}${context.length ? ` — ${context.join(" · ")}` : ""}`;
+    });
+    const candidateCounts = new Map<string, number>();
+    for (const candidate of candidates) {
+      const key = normalizeEntityCollisionName(candidate);
+      candidateCounts.set(key, (candidateCounts.get(key) ?? 0) + 1);
+    }
+    group.forEach((row, index) => {
+      const candidate = candidates[index]!;
+      labels.set(
+        row.stableId,
+        candidateCounts.get(normalizeEntityCollisionName(candidate))! > 1
+          ? `${candidate} · row ${index + 1}`
+          : candidate
+      );
+    });
+  }
+  return labels;
 }
 
 export const COMPACT_ACCESSIBLE_LABELS: Readonly<Record<string, string>> = {
@@ -45,36 +174,19 @@ export const COMPACT_ACCESSIBLE_LABELS: Readonly<Record<string, string>> = {
   "MAX HIT": "Maximum hit",
   DPS: "Damage per second",
   TTK: "Time to kill",
-  "K/HR": "Kills per hour",
-  "K/hr": "Kills per hour",
-  "KILLS/HR": "Kills per hour",
-  "XP/HR": "Experience points per hour",
+  "EFF. K/HR": "Effective kills per hour",
   "XP/hr": "Experience points per hour",
-  "XP/KL": "Experience points per kill",
-  "XP/kill": "Experience points per kill",
+  "EFF. XP/HR": "Effective experience points per hour",
   "GP/KL": "Gold pieces per kill",
   "GP/KILL": "Gold pieces per kill",
   "GP/kill": "Gold pieces per kill",
-  "GP/HR": "Gold pieces per hour",
-  "GP/hr": "Gold pieces per hour",
-  "NET GP/HR": "Net gold pieces per hour",
-  "GP/HR NET": "Net gold pieces per hour",
-  "Net GP/hr": "Net gold pieces per hour",
-  "GP/XP": "Gold pieces per experience point",
+  "EFF. GP/HR": "Effective gross gold pieces per hour",
+  "EFF. NET GP/HR": "Effective net gold pieces per hour",
   "SUPPLY/KILL": "Supply cost per kill",
   "F/KL": "Food per kill",
-  EV: "Expected value",
   "EV/kill": "Expected value per kill",
   "Delta/hr": "Net gold pieces change per hour",
-  Qty: "Quantity",
-  s: "Seconds",
-  sec: "Seconds",
-  min: "Minutes",
-  hr: "Hours",
-  tick: "Game tick",
-  ticks: "Game ticks",
-  GP: "Gold pieces",
-  XP: "Experience points"
+  Qty: "Quantity"
 };
 
 export function expandedCompactLabel(label: string): string | null {

@@ -19,7 +19,6 @@ import {
   WORKSPACE_BACKUP_IMPORT_MAX_BYTES,
   WORKSPACE_REQUIRED_AREA_IDS,
   createWorkspaceBackupExport,
-  createWorkspaceBackupFileName,
   parseWorkspaceBackupText,
   WorkspaceBackupError,
   type WorkspaceLiveState
@@ -138,7 +137,7 @@ describe("Workspace backup V1 registry and envelope", () => {
     );
     expect(parsed.areas.every((area) => area.status === "ready")).toBe(true);
     expect(exported.byteSize).toBe(new TextEncoder().encode(exported.text).byteLength);
-    expect(exported.fileName).toBe("index-sim-workspace-274-2026-07-19T12-34-56.000Z.json");
+    expect(exported.fileName).toBe("2004scape-workspace-backup-rev-274-20260719T123456Z.json");
     expect(exported.text).not.toContain("hiscores-last-player");
     expect(exported.text).not.toContain("legacy-migration-dismissed");
     expect(exported.text).not.toContain("index-sim:rewrite-setup");
@@ -309,12 +308,5 @@ describe("Workspace backup V1 registry and envelope", () => {
     );
     expectWorkspaceError(() => parseWorkspaceBackupText(unsafe), "unsafe_key");
     expect(({} as { polluted?: boolean }).polluted).toBeUndefined();
-  });
-
-  it("sanitizes every dynamic file-name segment", () => {
-    const fileName = createWorkspaceBackupFileName("../274 private", "../../19:00 / secret");
-    expect(fileName).toMatch(/^index-sim-workspace-[A-Za-z0-9._-]+-[A-Za-z0-9._-]+\.json$/);
-    expect(fileName).not.toContain("/");
-    expect(fileName).not.toContain(" ");
   });
 });

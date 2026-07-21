@@ -49,11 +49,11 @@ export interface DenseCompareRowViewModel {
   maxHit: number;
   dps: number;
   ttkSec: number;
-  killsPerHour: number;
-  xpPerHour: number;
+  effectiveKph: number;
+  effectiveXpPerHour: number;
   gpPerKill: number;
-  gpPerHour: number;
-  netGpPerHour: number;
+  effectiveGpPerHour: number;
+  effectiveNetGpPerHour: number;
   bound: string;
 }
 
@@ -69,6 +69,8 @@ export interface DenseCompareScaleCellViewModel {
 export interface DenseCompareScaleRowViewModel {
   xpPerHour: DenseCompareScaleCellViewModel;
   netGpPerHour: DenseCompareScaleCellViewModel;
+  bestKph: boolean;
+  bestGp: boolean;
 }
 
 export type DenseCompareScaleViewModel = Record<EntityId, DenseCompareScaleRowViewModel>;
@@ -82,11 +84,11 @@ const denseCompareSortValue: Record<
   maxHit: (row) => row.maxHit,
   dps: (row) => row.dps,
   ttkSec: (row) => row.ttkSec,
-  killsPerHour: (row) => row.killsPerHour,
-  xpPerHour: (row) => row.xpPerHour,
+  killsPerHour: (row) => row.effectiveKph,
+  xpPerHour: (row) => row.effectiveXpPerHour,
   gpPerKill: (row) => row.gpPerKill,
-  gpPerHour: (row) => row.gpPerHour,
-  netGpPerHour: (row) => row.netGpPerHour
+  gpPerHour: (row) => row.effectiveGpPerHour,
+  netGpPerHour: (row) => row.effectiveNetGpPerHour
 };
 
 function compareNumbers(left: number, right: number, direction: "asc" | "desc"): number {
@@ -219,38 +221,46 @@ function scalePercent(value: number, maxValue: number): number {
 export function createDenseCompareScaleModel(
   rows: DenseCompareRowViewModel[]
 ): DenseCompareScaleViewModel {
-  const maxXp = finitePositiveMax(rows.map((row) => row.xpPerHour));
-  const maxPositiveNetGp = finitePositiveMax(rows.map((row) => row.netGpPerHour));
+  const maxXp = finitePositiveMax(rows.map((row) => row.effectiveXpPerHour));
+  const maxKph = finitePositiveMax(rows.map((row) => row.effectiveKph));
+  const maxGp = finitePositiveMax(rows.map((row) => row.effectiveGpPerHour));
+  const maxPositiveNetGp = finitePositiveMax(rows.map((row) => row.effectiveNetGpPerHour));
   const maxNegativeNetGp = finitePositiveMax(
-    rows.map((row) => (row.netGpPerHour < 0 ? Math.abs(row.netGpPerHour) : 0))
+    rows.map((row) => (row.effectiveNetGpPerHour < 0 ? Math.abs(row.effectiveNetGpPerHour) : 0))
   );
 
   return Object.fromEntries(
     rows.map((row) => {
       const netTone: DenseCompareScaleTone =
-        row.netGpPerHour > 0 ? "positive" : row.netGpPerHour < 0 ? "negative" : "neutral";
+        row.effectiveNetGpPerHour > 0
+          ? "positive"
+          : row.effectiveNetGpPerHour < 0
+            ? "negative"
+            : "neutral";
       const netWidth =
-        row.netGpPerHour < 0
-          ? scalePercent(Math.abs(row.netGpPerHour), maxNegativeNetGp)
-          : scalePercent(row.netGpPerHour, maxPositiveNetGp);
+        row.effectiveNetGpPerHour < 0
+          ? scalePercent(Math.abs(row.effectiveNetGpPerHour), maxNegativeNetGp)
+          : scalePercent(row.effectiveNetGpPerHour, maxPositiveNetGp);
 
       return [
         row.monsterId,
         {
           xpPerHour: {
-            value: row.xpPerHour,
-            widthPercent: scalePercent(row.xpPerHour, maxXp),
-            tone: row.xpPerHour > 0 ? "positive" : "neutral",
-            ariaLabel: `${row.monsterName} XP/hr ${formatNumber(row.xpPerHour)}, scaled to visible rows`
+            value: row.effectiveXpPerHour,
+            widthPercent: scalePercent(row.effectiveXpPerHour, maxXp),
+            tone: row.effectiveXpPerHour > 0 ? "positive" : "neutral",
+            ariaLabel: `${row.monsterName} effective XP/hr ${formatNumber(row.effectiveXpPerHour)}, scaled to visible rows`
           },
           netGpPerHour: {
-            value: row.netGpPerHour,
+            value: row.effectiveNetGpPerHour,
             widthPercent: netWidth,
             tone: netTone,
-            ariaLabel: `${row.monsterName} net GP/hr ${formatNumber(row.netGpPerHour)}, ${
+            ariaLabel: `${row.monsterName} effective net GP/hr ${formatNumber(row.effectiveNetGpPerHour)}, ${
               netTone === "negative" ? "loss" : netTone === "positive" ? "profit" : "break-even"
             } scaled to visible rows`
-          }
+          },
+          bestKph: rows.length > 1 && row.effectiveKph === maxKph,
+          bestGp: rows.length > 1 && row.effectiveGpPerHour === maxGp
         }
       ];
     })
@@ -337,11 +347,11 @@ export function createDenseCompareRows(
       maxHit: vm.result.combat.maxHit,
       dps: vm.result.rates.effectiveDps,
       ttkSec: vm.result.rates.ttkSec,
-      killsPerHour: vm.result.rates.killsPerHour,
-      xpPerHour: vm.result.xp.effectiveXpPerHour,
+      effectiveKph: vm.result.rates.effectiveKph,
+      effectiveXpPerHour: vm.result.xp.effectiveXpPerHour,
       gpPerKill: vm.result.rates.gpPerKill,
-      gpPerHour: vm.result.rates.gpPerHour,
-      netGpPerHour: vm.result.rates.effectiveNetGpPerHour,
+      effectiveGpPerHour: vm.result.rates.effectiveGpPerHour,
+      effectiveNetGpPerHour: vm.result.rates.effectiveNetGpPerHour,
       bound: vm.result.trip.trip.bound
     };
   });
@@ -362,14 +372,14 @@ export function createCompareRows(
     cannonByMonster,
     lootPrefsByMonster
   )
-    .filter((row) => Number.isFinite(row.xpPerHour))
+    .filter((row) => Number.isFinite(row.effectiveXpPerHour))
     .slice(0, limit)
     .map((row) => ({
       monsterId: row.monsterId,
       monsterName: row.monsterName,
       dps: row.dps,
-      effectiveXpPerHour: row.xpPerHour,
-      effectiveNetGpPerHour: row.netGpPerHour,
+      effectiveXpPerHour: row.effectiveXpPerHour,
+      effectiveNetGpPerHour: row.effectiveNetGpPerHour,
       bound: row.bound
     }));
 }

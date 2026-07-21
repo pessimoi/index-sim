@@ -119,10 +119,10 @@ function comparableMetricsFromViewModel(vm: SimulationViewModel): ComparableMetr
     maxHit: vm.result.combat.maxHit,
     dps: vm.result.rates.effectiveDps,
     ttkSec: vm.result.rates.ttkSec,
-    killsPerHour: vm.result.rates.killsPerHour,
+    killsPerHour: vm.result.rates.effectiveKph,
     xpPerHour: vm.result.xp.effectiveXpPerHour,
     gpPerKill: vm.result.rates.gpPerKill,
-    gpPerHour: vm.result.rates.gpPerHour,
+    gpPerHour: vm.result.rates.effectiveGpPerHour,
     netGpPerHour: vm.result.rates.effectiveNetGpPerHour
   };
 }
@@ -133,11 +133,11 @@ function comparableMetricsFromDenseRow(row: DenseCompareRowViewModel): Comparabl
     maxHit: row.maxHit,
     dps: row.dps,
     ttkSec: row.ttkSec,
-    killsPerHour: row.killsPerHour,
-    xpPerHour: row.xpPerHour,
+    killsPerHour: row.effectiveKph,
+    xpPerHour: row.effectiveXpPerHour,
     gpPerKill: row.gpPerKill,
-    gpPerHour: row.gpPerHour,
-    netGpPerHour: row.netGpPerHour
+    gpPerHour: row.effectiveGpPerHour,
+    netGpPerHour: row.effectiveNetGpPerHour
   };
 }
 
@@ -306,7 +306,7 @@ function auditCase(
       maxHit: duelLive.maxHit,
       dps: duelLive.dps,
       ttkSec: duelLive.ttkSec,
-      killsPerHour: duelLive.killsPerHour,
+      killsPerHour: duelLive.effectiveKph,
       xpPerHour: duelLive.effectiveXpPerHour,
       netGpPerHour: duelLive.effectiveNetGpPerHour
     }

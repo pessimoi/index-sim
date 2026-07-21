@@ -332,8 +332,9 @@ test("uses saved setup comparison to import export rename load delete and persis
   const table = duel.getByRole("table", { name: "Setup comparison table" });
   await expect(table.getByRole("row", { name: /Live setup/ })).toBeVisible();
   await expect(table.getByLabel(/Rename saved setup/)).toHaveCount(1);
-  await expect(table).toContainText("XP/hr");
-  await expect(table).toContainText("Net GP/hr");
+  await expect(table).toContainText("EFF. XP/HR");
+  await expect(table).toContainText("EFF. NET GP/HR");
+  await expect(table).toContainText("EFF. K/HR");
   await expect(table).toContainText("GP/XP");
 
   const rename = table.getByLabel(/Rename saved setup/).first();
@@ -362,16 +363,21 @@ test("uses saved setup comparison to import export rename load delete and persis
       !raw.includes("effectiveXpPerHour")
     );
   });
-  const setupHeader = table.getByRole("columnheader", { name: "Setup", exact: true });
-  await setupHeader.getByRole("button", { name: "Setup", exact: true }).click();
+  const setupHeader = table.getByRole("columnheader", { name: "Sort by Setup", exact: true });
+  await setupHeader.getByRole("button", { name: "Sort by Setup", exact: true }).click();
   await expect(setupHeader).toHaveAttribute("aria-sort", "ascending");
-  await setupHeader.getByRole("button", { name: "Setup", exact: true }).click();
+  await setupHeader.getByRole("button", { name: "Sort by Setup", exact: true }).click();
   await expect(setupHeader).toHaveAttribute("aria-sort", "descending");
   await expect(
     table.locator("tbody > tr").first().getByLabel("Rename saved setup Melee saved")
   ).toBeVisible();
-  const xpHeader = table.getByRole("columnheader", { name: "XP/hr", exact: true });
-  await xpHeader.getByRole("button", { name: "XP/hr", exact: true }).click();
+  const xpHeader = table.getByRole("columnheader", {
+    name: "Sort by Effective experience points per hour",
+    exact: true
+  });
+  await xpHeader
+    .getByRole("button", { name: "Sort by Effective experience points per hour", exact: true })
+    .click();
   await expect(xpHeader).toHaveAttribute("aria-sort", "descending");
   const exportedSnapshotJson = await page.evaluate(() => {
     const saved = JSON.parse(window.localStorage.getItem("index-sim:duel-snapshots") ?? "null");
@@ -383,13 +389,17 @@ test("uses saved setup comparison to import export rename load delete and persis
   });
   const downloadPromise = page.waitForEvent("download");
   await duel.getByText("Manage saved setups", { exact: true }).click();
-  const exportSetupsButton = duel.getByRole("button", { name: "Export setups" });
+  const exportSetupsButton = duel.getByRole("button", {
+    name: "Export saved setup collection"
+  });
   await exportSetupsButton.focus();
   await exportSetupsButton.press("Enter");
   const download = await downloadPromise;
-  expect(download.suggestedFilename()).toBe("index-sim-saved-setups.json");
+  expect(download.suggestedFilename()).toMatch(
+    /^2004scape-saved-setup-collection-rev-274-\d{8}T\d{6}Z\.json$/
+  );
   await expect(duel.getByLabel("Saved setup transfer notice")).toHaveText(
-    "Saved setup download started: index-sim-saved-setups.json. Check your browser downloads."
+    `Saved setup collection download started: ${download.suggestedFilename()}. Check your browser downloads.`
   );
   await expect(exportSetupsButton).toBeFocused();
   const exportedFile = JSON.parse(await readDownloadText(download));
@@ -494,7 +504,7 @@ test("uses saved setup comparison to import export rename load delete and persis
 
   await reloadedDuel.getByText("Manage saved setups", { exact: true }).click();
   await page.setViewportSize({ width: 390, height: 844 });
-  await reloadedDuel.getByLabel("Import setups").setInputFiles({
+  await reloadedDuel.getByLabel("Review saved setup collection").setInputFiles({
     name: "contextual-duel-snapshots.json",
     mimeType: "application/json",
     buffer: Buffer.from(JSON.stringify(exportedFile))
@@ -508,7 +518,7 @@ test("uses saved setup comparison to import export rename load delete and persis
   await exactImportReview.getByRole("button", { name: "Dismiss" }).click();
   await expect(reloadedTable).toContainText("No saved setups");
 
-  await reloadedDuel.getByLabel("Import setups").setInputFiles({
+  await reloadedDuel.getByLabel("Review saved setup collection").setInputFiles({
     name: "duel-snapshots.json",
     mimeType: "application/json",
     buffer: Buffer.from(exportedSnapshotJson)
@@ -571,7 +581,7 @@ test("reviews matching-ID setup replacements, refreshes stale plans and undoes e
     };
   });
 
-  const importInput = duel.getByLabel("Import setups");
+  const importInput = duel.getByLabel("Review saved setup collection");
   await importInput.setInputFiles({
     name: "replacement.json",
     mimeType: "application/json",
@@ -638,11 +648,16 @@ test("builds and filters the all-monster saved setup matrix on demand", async ({
   await expect(matrix.locator("thead th")).toHaveCount(3);
   await expect.poll(async () => matrix.locator("tbody tr").count()).toBeGreaterThan(60);
   await expect(matrix.locator('tbody tr[aria-current="true"]')).toHaveCount(1);
-  await expect(matrix.locator('td[aria-label*="XP/hr"]')).not.toHaveCount(0);
+  await expect(
+    matrix.locator('td[aria-label*="Effective experience points per hour"]')
+  ).not.toHaveCount(0);
   await expect(matrix.locator("td.best")).not.toHaveCount(0);
 
-  await duel.getByLabel("Setup comparison metric").getByRole("button", { name: "DPS" }).click();
-  await expect(matrix.locator('td[aria-label*="DPS"]')).not.toHaveCount(0);
+  await duel
+    .getByLabel("Setup comparison metric")
+    .getByRole("button", { name: "Damage per second" })
+    .click();
+  await expect(matrix.locator('td[aria-label*="Damage per second"]')).not.toHaveCount(0);
   const liveSetupHeader = matrix.getByRole("columnheader", { name: /Live setup/ }).first();
   await liveSetupHeader.getByRole("button", { name: /Live setup/ }).click();
   await expect(liveSetupHeader).toHaveAttribute("aria-sort", "descending");

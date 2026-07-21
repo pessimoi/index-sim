@@ -273,7 +273,10 @@ export function PlannerPane({ hidden, model, actions }: PlannerPaneProps) {
                 { label: "Unlocks", value: formatNumber(model.panel.summary.unlockCount) },
                 { label: "Start DPS", value: formatNumber(model.panel.summary.startDps, 2) },
                 { label: "End DPS", value: formatNumber(model.panel.summary.endDps, 2) },
-                { label: "Metric gain", value: plannerMetricDeltaValue(model) },
+                {
+                  label: `${plannerMetricLabel(model.computedMetric)} gain`,
+                  value: plannerMetricDeltaValue(model)
+                },
                 { label: "Truncated", value: model.panel.summary.truncated ? "Yes" : "No" }
               ]}
             />
@@ -301,7 +304,7 @@ export function PlannerPane({ hidden, model, actions }: PlannerPaneProps) {
                         <th className="numeric">To</th>
                         <th className="numeric">XP</th>
                         <th className="numeric">DPS</th>
-                        <th className="numeric">Metric</th>
+                        <th className="numeric">{plannerMetricLabel(model.computedMetric)}</th>
                         <th className="numeric">Unlocks</th>
                       </tr>
                     </thead>
@@ -593,7 +596,7 @@ export function PlannerPane({ hidden, model, actions }: PlannerPaneProps) {
                             else gearOptionRefs.current.delete(option.id);
                           }}
                           checked={option.selected}
-                          aria-label={`Planner pool ${option.label}`}
+                          aria-label={`Planner pool ${option.accessibleLabel ?? option.label}`}
                           onChange={(event) =>
                             actions.setGearPoolItem(slot.slot, option.id, event.target.checked)
                           }

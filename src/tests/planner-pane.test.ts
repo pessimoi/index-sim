@@ -223,6 +223,9 @@ describe("Planner pane", () => {
     expect(markup).toContain("Advanced gear pool · ");
     expect(markup).toContain("1/1");
     expect(markup).toContain('aria-label="Planner pool Rune scimitar"');
+    expect(markup).toContain("Effective XP/hr");
+    expect(markup).toContain("Effective net GP/hr");
+    expect(markup).toContain("Balanced effective XP and net GP");
     expect(markup).toContain("Next plan starts at");
     expect(markup).toContain("Use level floor");
     expect(markup).toContain("+0.50");

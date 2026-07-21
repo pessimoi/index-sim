@@ -1,92 +1,57 @@
-import type { CombatStyle } from "@/domain/shared";
-import type { DenseCompareSortState } from "../state/dense-compare";
-import type { SavedSetupState, SetupMode } from "../state/ui-state";
 import type { SetupTransferContextReview } from "../state/setup-transfer-context";
-import { formatNumber } from "./formatting";
+import type { SetupChangeGroup, SetupTransferChangeReview } from "../state/setup-transfer-changes";
 
 interface SetupImportReviewCandidate {
   id: number;
   context: SetupTransferContextReview;
-  summary: {
-    targetLabel: string;
-    combatStyle: CombatStyle;
-    setupMode: SetupMode;
-    customSetupCount: number;
-    cannonMonsterCount: number;
-    denseSort: DenseCompareSortState;
-    irrelevantMonsterCount: number;
-  };
+  changeReview: SetupTransferChangeReview;
+  stale: boolean;
 }
 
 export interface SetupImportReviewViewModel {
   id: number;
-  rows: ReadonlyArray<{ label: string; value: string }>;
+  artifactLabel: string;
+  changeSummary: string;
   contextTone: "ready" | "warning";
   contextMessage: string;
+  includedScope: readonly string[];
+  excludedScope: readonly string[];
+  groups: readonly SetupChangeGroup[];
+  stale: boolean;
+  staleMessage: string | null;
+  noChanges: boolean;
+  noChangesMessage: string | null;
+  canApply: boolean;
+  statusLabel: string;
+  statusTone: "ready" | "warning" | "neutral";
   consequence: string;
 }
 
-const DENSE_SORT_LABELS: Record<DenseCompareSortState["key"], string> = {
-  monsterName: "Monster",
-  hitChance: "Hit chance",
-  maxHit: "Max hit",
-  dps: "DPS",
-  ttkSec: "TTK",
-  killsPerHour: "Kills/hr",
-  xpPerHour: "XP/hr",
-  gpPerKill: "GP/kill",
-  gpPerHour: "GP/hr",
-  netGpPerHour: "Net GP/hr"
-};
-
-function titleCase(value: string): string {
-  return `${value.charAt(0).toUpperCase()}${value.slice(1)}`;
-}
-
-function countChange(current: number, imported: number): string {
-  return `${formatNumber(current)} → ${formatNumber(imported)}`;
-}
-
-function denseSortLabel(sort: DenseCompareSortState): string {
-  return `${DENSE_SORT_LABELS[sort.key]}, ${sort.direction === "asc" ? "ascending" : "descending"}`;
-}
-
 export function buildSetupImportReviewViewModel(
-  review: SetupImportReviewCandidate,
-  current: SavedSetupState
+  review: SetupImportReviewCandidate
 ): SetupImportReviewViewModel {
+  const changeCount = review.changeReview.changeCount;
+  const noChanges = changeCount === 0;
   return {
     id: review.id,
+    artifactLabel: "Combat setup file",
+    changeSummary:
+      changeCount === 1
+        ? "1 changed field"
+        : `${changeCount.toLocaleString("en-GB")} changed fields`,
     contextTone: review.context.tone,
     contextMessage: review.context.message,
-    rows: [
-      { label: "Target", value: review.summary.targetLabel },
-      { label: "Combat style", value: titleCase(review.summary.combatStyle) },
-      { label: "Setup mode", value: titleCase(review.summary.setupMode) },
-      {
-        label: "Custom setups",
-        value: countChange(
-          Object.keys(current.customSetupsByMonster).length,
-          review.summary.customSetupCount
-        )
-      },
-      {
-        label: "Cannon settings",
-        value: countChange(
-          Object.keys(current.cannonByMonster).length,
-          review.summary.cannonMonsterCount
-        )
-      },
-      { label: "Dense sort", value: denseSortLabel(review.summary.denseSort) },
-      {
-        label: "Hidden / irrelevant",
-        value: countChange(
-          current.denseCompare.irrelevantMonsterIds.length,
-          review.summary.irrelevantMonsterCount
-        )
-      }
-    ],
+    includedScope: review.changeReview.includedScope,
+    excludedScope: review.changeReview.excludedScope,
+    groups: review.changeReview.groups,
+    stale: review.stale,
+    staleMessage: review.stale ? "Current setup changed after this review was prepared." : null,
+    noChanges,
+    noChangesMessage: noChanges ? "No changes. This file matches the current setup." : null,
+    canApply: !review.stale && !noChanges,
+    statusLabel: review.stale ? "Refresh required" : noChanges ? "No changes" : "Ready to apply",
+    statusTone: review.stale ? "warning" : noChanges ? "neutral" : "ready",
     consequence:
-      "Applying replaces the active form, default form, setup mode, custom setups, Dense preferences and cannon settings."
+      "Applying replaces the included setup areas only. Excluded browser data and calculated results stay unchanged."
   };
 }
