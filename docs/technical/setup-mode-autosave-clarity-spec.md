@@ -1,13 +1,16 @@
 # Default/custom setup mode and autosave clarity specification
 
-- Status: specification ready; implementation not started
-- Date: 2026-07-20
+- Status: implemented and verified
+- Date: 2026-07-21
 - Priority: high
 - Estimated effort: M
 - Owner: setup shell, rewrite setup persistence and local-state feedback
 - Feature-inventory parent: `Basic combat setup` (`Valmis`)
 - Depends on: the current `setupMode`, local-state recovery controller and
   application-level status/attention surfaces
+- Related boundary: [cross-tab local-state conflict safety](cross-tab-local-state-conflict-spec.md)
+  owns detection and resolution when another open tab changes the same saved
+  browser data; it is not required to implement this clarity card
 
 ## Purpose
 
@@ -53,6 +56,92 @@ user is changing the shared Default or one monster's Custom setup, whether a
 field change saves automatically, and whether the saved value will survive a
 reload in this browser.
 
+## Browser storage and autosave contract
+
+The current browser-local persistence mechanism remains the implementation
+boundary. This goal must not introduce a second setup store or a new write
+path.
+
+### Storage location and ownership
+
+- The durable store is the selected browser profile's `window.localStorage`.
+- The exact key remains `index-sim:rewrite-setup`, exported as
+  `REWRITE_SETUP_STORAGE_KEY`.
+- The exact envelope version remains `3`, exported as
+  `REWRITE_SETUP_VERSION`.
+- The serialized value remains the validated versioned envelope
+  `{ version, savedAt, data }`, where `data` is the complete
+  `SavedSetupState`.
+- Browser-local storage is scoped to the page origin: scheme, host and port.
+  Different origins, browser profiles, devices and private-browsing lifetimes
+  do not share this value.
+- Clearing site data may remove the value. This is not account, cloud,
+  repository, Cloudflare, server or cross-device storage.
+- [Workspace backup and restore](workspace-backup-restore-spec.md) remains the
+  explicit file-based portability and recovery path. Autosave does not replace
+  it.
+
+The ready UI must not expose the raw storage key, serialized envelope or
+browser exception text. User-facing copy describes the location as saved in
+this browser.
+
+### Autosave trigger and timing
+
+Autosave observes the complete canonical rewrite setup after application
+readiness. A save is eligible whenever any of these existing owners changes:
+
+- the active `form`;
+- the shared `defaultForm`;
+- `setupMode`;
+- `customSetupsByMonster`;
+- `denseCompare`; or
+- `cannonByMonster`.
+
+Only an accepted canonical value triggers this persistence contract. A numeric
+or other field may retain a literal draft for validation; an invalid or
+uncommitted draft is not serialized as setup truth. Once the field owner emits
+an accepted value, the existing state normalization runs and the next ready
+effect attempts the complete save. Selectors and other immediately committed
+controls become eligible on their normal state update.
+
+The save is automatic and requires no Save action, navigation or page unload.
+The implementation may coalesce React updates naturally, but it must not rely
+on a delayed timer or unload-only write for durability. Each attempt validates
+the complete `SavedSetupState`, creates a new `savedAt` instant and writes one
+complete envelope through the existing local-state recovery controller.
+
+### Reload and invalid-data behavior
+
+Runtime bootstrap reads the same key once, checks the envelope version and
+validates `data` through `SavedSetupSchema` before applying it. A valid value
+restores the active form, Default form, mode, Custom map, Dense state and Cannon
+state together.
+
+Missing data falls back to the canonical initial setup. Unsupported, malformed
+or context-invalid stored data must continue through the existing local-state
+health and recovery policy. Ordinary autosave must not silently overwrite a
+blocked value before the user clears or explicitly replaces it through an
+accepted recovery transaction.
+
+### Persistence outcomes
+
+- A successful `localStorage.setItem()` attempt for the exact current complete
+  value authorizes `Saved locally`.
+- Safe-session memory storage, unavailable browser storage or a protective
+  recovery block authorizes `Session only`; existing durable browser data must
+  remain untouched.
+- An attempted durable `localStorage.setItem()` failure authorizes
+  `Could not save` and keeps the live in-memory value usable.
+- A newer canonical setup invalidates the previous positive claim until its
+  own attempt settles. The UI may show `Saving…` during this gap.
+- A later successful write clears the setup-specific failed outcome.
+
+These outcomes describe the current tab's selected storage boundary. This card
+does not claim multi-tab synchronization or conflict protection. If the related
+cross-tab safety specification is implemented, a suspended rewrite-setup write
+must not render `Saved locally`; the conflict owner supplies the more specific
+review state and remains authoritative until resolution.
+
 ## Feature-inventory check
 
 `Basic combat setup` remains `Valmis`. Per-style loadouts, Default and Custom
@@ -63,6 +152,42 @@ trust pass over that completed workflow, not a missing setup capability.
 The status remains `Valmis` before and after implementation. The implementation
 must not introduce a third setup mode, a new persisted area or a separate
 manual-save feature.
+
+## Implemented result
+
+The ready Setup context now derives one typed editor presentation from the
+active two-mode state machine. It names the current owner, exposes only the
+valid destination-aware actions, explains Default/Custom scope and reports the
+durability of the exact current six-family setup as `Saving…`, `Saved locally`,
+`Session only` or `Could not save`.
+
+`src/app/App.tsx` owns one runtime-only complete-value identity and routes both
+ordinary autosave and the existing reset/replacement persistence transaction
+through the same outcome owner. The persisted key, version-3 envelope, schemas,
+field ownership, Review/Undo behavior and recovery policy are unchanged.
+
+The shared shell layout was reviewed at desktop, 640 x 360, mobile and portrait
+tablet sizes. Long action names remain complete, the compact landscape uses no
+setup-context horizontal scrolling and the reset Review slot retains its own
+bounded desktop scroll owner.
+
+## Validation status
+
+Focused app-shell, recovery, adapter and conditional-owner coverage passes
+eight files / 105 tests. Nine targeted production-preview Chromium
+transactions cover Default/Custom ownership, reset, setup import, sharing,
+legacy migration, invalid local state and cross-tab behavior. The complete
+read-only Darwin suite passes 26/26 against the reviewed baselines.
+
+The shared repository gate passes architecture (173 source modules, 158
+client-reachable modules, eight external entrypoints and no cycles), 1,085
+unit tests, 19 goldens, typecheck, production build, lint and format. The
+artifact has 20 JavaScript chunks and a 779,983-byte raw / 229,673-byte gzip
+direct entry, below D-098's unchanged 230,000-byte gzip limit. The reduction
+comes from real conditional loading of setup import/reset/share reviews, the
+share dialog, legacy migration presentation and view-model, and local-state
+attention banner; no budget, storage key, version-3 envelope, schema or
+transaction semantics changed.
 
 ## User promise
 
@@ -417,6 +542,15 @@ Extend the direct app-shell suites to prove:
 
 Keep focused local-state recovery coverage for save-failure recording,
 successful retry clearing, protective blocking and safe-session persistence.
+The persistence and adapter suites must additionally prove:
+
+- the exact `index-sim:rewrite-setup` key receives a version-3
+  `{ version, savedAt, data }` envelope containing all six setup families;
+- an uncommitted or invalid field draft does not replace the last accepted
+  canonical envelope;
+- a valid envelope restores the six families together after reload; and
+- unsupported, malformed or context-invalid raw data remains untouched while
+  ordinary rewrite-setup persistence is blocked.
 
 ### Browser transitions
 
@@ -471,6 +605,11 @@ the accepted setup-context layout intentionally changes them.
 - The latest complete rewrite setup shows truthful `Saved locally`, `Session
 only` or `Could not save` feedback, with no stale saved claim for a newer
   unattempted state.
+- Durable setup data remains origin- and browser-profile-local under the exact
+  version-3 `index-sim:rewrite-setup` envelope; no server, account or
+  cross-device storage path is introduced.
+- Only accepted canonical state is serialized. Invalid or uncommitted input
+  drafts cannot replace the last accepted setup.
 - Successful retry clears a prior setup save failure; protective recovery blocks
   never overwrite the blocked stored setup.
 - Autosave success does not spam the global status/live region or create Undo.

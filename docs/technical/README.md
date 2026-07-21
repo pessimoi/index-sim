@@ -37,6 +37,13 @@
 - [setup-file-transfer-controller-spec.md](setup-file-transfer-controller-spec.md): implemented bounded rewrite setup import/export orchestration and typed caller-owned Apply boundary.
 - [setup-replacement-review-undo-spec.md](setup-replacement-review-undo-spec.md): implemented review-before-Apply and persistence-aware Undo for setup file and saved-row replacement paths.
 - [active-setup-reset-spec.md](active-setup-reset-spec.md): implemented canonical active Default/current-target Custom reset with grouped Review, all-style-cache scope, protected surrounding state and persistence-aware Undo.
+- [setup-mode-autosave-clarity-spec.md](setup-mode-autosave-clarity-spec.md): implemented explicit Default/current-monster Custom editing scope, destination-aware setup actions and exact-current-value browser/session persistence feedback.
+- [cross-tab-local-state-conflict-spec.md](cross-tab-local-state-conflict-spec.md): implemented external-tab detection, freshness-guarded browser writes and explicit per-area conflict resolution without a server sync layer.
+- [file-export-outcome-feedback-spec.md](file-export-outcome-feedback-spec.md): implemented typed browser download dispatch and truthful started/failed feedback for every existing JSON export.
+- [duel-only-legacy-import-readiness-spec.md](duel-only-legacy-import-readiness-spec.md): implemented import-plan-derived gating that makes already validated Duel-only legacy data actionable.
+- [assistive-technology-accessibility-spec.md](assistive-technology-accessibility-spec.md): implemented WCAG 2.2 AA journey manifest, automated scans and semantic repairs; the VoiceOver/NVDA release gate remains open.
+- [cross-browser-release-support-spec.md](cross-browser-release-support-spec.md): specced Firefox/WebKit/mobile-WebKit functional manifest, browser-API contract and bounded Safari support claim.
+- [lazy-pane-loading-failure-isolation-spec.md](lazy-pane-loading-failure-isolation-spec.md): implemented Compare-only initial pane request, first-activation optional families, named loading feedback, mounted revisits and pane-local failure recovery.
 - [price-set-transfer-controller-spec.md](price-set-transfer-controller-spec.md): implemented PriceSet import/acceptance/export/reset transaction extraction with typed caller-owned runtime application.
 - [price-set-import-discoverability-spec.md](price-set-import-discoverability-spec.md): implemented D-102 workflow with one advanced Market-owned full-PriceSet disclosure, explicit replacement/format guidance and no topbar/Settings duplicates.
 - [user-facing-language-units-information-hierarchy-spec.md](user-facing-language-units-information-hierarchy-spec.md): implemented source-name-first entity labels, technical-id disclosure, semantic units/abbreviations and a concise Settings-to-Economy price hierarchy.
@@ -72,6 +79,7 @@
 - [testing/runtime-data-deployment.md](testing/runtime-data-deployment.md): source audits, generated data, local-state health, market artifacts and deployment validation.
 - [testing/domain-and-integrations.md](testing/domain-and-integrations.md): golden, performance, domain, schema and same-origin integration testing.
 - [testing/ui-state-and-browser.md](testing/ui-state-and-browser.md): feature view-model, persistence, controller, pane and browser coverage.
+- [testing/accessibility-manual.md](testing/accessibility-manual.md): VoiceOver/Safari and NVDA/browser AT-01 through AT-12 procedure and evidence template.
 
 Implemented specifications preserve their dated implementation contract and
 evidence. Their activation-time phase lists, measurements and “next phase”

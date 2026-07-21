@@ -5,6 +5,176 @@ It does not own current commands, required gates or test strategy; those remain 
 [the testing guide](../technical/testing.md). Counts and artifact hashes below
 apply only to the source state described by each entry.
 
+## 2026-07-21 lazy pane loading and failure isolation
+
+The Workbench now initializes one requested lazy family, Compare, and adds an
+optional family only through the shared tab-activation action. Successfully
+visited families stay mounted. The shared pane boundary publishes named
+loading, sanitized loader/render failure and active `aria-busy` state without
+changing persistence or calculation ownership. Stats uses the same isolation
+boundary synchronously, while Workspace has a narrower Settings-local
+boundary. A lazy loader failure offers Reload only; a post-load render or
+lifecycle failure can remount just that pane and returns focus to the active
+tabpanel after success.
+
+The focused registry/boundary, root-boundary, shell and Economy/Settings suites
+pass 32/32 tests. The production-preview pane suite passes 5/5 with a real
+emitted build: cold startup excludes every unvisited pane chunk, throttled
+Compare and Risk expose named loading, Risk is requested once and retains its
+control value, Economy/Settings share one request, Workspace starts only under
+Settings, Trip loader failure leaves Stats usable, normal Reload recovers and
+the exact saved-storage snapshot remains unchanged. A failed Workspace import
+leaves Calculation context and Price data available. The build keeps separate
+hashed Compare, Loadout, Duel, Loot, Trip, Risk, Cannon, Planner,
+Economy/Settings and Workspace chunks. Artifact validation passes 27 files,
+20 JavaScript chunks and a 779,983 raw / 229,673 gzip direct entry against the
+unchanged 800,000 / 230,000 limits; the deterministic artifact SHA-256 is
+`6071cf259ec7069a2d94e3f37873b227ea2f1c40565181677583f49bbdf72848`.
+
+One local cold/warm command-contract sample (`--skip-build --runs 1`) recorded
+shell and initial-pane checkpoints. The cold sample reported shell ready at
+711 ms with two JavaScript requests / 282,567 transfer bytes, then initial
+Compare ready at 1,106 ms with four requests / 363,738 transfer bytes. This
+single workstation sample verifies the additive fields and requested-path
+lists only; it is not the required five-pair release comparison or a latency
+SLA.
+
+## 2026-07-21 assistive-technology accessibility automation
+
+The automated accessibility foundation now owns one typed AT-01 through AT-12
+manifest, a lockfile-pinned `@axe-core/playwright` production-preview gate and
+the repaired shared searchable-selector contract. The closed selector is a
+native button; its focused search input owns combobox/listbox/active-descendant
+state, options remain outside the tab order, the settled result count is
+bounded and zero results are related to the input. Shared metric alternatives
+no longer rely on prohibited ARIA naming, horizontal Stats/result and Economy
+regions are keyboard reachable, and the two discovered low-contrast supporting
+text styles now meet the automated threshold.
+
+Focused manifest, selector, numeric and shell component coverage passes four
+files / 16 tests. The full accessibility gate passes 13/13: twelve journey
+scans plus the separate 320 CSS-pixel / 200% text reflow, skip-link focus and
+Settings reachability case. The scans use WCAG 2 A/AA, 2.1 A/AA and 2.2 AA tags
+and have no rule exclusion, serious/critical finding or undispositioned
+lower-impact finding. The complete shell/accessibility Chromium file passes
+22/22 after constraining visually hidden alternatives to their metric
+container. A supplemental in-app browser inspection confirmed the visible
+focused Weapon combobox, expanded trigger, listbox relationship and Escape
+focus return without changing the selection. Typecheck and the 170-source /
+155-client-reachable / eight-external-entrypoint zero-cycle architecture check
+pass.
+
+The first 26-scenario read-only Darwin visual run lost its preview connection
+after two scenarios; that infrastructure interruption produced no image diff.
+The five already completed scenarios and three fresh-server groups covering
+the remaining 7, 9 and 5 scenarios together establish 26/26 passing comparisons
+without baseline writes.
+
+This is automated Chromium DOM/keyboard/reflow evidence, not a screen-reader
+or WCAG-conformance claim. The required manual evidence remains open:
+
+| Rows                | VoiceOver / stable Safari | NVDA / supported browser | Release effect                          |
+| ------------------- | ------------------------- | ------------------------ | --------------------------------------- |
+| AT-01 through AT-12 | `not run`                 | `not run`                | Accessibility release statement blocked |
+
+The reproducible procedure and per-row record template are in
+[the manual runbook](../technical/testing/accessibility-manual.md). No personal
+player, setup or raw browser-profile values are part of this evidence.
+
+## 2026-07-21 Duel-only legacy import readiness
+
+Legacy migration readiness and status now come from the same non-empty import
+plan. A validated saved-Duel candidate alone yields `1 compatible area`; an
+empty defensive candidate yields no plan and remains review-only. The inspector,
+App merge/persist path, rewrite-owned collision precedence, 12-entry cap,
+legacy-key retention and dismissal semantics were not changed.
+
+Focused view-model, inspector, adapter and panel coverage passes four files /
+89 tests, including every single compatible-area family, mixed field/area
+counts, invalid/computed entries, cap and collision behavior. The complete
+19-test production-preview persistence/migration file passes with one worker.
+Its Duel-only case proves aligned summary/plan/outcome copy, enabled keyboard
+and pointer action, unchanged active rewrite target, durable saved setup,
+retained `sim_input_v3`, dismissed review and reload persistence. Typecheck and
+the preview build pass. This is local browser-state migration evidence and does
+not broaden the allowlist, schemas, backend or deployment scope.
+
+## 2026-07-21 Default/custom setup and autosave clarity
+
+The ready setup context now presents the exact active Default/current-monster
+Custom owner, destination-aware actions, fallback scope and exact-current-value
+rewrite-setup persistence outcome. Ordinary autosave and direct setup
+replacement/reset persistence share one App-owned result without changing the
+six-family version-3 envelope, local-state recovery policy or Undo contracts.
+
+Focused app-shell, recovery, adapter and conditional-owner coverage passes
+eight files / 105 tests. Nine targeted production-preview Chromium
+transactions cover Default/Custom ownership, reset, setup import, sharing,
+legacy migration, invalid local state and cross-tab behavior. The complete
+read-only Darwin suite passes 26/26 against the reviewed baselines.
+
+The combined repository verification passes the 173-source / 158-client /
+eight-external-entrypoint zero-cycle architecture gate, 1,085/1,085 unit
+tests, 19/19 goldens, typecheck, production build, lint and format. The
+artifact contains 20 JavaScript chunks and a 779,983-byte raw / 229,673-byte
+gzip direct entry with SHA-256
+`6071cf259ec7069a2d94e3f37873b227ea2f1c40565181677583f49bbdf72848`.
+Real conditional loading of setup reviews, the share dialog, legacy migration
+presentation/view-model and local-state attention resolved the previous D-098
+overage without changing the 230,000-byte budget, persistence semantics or
+user-visible transaction ownership.
+
+## 2026-07-21 browser file-export outcomes
+
+The browser adapter now returns a closed requested/failed result after one
+pretty serialization, a connected hidden-anchor click and delayed one-shot
+object-URL cleanup. Setup, saved Duel setup, PriceSet, Workspace and recovery
+owners map that result to fixed started/failed copy. The flows retain their
+existing envelopes and privacy boundaries; export does not close a setup
+review, PriceSet reset confirmation or recovery clear action, and visible live
+notices suppress an identical hidden global announcement.
+
+Focused adapter, five-workflow controller and shared presentation coverage
+passes nine files / 85 tests. The direct adapter matrix covers UTF-8 byte count,
+MIME/name/`rel`, connected synchronous click, immediate anchor removal,
+delayed revoke, serialization/browser-API/append/click failure and raw-error
+non-disclosure. Six production-preview download transactions pass across the
+five files plus injected setup failure; every actual download event carries the
+existing filename and schema/privacy content. Typecheck, targeted ESLint,
+format checks, build and the 167-source / 152-client-reachable /
+eight-external-entrypoint zero-cycle architecture check pass.
+
+The first complete Chromium run passed 115/119; its four failures were all the
+same strict locator ambiguity introduced when the recovery notice label began
+with its parent region's accessible name. Renaming only that child label to
+`Recovery export notice` made the four exact reruns pass 4/4. A later final
+release gate will record the next single-run full-suite count. Current evidence
+is `LOCAL_RUNTIME` / synthetic browser evidence and proves download request
+dispatch, not final filesystem persistence, live providers or deployment.
+
+## 2026-07-21 cross-tab local-state conflict safety
+
+The implemented controller owns a closed ten-area registry, exact raw
+baselines, event coalescing, per-area write suspension and synchronous
+pre-write freshness checks. Settings exposes metadata-only review, Workspace
+rescue, fresh reload-based `Use saved data`, verified batched `Keep this tab's
+data` and postimage-guarded exact-raw Undo. Safe-session storage installs no
+browser listener, invalid or unsupported external values remain untouched and
+the legacy-migration dismissal key stays outside the contract.
+
+Focused controller, component, recovery and transaction coverage passes eight
+files / 87 tests. Typecheck and the 165-source / 150-client-reachable /
+eight-external-entrypoint zero-cycle architecture check pass. The complete
+functional Chromium suite passes 117/117 with one worker, including the real
+two-page stale-write, Settings-review, Keep and Undo transaction. The first
+read-only Darwin visual comparison passed its first 20 scenarios before the
+local preview server exited; a scoped fresh-server rerun passes the remaining
+six scenarios 6/6 with no snapshot writes or image diffs. Targeted ESLint for
+the new source boundary passes, while the repository-wide command remains
+polluted by the existing generated `.codex-tmp/goal-dist` tree. `git diff
+--check` passes. This is `LOCAL_RUNTIME` / synthetic local-browser evidence,
+not an atomic-locking, multi-device-sync, live-provider or deployment claim.
+
 ## 2026-07-20 Hiscores Apply/Undo transaction
 
 The implemented App-owned transaction rechecks normalized-player freshness,
