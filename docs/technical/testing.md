@@ -109,6 +109,25 @@ npm run format:check
 
 Playwright and visual suites remain separate environment-dependent gates.
 
+Install the lockfile-matched browser engines and run the browser release gates
+with:
+
+```sh
+npx playwright install chromium firefox webkit
+npm run test:e2e
+npm run test:e2e:cross-browser
+npm run test:e2e:release
+npm run test:e2e:visual
+```
+
+`test:e2e` remains the complete Chromium functional owner.
+`test:e2e:cross-browser` serves one production preview on port 5176 and runs
+only CB-01 through CB-12 serially in Firefox, desktop WebKit and iPhone 13
+WebKit emulation. `test:e2e:release` composes the two functional commands; the
+read-only Darwin visual suite remains a separate gate. Missing browser binaries
+must fail with Playwright's install instruction rather than skip. Playwright
+WebKit and device emulation are not branded Safari or physical-iOS evidence.
+
 For an account-free Cloudflare bundle check after deployment-shape changes, run:
 
 ```sh
@@ -182,6 +201,7 @@ node -e "for (const f of ['prices.json','price-provenance.json','alch.json','pri
 - Browser JSON export outcomes: include `src/tests/browser-download.test.ts`, `src/tests/duel-file-transfer.test.ts` and the setup, PriceSet, Workspace and recovery controller suites. Prove one pretty serialization, exact MIME/name/byte count, a connected non-focusable anchor, synchronous click, immediate DOM removal, delayed one-shot URL revoke, closed serialization/browser-API/dispatch failure and raw-error non-disclosure. Production-preview coverage must observe real download events and exact started copy for setup, saved setups, PriceSet, Workspace and recovery files, inspect their existing privacy/schema boundaries and inject one synchronous browser-API failure. The browser evidence proves request dispatch only, not final filesystem persistence.
 - Duel-only legacy import readiness: include `src/tests/legacy-migration-view-model.test.ts`, `src/tests/legacy-migration-setup.test.ts`, `src/tests/ui-adapters.test.ts` and the Duel-only transaction in `src/tests/e2e/persistence-migration.spec.ts`. Prove non-empty plan-derived readiness, singular/plural area count independent of field audit count, defensive empty Duel non-actionability, inspector cap/collision/skips and the existing merge transaction. Browser evidence must seed no top-level active setup field, preserve the current rewrite setup and legacy key, persist/display the saved setup, dismiss the review and retain the result across reload.
 - Assistive-technology accessibility: `src/tests/e2e/accessibility-manifest.ts` owns the exact AT-01 through AT-12 fixtures, entry points, outcomes, announcements, automated checkpoints and manual steps. Run `npm run test -- src/tests/accessibility-manifest.test.ts src/tests/searchable-select-field.test.tsx src/tests/numeric-field-components.test.tsx src/tests/app-shell-components.test.tsx`, `npm run test:a11y`, the complete functional Chromium suite and the read-only visual suite. The dedicated accessibility config builds and serves a deterministic production preview on port 5174; axe runs WCAG 2 A/AA, 2.1 A/AA and 2.2 AA tags and fails every undispositioned impact without broad exclusions. The separate 320 CSS-pixel / 200% text case owns automated reflow, while [the manual runbook](testing/accessibility-manual.md) owns required VoiceOver/Safari plus NVDA/browser evidence. A passing npm command is not screen-reader evidence or certification.
+- Cross-browser release support: `src/tests/e2e/cross-browser-release.spec.ts` owns CB-01 through CB-12 and `playwright.cross-browser.config.ts` owns only the `firefox`, `webkit` and `webkit-mobile` projects. Prove all pane chunks, representative module-Worker calculations, numeric/native/searchable inputs, setup/Duel/Loot/PriceSet/Planner reload state, invalid-state recovery, keyboard-triggered setup/Workspace downloads with focus retention, Share hash/dialog/fallback, mocked same-origin integrations, keyboard navigation, 390 px containment, two-page storage resolution and sanitized pane failure. Every HTTP(S) origin outside the preview and every unexpected console/page error fails the manifest. Use one worker for the durable gate; a one-time full Firefox/WebKit discovery audit may be broader but its failures and dispositions belong in testing evidence. Do not infer branded Safari, physical iOS, Edge, ESR or historical-version support from Playwright projects.
 - Lazy pane loading and failure isolation: include `src/tests/pane-delivery.test.tsx`, `src/tests/application-error-boundary.test.tsx`, `src/tests/app-shell-components.test.tsx`, `src/tests/economy-settings-pane.test.ts` and `src/tests/e2e/pane-delivery.spec.ts`. Prove the exhaustive family map, Compare-only initial lazy request, monotonic/shared family activation, named active and silent hidden loading, sanitized loader failure with Reload only, post-load subtree Retry/focus return, mounted control state, one feature request per family, exact saved-storage preservation and nested Workspace sibling survival. Run `npm run startup:measure -- --runs 5` to capture separate shell/initial-pane JavaScript checkpoints, then run typecheck, architecture, build, artifact verification, complete functional Chromium and read-only visual gates. Do not treat workstation startup samples as universal latency SLAs or claim fewer total artifact bytes.
 - Setup replacement review and Undo: include `src/tests/setup-file-transfer-controller.test.ts`, `src/tests/setup-import-review.test.tsx`, share/setup-state coverage and focused import plus saved-setup Playwright transactions. Prove preparation has no mutation authority, latest request wins, review output is resolved and bounded, Dismiss/stale consume are no-ops, Apply covers all six setup families, durable/session-only Undo restores the complete prior setup and saved-row Load preserves the saved collection and current target.
 - Active setup reset: follow [the implemented reset contract](active-setup-reset-spec.md) with `active-setup-reset.test.ts`, `active-setup-reset-review.test.tsx`, `ui-adapters.test.ts`, `planner-ui-state.test.ts` and the `Reset active setup` Playwright transactions in `e2e/loadout.spec.ts`. Prove target/style/mode preservation, reset of all three style caches, correct Default/current-target Custom ownership, no mutation before Confirm, stale/no-op safety, one complete durable/session-only Apply/Undo and non-interference with Duel/custom collections, Dense, Cannon, loot, PriceSet, manual prices, histories and Hiscores.

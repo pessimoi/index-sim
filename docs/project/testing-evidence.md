@@ -5,6 +5,59 @@ It does not own current commands, required gates or test strategy; those remain 
 [the testing guide](../technical/testing.md). Counts and artifact hashes below
 apply only to the source state described by each entry.
 
+## 2026-07-21 cross-browser release support
+
+The durable browser release boundary now keeps the complete Chromium functional
+suite separate and adds one owned CB-01 through CB-12 manifest in
+`playwright.cross-browser.config.ts`. The manifest activates every Workbench
+pane and covers module Workers, numeric/native/searchable inputs, reload state,
+invalid-state recovery, keyboard-triggered setup and Workspace downloads,
+Share hash/dialog/fallback, mocked same-origin integrations, keyboard
+navigation, 390 px containment, two-page storage resolution and pane failure
+isolation. Every page in the browser context contributes to the no-live-external
+HTTP(S), unexpected-console-error and unhandled-page-error gates. CB-12's only
+allowlist is limited to exact engine messages from its deliberately aborted Trip
+module.
+
+The final permanent gate passes 36/36 with one worker: 12/12 in Playwright
+Firefox 151.0, 12/12 in desktop Playwright WebKit 26.5 and 12/12 in iPhone 13
+WebKit emulation. The separately retained complete Chromium 149.0.7827.55 suite
+passes 138/138, and `--list` proves it selects 138 tests while the dedicated
+configuration selects only the 36 manifest project cases. The read-only Darwin
+visual owner passes 26/26 without baseline writes. A deliberately empty
+`PLAYWRIGHT_BROWSERS_PATH` run failed with exit code 1, the exact missing
+Firefox executable path and Playwright's `npx playwright install` instruction;
+the temporary empty directory was removed afterward.
+
+The required one-time full discovery audit ran all 138 existing functional
+cases once in Firefox and once in desktop WebKit: 265/276 passed in the initial
+four-worker run. The 11 findings had four shared dispositions rather than
+browser skips: WebKit short `Intl` output used `at` instead of the canonical
+comma; pointer click focus followed Safari/WebKit semantics instead of the
+keyboard-origin contract; native Planner `<details>` forward/backward Tab order
+differed; and two Firefox Planner cases were resource-sensitive under four
+concurrent browser workers. Shared code now normalizes the short date literal,
+preserves an already focused export trigger and gives the Planner gear editor
+deterministic Tab/Shift+Tab handling. Focus assertions invoke exports and
+Recompute from an explicitly focused keyboard trigger. The two WebKit date
+rows passed their focused rerun, the remaining seven WebKit rows passed 7/7
+serially and the two Firefox Planner rows passed 2/2 serially. The durable
+cross-browser gate intentionally remains one-worker and has no engine skip or
+user-agent product branch.
+
+Repository verification covers 173 source modules with no cycles, 158
+client-reachable modules, eight documented external entrypoints, 1,085/1,085
+unit tests and 19/19 goldens. The final artifact passes 27 files, 20 JavaScript
+chunks and a 780,940 raw / 230,000 gzip entry against the unchanged D-098
+limits; total size is 2,393,892 bytes and SHA-256 is
+`ff6d13a948d56385f3640039402e43815fe3a5c41b16507459ba64ee47ff95b7`.
+
+This is deterministic local Playwright engine evidence. Branded stable Safari
+smoke was `not run`, so Safari support is not claimed. Physical iPhone/iPad
+evidence was `not run`; mobile WebKit is explicitly emulation only. The
+separate VoiceOver/Safari and NVDA manual accessibility rows also remain
+`not run`, so this entry makes no screen-reader or WCAG-conformance claim.
+
 ## 2026-07-21 lazy pane loading and failure isolation
 
 The Workbench now initializes one requested lazy family, Compare, and adds an
@@ -17,8 +70,8 @@ boundary. A lazy loader failure offers Reload only; a post-load render or
 lifecycle failure can remount just that pane and returns focus to the active
 tabpanel after success.
 
-The focused registry/boundary, root-boundary, shell and Economy/Settings suites
-pass 32/32 tests. The production-preview pane suite passes 5/5 with a real
+The focused registry/boundary, root-boundary, shell, Economy/Settings and
+deployment-readiness suites pass 45/45 tests. The production-preview pane suite passes 5/5 with a real
 emitted build: cold startup excludes every unvisited pane chunk, throttled
 Compare and Risk expose named loading, Risk is requested once and retains its
 control value, Economy/Settings share one request, Workspace starts only under
@@ -27,17 +80,22 @@ the exact saved-storage snapshot remains unchanged. A failed Workspace import
 leaves Calculation context and Price data available. The build keeps separate
 hashed Compare, Loadout, Duel, Loot, Trip, Risk, Cannon, Planner,
 Economy/Settings and Workspace chunks. Artifact validation passes 27 files,
-20 JavaScript chunks and a 779,983 raw / 229,673 gzip direct entry against the
+20 JavaScript chunks and a 780,799 raw / 229,940 gzip direct entry against the
 unchanged 800,000 / 230,000 limits; the deterministic artifact SHA-256 is
-`6071cf259ec7069a2d94e3f37873b227ea2f1c40565181677583f49bbdf72848`.
+`ed1c337fc68e00df4133176dfd6f1e94da1f1fd5e89ea4ba0a15930194fe303b`.
 
-One local cold/warm command-contract sample (`--skip-build --runs 1`) recorded
-shell and initial-pane checkpoints. The cold sample reported shell ready at
-711 ms with two JavaScript requests / 282,567 transfer bytes, then initial
-Compare ready at 1,106 ms with four requests / 363,738 transfer bytes. This
-single workstation sample verifies the additive fields and requested-path
-lists only; it is not the required five-pair release comparison or a latency
-SLA.
+The complete functional Chromium matrix passes 138/138 after the first-visit
+focus owner waits for the requested pane's ready state, and the read-only
+Darwin visual matrix passes 26/26 without baseline writes.
+
+Five local cold/warm pairs (`--skip-build --runs 5`) recorded the final shell
+and initial-pane checkpoints. Cold medians were 474 ms shell ready with two
+JavaScript requests / 282,833 transfer bytes, then 785 ms initial Compare ready
+with four requests / 364,004 transfer bytes. Warm medians were 330 ms and
+539 ms respectively. Every initial-pane sample listed the two entry/runtime
+paths, Compare chunk and calculation Worker; no optional unvisited pane path
+appeared. These are workstation comparison measurements, not universal
+latency SLAs.
 
 ## 2026-07-21 assistive-technology accessibility automation
 

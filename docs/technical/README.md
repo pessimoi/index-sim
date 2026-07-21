@@ -42,7 +42,7 @@
 - [file-export-outcome-feedback-spec.md](file-export-outcome-feedback-spec.md): implemented typed browser download dispatch and truthful started/failed feedback for every existing JSON export.
 - [duel-only-legacy-import-readiness-spec.md](duel-only-legacy-import-readiness-spec.md): implemented import-plan-derived gating that makes already validated Duel-only legacy data actionable.
 - [assistive-technology-accessibility-spec.md](assistive-technology-accessibility-spec.md): implemented WCAG 2.2 AA journey manifest, automated scans and semantic repairs; the VoiceOver/NVDA release gate remains open.
-- [cross-browser-release-support-spec.md](cross-browser-release-support-spec.md): specced Firefox/WebKit/mobile-WebKit functional manifest, browser-API contract and bounded Safari support claim.
+- [cross-browser-release-support-spec.md](cross-browser-release-support-spec.md): implemented Firefox/WebKit/mobile-WebKit CB-01 through CB-12 release manifest, browser-API/diagnostic gates and bounded Safari support claim.
 - [lazy-pane-loading-failure-isolation-spec.md](lazy-pane-loading-failure-isolation-spec.md): implemented Compare-only initial pane request, first-activation optional families, named loading feedback, mounted revisits and pane-local failure recovery.
 - [price-set-transfer-controller-spec.md](price-set-transfer-controller-spec.md): implemented PriceSet import/acceptance/export/reset transaction extraction with typed caller-owned runtime application.
 - [price-set-import-discoverability-spec.md](price-set-import-discoverability-spec.md): implemented D-102 workflow with one advanced Market-owned full-PriceSet disclosure, explicit replacement/format guidance and no topbar/Settings duplicates.

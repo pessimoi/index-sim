@@ -1,6 +1,6 @@
 # Cross-browser release support specification
 
-- Status: specification ready; implementation not started
+- Status: automated release gate implemented; branded Safari smoke not run
 - Date: 2026-07-21
 - Priority: high
 - Estimated effort: L
@@ -14,7 +14,7 @@
 Add Firefox and WebKit evidence to the Chromium-only functional release gate,
 then state browser support no more broadly than the evidence allows.
 
-The current 115-case production-preview suite and all visual baselines run only
+The current 138-case production-preview suite and all visual baselines run only
 with Playwright Chromium. That gives strong product coverage in one engine but
 does not exercise browser-sensitive behavior such as module Workers,
 `localStorage`, file input/download, object-URL lifetime, clipboard fallback,
@@ -42,25 +42,32 @@ Playwright Firefox uses a patched recent Firefox build, and Playwright WebKit is
 not the branded Safari application. Automated engine evidence alone must not be
 described as a real-Safari or real-device certification.
 
-## Verified current state and problem
+## Implemented state
 
-- `playwright.config.ts` defines one `chromium` project using `Desktop Chrome`.
+- `playwright.config.ts` retains one complete `chromium` project using
+  `Desktop Chrome` and excludes only visual cases plus the separately owned
+  cross-browser manifest.
 - `playwright.visual.config.ts` explicitly sets `browserName: "chromium"` and
   stores one platform-named snapshot family.
 - `npm run test:e2e` runs the complete functional production-preview suite only
   in Chromium.
-- The current testing guide records the passing result as a Chromium gate and
-  contains no supported-browser matrix.
-- The repository depends on Playwright but does not require Firefox or WebKit
-  binaries as a documented local release prerequisite.
+- `playwright.cross-browser.config.ts` runs only CB-01 through CB-12 in
+  lockfile-pinned Firefox, desktop WebKit and iPhone 13 WebKit emulation on one
+  production preview with one worker, retry traces and failure screenshots.
+- `npm run test:e2e:cross-browser` owns the bounded multi-engine manifest;
+  `npm run test:e2e:release` runs the complete Chromium suite followed by that
+  manifest.
+- The testing and operations guides own the browser installation command,
+  reproducible command matrix and evidence boundaries.
 - No active GitHub Actions capacity exists in this checkout. Browser evidence
   is currently a repository/local handoff gate, not an active hosted CI matrix.
 - Browser code uses module Workers, browser storage, session storage, File and
   Blob/Object URL APIs, programmatic downloads, clipboard, native dialog,
   `history.replaceState`, URL fragments, animation frames and same-origin
   fetches.
-- Existing E2E tests contain no browser-name skips or engine-specific product
-  branches. This is a useful starting point, not proof of compatibility.
+- No browser-name skip, user-agent product branch, live provider request or
+  broad console-error exception was added. CB-12 permits only the exact
+  engine messages caused by its deliberately aborted pane module.
 
 ## Feature-inventory check
 

@@ -108,8 +108,10 @@ The implementation order is:
    semantics, zero-finding axe checkpoints and 320 CSS-pixel / 200% text
    reflow evidence. The required VoiceOver/Safari and NVDA/browser manual rows
    remain `not run`, so the supported-release accessibility statement stays open.
-5. [Cross-browser release support](../technical/cross-browser-release-support-spec.md)
-   adds Firefox/WebKit evidence and constrains branded Safari claims.
+5. [Implemented cross-browser release support](../technical/cross-browser-release-support-spec.md)
+   retains the complete Chromium suite and adds the bounded CB-01 through
+   CB-12 manifest in Firefox, desktop WebKit and mobile WebKit emulation. It
+   does not claim branded Safari or physical iOS support.
 6. [Implemented lazy pane loading and failure isolation](../technical/lazy-pane-loading-failure-isolation-spec.md)
    requests Compare initially and optional pane families on first activation,
    retains visited pane state, replaces blank waits with named status and keeps

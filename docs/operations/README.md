@@ -50,6 +50,31 @@ installed Playwright Chromium; when it is absent, use
 `npx playwright install chromium` and rerun. They use committed data and do not
 call a live Hiscores or market provider.
 
+## Browser release matrix
+
+Install the repository's lockfile-matched engines with:
+
+```sh
+npx playwright install chromium firefox webkit
+```
+
+The repository-owned automated matrix is:
+
+| Evidence target                             | Command                          | Claim boundary                                     |
+| ------------------------------------------- | -------------------------------- | -------------------------------------------------- |
+| Complete Chromium functional suite          | `npm run test:e2e`               | Playwright Chromium engine                         |
+| Firefox + desktop/mobile WebKit CB-01…CB-12 | `npm run test:e2e:cross-browser` | Playwright engine and device-emulation evidence    |
+| Both functional gates in release order      | `npm run test:e2e:release`       | No visual or real-device evidence implied          |
+| Darwin visual baselines                     | `npm run test:e2e:visual`        | Chromium pixel evidence on the named host platform |
+
+The cross-browser manifest uses deterministic committed data and mocked
+same-origin integrations; any live external HTTP(S) request fails it. A missing
+browser executable is a prerequisite failure and must retain Playwright's
+actionable install output. Playwright WebKit is not the branded Safari app, and
+the iPhone project is emulation rather than a physical iPhone/iPad. Do not
+publish Safari or real-iOS support wording until the manual stable-Safari and
+approved physical-device/device-lab evidence is dated in the testing log.
+
 If the requested port is occupied, inspect the listener separately or choose an
 explicit free port. The checked command never kills or silently reuses an
 unknown process. On readiness failure it exits non-zero, prints bounded browser
