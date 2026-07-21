@@ -820,7 +820,6 @@ export function App() {
   const selectedPriceItemRef = useRef<HTMLDivElement>(null);
   const loadoutWeaponTriggerRef = useRef<HTMLButtonElement>(null);
   const tripFoodPerKillOverrideRef = useRef<HTMLSelectElement>(null);
-  const plannerNoticeActionIdRef = useRef(0);
   const priceHistoryReviewReturnFocusRef = useRef<HTMLButtonElement>(null);
   const priceHistoryReviewHeadingRef = useRef<HTMLHeadingElement>(null);
   const priceHistoryManagementSummaryRef = useRef<HTMLElement>(null);
@@ -833,6 +832,64 @@ export function App() {
   const handledEconomyReviewRequestRef = useRef(0);
   const handledWorkspaceReviewIdRef = useRef(0);
   const workspaceExecutionRef = useRef<WorkspaceRestoreExecutionInput | null>(null);
+  const pendingPaneFocusRef = useRef<{
+    id: number;
+    tabId: WorkbenchTabId;
+    target(): HTMLElement | null;
+  } | null>(null);
+  const nextPaneFocusIdRef = useRef(0);
+  const [paneFocusRevision, setPaneFocusRevision] = useState(0);
+
+  const focusPaneTarget = useCallback(
+    (tabId: WorkbenchTabId, target: () => HTMLElement | null): void => {
+      nextPaneFocusIdRef.current += 1;
+      pendingPaneFocusRef.current = { id: nextPaneFocusIdRef.current, tabId, target };
+      setPaneFocusRevision(nextPaneFocusIdRef.current);
+      activateWorkbenchTab(tabId);
+    },
+    [activateWorkbenchTab]
+  );
+
+  useEffect(() => {
+    const request = pendingPaneFocusRef.current;
+    if (!request || request.id !== paneFocusRevision) return;
+    if (activeTab !== request.tabId) {
+      pendingPaneFocusRef.current = null;
+      return;
+    }
+    if (paneLoadStates[paneFamilyForTab(request.tabId)] !== "ready") return;
+
+    let frameId = 0;
+    let timeoutId = 0;
+    const attemptFocus = (): boolean => {
+      if (pendingPaneFocusRef.current?.id !== request.id) return true;
+      const target = request.target();
+      if (!target) return false;
+      target.focus({ preventScroll: true });
+      const bounds = target.getBoundingClientRect();
+      if (bounds.top < 0 || bounds.bottom > window.innerHeight) {
+        target.scrollIntoView({ block: "nearest" });
+      }
+      pendingPaneFocusRef.current = null;
+      return true;
+    };
+    const observer = new MutationObserver(() => {
+      if (!attemptFocus()) return;
+      observer.disconnect();
+      window.clearTimeout(timeoutId);
+    });
+    frameId = window.requestAnimationFrame(() => {
+      if (attemptFocus()) return;
+      const panel = document.getElementById("workbench-active-panel");
+      if (panel) observer.observe(panel, { childList: true, subtree: true });
+      timeoutId = window.setTimeout(() => observer.disconnect(), 5_000);
+    });
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.clearTimeout(timeoutId);
+      observer.disconnect();
+    };
+  }, [activeTab, paneFocusRevision, paneLoadStates]);
 
   const setPriceNoticeActionRef = useCallback(
     (noticeId: string, element: HTMLButtonElement | null) => {
@@ -851,6 +908,7 @@ export function App() {
       !request ||
       request.id === handledPriceItemReviewRequestRef.current ||
       activeTab !== "economy" ||
+      paneLoadStates["economy-settings"] !== "ready" ||
       (request.action.kind === "correct-price" && manualPriceItemId !== request.action.itemId) ||
       (request.action.kind === "inspect-item" && !priceNotesOpen)
     ) {
@@ -879,7 +937,7 @@ export function App() {
       handledPriceItemReviewRequestRef.current = request.id;
     });
     return () => window.cancelAnimationFrame(frameId);
-  }, [activeTab, manualPriceItemId, priceItemReviewRequest, priceNotesOpen]);
+  }, [activeTab, manualPriceItemId, paneLoadStates, priceItemReviewRequest, priceNotesOpen]);
 
   /* eslint-disable react-hooks/set-state-in-effect -- External storage revisions reset the bounded conflict review selection. */
   useEffect(() => {
@@ -910,10 +968,8 @@ export function App() {
     ) {
       return;
     }
-    if (
-      activeTab !== "settings" ||
-      (!localStateRecovery.report.hasAttention && crossTabConflicts.conflicts.length === 0)
-    ) {
+    if (activeTab !== "settings" || paneLoadStates["economy-settings"] !== "ready") return;
+    if (!localStateRecovery.report.hasAttention && crossTabConflicts.conflicts.length === 0) {
       handledLocalStateReviewRequestRef.current = localStateReviewRequest;
       return;
     }
@@ -937,12 +993,14 @@ export function App() {
     activeTab,
     crossTabConflicts.conflicts.length,
     localStateRecovery.report.hasAttention,
-    localStateReviewRequest
+    localStateReviewRequest,
+    paneLoadStates
   ]);
 
   useEffect(() => {
     if (
       activeTab !== "economy" ||
+      paneLoadStates["economy-settings"] !== "ready" ||
       economyReviewRequest === 0 ||
       economyReviewRequest === handledEconomyReviewRequestRef.current
     ) {
@@ -955,12 +1013,13 @@ export function App() {
       if (heading) handledEconomyReviewRequestRef.current = economyReviewRequest;
     });
     return () => window.cancelAnimationFrame(frameId);
-  }, [activeTab, economyReviewRequest]);
+  }, [activeTab, economyReviewRequest, paneLoadStates]);
 
   useEffect(() => {
     const reviewId = priceHistoryReview?.candidate.id;
     if (
       activeTab !== "economy" ||
+      paneLoadStates["economy-settings"] !== "ready" ||
       !reviewId ||
       focusedPriceHistoryReviewIdRef.current === reviewId
     ) {
@@ -973,7 +1032,7 @@ export function App() {
       if (heading) focusedPriceHistoryReviewIdRef.current = reviewId;
     });
     return () => window.cancelAnimationFrame(frameId);
-  }, [activeTab, priceHistoryReview]);
+  }, [activeTab, paneLoadStates, priceHistoryReview]);
 
   useEffect(() => {
     if (!lastHiscoresPlayerState && workspaceIncludesLastHiscoresPlayer) {
@@ -983,7 +1042,12 @@ export function App() {
 
   useEffect(() => {
     const reviewId = workspaceFileTransfer.review?.id;
-    if (!reviewId || reviewId === handledWorkspaceReviewIdRef.current || activeTab !== "settings") {
+    if (
+      !reviewId ||
+      reviewId === handledWorkspaceReviewIdRef.current ||
+      activeTab !== "settings" ||
+      paneLoadStates["economy-settings"] !== "ready"
+    ) {
       return;
     }
     const frameId = window.requestAnimationFrame(() => {
@@ -995,10 +1059,10 @@ export function App() {
           heading.scrollIntoView({ block: "nearest" });
         }
       }
-      handledWorkspaceReviewIdRef.current = reviewId;
+      if (heading) handledWorkspaceReviewIdRef.current = reviewId;
     });
     return () => window.cancelAnimationFrame(frameId);
-  }, [activeTab, workspaceFileTransfer.review?.id]);
+  }, [activeTab, paneLoadStates, workspaceFileTransfer.review?.id]);
 
   useEffect(() => {
     if (activeTab !== "settings" || workspaceFileTransfer.notice?.tone !== "error") return;
@@ -1753,6 +1817,7 @@ export function App() {
             ? "loot"
             : "compare";
     if (activeTab !== destination) return;
+    if (paneLoadStates[paneFamilyForTab(destination)] !== "ready") return;
     const stillPresent = monsterSpecificChanges.rows
       .find((row) => row.monsterId === request.monsterId)
       ?.categories.some((category) => category.kind === request.kind);
@@ -1785,7 +1850,13 @@ export function App() {
       window.cancelAnimationFrame(firstFrame);
       if (secondFrame) window.cancelAnimationFrame(secondFrame);
     };
-  }, [activeTab, denseCompareRows, monsterSpecificChanges.rows, monsterSpecificReviewRequest]);
+  }, [
+    activeTab,
+    denseCompareRows,
+    monsterSpecificChanges.rows,
+    monsterSpecificReviewRequest,
+    paneLoadStates
+  ]);
 
   const applyWorkspaceLiveState = (outcome: WorkspaceRestoreLiveOutcome): void => {
     const selected = new Set(outcome.selectedIds);
@@ -2744,8 +2815,7 @@ export function App() {
   };
   const reviewPriceData = () => {
     setPriceNotesOpen(true);
-    activateWorkbenchTab("economy");
-    window.requestAnimationFrame(() => priceNotesSummaryRef.current?.focus());
+    focusPaneTarget("economy", () => priceNotesSummaryRef.current);
   };
 
   const exportWorkspace = () => {
@@ -2850,31 +2920,14 @@ export function App() {
   };
 
   const reviewPlannerNotice = (action: PlannerNoticeAction): void => {
-    plannerNoticeActionIdRef.current += 1;
-    const requestId = plannerNoticeActionIdRef.current;
-    const focusInNextFrame = (target: () => HTMLElement | null): void => {
-      window.requestAnimationFrame(() => {
-        if (plannerNoticeActionIdRef.current !== requestId) return;
-        const element = target();
-        element?.focus({ preventScroll: true });
-        if (!element) return;
-        const bounds = element.getBoundingClientRect();
-        if (bounds.top < 0 || bounds.bottom > window.innerHeight) {
-          element.scrollIntoView({ block: "nearest" });
-        }
-      });
-    };
-
     if (action.kind === "review-loadout") {
       setPriceItemReviewRequest(null);
-      activateWorkbenchTab("loadout");
-      focusInNextFrame(() => loadoutWeaponTriggerRef.current);
+      focusPaneTarget("loadout", () => loadoutWeaponTriggerRef.current);
       return;
     }
     if (action.kind === "review-trip") {
       setPriceItemReviewRequest(null);
-      activateWorkbenchTab("trip");
-      focusInNextFrame(() => tripFoodPerKillOverrideRef.current);
+      focusPaneTarget("trip", () => tripFoodPerKillOverrideRef.current);
       return;
     }
     if (action.kind === "correct-price") {
@@ -2909,8 +2962,7 @@ export function App() {
           message: "That Planner price item is no longer available. Showing the current price data."
         });
       }
-      activateWorkbenchTab("economy");
-      focusInNextFrame(() =>
+      focusPaneTarget("economy", () =>
         itemAvailable ? selectedPriceItemRef.current : marketHeadingRef.current
       );
     }

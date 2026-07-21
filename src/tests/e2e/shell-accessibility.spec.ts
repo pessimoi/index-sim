@@ -1067,6 +1067,7 @@ test("keeps explicit setup actions, Risk controls and setup summaries readable",
   await tabs.getByRole("tab", { name: "Setups" }).click();
   await page.setViewportSize({ width: 1024, height: 720 });
   const duelControls = page.getByLabel("Saved setup controls");
+  await expect(duelControls).toBeVisible();
   await expect(duelControls.getByText("Current target", { exact: true })).toHaveCount(0);
   const duelActionBoxes = await duelControls
     .locator(".duel-control-actions > button, .duel-control-actions > details > summary")

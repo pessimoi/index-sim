@@ -70,6 +70,7 @@ export function requestJsonDownload(fileName: string, value: unknown): JsonDownl
   }
 
   let anchor: HTMLAnchorElement;
+  const focusTarget = document.activeElement;
   try {
     anchor = document.createElement("a");
     anchor.href = objectUrl;
@@ -91,6 +92,11 @@ export function requestJsonDownload(fileName: string, value: unknown): JsonDownl
       anchor.remove();
     } catch {
       // The bounded URL cleanup above still runs even if DOM cleanup fails.
+    }
+    try {
+      if (focusTarget instanceof HTMLElement) focusTarget.focus();
+    } catch {
+      // Focus restoration is best-effort and must not replace the download outcome.
     }
   }
 

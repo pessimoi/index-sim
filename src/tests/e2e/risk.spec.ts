@@ -2,7 +2,10 @@ import { chooseSearchableOption, expect, searchableCombobox, test } from "./scaf
 
 test("runs, invalidates and cancels modeled Risk analysis", async ({ page }) => {
   await page.goto("/");
-  await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Risk" }).click();
+  const tabs = page.getByLabel("Workbench tabs");
+  await tabs.getByRole("tab", { name: "Trip" }).click();
+  await expect(page.locator('[aria-label="Trip summary"]')).toBeAttached();
+  await tabs.getByRole("tab", { name: "Risk" }).click();
 
   const risk = page.locator('section[aria-label="Risk"]');
   await expect(risk).toBeVisible();

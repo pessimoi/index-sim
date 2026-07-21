@@ -543,11 +543,30 @@ export function PlannerPane({ hidden, model, actions }: PlannerPaneProps) {
             }
           }}
         >
-          <summary ref={gearEditorSummaryRef}>
+          <summary
+            ref={gearEditorSummaryRef}
+            onKeyDown={(event) => {
+              if (event.key !== "Tab" || event.shiftKey || !gearEditorOpen) return;
+              const firstOption = gearOptionRefs.current.values().next().value;
+              if (!firstOption) return;
+              event.preventDefault();
+              focusNearest(firstOption);
+            }}
+          >
             Advanced gear pool · {formatNumber(model.gearPoolEditor.totalSelectedCount)}/
             {formatNumber(model.gearPoolEditor.totalOptionCount)}
           </summary>
-          <div className="planner-gear-editor-content" aria-label="Planner gear pool editor">
+          <div
+            className="planner-gear-editor-content"
+            aria-label="Planner gear pool editor"
+            onKeyDown={(event) => {
+              if (event.key !== "Tab" || !event.shiftKey) return;
+              const firstOption = gearOptionRefs.current.values().next().value;
+              if (event.target !== firstOption) return;
+              event.preventDefault();
+              focusNearest(gearEditorSummaryRef.current);
+            }}
+          >
             <div className="planner-gear-slots">
               {model.gearPoolEditor.slots.map((slot) => (
                 <section className="planner-gear-slot" key={slot.slot}>

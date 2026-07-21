@@ -91,7 +91,7 @@ function formatInstant(
   zoneName: "short" | "long",
   includeSeconds: boolean
 ): string {
-  return new Intl.DateTimeFormat(PRICE_TIME_LOCALE, {
+  const formatted = new Intl.DateTimeFormat(PRICE_TIME_LOCALE, {
     timeZone,
     day: "numeric",
     month,
@@ -102,6 +102,9 @@ function formatInstant(
     hourCycle: "h23",
     timeZoneName: zoneName
   }).format(instant);
+  return month === "short" && zoneName === "short"
+    ? formatted.replace(/\s+at\s+/u, ", ")
+    : formatted;
 }
 
 function exactInstant(

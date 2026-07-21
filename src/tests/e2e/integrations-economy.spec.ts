@@ -6,6 +6,7 @@ import {
   expectAppStatus,
   expectPageWidthContained,
   searchableCombobox,
+  searchableInput,
   test
 } from "./scaffold-fixture";
 import { readFileSync } from "node:fs";
@@ -397,7 +398,7 @@ test("keeps manual item drafts and unavailable overrides scoped across base chan
   await expect(priceInput).toHaveValue("777");
 
   await manualItem.click();
-  await panel.getByLabel("Search Manual price item options").fill("big_bones");
+  await searchableInput(panel, "Manual price item").fill("big_bones");
   const bigBonesOption = panel.getByRole("option", { name: "Big bones", exact: true });
   await expect(bigBonesOption).toBeVisible();
   await bigBonesOption.click();

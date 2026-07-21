@@ -786,14 +786,16 @@ test("keeps global actions focused and completes setup export and Import setup r
     (await transferControls.allTextContents()).map((text) => text.trim().replace(/\s+/g, " "))
   ).toEqual(["Import setup", "Export setup", "Share setup"]);
 
+  const exportSetupButton = topbarActions.getByRole("button", { name: "Export setup" });
   const downloadPromise = page.waitForEvent("download");
-  await topbarActions.getByRole("button", { name: "Export setup" }).click();
+  await exportSetupButton.focus();
+  await exportSetupButton.press("Enter");
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe("index-sim-rewrite-setup.json");
   await expect(page.getByLabel("Setup transfer notice")).toHaveText(
     "Setup download started: index-sim-rewrite-setup.json. Check your browser downloads."
   );
-  await expect(topbarActions.getByRole("button", { name: "Export setup" })).toBeFocused();
+  await expect(exportSetupButton).toBeFocused();
   const exportedText = await readDownloadText(download);
   const exported = RewriteSetupTransferEnvelopeV1Schema.parse(JSON.parse(exportedText));
   expect(exported.kind).toBe("index-sim-rewrite-setup");
@@ -1094,16 +1096,18 @@ test("round-trips a full PriceSet through the one advanced Market workflow", asy
   await expect(advancedPriceSetTools).toContainText('"itemPrices"');
   await expect(advancedPriceSetTools).toContainText("complete replacement map, not a patch");
 
+  const exportPriceSetButton = advancedPriceSetTools.getByRole("button", {
+    name: "Export active PriceSet"
+  });
   const downloadPromise = page.waitForEvent("download");
-  await advancedPriceSetTools.getByRole("button", { name: "Export active PriceSet" }).click();
+  await exportPriceSetButton.focus();
+  await exportPriceSetButton.press("Enter");
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(/^index-sim-price-set-.+\.json$/);
   await expect(page.getByLabel("Market action notice")).toHaveText(
     `PriceSet download started: ${download.suggestedFilename()}. Check your browser downloads.`
   );
-  await expect(
-    advancedPriceSetTools.getByRole("button", { name: "Export active PriceSet" })
-  ).toBeFocused();
+  await expect(exportPriceSetButton).toBeFocused();
   const exportedText = await readDownloadText(download);
   const exported = JSON.parse(exportedText);
   expect(exported).toMatchObject({
@@ -1289,8 +1293,10 @@ test("downloads a metadata-only recovery report with truthful request feedback",
   const recovery = page.getByRole("region", { name: "Local state recovery" });
   await expect(recovery).toBeVisible();
 
+  const exportRecoveryButton = recovery.getByRole("button", { name: "Export recovery report" });
   const downloadPromise = page.waitForEvent("download");
-  await recovery.getByRole("button", { name: "Export recovery report" }).click();
+  await exportRecoveryButton.focus();
+  await exportRecoveryButton.press("Enter");
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(
     /^index-sim-local-state-health-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.\d{3}Z\.json$/
@@ -1298,7 +1304,7 @@ test("downloads a metadata-only recovery report with truthful request feedback",
   await expect(recovery.getByLabel("Recovery export notice")).toHaveText(
     `Recovery report download started: ${download.suggestedFilename()}. Check your browser downloads.`
   );
-  await expect(recovery.getByRole("button", { name: "Export recovery report" })).toBeFocused();
+  await expect(exportRecoveryButton).toBeFocused();
   const exportedText = await readDownloadText(download);
   const exported = JSON.parse(exportedText) as {
     itemCount: number;
@@ -1330,7 +1336,8 @@ test("keeps a synchronous browser download failure fixed, focused and recoverabl
   await page.goto("/");
   const exportButton = page.getByRole("button", { name: "Export setup" });
 
-  await exportButton.click();
+  await exportButton.focus();
+  await exportButton.press("Enter");
 
   const notice = page.getByLabel("Setup transfer notice");
   await expect(notice).toHaveText("Setup download could not be started. Try again.");

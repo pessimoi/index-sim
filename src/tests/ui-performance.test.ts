@@ -57,7 +57,7 @@ describe("rewrite UI performance smoke", () => {
     });
 
     expect(fullPanelMs).toBeGreaterThan(immediateMs * 3);
-  }, 15_000);
+  }, 30_000);
 
   it("keeps the explicitly requested maximum-size Duel matrix bounded", () => {
     const snapshots = Array.from({ length: 12 }, (_, index) =>

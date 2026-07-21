@@ -18,12 +18,18 @@ describe("browser JSON download request", () => {
     });
     const revokeObjectURL = vi.fn();
     vi.stubGlobal("URL", { createObjectURL, revokeObjectURL });
+    const trigger = document.createElement("button");
+    document.body.appendChild(trigger);
+    trigger.focus();
     const clickedAnchors: HTMLAnchorElement[] = [];
     vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (
       this: HTMLAnchorElement
     ) {
       clickedAnchors.push(this);
       expect(this.isConnected).toBe(true);
+      document.body.tabIndex = -1;
+      document.body.focus();
+      expect(document.activeElement).toBe(document.body);
     });
 
     const result = requestJsonDownload("fixture.json", { nested: { value: "ä" } });
@@ -46,6 +52,7 @@ describe("browser JSON download request", () => {
       hidden: true
     });
     expect(clickedAnchor.isConnected).toBe(false);
+    expect(document.activeElement).toBe(trigger);
     expect(revokeObjectURL).not.toHaveBeenCalled();
 
     vi.runOnlyPendingTimers();

@@ -29,8 +29,12 @@ test("Workspace backup export opens a zero-mutation review and Dismiss returns f
     )
   );
 
+  const downloadWorkspaceButton = panel.getByRole("button", {
+    name: "Download Workspace backup"
+  });
   const downloadPromise = page.waitForEvent("download");
-  await panel.getByRole("button", { name: "Download Workspace backup" }).click();
+  await downloadWorkspaceButton.focus();
+  await downloadWorkspaceButton.press("Enter");
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(
     /^index-sim-workspace-274-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.\d{3}Z\.json$/
@@ -38,7 +42,7 @@ test("Workspace backup export opens a zero-mutation review and Dismiss returns f
   await expect(panel.getByLabel("Workspace transfer notice")).toHaveText(
     `Workspace backup download started: ${download.suggestedFilename()}. Check your browser downloads.`
   );
-  await expect(panel.getByRole("button", { name: "Download Workspace backup" })).toBeFocused();
+  await expect(downloadWorkspaceButton).toBeFocused();
   const exportedText = await readDownloadText(download);
   const exported = JSON.parse(exportedText) as {
     kind: string;

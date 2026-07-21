@@ -70,7 +70,8 @@ test("recomputes the Planner tab workflow from visible planner controls", async 
   await gearPoolSummary.click();
   await expect(gearPoolEditor).toBeHidden();
   const recompute = planner.getByRole("button", { name: "Recompute plan" });
-  await recompute.click();
+  await recompute.focus();
+  await recompute.press("Enter");
   await expect(recompute).toBeFocused();
   await expect(planner.getByText("ready")).toBeVisible();
   await expect(gearPoolEditor).toBeHidden();
@@ -382,13 +383,15 @@ test("uses saved setup comparison to import export rename load delete and persis
   });
   const downloadPromise = page.waitForEvent("download");
   await duel.getByText("Manage saved setups", { exact: true }).click();
-  await duel.getByRole("button", { name: "Export setups" }).click();
+  const exportSetupsButton = duel.getByRole("button", { name: "Export setups" });
+  await exportSetupsButton.focus();
+  await exportSetupsButton.press("Enter");
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe("index-sim-saved-setups.json");
   await expect(duel.getByLabel("Saved setup transfer notice")).toHaveText(
     "Saved setup download started: index-sim-saved-setups.json. Check your browser downloads."
   );
-  await expect(duel.getByRole("button", { name: "Export setups" })).toBeFocused();
+  await expect(exportSetupsButton).toBeFocused();
   const exportedFile = JSON.parse(await readDownloadText(download));
   expect(exportedFile).toMatchObject({
     kind: "index-sim-saved-setups",
