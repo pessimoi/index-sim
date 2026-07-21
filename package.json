@@ -37,6 +37,8 @@
     "deploy:cloudflare:preview": "$NODE scripts/run-cloudflare-release.mjs preview",
     "deploy:cloudflare": "$NODE scripts/run-cloudflare-release.mjs deploy",
     "test:e2e": "playwright test",
+    "test:e2e:cross-browser": "playwright test --config playwright.cross-browser.config.ts",
+    "test:e2e:release": "npm run test:e2e && npm run test:e2e:cross-browser",
     "test:a11y": "playwright test --config playwright.accessibility.config.ts src/tests/e2e/accessibility-audit.spec.ts",
     "test:startup:dev": "$NODE scripts/dev-startup.mjs check",
     "test:e2e:visual": "playwright test --config playwright.visual.config.ts",
