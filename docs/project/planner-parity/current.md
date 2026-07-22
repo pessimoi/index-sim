@@ -1,7 +1,7 @@
 # Legacy Planner parity audit
 
 - Status: classified
-- Evidence date: 2026-07-20
+- Evidence date: 2026-07-22
 - Cases: 16
 - Comparisons: 32
 - Matches: 4
@@ -240,27 +240,27 @@ GP/hour planning remains finite when rune costs outweigh loot value.
 
 - Result: different
 - Classification: source-data-delta
-- Reason: The committed 2026-07-20 market snapshot updates current-product GP/hour metrics and adds a market-observed rune_spear price, removing the price-fallback-used warning. Training order and the bounded configuration/DPS difference set remain unchanged.
+- Reason: The committed 2026-07-22 market snapshot refreshes current-product GP/hour metrics. Training order, selected spell configuration, DPS values, warning set and the bounded difference count remain unchanged.
 - Source: prices.json; price-provenance.json; price-history.json; docs/technical/architecture.md; docs/project/decisions.md D-059/D-060/D-062
 - Difference count: 16
 - Legacy step order: magic -> magic
 - Rewrite step order: magic -> magic
 - Rewrite warning codes: none
 - Legacy digest: `9dbd0105c727379a`
-- Rewrite digest: `82c208b1263ea8fe`
+- Rewrite digest: `994e25e8dcc0023c`
 
 | Path                        | Kind   | Legacy         | Rewrite       |
 | --------------------------- | ------ | -------------- | ------------- |
 | `$.end.config.spellId`      | value  | fire_bolt      | fire_strike   |
 | `$.end.dps`                 | number | 1.829934       | 1.219956      |
-| `$.end.metricValue`         | number | -164731.276636 | -57404.60161  |
+| `$.end.metricValue`         | number | -164731.276636 | -55296.009979 |
 | `$.phases[0].endDps`        | number | 1.829934       | 1.219956      |
-| `$.phases[0].endMetric`     | number | -164731.276636 | -57404.60161  |
+| `$.phases[0].endMetric`     | number | -164731.276636 | -55296.009979 |
 | `$.phases[0].startDps`      | number | 1.822994       | 1.215329      |
-| `$.phases[0].startMetric`   | number | -165079.604202 | -57636.581585 |
+| `$.phases[0].startMetric`   | number | -165079.604202 | -55522.763354 |
 | `$.start.config.spellId`    | value  | fire_bolt      | fire_strike   |
 | `$.start.dps`               | number | 1.822994       | 1.215329      |
-| `$.start.metricValue`       | number | -165079.604202 | -57636.581585 |
+| `$.start.metricValue`       | number | -165079.604202 | -55522.763354 |
 | `$.steps[0].config.spellId` | value  | fire_bolt      | fire_strike   |
 | `$.steps[0].dps`            | number | 1.826533       | 1.217689      |
 

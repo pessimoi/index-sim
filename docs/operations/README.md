@@ -13,7 +13,7 @@ The repo now uses the Vite/React rewrite as the root app path. The old CDN/Babel
 
 Current verified facts:
 
-- `README.md` states Revision 274 and identifies the committed price snapshot as captured on 16 July 2026. The machine-readable source of truth is `prices.json._scraped_at`, which matches `price-provenance.json.capturedAt`.
+- `README.md` states Revision 274 and identifies the committed price snapshot as captured on 22 July 2026. The machine-readable source of truth is `prices.json._scraped_at`, which matches `price-provenance.json.capturedAt`.
 - `index.html` renders a non-empty `starting` shell, installs the DOM-only startup guard and then mounts `src/app/main.tsx` through Vite. The existing React branches replace that shell with canonical `starting`, `ready` or `error` state.
 - `legacy/index.html` can load the old local scripts in script-tag order for reference and parity work.
 - Archived legacy UI text mentions `python run_sim.py`, `/api/prices`, `/api/scrape` and `/api/hiscores`.

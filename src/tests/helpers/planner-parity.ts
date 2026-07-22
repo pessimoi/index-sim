@@ -319,7 +319,7 @@ export function formatPlannerParityReport(
     "# Legacy Planner parity audit",
     "",
     "- Status: " + reportStatus(status),
-    "- Evidence date: 2026-07-20",
+    "- Evidence date: 2026-07-22",
     `- Cases: ${audit.caseCount}`,
     `- Comparisons: ${audit.comparisonCount}`,
     `- Matches: ${matches}`,
