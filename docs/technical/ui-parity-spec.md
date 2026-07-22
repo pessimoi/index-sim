@@ -959,7 +959,8 @@ Current implementation note: Economy is complete for the accepted slice. It
 loads committed `price-history.json` into a read-only shared analysis source and
 merges capped `index-sim:price-history` comparisons only in memory. The UI shows
 shared/local/total counts, movers, sparklines and exact item trend points across
-both sources. `Save local comparison` records the active composed PriceSet;
+both sources. The selected trend item provenance and chart stay adjacent before
+the market-wide top-gainers/top-fallers summary. `Save local comparison` records the active composed PriceSet;
 `Clear local history` requires confirmation and removes only the local key, so
 shared points remain visible. Selected local market prices still win over
 scheduled then bundled prices, while generated high alch wins in every source.

@@ -986,6 +986,7 @@ export function EconomySettingsPane({
               sourceNameUnavailable={history.selectedItem.itemDisplayLabel.source === "fallback"}
             />
           </div>
+          <PriceTrendChart trend={history.trend} />
           <div className="movers-grid" aria-label="Top movers">
             <div className="mover-list" aria-label="Top gainers">
               <h3>Top gainers</h3>
@@ -1018,7 +1019,6 @@ export function EconomySettingsPane({
               )}
             </div>
           </div>
-          <PriceTrendChart trend={history.trend} />
           <div className="dense-table-wrap economy-table-wrap">
             <table className="dense-table" aria-label="Price movers">
               <thead>

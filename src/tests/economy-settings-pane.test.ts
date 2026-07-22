@@ -249,6 +249,7 @@ describe("Economy and Settings pane", () => {
       'aria-label="Local price history lifecycle"',
       'aria-label="Price history summary"',
       'aria-label="Selected item price provenance"',
+      'aria-label="Item price trend"',
       'aria-label="Top movers"',
       'aria-label="Price movers"'
     ]);
