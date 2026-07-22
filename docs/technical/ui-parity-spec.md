@@ -572,8 +572,8 @@ MonsterCard view-model for current target stats, active defence row from
 weapon/ammo/spell setup overview. Target search/select uses the same target
 switch path as SetupBar so custom setups restore consistently. Drop filtering
 shares the dense compare `dropFilter` state instead of creating a second filter
-truth. The validated snapshot monster name is primary, the exact monster id is
-available only in a labelled selectable `Technical details` disclosure, source
+truth. The validated snapshot monster name is primary, the exact selectable
+monster id appears as secondary identity text directly below the name, source
 attack speed is shown as `6 ticks`/`6 game ticks`, and the separately derived
 player speed remains seconds such as `2.4 s`.
 

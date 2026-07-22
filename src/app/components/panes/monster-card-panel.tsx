@@ -73,6 +73,12 @@ export function MonsterCardPanel({
         <div className="section-title-row">
           <div>
             <h2>{card.monsterName}</h2>
+            <p className="monster-card-subtitle">
+              <span>Monster ID</span> <code>{card.monsterId}</code>
+              {card.monsterDisplayLabel.source === "fallback" ? (
+                <span className="monster-card-name-source">Source name unavailable</span>
+              ) : null}
+            </p>
           </div>
           <span
             className={`status-pill ${card.setupBadge.tone === "custom" ? "ready" : ""}`}
@@ -139,23 +145,6 @@ export function MonsterCardPanel({
             ))}
           </dl>
         </section>
-        <details className="technical-details monster-card-technical-details">
-          <summary>Technical details</summary>
-          <dl>
-            <div>
-              <dt>Monster ID</dt>
-              <dd>
-                <code>{card.monsterId}</code>
-              </dd>
-            </div>
-            {card.monsterDisplayLabel.source === "fallback" ? (
-              <div>
-                <dt>Name source</dt>
-                <dd>Source name unavailable</dd>
-              </div>
-            ) : null}
-          </dl>
-        </details>
       </section>
     </aside>
   );

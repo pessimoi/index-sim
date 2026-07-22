@@ -118,6 +118,9 @@ describe("Monster card panel", () => {
     expect(markup).toContain('class="mobile-monster-back" href="#workbench-active-panel"');
     expect(markup).toContain("Back to Compare");
     expect(markup).toContain("<h2>Fixture Monster</h2>");
+    expect(markup).toContain(
+      '<p class="monster-card-subtitle"><span>Monster ID</span> <code>fixture_monster</code></p>'
+    );
     expect(markup).toContain('class="status-pill ready"');
     expect(markup).toContain('aria-label="Monster target controls"');
     expect(markup).toContain('aria-label="Monster stats"');
@@ -142,9 +145,26 @@ describe("Monster card panel", () => {
     }
     expect(markup).toContain('aria-label="6 game ticks"');
     expect(markup).toContain('aria-label="2.4 seconds"');
-    expect(markup).toContain("Technical details");
-    expect(markup).toContain("<dt>Monster ID</dt><dd><code>fixture_monster</code></dd>");
-    expect(markup).not.toContain('class="monster-card-subtitle"');
+    expect(markup).not.toContain("Technical details");
+    expect(markup).not.toContain("Source name unavailable");
     expect(markup).not.toContain("<dt>Spell</dt>");
+  });
+
+  it("keeps the missing source-name warning beside the monster identity", () => {
+    const markup = renderToStaticMarkup(
+      createElement(MonsterCardPanel, {
+        card: {
+          ...card,
+          monsterDisplayLabel: { ...card.monsterDisplayLabel, source: "fallback" }
+        },
+        monsterOptions: [{ id: "fixture_monster", label: "Fixture Monster" }],
+        selectedMonsterId: "fixture_monster",
+        onTargetChange: () => undefined
+      })
+    );
+
+    expect(markup).toContain(
+      '<span class="monster-card-name-source">Source name unavailable</span>'
+    );
   });
 });

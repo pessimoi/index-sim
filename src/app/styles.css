@@ -1197,9 +1197,24 @@ th {
   display: block;
   font-size: 0.72rem;
   font-weight: 700;
-  margin-top: 0.15rem;
+  margin: 0.15rem 0 0;
   overflow-wrap: anywhere;
+}
+
+.monster-card-subtitle > span:first-child {
   text-transform: uppercase;
+}
+
+.monster-card-subtitle code {
+  color: #c8d0dc;
+  font-weight: 400;
+  user-select: text;
+}
+
+.monster-card-name-source {
+  display: block;
+  font-weight: 400;
+  margin-top: 0.1rem;
 }
 
 .monster-card-controls {
@@ -5336,11 +5351,6 @@ th {
 .technical-details code {
   overflow-wrap: anywhere;
   user-select: text;
-}
-
-.monster-card-technical-details {
-  border-top: 1px solid #26303d;
-  padding-top: 0.5rem;
 }
 
 .calculation-context-grid {
