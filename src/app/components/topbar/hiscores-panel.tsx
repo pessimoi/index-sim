@@ -101,11 +101,7 @@ export function HiscoresPanel({
         </p>
       )}
       {showManualFallbackAction ? (
-        <button
-          type="button"
-          className="hiscores-manual-levels-action"
-          onClick={onEditManually}
-        >
+        <button type="button" className="hiscores-manual-levels-action" onClick={onEditManually}>
           Edit Player levels manually
         </button>
       ) : null}

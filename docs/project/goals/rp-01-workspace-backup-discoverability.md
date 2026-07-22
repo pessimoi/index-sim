@@ -29,7 +29,7 @@ ennen editointia.
 ## Toteutusvaatimukset
 
 - Lisää setup-siirtopinnan viereen suora route/action `Download full Workspace
-  backup` tai vastaava parent-specin mukainen toiminto.
+backup` tai vastaava parent-specin mukainen toiminto.
 - Käytä nykyistä Settings/Workspace controlleria ja Hiscores privacy opt-inia.
 - Toteuta one-shot focus Workspace backup -headingiin tai export-kontrolliin.
 - Säilytä setup exportin ja Workspace backupin scope-copyt erillisinä.

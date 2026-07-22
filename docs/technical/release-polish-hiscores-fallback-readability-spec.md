@@ -36,7 +36,7 @@ path to manual Player level fields.
 - Let Hiscores status and fallback messages wrap safely instead of clipping
   meaningful text.
 - Replace relative-position fallback copy with a concrete `Edit Player levels
-  manually` action or equivalent focus-safe route.
+manually` action or equivalent focus-safe route.
 - Focus the Player level group or first relevant level input without changing
   levels or active setup.
 - Preserve disabled/unavailable service state, lookup freshness, preview Apply

@@ -72,9 +72,9 @@ describe("app shell components", () => {
     expect(globalStatusAnnouncement(pendingUndo.label, pendingUndo)).toBe("");
     expect(globalStatusAnnouncement("Unrelated status", pendingUndo)).toBe("Unrelated status");
     expect(globalStatusAnnouncement("Visible transfer", null, ["Visible transfer"])).toBe("");
-    expect(globalStatusAnnouncement("Loaded scheduled prices", null, ["Loaded scheduled prices"])).toBe(
-      ""
-    );
+    expect(
+      globalStatusAnnouncement("Loaded scheduled prices", null, ["Loaded scheduled prices"])
+    ).toBe("");
     expect(renderToStaticMarkup(<PendingUndoStatus pendingUndo={null} onUndo={noOp} />)).toBe("");
   });
 
