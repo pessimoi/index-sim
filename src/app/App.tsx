@@ -9,7 +9,7 @@ import {
   useState,
   useSyncExternalStore
 } from "react";
-import { PendingUndoStatus, type PendingUndo } from "./components/app-presenters";
+import { ActionStatus, PendingUndoStatus, type PendingUndo } from "./components/app-presenters";
 import type { ShareSetupDialogState } from "./components/share-setup-dialog";
 import { globalStatusAnnouncement } from "./view-models/global-status";
 import type { SelectOption } from "./components/form-fields";
@@ -866,6 +866,7 @@ export function App() {
     );
   }, []);
   const [localStateReviewRequest, setLocalStateReviewRequest] = useState(0);
+  const [workspaceBackupFocusRequest, setWorkspaceBackupFocusRequest] = useState(0);
   const [crossTabSelectedIds, setCrossTabSelectedIds] = useState<CrossTabAreaId[]>([]);
   const [crossTabNotice, setCrossTabNotice] = useState<{
     tone: "neutral" | "success" | "warning" | "error";
@@ -878,7 +879,9 @@ export function App() {
   const shareSetupButtonRef = useRef<HTMLButtonElement>(null);
   const setupImportInputRef = useRef<HTMLInputElement>(null);
   const workspaceImportInputRef = useRef<HTMLInputElement>(null);
+  const workspaceExportButtonRef = useRef<HTMLButtonElement>(null);
   const workspaceReviewHeadingRef = useRef<HTMLHeadingElement>(null);
+  const handledWorkspaceBackupFocusRequestRef = useRef(0);
   const monsterRemovalIdRef = useRef(0);
   const priceHistoryReviewIdRef = useRef(0);
   const handledPriceHistoryReviewIdRef = useRef(0);
@@ -897,6 +900,7 @@ export function App() {
   }
   const resetSetupButtonRef = useRef<HTMLButtonElement>(null);
   const setupModeHeadingRef = useRef<HTMLElement>(null);
+  const playerLevelGroupRef = useRef<HTMLDivElement>(null);
   const duelImportAttemptRef = useRef(0);
   const priceNotesSummaryRef = useRef<HTMLElement>(null);
   const marketHeadingRef = useRef<HTMLHeadingElement>(null);
@@ -1156,6 +1160,24 @@ export function App() {
     });
     return () => window.cancelAnimationFrame(frameId);
   }, [activeTab, economyReviewRequest, paneLoadStates]);
+
+  useEffect(() => {
+    if (
+      activeTab !== "settings" ||
+      paneLoadStates["economy-settings"] !== "ready" ||
+      workspaceBackupFocusRequest === 0 ||
+      workspaceBackupFocusRequest === handledWorkspaceBackupFocusRequestRef.current
+    ) {
+      return;
+    }
+    const frameId = window.requestAnimationFrame(() => {
+      const button = workspaceExportButtonRef.current;
+      button?.focus({ preventScroll: true });
+      button?.scrollIntoView({ block: "nearest" });
+      if (button) handledWorkspaceBackupFocusRequestRef.current = workspaceBackupFocusRequest;
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }, [activeTab, paneLoadStates, workspaceBackupFocusRequest]);
 
   useEffect(() => {
     const reviewId = priceHistoryReview?.candidate.id;
@@ -3125,6 +3147,11 @@ export function App() {
     }
   };
 
+  const openWorkspaceBackupFromHeader = () => {
+    activateWorkbenchTab("settings", "routed-action");
+    setWorkspaceBackupFocusRequest((request) => request + 1);
+  };
+
   const dismissWorkspaceReview = (reviewId: number): void => {
     if (!workspaceFileTransfer.dismissReview(reviewId)) return;
     window.requestAnimationFrame(() => workspaceImportInputRef.current?.focus());
@@ -3282,6 +3309,13 @@ export function App() {
         levels: { ...current.levels, [skill]: value }
       })
     );
+
+  const focusManualPlayerLevels = () => {
+    const focusTarget = playerLevelGroupRef.current;
+    if (!focusTarget) return;
+    focusTarget.scrollIntoView({ block: "center", inline: "nearest" });
+    focusTarget.focus({ preventScroll: true });
+  };
 
   const updatePlannerMetric = (metric: PlannerMetric) =>
     setPlannerState((current) => normalizePlannerUiState({ ...current, metric }));
@@ -4011,6 +4045,22 @@ export function App() {
         trip: { ...current.trip, ...patch }
       })
     );
+  const applyTripRecommendation = (patch: Partial<CombatSetupFormState["trip"]>) => {
+    const previousTrip = form.trip;
+    const changedKeys = Object.keys(patch).filter((key) => {
+      const field = key as keyof CombatSetupFormState["trip"];
+      return previousTrip[field] !== patch[field];
+    });
+    if (!changedKeys.length) {
+      setStatus("Trip recommendation already matches current assumptions");
+      return;
+    }
+    updateTrip(patch);
+    const label = `Applied Trip recommendation: ${formatNumber(changedKeys.length)} fields`;
+    setUndoableStatus(label, "Restored Trip recommendation", () => {
+      setFormSafe((current) => updateForm(current, { trip: previousTrip }));
+    });
+  };
   const setCannonForCurrentMonster = (patch: Partial<CannonByMonsterState[string]>) => {
     setCannonByMonster((current) => {
       const previous = current[form.monsterId] ?? DEFAULT_CANNON_SETTINGS;
@@ -4204,6 +4254,12 @@ export function App() {
       cannonByMonster,
       lootSettingsByMonster
     );
+    if (result.changedRows <= 0) {
+      const message = `Loot actions already match optimized choices for ${monsterName}`;
+      setLootNotice(message);
+      setStatus(message);
+      return;
+    }
     setLootPrefsByMonster((current) =>
       replaceLootPrefsForMonster(current, form.monsterId, result.prefs)
     );
@@ -4598,6 +4654,28 @@ export function App() {
         sourceMissing: duelLoadReviewSnapshot === undefined
       }
     : null;
+  const visibleLiveMessages = [
+    setupFileTransfer.phase === "reading" ? "Reviewing setup file" : null,
+    setupFileTransfer.notice?.message,
+    setupImportNotice?.message,
+    duelImportNotice?.message,
+    marketNotice?.message,
+    workspaceFileTransfer.notice?.message,
+    localStateRecovery.notice
+  ];
+  const visibleActionSuppressedMessages = [
+    ...visibleLiveMessages,
+    "Loaded scheduled prices",
+    "Loaded source-backed runtime data",
+    "Loaded saved rewrite setup",
+    "Loaded saved rewrite setup and selected PriceSet",
+    "Loaded selected PriceSet"
+  ];
+  const actionStatusMessage = globalStatusAnnouncement(
+    status,
+    pendingUndo,
+    visibleActionSuppressedMessages
+  );
 
   return (
     <main className="app-shell" data-app-startup-state="ready">
@@ -4616,7 +4694,8 @@ export function App() {
           onPlayerChange: hiscores.changePlayer,
           onLookup: hiscores.lookup,
           onPreviewOpenChange: hiscores.setPreviewOpen,
-          onApply: applyHiscoresPreview
+          onApply: applyHiscoresPreview,
+          onEditManually: focusManualPlayerLevels
         }}
         setupImportPhase={setupFileTransfer.phase}
         setupImportNotice={setupFileTransfer.notice ?? setupImportNotice}
@@ -4626,6 +4705,7 @@ export function App() {
         onImportSetup={importSetupFile}
         onExportSetup={exportCurrentSetup}
         onShareSetup={openShareSetupDialog}
+        onOpenWorkspaceBackup={openWorkspaceBackupFromHeader}
       />
       {(savedDataIgnoredForSession ||
         sessionOnlyExitProtectionSnapshot.sessionOnlyChangeCount > 0) && (
@@ -4656,16 +4736,7 @@ export function App() {
             />
           </Suspense>
         )}
-      <span className="visually-hidden" role="status" aria-live="polite">
-        {globalStatusAnnouncement(status, pendingUndo, [
-          setupFileTransfer.notice?.message,
-          setupImportNotice?.message,
-          duelImportNotice?.message,
-          marketNotice?.message,
-          workspaceFileTransfer.notice?.message,
-          localStateRecovery.notice
-        ])}
-      </span>
+      <ActionStatus message={actionStatusMessage} />
 
       {shareDialog && (
         <Suspense fallback={<p role="status">Loading share setup dialog…</p>}>
@@ -4715,6 +4786,7 @@ export function App() {
         currentMonsterLabel={currentMonster?.name ?? form.monsterId}
         setupModeHeadingRef={setupModeHeadingRef}
         resetSetupButtonRef={resetSetupButtonRef}
+        playerLevelGroupRef={playerLevelGroupRef}
         monsterOptions={monsters}
         styleOptions={styles}
         spellOptions={spellSelectOptions}
@@ -4929,6 +5001,7 @@ export function App() {
               }}
               actions={{
                 updateTrip,
+                applyRecommendation: applyTripRecommendation,
                 openRisk: () => activateWorkbenchTab("risk", "routed-action")
               }}
             />
@@ -5108,6 +5181,7 @@ export function App() {
               priceNotesSummaryRef={priceNotesSummaryRef}
               manualPriceInputRef={manualPriceInputRef}
               workspaceImportInputRef={workspaceImportInputRef}
+              workspaceExportButtonRef={workspaceExportButtonRef}
               workspaceReviewHeadingRef={workspaceReviewHeadingRef}
               setPriceNoticeActionRef={setPriceNoticeActionRef}
               marketHeadingRef={marketHeadingRef}

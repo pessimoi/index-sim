@@ -483,7 +483,7 @@ test("updates prayer restore detail controls and keeps the trip summary visible"
 
 test("updates per-monster loot settings and keeps them after reload", async ({ page }) => {
   await page.goto("/");
-  await page.getByLabel("TARGET", { exact: true }).selectOption("green_dragon");
+  await chooseSearchableOption(page.getByLabel("Setup context"), "Monster", "Green Dragon");
   await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Loot" }).click();
 
   const loot = page.locator('section[aria-label="Current monster loot"]');
@@ -513,7 +513,7 @@ test("updates per-monster loot settings and keeps them after reload", async ({ p
   });
 
   await page.reload();
-  await page.getByLabel("TARGET", { exact: true }).selectOption("green_dragon");
+  await chooseSearchableOption(page.getByLabel("Setup context"), "Monster", "Green Dragon");
   await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Loot" }).click();
   const reloadedLoot = page.locator('section[aria-label="Current monster loot"]');
   await expect(reloadedLoot.getByLabel("High alch")).toHaveValue("enabled");

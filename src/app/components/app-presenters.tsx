@@ -109,3 +109,17 @@ export function PendingUndoStatus({
     </section>
   );
 }
+
+export function ActionStatus({ message }: { message: string }) {
+  if (!message) return null;
+  return (
+    <section
+      className="action-status-strip"
+      role="status"
+      aria-live="polite"
+      aria-label="Action status"
+    >
+      <span>{message}</span>
+    </section>
+  );
+}

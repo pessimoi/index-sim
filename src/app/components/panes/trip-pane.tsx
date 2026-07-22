@@ -24,6 +24,7 @@ export interface TripPaneModel {
 
 export interface TripPaneActions {
   updateTrip(patch: Partial<CombatSetupFormState["trip"]>): void;
+  applyRecommendation(patch: Partial<CombatSetupFormState["trip"]>): void;
   openRisk(): void;
 }
 
@@ -140,7 +141,7 @@ export function TripPane({ hidden, model, actions, foodPerKillOverrideRef }: Tri
             className="potion-recommendation-apply"
             disabled={!recommendation.canApply}
             onClick={() => {
-              if (recommendation.canApply) actions.updateTrip(recommendation.patch);
+              if (recommendation.canApply) actions.applyRecommendation(recommendation.patch);
             }}
           >
             Apply recommendation

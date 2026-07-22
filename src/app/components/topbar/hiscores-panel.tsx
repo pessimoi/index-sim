@@ -17,6 +17,7 @@ export interface HiscoresPanelProps {
   onLookup: () => Promise<void>;
   onPreviewOpenChange: (open: boolean) => void;
   onApply: () => void;
+  onEditManually: () => void;
 }
 
 export function HiscoresPanel({
@@ -32,10 +33,12 @@ export function HiscoresPanel({
   onPlayerChange,
   onLookup,
   onPreviewOpenChange,
-  onApply
+  onApply,
+  onEditManually
 }: HiscoresPanelProps) {
   const detailsRef = useRef<HTMLDetailsElement>(null);
   const summaryRef = useRef<HTMLElement>(null);
+  const showManualFallbackAction = !available || notice?.tone === "error";
 
   useEffect(() => {
     if (!previewOpen) return;
@@ -97,6 +100,15 @@ export function HiscoresPanel({
           {notice.message}
         </p>
       )}
+      {showManualFallbackAction ? (
+        <button
+          type="button"
+          className="hiscores-manual-levels-action"
+          onClick={onEditManually}
+        >
+          Edit Player levels manually
+        </button>
+      ) : null}
       {previewRows.length > 0 && (
         <details
           className="hiscores-preview-details"

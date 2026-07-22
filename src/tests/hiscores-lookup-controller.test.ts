@@ -442,7 +442,8 @@ describe("Hiscores topbar panel", () => {
     onPlayerChange: () => undefined,
     onLookup: async () => undefined,
     onPreviewOpenChange: () => undefined,
-    onApply: () => undefined
+    onApply: () => undefined,
+    onEditManually: () => undefined
   };
 
   it("preserves the landmark, form names, notice roles and busy state", () => {
@@ -464,6 +465,8 @@ describe("Hiscores topbar panel", () => {
     expect(idle).toContain("Lookup</button>");
     expect(error).toContain('class="inline-status error" role="alert"');
     expect(error).toContain("Player not found");
+    expect(error).toContain("Edit Player levels manually");
+    expect(idle).not.toContain("Edit Player levels manually");
     expect(error).toContain("disabled");
     expect(busy).toContain("Looking up</button>");
     expect(busy).toContain("disabled");

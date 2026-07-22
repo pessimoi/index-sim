@@ -784,7 +784,12 @@ test("reviews every setup transfer change across file, shared-link and saved-row
   const transferControls = topbarActions.locator("label.file-button, button");
   expect(
     (await transferControls.allTextContents()).map((text) => text.trim().replace(/\s+/g, " "))
-  ).toEqual(["Review combat setup file", "Export combat setup", "Share setup"]);
+  ).toEqual([
+    "Download full Workspace backup",
+    "Review combat setup file",
+    "Export combat setup",
+    "Share setup"
+  ]);
 
   const exportSetupButton = topbarActions.getByRole("button", { name: "Export combat setup" });
   const downloadPromise = page.waitForEvent("download");
@@ -982,7 +987,9 @@ test("reviews every setup transfer change across file, shared-link and saved-row
   const meleeSetupTab = tabs.getByRole("tab", { name: "Melee setup" });
   await meleeSetupTab.focus();
   await meleeSetupTab.press("Enter");
-  const attackLevel = page.getByLabel("Combat setup").getByLabel("ATT", { exact: true });
+  const attackLevel = page
+    .getByRole("region", { name: "Combat setup", exact: true })
+    .getByLabel("ATT", { exact: true });
   await attackLevel.fill("61");
   await expect(liveReview).toContainText("Current setup changed after this review was prepared.");
   await expect(liveReview.getByRole("button", { name: "Apply imported setup" })).toHaveCount(0);
@@ -1006,9 +1013,9 @@ test("reviews every setup transfer change across file, shared-link and saved-row
     await setupNotice.evaluate((element) =>
       Array.from(element.parentElement?.children ?? []).indexOf(element)
     )
-  ).toBe(3);
+  ).toBe(5);
   await expect(setupInput).toHaveValue("");
-  await expect(page.locator('span.visually-hidden[role="status"]')).toHaveText("");
+  await expect(page.getByLabel("Action status")).toHaveCount(0);
   await expect(page.getByLabel("Local state undo")).toContainText(
     "Imported rewrite setup using current Revision 274 data."
   );

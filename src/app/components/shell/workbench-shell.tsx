@@ -69,6 +69,7 @@ export interface WorkbenchShellProps {
   currentMonsterLabel: string;
   setupModeHeadingRef: RefObject<HTMLElement | null>;
   resetSetupButtonRef: RefObject<HTMLButtonElement | null>;
+  playerLevelGroupRef: RefObject<HTMLDivElement | null>;
   monsterOptions: SelectOption[];
   styleOptions: SelectOption[];
   spellOptions: SelectOption[];
@@ -126,6 +127,7 @@ export function WorkbenchShell({
   currentMonsterLabel,
   setupModeHeadingRef,
   resetSetupButtonRef,
+  playerLevelGroupRef,
   monsterOptions,
   styleOptions,
   spellOptions,
@@ -182,7 +184,13 @@ export function WorkbenchShell({
                 </button>
               ))}
             </div>
-            <div className="level-grid sidebar-levels" aria-label="Player levels">
+            <div
+              id="player-level-fields"
+              className="level-grid sidebar-levels"
+              aria-label="Player levels"
+              ref={playerLevelGroupRef}
+              tabIndex={-1}
+            >
               {form.combatStyle === "melee" && (
                 <>
                   <NumberField
@@ -461,6 +469,11 @@ export function WorkbenchShell({
                   />
                 ))}
               </section>
+              {activeTab === "compare" ? (
+                <a className="mobile-monster-jump" href="#monster-card-panel">
+                  Monster details
+                </a>
+              ) : null}
               <div
                 className="calculation-warning-slot"
                 hidden={activeTab !== "stats" && activeTab !== "compare"}

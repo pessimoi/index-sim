@@ -351,6 +351,11 @@ export function ComparePane({ hidden, model, actions }: ComparePaneProps) {
             })}
           </tbody>
         </table>
+        {denseCompareRows.length === 0 ? (
+          <p className="dense-empty-state" role="status">
+            No monsters match the current filters. Reset filters to show the full comparison again.
+          </p>
+        ) : null}
       </div>
     </section>
   );

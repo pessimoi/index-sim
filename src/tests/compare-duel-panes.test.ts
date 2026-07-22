@@ -162,6 +162,40 @@ describe("Compare and Duel panes", () => {
     expect(markup).toContain('aria-label="All monsters"');
   });
 
+  it("keeps zero-result Compare recovery copy adjacent to Reset filters", () => {
+    const markup = renderToStaticMarkup(
+      createElement(ComparePane, {
+        hidden: false,
+        model: {
+          denseCompare: {
+            ...DEFAULT_DENSE_COMPARE_STATE,
+            monsterFilter: "no-match"
+          },
+          denseCompareRows: [],
+          denseCompareScale: {},
+          denseCompareTotalRows: 63,
+          denseComparePresentation: {
+            status: "ready",
+            displayIsCurrent: true,
+            message: "",
+            statusLabel: "Current",
+            summary: "current loadout",
+            aria: "Compare calculation status: Ready.",
+            canRetry: false,
+            retryActionLabel: "Retry comparison"
+          },
+          selectedMonsterId: DEFAULT_FORM_STATE.monsterId
+        },
+        actions: compareActions
+      })
+    );
+
+    inOrder(markup, [
+      "Reset filters",
+      "No monsters match the current filters. Reset filters to show the full comparison again."
+    ]);
+  });
+
   it("keeps saved setup controls, current-target comparison and diff disclosure semantics", async () => {
     const { context } = await loadBundledLegacyContext();
     const snapshot = createDuelSnapshot("saved-ranged", "Saved ranged", {

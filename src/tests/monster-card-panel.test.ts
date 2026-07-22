@@ -112,7 +112,11 @@ describe("Monster card panel", () => {
       })
     );
 
-    expect(markup).toContain('<aside class="monster-rail" aria-label="Monster card">');
+    expect(markup).toContain(
+      '<aside id="monster-card-panel" class="monster-rail" aria-label="Monster card">'
+    );
+    expect(markup).toContain('class="mobile-monster-back" href="#workbench-active-panel"');
+    expect(markup).toContain("Back to Compare");
     expect(markup).toContain("<h2>Fixture Monster</h2>");
     expect(markup).toContain('class="status-pill ready"');
     expect(markup).toContain('aria-label="Monster target controls"');

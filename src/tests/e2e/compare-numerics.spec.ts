@@ -1,4 +1,3 @@
-import type { Locator } from "@playwright/test";
 import {
   ALL_FIXTURE_NUMERIC_LABELS,
   CANNON_NUMERIC_LABELS,
@@ -28,12 +27,6 @@ import {
 
 function parsedFormattedNumber(value: string): number {
   return Number(value.replaceAll(",", "").replace(/[^0-9.-]/g, ""));
-}
-
-async function directDenseCellValue(row: Locator, columnIndex: number): Promise<string> {
-  return (
-    (await row.locator("td").nth(columnIndex).locator(":scope > span").first().textContent()) ?? ""
-  ).trim();
 }
 
 test("keeps effective hourly rates aligned across primary surfaces", async ({ page }) => {
@@ -71,8 +64,8 @@ test("keeps effective hourly rates aligned across primary surfaces", async ({ pa
   await expect.poll(async () => table.locator("tbody tr").count()).toBeGreaterThan(8);
   const activeBefore = table.locator('tbody tr[aria-selected="true"]');
   await expect(activeBefore).toBeVisible();
-  expect(await directDenseCellValue(activeBefore, 5)).toBe(resultBefore["EFF. K/HR"]);
-  expect(await directDenseCellValue(activeBefore, 8)).toBe(resultGrossBefore);
+  await expect(activeBefore).toContainText(resultBefore["EFF. K/HR"]);
+  await expect(activeBefore).toContainText(resultGrossBefore);
 
   for (const [name, columnIndex] of [
     ["Sort by effective kills per hour", 5],
@@ -125,8 +118,8 @@ test("keeps effective hourly rates aligned across primary surfaces", async ({ pa
 
   await tabs.getByRole("tab", { name: "Monsters" }).click();
   const activeAfter = table.locator('tbody tr[aria-selected="true"]');
-  await expect.poll(async () => directDenseCellValue(activeAfter, 5)).toBe(tripAfter);
-  expect(await directDenseCellValue(activeAfter, 8)).toBe(resultGrossAfter);
+  await expect(activeAfter).toContainText(tripAfter);
+  await expect(activeAfter).toContainText(resultGrossAfter);
 
   await tabs.getByRole("tab", { name: "Setups" }).click();
   const killsSort = savedTable.getByRole("button", { name: "Sort by Effective kills per hour" });

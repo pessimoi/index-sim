@@ -54,7 +54,7 @@ test("loads the dense combat spreadsheet root", async ({ page }) => {
     "Settings"
   ]);
   await expect(page.getByLabel("Dense combat spreadsheet")).toBeVisible();
-  await expect(page.getByLabel("Combat setup")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Combat setup", exact: true })).toBeVisible();
   await expect(page.getByLabel("Simulation results")).toBeVisible();
   await expect(page.getByLabel("Active assumptions")).toBeVisible();
   await expect(page.getByLabel("Monster stats")).toBeVisible();
@@ -1308,7 +1308,7 @@ test("keeps Dense Compare mobile and tablet overflow contained", async ({ page }
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await page.goto("/");
 
-    const setupStrip = page.getByLabel("Combat setup");
+    const setupStrip = page.getByRole("region", { name: "Combat setup", exact: true });
     const metricStrip = page.getByLabel("Simulation results");
     const comparePanel = page.getByLabel("Monster comparison");
     const tableWrap = comparePanel.locator(".dense-table-wrap");

@@ -1,7 +1,9 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const port = 5174;
+const port = Number.parseInt(process.env.VISUAL_TEST_PORT ?? "5174", 10);
 const baseURL = `http://127.0.0.1:${port}`;
+const reuseExistingServer = process.env.VISUAL_REUSE_EXISTING_SERVER === "1";
+const disableWebServer = process.env.VISUAL_DISABLE_WEB_SERVER === "1";
 
 export default defineConfig({
   testDir: "./src/tests/e2e",
@@ -36,10 +38,12 @@ export default defineConfig({
       }
     }
   ],
-  webServer: {
-    command: `bash -lc 'npm run build && npm run preview -- --host 127.0.0.1 --port ${port}'`,
-    url: baseURL,
-    reuseExistingServer: false,
-    timeout: 180_000
-  }
+  webServer: disableWebServer
+    ? undefined
+    : {
+        command: `bash -lc 'npm run build && npm run preview -- --host 127.0.0.1 --port ${port}'`,
+        url: baseURL,
+        reuseExistingServer,
+        timeout: 180_000
+      }
 });

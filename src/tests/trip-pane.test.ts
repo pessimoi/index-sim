@@ -40,7 +40,11 @@ describe("Trip pane", () => {
       createElement(TripPane, {
         hidden: true,
         model: { presentation, modeledKillsPerTripRange: "10 / 20 / 30" },
-        actions: { updateTrip: () => undefined, openRisk: () => undefined }
+        actions: {
+          updateTrip: () => undefined,
+          applyRecommendation: () => undefined,
+          openRisk: () => undefined
+        }
       })
     );
 
@@ -88,7 +92,11 @@ describe("Trip pane", () => {
     const tree = TripPane({
       hidden: false,
       model: { presentation, modeledKillsPerTripRange: null },
-      actions: { updateTrip: (patch) => patches.push(patch), openRisk: () => undefined }
+      actions: {
+        updateTrip: (patch) => patches.push(patch),
+        applyRecommendation: () => undefined,
+        openRisk: () => undefined
+      }
     });
 
     selectChange(tree, "Bank time", "auto");
@@ -117,7 +125,7 @@ describe("Trip pane", () => {
 
   it("applies only an active recommendation patch and keeps the disabled path inert", async () => {
     const base = await fixture();
-    const patches: Array<Partial<CombatSetupFormState["trip"]>> = [];
+    const recommendationPatches: Array<Partial<CombatSetupFormState["trip"]>> = [];
     const active = TripPane({
       hidden: false,
       model: {
@@ -127,7 +135,11 @@ describe("Trip pane", () => {
         },
         modeledKillsPerTripRange: null
       },
-      actions: { updateTrip: (patch) => patches.push(patch), openRisk: () => undefined }
+      actions: {
+        updateTrip: () => undefined,
+        applyRecommendation: (patch) => recommendationPatches.push(patch),
+        openRisk: () => undefined
+      }
     });
     const activeButton = elements(active).find(
       (element) =>
@@ -145,7 +157,11 @@ describe("Trip pane", () => {
         },
         modeledKillsPerTripRange: null
       },
-      actions: { updateTrip: (patch) => patches.push(patch), openRisk: () => undefined }
+      actions: {
+        updateTrip: () => undefined,
+        applyRecommendation: (patch) => recommendationPatches.push(patch),
+        openRisk: () => undefined
+      }
     });
     const inactiveButton = elements(inactive).find(
       (element) =>
@@ -154,6 +170,6 @@ describe("Trip pane", () => {
     );
     (inactiveButton!.props as { onClick(): void }).onClick();
 
-    expect(patches).toEqual([{ potionSets: 7 }]);
+    expect(recommendationPatches).toEqual([{ potionSets: 7 }]);
   });
 });

@@ -37,7 +37,8 @@ async function chooseItemByKeyboard(
 
 async function assertDragonhideOptions(panel: Locator): Promise<void> {
   const trigger = searchableCombobox(panel, "Manual price item");
-  await trigger.click();
+  await trigger.focus();
+  await trigger.press("Enter");
   const input = searchableInput(panel, "Manual price item");
   await input.fill("dragonhide_");
   const options = panel.getByRole("listbox", { name: "Manual price item options" });

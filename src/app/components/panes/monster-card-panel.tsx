@@ -65,8 +65,11 @@ export function MonsterCardPanel({
   );
 
   return (
-    <aside className="monster-rail" aria-label="Monster card">
+    <aside id="monster-card-panel" className="monster-rail" aria-label="Monster card">
       <section className="monster-card-panel">
+        <a className="mobile-monster-back" href="#workbench-active-panel">
+          Back to Compare
+        </a>
         <div className="section-title-row">
           <div>
             <h2>{card.monsterName}</h2>

@@ -33,6 +33,7 @@ export interface WorkspaceBackupPanelProps {
   model: WorkspaceBackupPanelModel;
   actions: WorkspaceBackupPanelActions;
   importInputRef?: Ref<HTMLInputElement>;
+  exportButtonRef?: Ref<HTMLButtonElement>;
   reviewHeadingRef?: Ref<HTMLHeadingElement>;
 }
 
@@ -66,6 +67,7 @@ export function WorkspaceBackupPanel({
   model,
   actions,
   importInputRef,
+  exportButtonRef,
   reviewHeadingRef
 }: WorkspaceBackupPanelProps) {
   const privacyHelpId = "workspace-hiscores-privacy-help";
@@ -108,6 +110,7 @@ export function WorkspaceBackupPanel({
       </p>
       <div className="market-sync-bar">
         <button
+          ref={exportButtonRef}
           type="button"
           aria-describedby={`${scopeHelpId} ${privacyHelpId}`}
           onClick={actions.exportWorkspace}

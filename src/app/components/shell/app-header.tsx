@@ -14,6 +14,7 @@ export interface AppHeaderProps {
   onImportSetup(file: File): Promise<void>;
   onExportSetup(): void;
   onShareSetup(): void;
+  onOpenWorkspaceBackup(): void;
 }
 
 async function importSelectedFile(
@@ -40,7 +41,8 @@ export function AppHeader({
   shareButtonRef,
   onImportSetup,
   onExportSetup,
-  onShareSetup
+  onShareSetup,
+  onOpenWorkspaceBackup
 }: AppHeaderProps) {
   const setupScopeHelpId = "combat-setup-transfer-scope";
   return (
@@ -71,6 +73,9 @@ export function AppHeader({
             Combat setup files replace setup, custom-monster, cannon and Dense preferences. They are
             not full Workspace backups and do not include loot or prices.
           </p>
+          <button type="button" aria-describedby={setupScopeHelpId} onClick={onOpenWorkspaceBackup}>
+            Download full Workspace backup
+          </button>
           <label className="file-button">
             Review combat setup file
             <input

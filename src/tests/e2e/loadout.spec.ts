@@ -701,7 +701,9 @@ test("global Undo stays reachable across supported targeted Reset viewports", as
     const settings = page.locator('[aria-label="Hidden gear tiers"]');
     const iron = settings.getByLabel("Hide iron gear");
     await iron.check();
-    await settings.getByRole("button", { name: "Show all tiers" }).click();
+    const showAllTiers = settings.getByRole("button", { name: "Show all tiers" });
+    await showAllTiers.focus();
+    await showAllTiers.press("Enter");
 
     const undo = page.getByLabel("Local state undo");
     await expect(undo).toBeVisible();

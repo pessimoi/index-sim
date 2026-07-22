@@ -1,7 +1,11 @@
 import { createElement, createRef, isValidElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { AppHeader } from "../app/components/shell/app-header";
-import { PendingUndoStatus, type PendingUndo } from "../app/components/app-presenters";
+import {
+  ActionStatus,
+  PendingUndoStatus,
+  type PendingUndo
+} from "../app/components/app-presenters";
 import { globalStatusAnnouncement } from "../app/view-models/global-status";
 import { LegacyMigrationPanel } from "../app/components/shell/legacy-migration-panel";
 import { SharedSetupReview } from "../app/components/shell/shared-setup-review";
@@ -68,7 +72,20 @@ describe("app shell components", () => {
     expect(globalStatusAnnouncement(pendingUndo.label, pendingUndo)).toBe("");
     expect(globalStatusAnnouncement("Unrelated status", pendingUndo)).toBe("Unrelated status");
     expect(globalStatusAnnouncement("Visible transfer", null, ["Visible transfer"])).toBe("");
+    expect(globalStatusAnnouncement("Loaded scheduled prices", null, ["Loaded scheduled prices"])).toBe(
+      ""
+    );
     expect(renderToStaticMarkup(<PendingUndoStatus pendingUndo={null} onUndo={noOp} />)).toBe("");
+  });
+
+  it("renders one visible polite action status for unsuppressed global outcomes", () => {
+    const markup = renderToStaticMarkup(<ActionStatus message="Current loadout is already best" />);
+
+    expect(markup.match(/role="status"/g)).toHaveLength(1);
+    expect(markup).toContain('aria-live="polite"');
+    expect(markup).toContain('aria-label="Action status"');
+    expect(markup).toContain("Current loadout is already best");
+    expect(renderToStaticMarkup(<ActionStatus message="" />)).toBe("");
   });
 
   it("computes minimal bounded workbench-tab scroll targets", () => {
@@ -104,7 +121,8 @@ describe("app shell components", () => {
           onPlayerChange: noOp,
           onLookup: asyncNoOp,
           onPreviewOpenChange: noOp,
-          onApply: noOp
+          onApply: noOp,
+          onEditManually: noOp
         }}
         setupImportPhase="idle"
         setupImportNotice={{ tone: "success", message: "Setup fixture" }}
@@ -114,6 +132,7 @@ describe("app shell components", () => {
         onImportSetup={asyncNoOp}
         onExportSetup={noOp}
         onShareSetup={noOp}
+        onOpenWorkspaceBackup={noOp}
       />
     );
 
@@ -122,6 +141,7 @@ describe("app shell components", () => {
       'class="topbar"',
       "Revision 274",
       'aria-label="Hiscores"',
+      "Download full Workspace backup",
       "Review combat setup file",
       "Export combat setup",
       "Share setup",
@@ -133,7 +153,7 @@ describe("app shell components", () => {
     expect(markup).toContain(
       "Combat setup files replace setup, custom-monster, cannon and Dense preferences. They are not full Workspace backups and do not include loot or prices."
     );
-    expect(markup.match(/aria-describedby="combat-setup-transfer-scope"/g)).toHaveLength(2);
+    expect(markup.match(/aria-describedby="combat-setup-transfer-scope"/g)).toHaveLength(3);
     expect(markup.match(/accept="application\/json,.json"/g)).toHaveLength(1);
     expect(markup).not.toContain("Import prices");
   });
@@ -155,7 +175,8 @@ describe("app shell components", () => {
           onPlayerChange: noOp,
           onLookup: asyncNoOp,
           onPreviewOpenChange: noOp,
-          onApply: noOp
+          onApply: noOp,
+          onEditManually: noOp
         }}
         setupImportPhase="reading"
         setupImportNotice={null}
@@ -165,6 +186,7 @@ describe("app shell components", () => {
         onImportSetup={asyncNoOp}
         onExportSetup={noOp}
         onShareSetup={noOp}
+        onOpenWorkspaceBackup={noOp}
       />
     );
 
@@ -352,6 +374,7 @@ describe("app shell components", () => {
         currentMonsterLabel="Fixture monster"
         setupModeHeadingRef={createRef<HTMLElement>()}
         resetSetupButtonRef={createRef<HTMLButtonElement>()}
+        playerLevelGroupRef={createRef<HTMLDivElement>()}
         monsterOptions={[{ id: DEFAULT_FORM_STATE.monsterId, label: "Fixture monster" }]}
         styleOptions={[{ id: DEFAULT_FORM_STATE.styleId, label: "Accurate" }]}
         spellOptions={[{ id: DEFAULT_FORM_STATE.spellId, label: "None" }]}
@@ -424,6 +447,7 @@ describe("app shell components", () => {
       'aria-label="Workbench shell"',
       'aria-label="Player sidebar"',
       'aria-label="Player setup"',
+      'id="player-level-fields"',
       'aria-label="Mobile result summary"',
       'aria-label="Active player setup"',
       'aria-label="Setup context"',
@@ -449,8 +473,21 @@ describe("app shell components", () => {
     );
     expect(markup).toContain('id="workbench-tab-loadout" type="button" role="tab"');
     expect(markup).toContain("Melee setup");
+    expect(markup).toContain(
+      'id="player-level-fields" class="level-grid sidebar-levels" aria-label="Player levels" tabindex="-1"'
+    );
     expect(markup).toContain("Active setup");
     expect(markup).toContain("Rune scimitar");
+    expect(markup).not.toContain("Monster details");
+    const compareMarkup = renderToStaticMarkup(
+      WorkbenchShell({
+        ...shellElement.props,
+        activeTab: "compare",
+        activePaneFamily: "compare"
+      })
+    );
+    expect(compareMarkup).toContain('class="mobile-monster-jump" href="#monster-card-panel"');
+    expect(compareMarkup).toContain("Monster details");
     expect(markup).toContain("Requirements met");
     expect(markup).toContain('aria-label="Melee setup">Melee setup</button>');
     expect(markup).not.toContain("Open loadout");
