@@ -411,7 +411,7 @@ test("shows Stats XP routing and trip summary plus setup damage distribution", a
   await expect(combatRoll).toBeVisible();
   const combatRollMetrics = combatRoll.getByRole("list", { name: "Combat roll metrics" });
   await expect(combatRollMetrics).toContainText("Effective accuracy");
-  await expect(combatRollMetrics).toContainText("Effective damage");
+  await expect(combatRollMetrics).toContainText("Damage calculation level");
   await expect(combatRollMetrics).toContainText("Hit chance");
   await expect(combatRollMetrics).toContainText("Attack speed");
   await expect(combatRollMetrics).toContainText("Attack cycle");
@@ -470,7 +470,7 @@ test("shows Stats XP routing and trip summary plus setup damage distribution", a
 
   await selectCombatType(page, "magic");
   await page.getByLabel("Workbench tabs").getByRole("tab", { name: "Stats" }).click();
-  await expect(combatRoll).toContainText("Effective damage");
+  await expect(combatRoll).toContainText("Damage calculation level");
   await expect(
     sourceDetails.getByRole("listitem", { name: /Special attack detail: not modeled/i })
   ).toContainText("Magic DPS special attacks are not modeled yet");

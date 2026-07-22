@@ -486,7 +486,7 @@ describe("Hiscores topbar panel", () => {
     );
 
     expect(markup).toContain('<details class="hiscores-preview-details" open="">');
-    expect(markup).toContain("Review 1 levels");
+    expect(markup).toContain("Review stats");
     expect(markup).toContain("Preview for <strong>Fixture Player</strong>");
     expect(markup).toContain("Source: Mock hiscores");
     expect(markup).toContain("Fetched: 2026-07-13T12:00:00.000Z");

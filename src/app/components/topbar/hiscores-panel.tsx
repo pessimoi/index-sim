@@ -116,7 +116,7 @@ export function HiscoresPanel({
           ref={detailsRef}
           onToggle={(event) => onPreviewOpenChange(event.currentTarget.open)}
         >
-          <summary ref={summaryRef}>Review {previewRows.length} levels</summary>
+          <summary ref={summaryRef}>Review stats</summary>
           <div className="hiscores-preview">
             {response && (
               <p className="hiscores-preview-meta">

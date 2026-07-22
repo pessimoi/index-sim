@@ -339,8 +339,10 @@ describe("rewrite UI view models", () => {
       numericValue: result.combat.debug.effectiveAccuracy
     });
     expect(metrics.get("effective-damage")).toMatchObject({
+      label: "Damage calculation level",
       value: formatNumber(result.combat.debug.effectiveDamage),
-      numericValue: result.combat.debug.effectiveDamage
+      numericValue: result.combat.debug.effectiveDamage,
+      note: "Adjusted level used as a normal attack calculation input; this is not damage dealt by one hit."
     });
     expect(metrics.get("attack-roll")).toMatchObject({
       value: formatNumber(result.combat.attackRoll),

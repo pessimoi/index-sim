@@ -582,7 +582,7 @@ player speed remains seconds such as `2.4 s`.
 Required content:
 
 - Large metrics for DPS, effective XP/hr, effective net GP/hr and hit chance.
-- Combat roll metrics: max hit, effective accuracy, effective damage, tick/speed, TTK, cycle, kills/hr and GP/kill.
+- Combat roll metrics: max hit, effective accuracy, damage calculation level, tick/speed, TTK, cycle, kills/hr and GP/kill.
 - Banking trip metrics when trip modeling applies.
 - A normal-versus-selected-special main hit-distribution comparison plus separately scoped special-hit and cannonball detail histograms.
 - XP routing chips.
@@ -596,7 +596,7 @@ trip and cannon outputs. The source breakdown lists normal attack, special
 attack and cannon with modeled, partial, not modeled or inactive status and shows
 available DPS, DPS gain context, XP/hr, hit chance, max hit, supply-cost and note
 fields without changing formulas or adding new provider dependencies. Combat
-roll detail shows normal-attack effective accuracy, effective damage, attack
+roll detail shows normal-attack effective accuracy, damage calculation level, attack
 roll, active monster defence roll, hit chance, max hit, average hit, attack
 speed seconds, attack cycle ticks and the current result TTK, kills/hr and
 GP/kill. Missing, non-finite or unsupported values stay `null`/`-` instead of

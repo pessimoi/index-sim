@@ -1086,10 +1086,10 @@ export function createStatsCombatRollDetailViewModel(input: {
     }),
     statsCombatRollMetric({
       id: "effective-damage",
-      label: "Effective damage",
+      label: "Damage calculation level",
       value: formatOptionalNumber(effectiveDamage),
       numericValue: effectiveDamage,
-      note: "Normal attack damage input after level, stance, prayer, boost and damage bonus.",
+      note: "Adjusted level used as a normal attack calculation input; this is not damage dealt by one hit.",
       tone: "default"
     }),
     statsCombatRollMetric({
