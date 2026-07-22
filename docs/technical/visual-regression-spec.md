@@ -380,6 +380,30 @@ Two subsequent full tracked-baseline read-only runs passed 26/26 in 38.9 and
 43.6 seconds against all 37 images. The complete functional Chromium gate also
 passed 115/115 with one worker.
 
+## 2026-07-22 product-finishing and release-polish review
+
+The first allowed read-only run reached all 26 scenarios and reported a first
+mismatch in every scenario because the tracked baseline predated the accepted
+PF-01 through PF-06 presentation work as well as the active RP-01 through RP-06
+polish. The 26 first-mismatch pairs were inspected before the initial candidate
+write. That write exposed all 37 tracked current-vs-HEAD pairs, which were then
+inspected before final acceptance. PF-01 explains the sustained-rate labels and
+visible value changes; the remaining PF/RP specifications explain transfer
+copy, action feedback, mobile MonsterCard navigation, table cues/sticky identity
+and Hiscores fallback layout. No formula, data or price file changed in the
+release-polish work.
+
+Review rejected one initial candidate: the new outer Loot sticky identity cell
+covered child names in `loot-nested-mobile.png`. Giving the open detail an
+opaque foreground stacking layer restored the nested `CHILD` identities from
+Guam through Dwarf weed. A focused read-only run inspected that corrected
+actual image before the scoped Loot update.
+
+The final tracked set contains the same 26 scenarios and 37 Darwin images. Two
+independent complete read-only runs after the last write passed 26/26 and 26/26
+without a changed baseline, occluded identity, document overflow, missing
+control, unexpected private fixture data or unexplained numeric drift.
+
 ## Diff policy
 
 Use Playwright `toHaveScreenshot` with:

@@ -1,10 +1,12 @@
 # Executable product-finishing goals
 
-- Status: completed; PF-01 through PF-06 completed on 2026-07-21
-- Date: 2026-07-21
+- Status: completed; PF-01 through PF-06 and RP-01 through RP-06 complete
+- Date: 2026-07-22
 - Owner: project execution planning
-- Source specifications: the six specced product-finishing quality gaps in
-  [the backlog](../backlog.md#next-product-finishing-specifications)
+- Source specifications: the
+  [six product-finishing gaps](../backlog.md#next-product-finishing-specifications)
+  and
+  [six release-polish gaps](../backlog.md#2026-07-22-release-polish-specifications)
 
 ## Purpose
 
@@ -94,6 +96,29 @@ For the split setup-transfer work:
 Do not record a test as passed unless it ran. Keep VoiceOver, NVDA, branded
 Safari, physical iOS and any other manual evidence `not run` unless a human
 actually completed the owning procedure.
+
+## 2026-07-22 release-polish execution map
+
+These six RP goals are complete. They come from the 2026-07-22 release-polish
+audit over existing `Valmis` workflows and are not partial feature completions,
+provider work or the open manual VoiceOver/NVDA evidence gate.
+
+| Order | Goal                                                                                         | Parent specification                                                                                              | Priority | Effort | Dependency                                     |
+| ----- | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | -------- | ------ | ---------------------------------------------- |
+| 1     | [RP-01 · Workspace backup discoverability](rp-01-workspace-backup-discoverability.md)        | [Workspace backup discoverability](../../technical/release-polish-workspace-backup-discoverability-spec.md)       | Critical | M      | Existing Workspace backup/restore              |
+| 2     | [RP-02 · Visible action feedback](rp-02-visible-action-feedback.md)                          | [Visible action feedback](../../technical/release-polish-visible-action-feedback-spec.md)                         | High     | M      | Existing global status and Undo                |
+| 3     | [RP-03 · Mobile MonsterCard navigation loop](rp-03-mobile-monstercard-loop.md)               | [Mobile MonsterCard navigation loop](../../technical/release-polish-mobile-monstercard-loop-spec.md)              | High     | M      | Existing mobile navigation loop                |
+| 4     | [RP-04 · Recommendation and optimizer Undo](rp-04-recommendation-optimizer-undo.md)          | [Recommendation and optimizer Undo](../../technical/release-polish-recommendation-optimizer-undo-spec.md)         | High     | M      | Existing feature-local mutation owners         |
+| 5     | [RP-05 · Wide table discoverability](rp-05-wide-table-discoverability.md)                    | [Wide table discoverability](../../technical/release-polish-wide-table-discoverability-spec.md)                   | High     | M      | Existing compact layout and visual suite       |
+| 6     | [RP-06 · Hiscores fallback readability](rp-06-hiscores-fallback-readability.md)              | [Hiscores fallback readability](../../technical/release-polish-hiscores-fallback-readability-spec.md)             | Medium   | S      | Existing Hiscores lookup and Apply Undo        |
+
+Execution status: RP-01 through RP-06 implementation is complete with focused
+unit/typecheck evidence and the combined release-polish functional Chromium
+grep passing 59/59. All 37 Darwin snapshot candidates were reviewed, one nested
+Loot-mobile sticky-cell occlusion was corrected before acceptance and two final
+read-only visual runs pass 26/26. The round changes no formula, data, schema,
+provider or persistence boundary; the open manual VoiceOver/NVDA evidence gate
+remains separate.
 
 ## Completion report contract
 

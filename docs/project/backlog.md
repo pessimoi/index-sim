@@ -63,6 +63,24 @@ manual VoiceOver/NVDA evidence gate above.
 
 - `Done` - **#6 · Medium · M:** [Workbench browser history and page context](../technical/workbench-browser-history-context-spec.md) is implemented through [PF-06](goals/pf-06-workbench-history-context.md). The exact allowlisted `pane` query now owns initial deep links, reload and non-recursive user/routed Back/Forward activation through the current lazy-pane lifecycle; the ready title names pane and source-backed target. Invalid/duplicate pane entries canonicalize to the unchanged queryless Compare default while unrelated query/hash state survives. Safe-session and share capture compose unchanged, and active pane is not part of persistence or transfer schemas. Focused coverage passes 109/109, named Chromium 1/1 and the complete Firefox/WebKit release matrix 36/36.
 
+## 2026-07-22 release-polish specifications
+
+These six cards are ordered by release-polish impact over existing `Valmis`
+workflows. They are not partial-feature completions, provider/infrastructure
+work or the still-open manual VoiceOver/NVDA evidence gate.
+
+- `Done` - **#1 · Critical · M:** [Workspace backup discoverability](../technical/release-polish-workspace-backup-discoverability-spec.md) is implemented through [RP-01](goals/rp-01-workspace-backup-discoverability.md). The header setup-transfer area now exposes `Download full Workspace backup`, routes to Settings and focuses the existing Workspace export control without changing setup files, Workspace envelopes, privacy defaults, restore planning or Undo.
+
+- `Done` - **#2 · High · M:** [Visible action feedback](../technical/release-polish-visible-action-feedback-spec.md) is implemented through [RP-02](goals/rp-02-visible-action-feedback.md). One visible polite action-status strip now presents global action outcomes only when an existing workflow notice or pending Undo does not already own the message.
+
+- `Done` - **#3 · High · M:** [Mobile MonsterCard navigation loop](../technical/release-polish-mobile-monstercard-loop-spec.md) is implemented through [RP-03](goals/rp-03-mobile-monstercard-loop.md). Mobile Compare now has a `Monster details` jump, MonsterCard has a `Back to Compare` route and zero-result Compare states include visible recovery copy while preserving accepted pane order and browser-context policy. All 37 Darwin candidates were reviewed, the bounded mobile-loop images were accepted and two final read-only visual runs pass 26/26.
+
+- `Done` - **#4 · High · M:** [Recommendation and optimizer Undo](../technical/release-polish-recommendation-optimizer-undo-spec.md) is implemented through [RP-04](goals/rp-04-recommendation-optimizer-undo.md). Trip recommendations and optimizer paths now share the changed/no-op/Undo contract: changed actions get exact one-step Undo, and no-op actions give visible feedback without replacing useful pending Undo.
+
+- `Done` - **#5 · High · M:** [Wide table discoverability](../technical/release-polish-wide-table-discoverability-spec.md) is implemented through [RP-05](goals/rp-05-wide-table-discoverability.md). Dense, Loot, setup/Duel review and Workspace review table wrappers now expose horizontal overflow cues and sticky first-column identity behavior without replacing tables or changing calculations. Visual review caught and fixed the nested Loot-mobile identity occlusion before baseline acceptance; two final read-only visual runs pass 26/26.
+
+- `Done` - **#6 · Medium · S:** [Hiscores fallback readability](../technical/release-polish-hiscores-fallback-readability-spec.md) is implemented through [RP-06](goals/rp-06-hiscores-fallback-readability.md). Disabled/error status copy wraps, and `Edit Player levels manually` focuses the existing Player level group while preserving mocked-provider tests, lookup freshness, Apply Undo and manual fallback ownership.
+
 ## Current-app stabilization
 
 - `Done` - Implement [global Undo visibility and targeted Reset recovery](../technical/global-undo-visibility-targeted-reset-spec.md). One opaque labelled polite owner is now sticky in normal-flow mobile/portrait layouts and stays outside the three compact/desktop workbench scroll owners; duplicate matching general-status announcements are suppressed. Manual overrides, current-monster Cannon, Loot settings/actions, scarce spot, safespot and hidden gear tiers share changed/no-op/restore handling while retaining their exact existing reset boundaries. Focused coverage passes 87/87, full unit coverage 952/952, four targeted production-preview transactions plus three Loot/hidden-tier regressions pass, the five-viewport reachability matrix passes, and the final combined 115/115 Chromium plus twice-clean 26/26 Darwin gates pass.

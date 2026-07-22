@@ -25,6 +25,17 @@ The verification subprocess skips dependency audit under its network-disabled
 policy; the immediately following escalated `npm audit` reports zero
 vulnerabilities.
 
+The 2026-07-22 release-polish review supersedes the remaining stale pre-PF
+images. The 26 first-mismatch pairs were inspected before the initial candidate
+write; that run then exposed all 37 tracked current-vs-HEAD pairs for inspection
+before final acceptance. The review includes the accepted PF-01 through PF-06
+presentation changes and RP-01 through RP-06, rather than attributing the full
+set only to RP-03/RP-05.
+One initial nested Loot-mobile candidate was rejected because the outer sticky
+row name obscured child identities. The detail stacking/opaque-background fix
+restored those labels before the scoped Loot update. Two complete read-only
+runs after the final write pass 26/26 and 26/26.
+
 Detailed dated implementation, release and superseded failure snapshots live in [the testing evidence log](../project/testing-evidence.md); they are evidence, not current command truth.
 
 The functional Playwright, composed view-model and testing-document ownership
@@ -129,6 +140,13 @@ WebKit emulation. `test:e2e:release` composes the two functional commands; the
 read-only Darwin visual suite remains a separate gate. Missing browser binaries
 must fail with Playwright's install instruction rather than skip. Playwright
 WebKit and device emulation are not branded Safari or physical-iOS evidence.
+The visual config defaults to port 5174; if a local runner needs a different
+preview port, set `VISUAL_TEST_PORT`, for example
+`VISUAL_TEST_PORT=5173 npm run test:e2e:visual`. This does not change snapshot
+ownership or baseline update policy. If the preview server is already running,
+`VISUAL_DISABLE_WEB_SERVER=1` skips the Playwright-owned webServer startup and
+uses the configured `baseURL` directly; that is a local environment workaround,
+not a baseline acceptance shortcut.
 
 For an account-free Cloudflare bundle check after deployment-shape changes, run:
 

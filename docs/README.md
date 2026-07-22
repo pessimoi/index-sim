@@ -90,6 +90,12 @@ This directory is the project memory layer for humans and AI agents. It keeps cu
 - Live integrations specification: [technical/live-integrations-spec.md](technical/live-integrations-spec.md)
 - Hiscores live implementation specification: [technical/hiscores-live-implementation-spec.md](technical/hiscores-live-implementation-spec.md)
 - Implemented-disabled Hiscores global provider-budget and conditional abuse-control specification: [technical/hiscores-global-rate-limit-spec.md](technical/hiscores-global-rate-limit-spec.md)
+- Workspace backup discoverability specification: [technical/release-polish-workspace-backup-discoverability-spec.md](technical/release-polish-workspace-backup-discoverability-spec.md)
+- Visible action feedback specification: [technical/release-polish-visible-action-feedback-spec.md](technical/release-polish-visible-action-feedback-spec.md)
+- Mobile MonsterCard navigation loop specification: [technical/release-polish-mobile-monstercard-loop-spec.md](technical/release-polish-mobile-monstercard-loop-spec.md)
+- Recommendation and optimizer Undo contract specification: [technical/release-polish-recommendation-optimizer-undo-spec.md](technical/release-polish-recommendation-optimizer-undo-spec.md)
+- Wide table discoverability specification: [technical/release-polish-wide-table-discoverability-spec.md](technical/release-polish-wide-table-discoverability-spec.md)
+- Hiscores fallback readability specification: [technical/release-polish-hiscores-fallback-readability-spec.md](technical/release-polish-hiscores-fallback-readability-spec.md)
 - Feature test-suite split specification: [technical/feature-test-suite-split-spec.md](technical/feature-test-suite-split-spec.md)
 - Testing strategy and commands: [technical/testing.md](technical/testing.md)
 - Detailed runtime/data/deployment tests: [technical/testing/runtime-data-deployment.md](technical/testing/runtime-data-deployment.md)
@@ -200,5 +206,6 @@ These files are useful evidence, but they are not the living source of truth. Pr
 - Accepted choices and open decision boundaries belong in [project/decisions.md](project/decisions.md).
 - Future work belongs in [project/roadmap.md](project/roadmap.md), [project/backlog.md](project/backlog.md) or [project/idea-inbox.md](project/idea-inbox.md).
 - Directly executable slicing, ordered prerequisites, required checks and documentation state transitions for the six specced finishing gaps belong in [project/goals/README.md](project/goals/README.md); the linked technical specifications remain requirement truth and [project/backlog.md](project/backlog.md) remains implementation status truth.
+- The 2026-07-22 release-polish requirements belong in [technical/release-polish-workspace-backup-discoverability-spec.md](technical/release-polish-workspace-backup-discoverability-spec.md), [technical/release-polish-visible-action-feedback-spec.md](technical/release-polish-visible-action-feedback-spec.md), [technical/release-polish-mobile-monstercard-loop-spec.md](technical/release-polish-mobile-monstercard-loop-spec.md), [technical/release-polish-recommendation-optimizer-undo-spec.md](technical/release-polish-recommendation-optimizer-undo-spec.md), [technical/release-polish-wide-table-discoverability-spec.md](technical/release-polish-wide-table-discoverability-spec.md) and [technical/release-polish-hiscores-fallback-readability-spec.md](technical/release-polish-hiscores-fallback-readability-spec.md); their execution slicing belongs in [project/goals/README.md](project/goals/README.md) and implementation status belongs in [project/backlog.md](project/backlog.md).
 
 If a document and code disagree about current behavior, trust the code and update the document.
