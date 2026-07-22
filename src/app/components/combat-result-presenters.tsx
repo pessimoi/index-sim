@@ -11,7 +11,7 @@ import type {
 } from "../view-models/stats";
 import type { CalculationWarningViewModel } from "../view-models/contracts";
 import { formatNumber } from "../view-models/formatting";
-import { MetricList } from "./app-presenters";
+import { CollapsibleSection, MetricList } from "./app-presenters";
 
 export function CalculationWarningSummary({
   warnings,
@@ -402,16 +402,14 @@ export function StatsSourceDetailCard({ detail }: { detail: StatsSourceDetailVie
 
 export function StatsCombatRollDetail({ detail }: { detail: StatsCombatRollDetailViewModel }) {
   return (
-    <section className="stats-panel combat-roll-panel" aria-label="Combat roll details">
-      <div className="section-title-row">
-        <div>
-          <h2>Combat roll details</h2>
-          <span className="section-subtitle">Normal attack and current result metrics</span>
-        </div>
-        <span className={`status-pill ${detail.status === "modeled" ? "ready" : ""}`}>
-          {detail.statusLabel}
-        </span>
-      </div>
+    <CollapsibleSection
+      ariaLabel="Combat roll details"
+      title="Combat roll details"
+      subtitle="Normal attack and current result metrics"
+      statusLabel={detail.statusLabel}
+      statusReady={detail.status === "modeled"}
+      className="stats-panel combat-roll-panel"
+    >
       <div className="combat-roll-grid" role="list" aria-label="Combat roll metrics">
         {detail.metrics.map((metric) => (
           <div
@@ -431,7 +429,7 @@ export function StatsCombatRollDetail({ detail }: { detail: StatsCombatRollDetai
           <li key={note}>{note}</li>
         ))}
       </ul>
-    </section>
+    </CollapsibleSection>
   );
 }
 

@@ -240,6 +240,9 @@ the disclosure does not trigger Recompute automatically.
 At the existing 1440×1000 desktop visual viewport:
 
 - the center pane remains the independent vertical scroll owner;
+- each skill row aligns its current-level card, XP control, target control and
+  lock card from one top edge; longer field descriptions continue below that
+  control line without pulling the adjacent cards downward;
 - result summary and the start of the primary training result are reachable
   before the closed advanced disclosure;
 - opening the disclosure may extend the pane's internal scroll content but

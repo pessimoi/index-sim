@@ -1657,6 +1657,51 @@ th {
   min-width: 0;
 }
 
+.collapsible-section-summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.collapsible-section-summary::-webkit-details-marker {
+  display: none;
+}
+
+.collapsible-section-title {
+  align-items: center;
+  display: flex;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.collapsible-section-title > span:last-child {
+  display: grid;
+  min-width: 0;
+}
+
+.collapsible-section-heading {
+  color: #eef2f7;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.collapsible-section-caret {
+  color: #9eacbd;
+  display: inline-block;
+  transform-origin: center;
+  transition: transform 120ms ease;
+}
+
+.collapsible-section[open] .collapsible-section-caret {
+  transform: rotate(90deg);
+}
+
+.collapsible-section-body {
+  display: grid;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
 .source-breakdown-panel {
   border-bottom: 1px solid #26303d;
   padding-bottom: 0.75rem;
@@ -2487,7 +2532,8 @@ th {
 
 @media (prefers-reduced-motion: reduce) {
   .hit-chart-bar,
-  .collapsible-control-caret {
+  .collapsible-control-caret,
+  .collapsible-section-caret {
     transition: none;
   }
 }
@@ -4445,7 +4491,7 @@ th {
 }
 
 .planner-skill-row {
-  align-items: end;
+  align-items: start;
   display: grid;
   gap: 0.55rem;
   grid-template-columns: minmax(7rem, 0.55fr) minmax(10rem, 1fr) minmax(7rem, 0.65fr) minmax(
@@ -4455,11 +4501,12 @@ th {
 }
 
 .planner-skill-name {
+  align-content: center;
   border: 1px solid #2a3544;
   border-radius: 6px;
   display: grid;
   gap: 0.2rem;
-  min-height: 2.15rem;
+  min-height: 2.9rem;
   padding: 0.35rem 0.5rem;
 }
 
@@ -4477,8 +4524,8 @@ th {
   font-variant-numeric: tabular-nums;
 }
 
-.planner-lock {
-  min-height: 2.15rem;
+.toggle.planner-lock {
+  min-height: 2.9rem;
 }
 
 .planner-gear-editor {

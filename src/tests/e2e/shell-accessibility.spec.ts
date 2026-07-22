@@ -378,7 +378,16 @@ test("shows Stats XP routing and trip summary plus setup damage distribution", a
     exact: true
   });
   await expect(sourceBreakdown).toBeVisible();
-  await expect(sourceBreakdown.getByRole("list", { name: "Source breakdown rows" })).toBeVisible();
+  const sourceBreakdownRows = sourceBreakdown.getByRole("list", {
+    name: "Source breakdown rows"
+  });
+  const sourceBreakdownSummary = sourceBreakdown.locator(":scope > summary");
+  await expect(sourceBreakdownRows).toBeVisible();
+  await sourceBreakdownSummary.click();
+  await expect(sourceBreakdownRows).toBeHidden();
+  await expect(sourceBreakdownSummary).toContainText(/\d+ sources/);
+  await sourceBreakdownSummary.click();
+  await expect(sourceBreakdownRows).toBeVisible();
   await expect(
     sourceBreakdown.getByRole("listitem", { name: /Normal attack: modeled/i })
   ).toContainText("DPS");

@@ -1,3 +1,4 @@
+import { useState, type ReactNode } from "react";
 import type { PriceImportNotice } from "../state/price-import";
 import type { InlineNoticeViewModel } from "../view-models/contracts";
 import type { DenseCompareScaleCellViewModel } from "../view-models/compare";
@@ -17,6 +18,57 @@ export interface DisplayMetric {
   value: string;
   tone?: string;
   accessibleLabel?: string;
+}
+
+export function CollapsibleSection({
+  ariaLabel,
+  title,
+  subtitle,
+  statusLabel,
+  statusReady = false,
+  className = "",
+  defaultOpen = true,
+  children
+}: {
+  ariaLabel: string;
+  title: string;
+  subtitle?: string;
+  statusLabel?: string;
+  statusReady?: boolean;
+  className?: string;
+  defaultOpen?: boolean;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <details
+      className={`collapsible-section ${className}`.trim()}
+      role="region"
+      aria-label={ariaLabel}
+      open={open}
+      onToggle={(event) => {
+        if (event.currentTarget.open !== open) setOpen(event.currentTarget.open);
+      }}
+    >
+      <summary className="section-title-row collapsible-section-summary">
+        <span className="collapsible-section-title">
+          <span className="collapsible-section-caret" aria-hidden="true">
+            ▸
+          </span>
+          <span>
+            <span className="collapsible-section-heading" role="heading" aria-level={2}>
+              {title}
+            </span>
+            {subtitle ? <span className="section-subtitle">{subtitle}</span> : null}
+          </span>
+        </span>
+        {statusLabel ? (
+          <span className={`status-pill ${statusReady ? "ready" : ""}`}>{statusLabel}</span>
+        ) : null}
+      </summary>
+      <div className="collapsible-section-body">{children}</div>
+    </details>
+  );
 }
 
 export function MetricList({ items }: { items: readonly DisplayMetric[] }) {

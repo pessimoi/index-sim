@@ -1,5 +1,6 @@
 import { formatNumber } from "../../view-models/formatting";
 import type { StatsPaneViewModel } from "../../view-models/stats";
+import { CollapsibleSection } from "../app-presenters";
 import { StatsCombatRollDetail, StatsSourceDetailCard } from "../combat-result-presenters";
 
 export function StatsPane({
@@ -11,16 +12,14 @@ export function StatsPane({
 }) {
   return (
     <section className="stats-analysis-pane" aria-label="Stats analysis" hidden={hidden}>
-      <section className="stats-panel source-breakdown-panel" aria-label="Source breakdown">
-        <div className="section-title-row">
-          <div>
-            <h2>Source breakdown</h2>
-            <span className="section-subtitle">DPS, XP and supply sources</span>
-          </div>
-          <span className="status-pill ready">
-            {formatNumber(viewModel.sourceBreakdown.rows.length)} sources
-          </span>
-        </div>
+      <CollapsibleSection
+        ariaLabel="Source breakdown"
+        title="Source breakdown"
+        subtitle="DPS, XP and supply sources"
+        statusLabel={`${formatNumber(viewModel.sourceBreakdown.rows.length)} sources`}
+        statusReady
+        className="stats-panel source-breakdown-panel"
+      >
         <div className="source-breakdown-grid" role="list" aria-label="Source breakdown rows">
           {viewModel.sourceBreakdown.rows.map((row) => (
             <article
@@ -81,21 +80,19 @@ export function StatsPane({
               <StatsSourceDetailCard detail={detail} key={detail.id} />
             ))}
         </div>
-      </section>
+      </CollapsibleSection>
 
       <StatsCombatRollDetail detail={viewModel.combatRollDetail} />
 
       <div className="stats-analysis-grid">
-        <section className="stats-panel" aria-label="XP routing">
-          <div className="section-title-row">
-            <div>
-              <h2>XP routing</h2>
-              <span className="section-subtitle">Effective and skill rows</span>
-            </div>
-            <span className="status-pill ready">
-              {viewModel.xpRouting.effectiveXpPerHourLabel} XP/hr
-            </span>
-          </div>
+        <CollapsibleSection
+          ariaLabel="XP routing"
+          title="XP routing"
+          subtitle="Effective and skill rows"
+          statusLabel={`${viewModel.xpRouting.effectiveXpPerHourLabel} XP/hr`}
+          statusReady
+          className="stats-panel"
+        >
           <div className="xp-routing-chip-list" role="list" aria-label="XP routing chips">
             {viewModel.xpRouting.rows.map((row) => (
               <div
@@ -111,19 +108,16 @@ export function StatsPane({
               </div>
             ))}
           </div>
-        </section>
+        </CollapsibleSection>
 
-        <section className="stats-panel" aria-label="Trip and banking summary">
-          <div className="section-title-row">
-            <div>
-              <h2>Trip &amp; banking</h2>
-              <span className="section-subtitle">Current effective-rate inputs</span>
-            </div>
-            <span className="status-pill ready">
-              {viewModel.tripBankingSummary.headline.value}{" "}
-              {viewModel.tripBankingSummary.headline.label}
-            </span>
-          </div>
+        <CollapsibleSection
+          ariaLabel="Trip and banking summary"
+          title="Trip & banking"
+          subtitle="Current effective-rate inputs"
+          statusLabel={`${viewModel.tripBankingSummary.headline.value} ${viewModel.tripBankingSummary.headline.label}`}
+          statusReady
+          className="stats-panel"
+        >
           <div className="stats-summary-table-wrap" tabIndex={0}>
             <table className="stats-summary-table" aria-label="Trip and banking metrics">
               <tbody>
@@ -137,7 +131,7 @@ export function StatsPane({
               </tbody>
             </table>
           </div>
-        </section>
+        </CollapsibleSection>
       </div>
     </section>
   );

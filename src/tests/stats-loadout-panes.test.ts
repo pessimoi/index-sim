@@ -72,13 +72,14 @@ describe("Stats and Loadout panes", () => {
       )
     ).toBe(true);
     inOrder(markup, [
-      'aria-label="Source breakdown"',
+      'aria-label="Source breakdown" open=""',
       'aria-label="Source breakdown rows"',
       'aria-label="Source detail panels"',
-      'aria-label="Combat roll details"',
-      'aria-label="XP routing"',
-      'aria-label="Trip and banking summary"'
+      'aria-label="Combat roll details" open=""',
+      'aria-label="XP routing" open=""',
+      'aria-label="Trip and banking summary" open=""'
     ]);
+    expect(markup.match(/class="collapsible-section /g)).toHaveLength(4);
     expect(markup).toContain(`${simulation.statsSourceBreakdown.rows.length} sources`);
     expect(markup).toContain(`${simulation.xpRouting.effectiveXpPerHourLabel} XP/hr`);
     expect(markup).toContain('aria-label="Trip and banking metrics"');

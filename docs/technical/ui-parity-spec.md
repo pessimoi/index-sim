@@ -589,8 +589,12 @@ Required content:
 Current implementation note: the rewrite Stats pane now includes the shared
 metric strip, active assumptions/modifiers summary, a compact source breakdown,
 combat roll detail metrics, XP routing chips, a Trip & banking summary and an
-exact discrete normal-versus-special hit-distribution comparison. The source breakdown and combat
-roll detail are derived in the view-model from existing combat, special attack,
+exact discrete normal-versus-special hit-distribution comparison. Source
+breakdown, combat roll details, XP routing and Trip & banking use one reusable,
+default-open whole-section disclosure; collapsing hides only the detail body and
+keeps the heading, subtitle and current status summary visible. Disclosure state
+is transient UI state. The source breakdown and combat roll detail are derived
+in the view-model from existing combat, special attack,
 trip and cannon outputs. The source breakdown lists normal attack, special
 attack and cannon with modeled, partial, not modeled or inactive status and shows
 available DPS, DPS gain context, XP/hr, hit chance, max hit, supply-cost and note
