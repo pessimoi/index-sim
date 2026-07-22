@@ -2497,7 +2497,8 @@ th {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hit-chart-bar {
+  .hit-chart-bar,
+  .collapsible-control-caret {
     transition: none;
   }
 }
@@ -2636,7 +2637,7 @@ th {
   text-align: center;
 }
 
-.selection-toggle-group {
+.collapsible-control-group {
   border-top: 1px solid #26303d;
   display: grid;
   gap: 0.45rem;
@@ -2645,19 +2646,38 @@ th {
   padding-top: 0.55rem;
 }
 
-.selection-toggle-header {
+.collapsible-control-summary {
   align-items: center;
+  cursor: pointer;
   display: flex;
   gap: 0.5rem;
   justify-content: space-between;
+  list-style: none;
   min-width: 0;
 }
 
-.selection-toggle-header > span:first-child {
+.collapsible-control-summary::-webkit-details-marker {
+  display: none;
+}
+
+.collapsible-control-label {
+  align-items: center;
   color: #aeb9c8;
+  display: flex;
   font-size: 0.72rem;
   font-weight: 700;
+  gap: 0.35rem;
   text-transform: uppercase;
+}
+
+.collapsible-control-caret {
+  display: inline-block;
+  transform-origin: center;
+  transition: transform 120ms ease;
+}
+
+.collapsible-control-group[open] .collapsible-control-caret {
+  transform: rotate(90deg);
 }
 
 .multi-selection-grid {

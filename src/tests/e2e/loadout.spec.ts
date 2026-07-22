@@ -451,10 +451,27 @@ test("supports multi-prayer and multi-boost workbench controls with compact prim
   await page.goto("/");
   await selectCombatType(page, "melee");
 
-  const compactSetup = page.getByLabel("Combat setup");
+  const compactSetup = page.getByRole("region", { name: "Combat setup" });
   const equipmentPane = page.getByLabel("Equipment loadout");
+  const prayerOptions = equipmentPane.getByLabel("Prayer options");
+  const boostOptions = equipmentPane.getByLabel("Boost options");
   const prayerSelections = equipmentPane.getByLabel("Prayer selections");
   const boostSelections = equipmentPane.getByLabel("Boost selections");
+
+  await expect(prayerOptions).toHaveAttribute("open", "");
+  await prayerOptions.locator(":scope > summary").click();
+  await expect(prayerOptions).not.toHaveAttribute("open", "");
+  await expect(prayerSelections).toBeHidden();
+  await expect(prayerOptions.locator(":scope > summary")).toContainText(/None|active/);
+  await prayerOptions.locator(":scope > summary").click();
+  await expect(prayerSelections).toBeVisible();
+
+  await boostOptions.locator(":scope > summary").click();
+  await expect(boostOptions).not.toHaveAttribute("open", "");
+  await expect(boostSelections).toBeHidden();
+  await expect(boostOptions.locator(":scope > summary")).toContainText(/None|active/);
+  await boostOptions.locator(":scope > summary").click();
+  await expect(boostSelections).toBeVisible();
 
   await expect(compactSetup.getByLabel("PRAYER", { exact: true })).toHaveValue("ultimate");
   await expect(compactSetup.getByLabel("BOOST", { exact: true })).toHaveValue("super_att");

@@ -163,6 +163,10 @@ describe("Stats and Loadout panes", () => {
     inOrder(markup, [
       'aria-label="Equipment loadout" hidden=""',
       'aria-label="Style loadout controls"',
+      'aria-label="Prayer options" open=""',
+      'aria-label="Prayer selections"',
+      'aria-label="Boost options" open=""',
+      'aria-label="Boost selections"',
       'aria-label="Manual combat overrides"',
       'aria-label="Equipment slots"',
       'aria-label="Special attack" hidden=""',
@@ -171,6 +175,9 @@ describe("Stats and Loadout panes", () => {
       'aria-label="Damage distribution buckets"'
     ]);
     expect(markup).toContain("Respect current levels");
+    expect(markup.match(/class="collapsible-control-group"/g)).toHaveLength(2);
+    expect(markup).toContain('aria-hidden="true">▸</span>Prayer');
+    expect(markup).toContain('aria-hidden="true">▸</span>Boost');
     expect(markup).toContain("Optimize loadout");
     expect(markup).toContain("Reset all overrides");
     expect(markup).toContain("42 x2");

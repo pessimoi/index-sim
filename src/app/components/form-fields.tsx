@@ -1,4 +1,12 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type Ref } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+  type Ref
+} from "react";
 import type { SetupSelectionOption } from "../state/ui-state";
 import { formatNumber } from "../view-models/formatting";
 import { expandedCompactLabel } from "../view-models/presentation-language";
@@ -114,13 +122,12 @@ export function MultiSelectionField({
 }) {
   const selectedCount = selectedIds.length;
   return (
-    <div className="selection-toggle-group">
-      <div className="selection-toggle-header">
-        <span>{label}</span>
-        <span className={`status-pill ${selectedCount ? "ready" : ""}`}>
-          {selectedCount ? `${formatNumber(selectedCount)} active` : "None"}
-        </span>
-      </div>
+    <CollapsibleControlGroup
+      label={label}
+      statusLabel={selectedCount ? `${formatNumber(selectedCount)} active` : "None"}
+      statusActive={selectedCount > 0}
+      ariaLabel={`${label} options`}
+    >
       <div className="multi-selection-grid" aria-label={`${label} selections`}>
         <label className="toggle">
           <input
@@ -142,7 +149,46 @@ export function MultiSelectionField({
           </label>
         ))}
       </div>
-    </div>
+    </CollapsibleControlGroup>
+  );
+}
+
+export function CollapsibleControlGroup({
+  label,
+  statusLabel,
+  statusActive = false,
+  ariaLabel,
+  defaultOpen = true,
+  children
+}: {
+  label: string;
+  statusLabel: string;
+  statusActive?: boolean;
+  ariaLabel: string;
+  defaultOpen?: boolean;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <details
+      className="collapsible-control-group"
+      aria-label={ariaLabel}
+      open={open}
+      onToggle={(event) => {
+        if (event.currentTarget.open !== open) setOpen(event.currentTarget.open);
+      }}
+    >
+      <summary className="collapsible-control-summary">
+        <span className="collapsible-control-label">
+          <span className="collapsible-control-caret" aria-hidden="true">
+            ▸
+          </span>
+          {label}
+        </span>
+        <span className={`status-pill ${statusActive ? "ready" : ""}`}>{statusLabel}</span>
+      </summary>
+      {children}
+    </details>
   );
 }
 
