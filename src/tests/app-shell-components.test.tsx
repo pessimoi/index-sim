@@ -489,9 +489,8 @@ describe("app shell components", () => {
     expect(compareMarkup).toContain('class="mobile-monster-jump" href="#monster-card-panel"');
     expect(compareMarkup).toContain("Monster details");
     expect(markup).toContain("Requirements met");
-    expect(markup).toContain('aria-label="Melee setup">Melee setup</button>');
-    expect(markup).not.toContain("Open loadout");
-    expect(markup).toContain("View stats");
+    expect(markup).not.toContain('class="player-profile-actions"');
+    expect(markup).not.toContain('aria-label="View stats"');
     expect(markup).toContain("Editing default");
     expect(markup).toContain("Default applies to monsters without their own setup");
     expect(markup).toContain("Saved locally");

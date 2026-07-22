@@ -10,7 +10,6 @@ import {
   COMBAT_STYLE_OPTIONS,
   PRIMARY_BOOST_OPTIONS,
   PRIMARY_PRAYER_OPTIONS,
-  workbenchTabLabel,
   type AppShellSetupViewModel,
   type SetupEditorActionId,
   type WorkbenchResultViewModel,
@@ -139,7 +138,6 @@ export function WorkbenchShell({
   children,
   rail
 }: WorkbenchShellProps) {
-  const setupTabLabel = workbenchTabLabel("loadout", form.combatStyle);
   const invokeSetupAction = (actionId: SetupEditorActionId): void => {
     if (actionId === "create-monster") actions.createCustomSetup();
     if (actionId === "edit-monster") actions.editCustomSetup();
@@ -260,22 +258,6 @@ export function WorkbenchShell({
                 </div>
               ))}
             </dl>
-            <div className="player-profile-actions">
-              <button
-                type="button"
-                aria-label={setupTabLabel}
-                onClick={() => actions.routeToTab("loadout")}
-              >
-                {setupTabLabel}
-              </button>
-              <button
-                type="button"
-                aria-label="View stats"
-                onClick={() => actions.routeToTab("stats")}
-              >
-                Stats
-              </button>
-            </div>
           </section>
         </aside>
 

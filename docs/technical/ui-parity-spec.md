@@ -421,10 +421,9 @@ legacy-order TabBar and active pane routing, and a right-side MonsterCard rail.
 The narrower PlayerSidebar keeps level and style inputs at the top and adds one
 read-only Active setup profile for the current weapon, stance/ammo/spell,
 attack speed, effective accuracy/damage levels, prayers, boosts and requirement
-or manual-override status. Its setup action uses the same dynamic `Melee setup`,
-`Ranged setup` or `Magic setup` label as the destination tab; the other action
-navigates to Stats. It does not duplicate target-, Trip-, loot- or
-price-dependent output metrics.
+or manual-override status. The profile remains read-only and does not duplicate
+the loadout or Stats navigation already owned by the workbench tab bar. It does
+not duplicate target-, Trip-, loot- or price-dependent output metrics.
 The left rail, center pane and MonsterCard rail have independent scroll
 containers on desktop. On mobile the zones stack in workflow order, with
 MonsterCard after the active pane. The final default-pane decision remains open.

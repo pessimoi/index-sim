@@ -1162,17 +1162,6 @@ th {
   color: #9cc9ff;
 }
 
-.player-profile-actions {
-  display: grid;
-  gap: 0.4rem;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.player-profile-actions button {
-  min-height: 2rem;
-  padding: 0.35rem 0.4rem;
-}
-
 .monster-rail {
   border-left: 1px solid #26303d;
   min-height: 0;
