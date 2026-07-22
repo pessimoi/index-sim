@@ -376,7 +376,9 @@ Preserve:
 - Reset/Optimize labels and button enabling;
 - `aria-live` notice/override status;
 - summary metric order and tones;
-- all table headers, numeric precision, row classes and accessible names;
+- all table headers, numeric precision, row classes and accessible names; the
+  per-item market-value column is labelled `Unit price` in both ordinary and
+  nested tables so stack quantity is not mistaken for total row value;
 - native `<details>` closed-by-default behavior;
 - action-select validation and callback timing;
 - price-history empty/tracked states; and
@@ -478,6 +480,16 @@ Those are intentional cross-surface consumers, not duplicate derivations.
 Moving `lootNotice` or the two persisted states to a controller is explicitly
 deferred. Their mutation participates in global recovery/share/Undo composition
 and does not block pane/view-model extraction.
+
+Current implementation note: the separate manual-override-derived combat model
+uses empty Loot preferences and default Loot settings because its consumers
+read combat values only. High alch, overhead, talisman and row-action changes
+therefore rebuild the primary current-result model once instead of also
+triggering a second full calculation whose Loot and Trip output was discarded.
+High alch additionally keeps a local selected value and schedules the App-owned
+mutation after the next browser paint, so the native selector visibly settles
+before that remaining synchronous result rebuild starts. The App-owned value
+remains the persistence and calculation source of truth.
 
 ## Cross-surface contracts
 

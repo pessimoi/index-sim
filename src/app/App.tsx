@@ -1675,11 +1675,11 @@ export function App() {
             { ...form, manualOverrides: DEFAULT_MANUAL_OVERRIDES },
             context,
             cannonByMonster,
-            currentLootPrefs,
-            lootSettingsByMonster
+            {},
+            DEFAULT_LOOT_SETTINGS_STATE
           )
         : null,
-    [cannonByMonster, context, currentLootPrefs, form, lootSettingsByMonster]
+    [cannonByMonster, context, form]
   );
   const appReadyForDocumentTitle = Boolean(context && viewModel && derivedViewModel);
   const documentTitleTarget = context?.gameData.monsters[form.monsterId]?.name ?? null;

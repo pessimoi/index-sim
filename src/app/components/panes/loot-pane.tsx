@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import type { JewelSpot, LootAction } from "@/domain/trip";
 import type { MonsterLootSettings } from "../../state/loot-settings";
 import type { PriceNoticeAction } from "../../view-models/price-data";
@@ -51,7 +52,7 @@ const LOOT_TABLE_COLUMNS: ReadonlyArray<{
   { label: "EV/kill", sortKey: "evPerKill", numeric: true },
   { label: "Chance", sortKey: "chance", numeric: true },
   { label: "Qty", sortKey: "quantity", numeric: true },
-  { label: "Price", sortKey: "price", numeric: true },
+  { label: "Unit price", sortKey: "price", numeric: true },
   { label: "Details", sortKey: null }
 ];
 
@@ -65,7 +66,7 @@ const LOOT_NESTED_TABLE_COLUMNS: ReadonlyArray<{
   { label: "Weight", sortKey: "weight", numeric: true },
   { label: "Chance", sortKey: "chance", numeric: true },
   { label: "Qty", sortKey: "quantity", numeric: true },
-  { label: "Price", sortKey: "price", numeric: true },
+  { label: "Unit price", sortKey: "price", numeric: true },
   { label: "EV share", sortKey: "evShare", numeric: true },
   { label: "Notes", sortKey: null }
 ];
@@ -102,6 +103,37 @@ export interface LootPaneProps {
 
 function optionLabel(options: ReadonlyArray<{ id: string; label: string }>, value: string): string {
   return options.find((option) => option.id === value)?.label ?? value;
+}
+
+function HighAlchField({
+  enabled,
+  onChange
+}: {
+  enabled: boolean;
+  onChange(enabled: boolean): void;
+}) {
+  const [selectedEnabled, setSelectedEnabled] = useState(enabled);
+
+  /* eslint-disable react-hooks/set-state-in-effect -- App remains the persisted source of truth; Reset settings, monster changes and external setup replacement must resync this paint-first control. */
+  useEffect(() => {
+    setSelectedEnabled(enabled);
+  }, [enabled]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  return (
+    <SelectField
+      label="High alch"
+      value={selectedEnabled ? "enabled" : "disabled"}
+      options={HIGH_ALCH_OPTIONS}
+      onChange={(value) => {
+        const nextEnabled = value === "enabled";
+        setSelectedEnabled(nextEnabled);
+        window.requestAnimationFrame(() => {
+          window.setTimeout(() => onChange(nextEnabled), 0);
+        });
+      }}
+    />
+  );
 }
 
 function lootAriaSort(
@@ -175,6 +207,7 @@ export function LootPane({ hidden, model, actions }: LootPaneProps) {
   const { presentation } = model;
   const { actionableRows, conditionalRows, summary } = presentation;
   const sortedActionableRows = sortLootTableRows(actionableRows, model.sort);
+  const highAlchEnabled = model.settings.highAlch ?? presentation.highAlchEnabled;
 
   return (
     <section className="loot-strip" aria-label="Current monster loot" hidden={hidden}>
@@ -193,12 +226,7 @@ export function LootPane({ hidden, model, actions }: LootPaneProps) {
         Loot settings
       </h3>
       <div className="loot-toolbar">
-        <SelectField
-          label="High alch"
-          value={presentation.highAlchEnabled ? "enabled" : "disabled"}
-          options={HIGH_ALCH_OPTIONS}
-          onChange={(value) => actions.setHighAlch(value === "enabled")}
-        />
+        <HighAlchField enabled={highAlchEnabled} onChange={actions.setHighAlch} />
         <SelectField
           label="Overhead"
           value={presentation.overheadMode}
@@ -253,7 +281,7 @@ export function LootPane({ hidden, model, actions }: LootPaneProps) {
             },
             { label: "Loot GP/kill", value: formatNumber(model.gpPerKill) },
             { label: "Effective net", value: formatNumber(model.effectiveNetGpPerHour) },
-            { label: "High alch", value: presentation.highAlchEnabled ? "On" : "Off" },
+            { label: "High alch", value: highAlchEnabled ? "On" : "Off" },
             {
               label: "Overhead",
               value:

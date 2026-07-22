@@ -46,6 +46,32 @@ function elements(node: ReactNode): ReactElement[] {
 }
 
 describe("Loot pane", () => {
+  it("shows the current High alch setting while calculated results catch up", async () => {
+    const { context } = await loadBundledLegacyContext();
+    const simulation = createSimulationViewModel(DEFAULT_FORM_STATE, context);
+    const markup = renderToStaticMarkup(
+      createElement(LootPane, {
+        hidden: false,
+        model: {
+          presentation: { ...simulation.loot, highAlchEnabled: false },
+          settings: {
+            ...lootSettingsForMonster({}, DEFAULT_FORM_STATE.monsterId),
+            highAlch: true
+          },
+          notice: null,
+          gpPerKill: simulation.trip.gpPerKill,
+          effectiveNetGpPerHour: simulation.trip.effectiveNetGpPerHour,
+          sort: DEFAULT_LOOT_TABLE_SORT_STATE,
+          nestedSort: DEFAULT_LOOT_NESTED_TABLE_SORT_STATE
+        },
+        actions
+      })
+    );
+
+    expect(markup).toContain('<option value="enabled" selected="">Enabled</option>');
+    expect(markup).toContain("<span>High alch</span><strong>On</strong>");
+  });
+
   it("renders friendly semantic latest and baseline capture facts", async () => {
     const { context } = await loadBundledLegacyContext();
     const simulation = createSimulationViewModel(DEFAULT_FORM_STATE, context);
@@ -199,7 +225,9 @@ describe("Loot pane", () => {
     expect(markup).toContain('<th aria-sort="none"><button type="button" class="sort-button"');
     expect(markup).toContain(">Drop</span>");
     expect(markup).toContain(">EV/kill</span>");
+    expect(markup.match(/>Unit price<\/span>/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
     expect(markup).toContain('aria-label="Sort by expected value per kill"');
+    expect(markup).toContain('aria-label="Sort by Unit price"');
   });
 
   it("validates a selected action against the row before invoking the caller", async () => {

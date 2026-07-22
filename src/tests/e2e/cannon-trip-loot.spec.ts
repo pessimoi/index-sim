@@ -714,8 +714,8 @@ test("shows loot value composition, nested detail and action impact detail", asy
   const nested = page.getByRole("table", { name: /Nested rows for Random herb/ });
   await expect(nested).toContainText("Ranarr");
   await expect(nested).toContainText("Weight");
-  const priceHeader = nested.getByRole("columnheader", { name: "Price", exact: true });
-  await priceHeader.getByRole("button", { name: "Price", exact: true }).click();
+  const priceHeader = nested.getByRole("columnheader", { name: "Unit price", exact: true });
+  await priceHeader.getByRole("button", { name: "Unit price", exact: true }).click();
   await expect(priceHeader).toHaveAttribute("aria-sort", "descending");
   const prices = (await nested.locator("tbody tr td:nth-child(6)").allTextContents()).map((value) =>
     Number(value.replaceAll(",", ""))
