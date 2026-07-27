@@ -219,10 +219,13 @@ test("CB-05 invalid local state recovery stays bounded and actionable", async ({
 
 test("CB-06 setup import and setup plus Workspace downloads dispatch", async ({ page }) => {
   await page.goto("/");
-  await expect(page.locator(".topbar > .actions")).toContainText(
+  const exportSetupButton = page.getByRole("button", { name: "Export combat setup" });
+  await expect(exportSetupButton).toHaveAccessibleDescription(
     "Combat setup files replace setup, custom-monster, cannon and Dense preferences. They are not full Workspace backups and do not include loot or prices."
   );
-  const exportSetupButton = page.getByRole("button", { name: "Export combat setup" });
+  await expect(
+    page.locator(".topbar").getByRole("button", { name: "Download full Workspace backup" })
+  ).toHaveCount(0);
   const setupDownloadPromise = page.waitForEvent("download");
   await exportSetupButton.focus();
   await exportSetupButton.press("Enter");

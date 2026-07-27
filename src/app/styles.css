@@ -171,17 +171,6 @@ th {
   margin-left: auto;
 }
 
-.transfer-scope-copy {
-  color: #8f9cac;
-  flex-basis: 100%;
-  font-size: 0.68rem;
-  margin: 0;
-  max-width: 36rem;
-  min-width: 0;
-  overflow-wrap: anywhere;
-  text-align: right;
-}
-
 .topbar-brand {
   flex: 0 1 17rem;
   min-width: 13rem;
@@ -7006,11 +6995,6 @@ th {
     flex: 1 1 100%;
     flex-wrap: wrap;
     gap: 0.18rem;
-  }
-
-  .transfer-scope-copy {
-    max-width: none;
-    text-align: left;
   }
 
   .workbench-shell {

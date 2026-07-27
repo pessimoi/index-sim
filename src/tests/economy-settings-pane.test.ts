@@ -464,16 +464,14 @@ describe("Economy and Settings pane", () => {
     expect((manualInput?.props as { inputRef?: unknown }).inputRef).toBe(inputRef);
   });
 
-  it("passes the Workspace model, actions and focus refs through the lazy Settings boundary", () => {
+  it("passes the Workspace model, actions and review focus refs through the lazy Settings boundary", () => {
     const paneModel = model("settings");
     const inputRef = { current: null };
-    const exportRef = { current: null };
     const headingRef = { current: null };
     const tree = EconomySettingsPane({
       model: paneModel,
       actions: defaultActions,
       workspaceImportInputRef: inputRef,
-      workspaceExportButtonRef: exportRef,
       workspaceReviewHeadingRef: headingRef
     });
     const workspaceElement = elements(tree).find((element) => {
@@ -485,7 +483,6 @@ describe("Economy and Settings pane", () => {
       model: paneModel.workspace,
       actions: defaultActions.workspace,
       importInputRef: inputRef,
-      exportButtonRef: exportRef,
       reviewHeadingRef: headingRef
     });
   });

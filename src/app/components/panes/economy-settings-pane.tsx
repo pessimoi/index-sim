@@ -155,7 +155,6 @@ export interface EconomySettingsPaneProps {
   priceNotesSummaryRef?: Ref<HTMLElement>;
   manualPriceInputRef?: Ref<HTMLInputElement>;
   workspaceImportInputRef?: Ref<HTMLInputElement>;
-  workspaceExportButtonRef?: Ref<HTMLButtonElement>;
   workspaceReviewHeadingRef?: Ref<HTMLHeadingElement>;
   setPriceNoticeActionRef?(noticeId: string, element: HTMLButtonElement | null): void;
   marketHeadingRef?: Ref<HTMLHeadingElement>;
@@ -345,7 +344,6 @@ export function EconomySettingsPane({
   priceNotesSummaryRef,
   manualPriceInputRef,
   workspaceImportInputRef,
-  workspaceExportButtonRef,
   workspaceReviewHeadingRef,
   setPriceNoticeActionRef,
   marketHeadingRef,
@@ -435,7 +433,6 @@ export function EconomySettingsPane({
             model={model.workspace}
             actions={actions.workspace}
             importInputRef={workspaceImportInputRef}
-            exportButtonRef={workspaceExportButtonRef}
             reviewHeadingRef={workspaceReviewHeadingRef}
           />
         </NestedPaneBoundary>

@@ -1,15 +1,29 @@
 # Workspace backup discoverability specification
 
-- Status: implemented 2026-07-22
+- Status: implemented
 - Date: 2026-07-22
+- Owner: ready app shell, Settings Workspace panel and file-transfer copy
+- Evidence: verified
+- Contract: closed
+
 - Priority: critical
 - Estimated effort: M
-- Owner: ready app shell, Settings Workspace panel and file-transfer copy
 - Feature-inventory parents: Workspace backup/restore, Basic combat setup,
   Setup comparison, Market price sync, Planner and Loot/Economy summary
   (`Valmis`)
 - Depends on: the implemented Workspace backup/restore contract, truthful file
   export outcomes and transfer artifact clarity
+
+## Revised placement decision (2026-07-23)
+
+The permanent topbar scope paragraph and `Download full Workspace backup`
+shortcut were removed after in-use review because they consumed scarce vertical
+space on every pane while duplicating Settings. `Workspace backup and restore`
+remains the single visible owner in Settings. Header combat-setup import and
+export keep the same scope sentence as an accessible description, and setup
+import review repeats it visibly before Apply. This supersedes the header route
+and focus requirements below without changing either transfer format, privacy
+defaults, restore behavior or recovery-only backup actions.
 
 ## Purpose
 

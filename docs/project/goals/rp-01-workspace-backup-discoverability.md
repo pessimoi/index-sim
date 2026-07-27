@@ -1,12 +1,21 @@
 # Goal
 
+- Status: implemented
+- Date: 2026-07-22
+- Owner: project execution
+- Evidence: verified
+
 - Id: RP-01
-- Status: completed 2026-07-22
 - Priority: critical
 - Estimated effort: M
 - Parent specification:
   [Workspace backup discoverability](../../technical/release-polish-workspace-backup-discoverability-spec.md)
 - Depends on: existing Workspace backup/restore and setup transfer surfaces
+
+> Placement revision 2026-07-23: the completed header route documented below
+> was removed after in-use review because it duplicated Settings and consumed
+> permanent vertical space. Settings remains the visible Workspace owner;
+> combat-setup controls retain an accessible scope description.
 
 ## Tavoite
 

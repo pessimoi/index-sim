@@ -784,12 +784,7 @@ test("reviews every setup transfer change across file, shared-link and saved-row
   const transferControls = topbarActions.locator("label.file-button, button");
   expect(
     (await transferControls.allTextContents()).map((text) => text.trim().replace(/\s+/g, " "))
-  ).toEqual([
-    "Download full Workspace backup",
-    "Review combat setup file",
-    "Export combat setup",
-    "Share setup"
-  ]);
+  ).toEqual(["Review combat setup file", "Export combat setup", "Share setup"]);
 
   const exportSetupButton = topbarActions.getByRole("button", { name: "Export combat setup" });
   const downloadPromise = page.waitForEvent("download");
@@ -1013,7 +1008,7 @@ test("reviews every setup transfer change across file, shared-link and saved-row
     await setupNotice.evaluate((element) =>
       Array.from(element.parentElement?.children ?? []).indexOf(element)
     )
-  ).toBe(5);
+  ).toBe(4);
   await expect(setupInput).toHaveValue("");
   await expect(page.getByLabel("Action status")).toHaveCount(0);
   await expect(page.getByLabel("Local state undo")).toContainText(

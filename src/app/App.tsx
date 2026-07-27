@@ -866,7 +866,6 @@ export function App() {
     );
   }, []);
   const [localStateReviewRequest, setLocalStateReviewRequest] = useState(0);
-  const [workspaceBackupFocusRequest, setWorkspaceBackupFocusRequest] = useState(0);
   const [crossTabSelectedIds, setCrossTabSelectedIds] = useState<CrossTabAreaId[]>([]);
   const [crossTabNotice, setCrossTabNotice] = useState<{
     tone: "neutral" | "success" | "warning" | "error";
@@ -879,9 +878,7 @@ export function App() {
   const shareSetupButtonRef = useRef<HTMLButtonElement>(null);
   const setupImportInputRef = useRef<HTMLInputElement>(null);
   const workspaceImportInputRef = useRef<HTMLInputElement>(null);
-  const workspaceExportButtonRef = useRef<HTMLButtonElement>(null);
   const workspaceReviewHeadingRef = useRef<HTMLHeadingElement>(null);
-  const handledWorkspaceBackupFocusRequestRef = useRef(0);
   const monsterRemovalIdRef = useRef(0);
   const priceHistoryReviewIdRef = useRef(0);
   const handledPriceHistoryReviewIdRef = useRef(0);
@@ -1160,24 +1157,6 @@ export function App() {
     });
     return () => window.cancelAnimationFrame(frameId);
   }, [activeTab, economyReviewRequest, paneLoadStates]);
-
-  useEffect(() => {
-    if (
-      activeTab !== "settings" ||
-      paneLoadStates["economy-settings"] !== "ready" ||
-      workspaceBackupFocusRequest === 0 ||
-      workspaceBackupFocusRequest === handledWorkspaceBackupFocusRequestRef.current
-    ) {
-      return;
-    }
-    const frameId = window.requestAnimationFrame(() => {
-      const button = workspaceExportButtonRef.current;
-      button?.focus({ preventScroll: true });
-      button?.scrollIntoView({ block: "nearest" });
-      if (button) handledWorkspaceBackupFocusRequestRef.current = workspaceBackupFocusRequest;
-    });
-    return () => window.cancelAnimationFrame(frameId);
-  }, [activeTab, paneLoadStates, workspaceBackupFocusRequest]);
 
   useEffect(() => {
     const reviewId = priceHistoryReview?.candidate.id;
@@ -3147,11 +3126,6 @@ export function App() {
     }
   };
 
-  const openWorkspaceBackupFromHeader = () => {
-    activateWorkbenchTab("settings", "routed-action");
-    setWorkspaceBackupFocusRequest((request) => request + 1);
-  };
-
   const dismissWorkspaceReview = (reviewId: number): void => {
     if (!workspaceFileTransfer.dismissReview(reviewId)) return;
     window.requestAnimationFrame(() => workspaceImportInputRef.current?.focus());
@@ -4705,7 +4679,6 @@ export function App() {
         onImportSetup={importSetupFile}
         onExportSetup={exportCurrentSetup}
         onShareSetup={openShareSetupDialog}
-        onOpenWorkspaceBackup={openWorkspaceBackupFromHeader}
       />
       {(savedDataIgnoredForSession ||
         sessionOnlyExitProtectionSnapshot.sessionOnlyChangeCount > 0) && (
@@ -5181,7 +5154,6 @@ export function App() {
               priceNotesSummaryRef={priceNotesSummaryRef}
               manualPriceInputRef={manualPriceInputRef}
               workspaceImportInputRef={workspaceImportInputRef}
-              workspaceExportButtonRef={workspaceExportButtonRef}
               workspaceReviewHeadingRef={workspaceReviewHeadingRef}
               setPriceNoticeActionRef={setPriceNoticeActionRef}
               marketHeadingRef={marketHeadingRef}

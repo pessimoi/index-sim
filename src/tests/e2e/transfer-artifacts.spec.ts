@@ -15,9 +15,13 @@ test("names and explains transfer artifacts", async ({ page }) => {
   await page.goto("/");
 
   const tabs = page.getByLabel("Workbench tabs");
+  const topbarActions = page.locator(".topbar > .actions");
   const setupInput = page.getByLabel("Review combat setup file");
   const setupExport = page.getByRole("button", { name: "Export combat setup" });
-  await expect(page.locator(".topbar > .actions")).toContainText(COMBAT_SCOPE);
+  await expect(topbarActions.getByText(COMBAT_SCOPE, { exact: true })).toBeHidden();
+  await expect(
+    topbarActions.getByRole("button", { name: "Download full Workspace backup" })
+  ).toHaveCount(0);
   await expect(setupInput).toHaveAccessibleDescription(COMBAT_SCOPE);
   await expect(setupExport).toHaveAccessibleDescription(COMBAT_SCOPE);
 

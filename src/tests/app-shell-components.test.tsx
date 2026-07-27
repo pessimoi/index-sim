@@ -132,7 +132,6 @@ describe("app shell components", () => {
         onImportSetup={asyncNoOp}
         onExportSetup={noOp}
         onShareSetup={noOp}
-        onOpenWorkspaceBackup={noOp}
       />
     );
 
@@ -141,7 +140,6 @@ describe("app shell components", () => {
       'class="topbar"',
       "Revision 274",
       'aria-label="Hiscores"',
-      "Download full Workspace backup",
       "Review combat setup file",
       "Export combat setup",
       "Share setup",
@@ -153,7 +151,9 @@ describe("app shell components", () => {
     expect(markup).toContain(
       "Combat setup files replace setup, custom-monster, cannon and Dense preferences. They are not full Workspace backups and do not include loot or prices."
     );
-    expect(markup.match(/aria-describedby="combat-setup-transfer-scope"/g)).toHaveLength(3);
+    expect(markup).toContain('id="combat-setup-transfer-scope" class="visually-hidden"');
+    expect(markup).not.toContain("Download full Workspace backup");
+    expect(markup.match(/aria-describedby="combat-setup-transfer-scope"/g)).toHaveLength(2);
     expect(markup.match(/accept="application\/json,.json"/g)).toHaveLength(1);
     expect(markup).not.toContain("Import prices");
   });
@@ -186,7 +186,6 @@ describe("app shell components", () => {
         onImportSetup={asyncNoOp}
         onExportSetup={noOp}
         onShareSetup={noOp}
-        onOpenWorkspaceBackup={noOp}
       />
     );
 
