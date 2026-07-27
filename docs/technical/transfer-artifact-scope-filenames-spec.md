@@ -1,9 +1,13 @@
 # Transfer artifact scope and filename clarity specification
 
-- Status: implemented 2026-07-21
+- Status: implemented
+- Date: 2026-07-21
+- Owner: transfer presentation models and shared export-filename helper
+- Evidence: verified
+- Contract: closed
+
 - Priority: medium
 - Estimated effort: M
-- Owner: transfer presentation models and shared export-filename helper
 - Feature-inventory parents: Basic combat setup, Setup comparison, Market price
   sync, Workspace backup/restore and Local state recovery (`Valmis`)
 - Depends on: existing transfer schemas, review transactions and typed browser

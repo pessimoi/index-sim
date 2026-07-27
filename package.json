@@ -45,6 +45,7 @@
     "test:e2e:visual:update": "playwright test --config playwright.visual.config.ts --update-snapshots",
     "typecheck": "tsc -b",
     "architecture:check": "$NODE node_modules/vite-node/vite-node.mjs --config vitest.config.ts scripts/check-architecture.ts",
+    "docs:check": "$NODE node_modules/vite-node/vite-node.mjs --config vitest.config.ts scripts/check-documentation.ts",
     "startup:measure": "$NODE scripts/measure-startup.mjs",
     "worker:measure": "$NODE scripts/measure-calculation-worker.mjs",
     "lint": "$NODE node_modules/eslint/bin/eslint.js .",

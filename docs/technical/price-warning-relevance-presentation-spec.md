@@ -1,6 +1,10 @@
 # Price warning relevance and presentation specification
 
-Status: implemented on 2026-07-17.
+- Status: implemented
+- Date: 2026-07-17
+- Owner: technical documentation
+- Evidence: verified
+- Contract: closed
 
 ## Purpose
 
@@ -392,7 +396,7 @@ is a regression signal.
 - Price values, formulas, PriceSet selection, persistence, provider policy and
   request schemas are unchanged.
 - Focused unit, Chromium, type, lint, architecture, golden, build and artifact
-  checks pass. [The dated testing evidence](../project/testing-evidence.md#2026-07-17-price-warning-relevance-and-presentation)
+  checks pass. [The dated testing evidence](../project/testing-evidence/2026-07-19-20.md#2026-07-17-price-warning-relevance-and-presentation)
   records the unrelated Planner-baseline and untracked-document blockers in
   the repository-wide wrapper.
 

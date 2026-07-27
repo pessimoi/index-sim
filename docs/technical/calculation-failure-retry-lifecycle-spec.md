@@ -1,6 +1,10 @@
 # Calculation failure and Retry lifecycle specification
 
-Status: implemented on 2026-07-19.
+- Status: implemented
+- Date: 2026-07-19
+- Owner: technical documentation
+- Evidence: verified
+- Contract: living
 
 ## Purpose
 

@@ -50,6 +50,12 @@ if (command === "gate") {
     "vitest.config.ts",
     "scripts/check-architecture.ts"
   );
+  runNode(
+    "node_modules/vite-node/vite-node.mjs",
+    "--config",
+    "vitest.config.ts",
+    "scripts/check-documentation.ts"
+  );
   runNode("node_modules/vitest/vitest.mjs", "run", "--config", "vitest.config.ts");
   runNode(
     "node_modules/vitest/vitest.mjs",

@@ -1,6 +1,11 @@
 # Local-state recovery controller and Settings panel specification
 
-Status: implemented as independent Goal 6, 2026-07-13. The controller, hook,
+- Status: implemented
+- Date: 2026-07-13
+- Owner: technical documentation
+- Evidence: verified
+- Contract: closed
+
 pure Settings panel and focused regression suite described here are current.
 
 ## Purpose

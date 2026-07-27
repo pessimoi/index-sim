@@ -1,8 +1,11 @@
 # Shareable setup permalink specification
 
-- Status: implemented in the root rewrite; repository-local evidence complete
+- Status: implemented
 - Date: 2026-07-10
 - Owner: product UI and browser adapters
+- Evidence: verified
+- Contract: living
+
 - Source: promoted from `docs/project/idea-inbox.md`
 - Related current workflows: Basic combat setup, setup JSON export/import,
   per-monster Cannon and loot state, Duel snapshots

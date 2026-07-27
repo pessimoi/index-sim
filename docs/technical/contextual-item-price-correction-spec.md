@@ -1,6 +1,10 @@
 # Contextual item-price correction specification
 
-Status: implemented on 2026-07-19.
+- Status: implemented
+- Date: 2026-07-19
+- Owner: technical documentation
+- Evidence: verified
+- Contract: closed
 
 Priority: high. Estimated implementation size: S.
 

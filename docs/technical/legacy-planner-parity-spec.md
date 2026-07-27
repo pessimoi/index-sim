@@ -1,8 +1,11 @@
 # Legacy Planner parity and gap-audit specification
 
-- Status: implemented repository-locally; classified baseline current
+- Status: implemented
 - Date: 2026-07-10
 - Owner: technical testing and Planner domain
+- Evidence: verified
+- Contract: closed
+
 - Source: `docs/project/backlog.md` conditional legacy Planner parity work
 - Related evidence: `planner-core.js`, `src/domain/planner/index.ts`,
   `src/tests/planner-parity.test.ts`,

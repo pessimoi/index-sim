@@ -1,6 +1,10 @@
 # Planner pane, view-model and calculation-controller refactor specification
 
-Status: implemented on 2026-07-13 as D-093 composition-root Phase 3D.
+- Status: implemented
+- Date: 2026-07-13
+- Owner: technical documentation
+- Evidence: verified
+- Contract: closed
 
 Current lifecycle note: the later
 [calculation failure and Retry contract](calculation-failure-retry-lifecycle-spec.md)

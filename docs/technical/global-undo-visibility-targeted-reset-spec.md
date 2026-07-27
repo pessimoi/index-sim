@@ -1,9 +1,13 @@
 # Global Undo visibility and targeted Reset recovery specification
 
-- Status: implemented on 2026-07-20
+- Status: implemented
+- Date: 2026-07-20
+- Owner: ready app shell, global status/Undo and existing state owners
+- Evidence: verified
+- Contract: closed
+
 - Priority: high
 - Estimated effort: M
-- Owner: ready app shell, global status/Undo and existing state owners
 - Feature-inventory parents: `Basic combat setup`, `Result summary`, `Cannon`
   and `Loot/economy summary` (`Valmis`)
 - Depends on: the existing single `PendingUndo` slot, normal Default/Custom form

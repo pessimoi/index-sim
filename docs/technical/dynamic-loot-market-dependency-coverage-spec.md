@@ -3,6 +3,9 @@
 - Status: implemented
 - Date: 2026-07-12
 - Owner: `src/domain/trip`, `src/data/market-sync-items` and generated runtime readiness
+- Evidence: verified
+- Contract: closed
+
 - Product surface: tagged Loot valuation, market diagnostics and scheduled coverage planning
 - Related decisions: D-052, D-058, D-072, D-084, D-085, D-086 and D-087
 

@@ -1,9 +1,13 @@
 # Entity label collision disambiguation specification
 
-- Status: implemented 2026-07-21
+- Status: implemented
+- Date: 2026-07-21
+- Owner: shared entity-label presentation and option/row view models
+- Evidence: verified
+- Contract: closed
+
 - Priority: high
 - Estimated effort: M
-- Owner: shared entity-label presentation and option/row view models
 - Feature-inventory parents: Basic combat setup, Loot/economy summary, Market
   price sync and Planner (`Valmis`)
 - Depends on: source-name-first presentation and the active generated

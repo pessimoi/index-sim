@@ -1,6 +1,11 @@
 # D-095 worker measurement commit specification
 
-Status: completed as commit `7cce5e4` (`Measure calculation worker startup and
+- Status: historical
+- Date: 2026-07-14
+- Owner: project documentation
+- Evidence: verified
+- Contract: closed
+
 transfer`). This document is the retained delivery manifest, not a current
 staging instruction.
 

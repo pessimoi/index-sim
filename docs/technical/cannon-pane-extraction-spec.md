@@ -1,6 +1,10 @@
 # Cannon pane extraction specification
 
-Status: implemented as composition-root Goal 10, 2026-07-13.
+- Status: implemented
+- Date: 2026-07-13
+- Owner: technical documentation
+- Evidence: verified
+- Contract: closed
 
 ## Purpose
 

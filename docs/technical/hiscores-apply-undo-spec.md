@@ -1,6 +1,10 @@
 # Hiscores Apply Undo specification
 
-Status: implemented and validated on 2026-07-20.
+- Status: implemented
+- Date: 2026-07-20
+- Owner: technical documentation
+- Evidence: verified
+- Contract: closed
 
 Priority: medium.
 

@@ -1,6 +1,11 @@
 # App composition-root refactor specification
 
-Status: shared presenters, ten focused controller slices, Cannon,
+- Status: implemented
+- Date: 2026-07-14
+- Owner: technical documentation
+- Evidence: verified
+- Contract: closed
+
 Stats/Loadout, Compare/Duel, Planner, Risk, Loot/Trip, Economy/Settings, the pure
 MonsterCard rail and the bounded
 [Phase 4 composition review](app-composition-root-phase4-spec.md) are

@@ -1,8 +1,11 @@
 # Live integrations specification
 
-- Status: repository implementation retained; automatic market workflow disabled
+- Status: implemented
 - Date: 2026-07-15
 - Owner: technical docs
+- Evidence: manual-gate-open
+- Contract: living
+
 - Related decisions: [D-015](../project/decisions.md), [D-021](../project/decisions.md), [D-033](../project/decisions.md), [D-061](../project/decisions.md), [D-062](../project/decisions.md), [D-065](../project/decisions.md), [D-066](../project/decisions.md), [D-099](../project/decisions.md)
 - Legacy evidence: `views.jsx` `HiscoresLookup`, `views.jsx` `SettingsPane`, `market.js`
 

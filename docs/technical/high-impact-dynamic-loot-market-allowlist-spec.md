@@ -3,6 +3,9 @@
 - Status: implemented
 - Date: 2026-07-12
 - Owner: `src/data/market-source-mapping.ts`
+- Evidence: verified
+- Contract: closed
+
 - Product surface: scheduled market coverage for active gem/mega and ultra-rare loot valuation
 - Related decisions: D-062, D-085, D-086 and D-087
 

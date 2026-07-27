@@ -1,6 +1,11 @@
 # Game revision and setup-transfer context specification
 
-Status: implemented on 2026-07-19. Generated revision context,
+- Status: implemented
+- Date: 2026-07-19
+- Owner: technical documentation
+- Evidence: verified
+- Contract: living
+
 source-pin/readiness agreement, ready-shell/Settings presentation and
 contextual setup, saved-setup and share transfers are complete. Queue-wide
 full verify and visual reconciliation remain assigned to the final integration

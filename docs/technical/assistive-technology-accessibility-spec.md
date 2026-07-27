@@ -1,10 +1,13 @@
 # Assistive-technology accessibility evidence specification
 
-- Status: automated implementation complete; manual screen-reader release gate open
+- Status: implemented
 - Date: 2026-07-21
+- Owner: shared UI primitives, feature presenters and browser test owners
+- Evidence: manual-gate-open
+- Contract: living
+
 - Priority: high
 - Estimated effort: L
-- Owner: shared UI primitives, feature presenters and browser test owners
 - Feature-inventory parents: all current rewrite workflows (`Valmis`)
 - Depends on: implemented keyboard/focus contract and current production-preview
   browser fixture

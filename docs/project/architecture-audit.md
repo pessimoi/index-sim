@@ -1,5 +1,10 @@
 # Arkkitehtuuriauditointi 2026-07-14
 
+- Status: historical
+- Date: 2026-07-14
+- Owner: project documentation
+- Evidence: verified
+
 Tämä raportti kuvaa repositoryn nykyisen Vite/React-, Web Worker-, data- ja
 Cloudflare Worker -tuotantopolun lähdekoodiin perustuvan auditoinnin. Nykyisen
 arkkitehtuurin totuuslähde on

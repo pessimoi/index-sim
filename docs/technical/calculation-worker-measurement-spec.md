@@ -1,6 +1,10 @@
 # Calculation worker startup and transfer measurement specification
 
-Status: implemented on 2026-07-14 under D-095.
+- Status: implemented
+- Date: 2026-07-14
+- Owner: technical documentation
+- Evidence: verified
+- Contract: closed
 
 ## Objective
 

@@ -1,7 +1,11 @@
 # Goal
 
+- Status: implemented
+- Date: 2026-07-21
+- Owner: project execution
+- Evidence: verified
+
 - Id: PF-03A
-- Status: completed 2026-07-21
 - Priority: high
 - Estimated effort: M
 - Parent specification:

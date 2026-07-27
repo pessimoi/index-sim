@@ -1,6 +1,10 @@
 # Accessibility and keyboard navigation specification
 
-Status: implemented and browser-verified on 2026-07-11 under D-070.
+- Status: implemented
+- Date: 2026-07-11
+- Owner: technical documentation
+- Evidence: verified
+- Contract: closed
 
 ## Purpose
 

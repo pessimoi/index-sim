@@ -1,10 +1,13 @@
 # Recommendation and optimizer Undo contract specification
 
-- Status: implemented 2026-07-22
+- Status: implemented
 - Date: 2026-07-22
+- Owner: Trip recommendation, Loot optimizer, Loadout optimizer and global Undo
+- Evidence: verified
+- Contract: closed
+
 - Priority: high
 - Estimated effort: M
-- Owner: Trip recommendation, Loot optimizer, Loadout optimizer and global Undo
 - Feature-inventory parents: Trip controls, Loot/Economy summary and Basic
   combat setup (`Valmis`)
 - Depends on: existing one-slot global Undo, Trip patch intents and Loot/Loadout

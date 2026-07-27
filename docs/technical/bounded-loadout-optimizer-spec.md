@@ -1,6 +1,10 @@
 # Bounded loadout optimizer specification
 
-Status: implemented on 2026-07-11 under D-073; D-088 adds the implemented default numeric-level eligibility policy.
+- Status: implemented
+- Date: 2026-07-11
+- Owner: technical documentation
+- Evidence: verified
+- Contract: closed
 
 D-088 later extends this implemented D-073 contract with the checked-by-default
 numeric-level eligibility policy in

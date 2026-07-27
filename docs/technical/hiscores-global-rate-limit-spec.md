@@ -1,8 +1,11 @@
 # Hiscores distributed and global rate-limit specification
 
-- Status: repository implementation complete; enforcement and edge rule disabled/evidence gated
+- Status: implemented
 - Date: 2026-07-14
 - Owner: server integration and deployment operations
+- Evidence: manual-gate-open
+- Contract: living
+
 - Source: `SEC-2026-01` and the conditional stabilization backlog item
 - Related documents: [hiscores-live-implementation-spec.md](hiscores-live-implementation-spec.md), [live-integrations-spec.md](live-integrations-spec.md), [../operations/public-deployment-spec.md](../operations/public-deployment-spec.md), [../project/security-audit.md](../project/security-audit.md), [../project/decisions.md](../project/decisions.md)
 

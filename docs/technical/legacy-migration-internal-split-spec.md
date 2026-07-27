@@ -1,6 +1,10 @@
 # Legacy migration internal split specification
 
-Status: implemented, 2026-07-14.
+- Status: implemented
+- Date: 2026-07-14
+- Owner: technical documentation
+- Evidence: verified
+- Contract: closed
 
 ## Activation-time trigger and problem
 

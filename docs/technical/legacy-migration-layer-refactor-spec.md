@@ -1,6 +1,10 @@
 # Legacy migration layer refactor specification
 
-Status: implemented in Goal 1/3, 2026-07-13.
+- Status: implemented
+- Date: 2026-07-13
+- Owner: technical documentation
+- Evidence: verified
+- Contract: closed
 
 ## Problem
 

@@ -1,6 +1,11 @@
 # Runtime bootstrap controller specification
 
-Status: implemented in Goal 5, 2026-07-13. The local-state recovery controller
+- Status: implemented
+- Date: 2026-07-13
+- Owner: technical documentation
+- Evidence: verified
+- Contract: closed
+
 remains a separate next goal.
 
 ## Purpose

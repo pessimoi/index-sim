@@ -1,8 +1,11 @@
 # Public deployment specification
 
-- Status: repository handoff ready; adopter deployment checklist not executed
+- Status: implemented
 - Date: 2026-07-14
 - Owner: operations docs
+- Evidence: manual-gate-open
+- Contract: living
+
 - Source: conditional public-release and deploy-hardening backlog work
 - Related documents: [README.md](README.md), [../technical/architecture.md](../technical/architecture.md), [../technical/testing.md](../technical/testing.md), [../technical/live-integrations-spec.md](../technical/live-integrations-spec.md), [../technical/hiscores-live-implementation-spec.md](../technical/hiscores-live-implementation-spec.md), [../technical/hiscores-global-rate-limit-spec.md](../technical/hiscores-global-rate-limit-spec.md)
 

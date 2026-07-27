@@ -1,10 +1,13 @@
 # Cross-browser release support specification
 
-- Status: automated release gate implemented; branded Safari smoke not run
+- Status: implemented
 - Date: 2026-07-21
+- Owner: Playwright configuration, browser adapters and release testing
+- Evidence: manual-gate-open
+- Contract: living
+
 - Priority: high
 - Estimated effort: L
-- Owner: Playwright configuration, browser adapters and release testing
 - Feature-inventory parents: all current rewrite workflows (`Valmis`)
 - Depends on: deterministic production preview and the file-export outcome
   contract for truthful download evidence

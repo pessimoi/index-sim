@@ -1,5 +1,10 @@
 # Repository documentation audit
 
+- Status: historical
+- Date: 2026-07-19
+- Owner: project documentation
+- Evidence: verified
+
 ## Current audit window: 2026-07-19
 
 - Status: complete with documented parallel-source deferrals

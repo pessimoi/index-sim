@@ -1,6 +1,10 @@
 # Conditional quest and clue loot specification
 
-Status: implemented on 2026-07-11 under D-072; exact player-state activation remains decision-gated.
+- Status: implemented
+- Date: 2026-07-11
+- Owner: technical documentation
+- Evidence: verified
+- Contract: closed
 
 ## Purpose
 

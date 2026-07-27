@@ -1,9 +1,13 @@
 # Workbench browser history and page-context specification
 
-- Status: implemented and browser-verified 2026-07-21
+- Status: implemented
+- Date: 2026-07-21
+- Owner: pure workbench URL state, App navigation composition and document title
+- Evidence: verified
+- Contract: living
+
 - Priority: medium
 - Estimated effort: M
-- Owner: pure workbench URL state, App navigation composition and document title
 - Feature-inventory parents: Desktop workbench, Keyboard navigation, mobile
   result/navigation loop and lazy pane loading (`Valmis`)
 - Depends on: the current 11-tab allowlist, pane-family request lifecycle and

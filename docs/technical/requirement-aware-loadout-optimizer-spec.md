@@ -1,6 +1,10 @@
 # Requirement-aware loadout optimizer specification
 
-Status: implemented and browser-verified on 2026-07-12 under D-088.
+- Status: implemented
+- Date: 2026-07-12
+- Owner: technical documentation
+- Evidence: verified
+- Contract: closed
 
 ## Purpose
 

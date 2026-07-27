@@ -1,6 +1,10 @@
 # Startup and bundle performance specification
 
-Status: implemented in Goal 3/3, 2026-07-13.
+- Status: implemented
+- Date: 2026-07-13
+- Owner: technical documentation
+- Evidence: verified
+- Contract: living
 
 ## Problem
 

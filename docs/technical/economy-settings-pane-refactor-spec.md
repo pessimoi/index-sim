@@ -1,6 +1,10 @@
 # Economy and Settings pane and price-data view-model refactor specification
 
-Status: implemented on 2026-07-14 as D-093 composition-root Phase 3G.
+- Status: implemented
+- Date: 2026-07-14
+- Owner: technical documentation
+- Evidence: verified
+- Contract: closed
 
 ## Purpose
 

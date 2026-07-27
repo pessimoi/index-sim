@@ -1,10 +1,13 @@
 # Visible action feedback specification
 
-- Status: implemented 2026-07-22
+- Status: implemented
 - Date: 2026-07-22
+- Owner: ready app shell, global status/Undo and workflow-local notice owners
+- Evidence: verified
+- Contract: closed
+
 - Priority: high
 - Estimated effort: M
-- Owner: ready app shell, global status/Undo and workflow-local notice owners
 - Feature-inventory parents: Basic combat setup, Result summary, Trip controls,
   Loot/Economy summary and Hiscores (`Valmis`)
 - Depends on: the implemented global Undo visibility contract and existing

@@ -1,6 +1,10 @@
 # Calculation Worker retention and persistent-trigger specification
 
-Status: implemented, 2026-07-14 under D-095.
+- Status: implemented
+- Date: 2026-07-14
+- Owner: technical documentation
+- Evidence: verified
+- Contract: living
 
 ## Purpose
 

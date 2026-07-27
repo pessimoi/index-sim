@@ -1,6 +1,11 @@
 # Source-backed incoming damage specification
 
-Status: implemented under D-081 on 2026-07-11; validation evidence recorded in
+- Status: implemented
+- Date: 2026-07-11
+- Owner: technical documentation
+- Evidence: verified
+- Contract: closed
+
 [testing.md](testing.md). The generated
 [63-monster evidence report](../project/npc-attack-source-audit.md) remains
 source evidence, while D-081 owns the accepted formula, context, overlay and

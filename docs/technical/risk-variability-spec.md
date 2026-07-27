@@ -1,5 +1,11 @@
 # Risk and variability specification
 
+- Status: implemented
+- Date: 2026-07-11
+- Owner: technical docs
+- Evidence: verified
+- Contract: living
+
 Current lifecycle note: the implemented
 [calculation failure and Retry contract](calculation-failure-retry-lifecycle-spec.md)
 replaces the original visible `Running`/`Cancelled`/`Unavailable` states with
@@ -7,9 +13,6 @@ replaces the original visible `Running`/`Cancelled`/`Unavailable` states with
 labelled previous data and exposes Retry. The stochastic model and explicit
 Run/Cancel boundary specified here are unchanged.
 
-- Status: implemented and browser-verified on 2026-07-11
-- Date: 2026-07-11
-- Owner: technical docs
 - Product surface: new `Risk` workbench tab with compact ranges beside existing averages
 - Related decisions: D-024, D-025, D-026, D-027, D-069, D-074 and D-081
 

@@ -1,10 +1,13 @@
 # Lazy pane loading and failure-isolation specification
 
-- Status: implemented; focused production-preview and component evidence pass
+- Status: implemented
 - Date: 2026-07-21
+- Owner: App composition root, Workbench shell and pane-loading boundary
+- Evidence: verified
+- Contract: closed
+
 - Priority: medium
 - Estimated effort: L
-- Owner: App composition root, Workbench shell and pane-loading boundary
 - Feature-inventory parents: Workbench and all current feature panes (`Valmis`)
 - Depends on: current dynamic pane chunks, root application recovery and
   production artifact/startup measurement owners

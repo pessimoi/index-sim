@@ -1,6 +1,10 @@
 # Numeric input draft and validation specification
 
-Status: implemented on 2026-07-18.
+- Status: implemented
+- Date: 2026-07-18
+- Owner: technical documentation
+- Evidence: verified
+- Contract: living
 
 ## Purpose
 

@@ -1,9 +1,13 @@
 # Safe active setup reset specification
 
-- Status: implemented on 2026-07-19
+- Status: implemented
+- Date: 2026-07-19
+- Owner: setup UI and rewrite-owned browser state
+- Evidence: verified
+- Contract: closed
+
 - Priority: high
 - Estimated effort: M
-- Owner: setup UI and rewrite-owned browser state
 - Feature-inventory parent: `Basic combat setup` (`Valmis`)
 - Active runtime context: canonical Revision 274 defaults
 - Depends on: the implemented six-family setup capture/apply/Undo boundary and

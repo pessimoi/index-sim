@@ -1,10 +1,13 @@
 # Cross-tab local-state conflict safety specification
 
-- Status: implemented 2026-07-21; focused controller and two-page Chromium evidence recorded
+- Status: implemented
 - Date: 2026-07-21
+- Owner: browser persistence boundary, local-state recovery and ready-shell feedback
+- Evidence: verified
+- Contract: living
+
 - Priority: critical
 - Estimated effort: L
-- Owner: browser persistence boundary, local-state recovery and ready-shell feedback
 - Feature-inventory parents: all browser-local `Valmis` workflows
 - Depends on: `BrowserStorageAccess`, the local-state health registry, the
   local-state batch transaction and the current global attention/Undo surfaces

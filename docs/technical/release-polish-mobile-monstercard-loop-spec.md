@@ -1,10 +1,13 @@
 # Mobile MonsterCard navigation loop specification
 
-- Status: implemented and visual review passed 2026-07-22
+- Status: implemented
 - Date: 2026-07-22
+- Owner: workbench shell, mobile navigation model and MonsterCard presenter
+- Evidence: verified
+- Contract: closed
+
 - Priority: high
 - Estimated effort: M
-- Owner: workbench shell, mobile navigation model and MonsterCard presenter
 - Feature-inventory parents: Desktop workbench layout, mobile result/navigation
   loop, Result summary and Monster Compare (`Valmis`)
 - Depends on: implemented mobile result/navigation loop and workbench browser

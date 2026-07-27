@@ -1,6 +1,10 @@
 # Local development startup reliability specification
 
-Status: implemented on 2026-07-15.
+- Status: implemented
+- Date: 2026-07-15
+- Owner: technical documentation
+- Evidence: verified
+- Contract: living
 
 ## Problem
 

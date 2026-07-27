@@ -1,8 +1,11 @@
 # Visual regression specification
 
-- Status: implemented repository-locally; remote merge gate not accepted
+- Status: implemented
 - Date: 2026-07-10
 - Owner: technical testing
+- Evidence: manual-gate-open
+- Contract: living
+
 - Source: promoted from `docs/project/idea-inbox.md`
 - Related current evidence: `docs/technical/testing.md`, `playwright.config.ts`, `src/tests/e2e/*.spec.ts`
 

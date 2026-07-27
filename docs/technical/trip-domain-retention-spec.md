@@ -1,6 +1,10 @@
 # Trip domain retention and split-trigger specification
 
-Status: implemented, 2026-07-14.
+- Status: implemented
+- Date: 2026-07-14
+- Owner: technical documentation
+- Evidence: verified
+- Contract: living
 
 ## Purpose
 

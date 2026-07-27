@@ -1,9 +1,13 @@
 # Result rate semantics specification
 
-- Status: implemented 2026-07-21
+- Status: implemented
+- Date: 2026-07-21
+- Owner: composed-result presentation view models and Compare/Duel presenters
+- Evidence: verified
+- Contract: closed
+
 - Priority: critical
 - Estimated effort: M
-- Owner: composed-result presentation view models and Compare/Duel presenters
 - Feature-inventory parents: Result summary, Dense spreadsheet comparison,
   Setup comparison, Trip and Planner (`Valmis`)
 - Depends on: the current `FullSimulationResult` combat, Trip and XP rate

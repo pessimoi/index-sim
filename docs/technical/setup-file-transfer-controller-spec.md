@@ -1,6 +1,10 @@
 # Rewrite setup file-transfer controller specification
 
-Status: implemented as composition-root Goal 8, 2026-07-13.
+- Status: implemented
+- Date: 2026-07-13
+- Owner: technical documentation
+- Evidence: verified
+- Contract: closed
 
 Current extension: the implemented
 [game revision and setup-transfer context contract](game-revision-transfer-context-spec.md)

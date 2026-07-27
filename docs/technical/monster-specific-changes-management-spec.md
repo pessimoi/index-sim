@@ -1,9 +1,13 @@
 # Monster-specific changes management specification
 
-- Status: implemented on 2026-07-20
+- Status: implemented
+- Date: 2026-07-20
+- Owner: Settings, app-shell navigation and existing monster-specific state
+- Evidence: verified
+- Contract: closed
+
 - Priority: high
 - Estimated effort: L
-- Owner: Settings, app-shell navigation and existing monster-specific state
   owners
 - Feature-inventory parents: `Basic combat setup`, `Dense spreadsheet view`,
   `Monster comparison`, `Loot/economy summary` and `Cannon` (`Valmis`)

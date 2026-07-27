@@ -1,6 +1,10 @@
 # PriceSet import discoverability and surface specification
 
-Status: implemented, 2026-07-17.
+- Status: implemented
+- Date: 2026-07-17
+- Owner: technical documentation
+- Evidence: verified
+- Contract: closed
 
 Decision owner: D-102.
 

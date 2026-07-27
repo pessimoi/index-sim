@@ -1,10 +1,13 @@
 # Wide table discoverability specification
 
-- Status: implemented and visual review passed 2026-07-22
+- Status: implemented
 - Date: 2026-07-22
+- Owner: shared table presenters and feature pane CSS
+- Evidence: verified
+- Contract: closed
+
 - Priority: high
 - Estimated effort: M
-- Owner: shared table presenters and feature pane CSS
 - Feature-inventory parents: Dense spreadsheet view, Loot/Economy summary,
   Setup comparison and Workspace backup/restore (`Valmis`)
 - Depends on: implemented compact text readability, mobile result/navigation

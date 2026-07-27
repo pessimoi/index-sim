@@ -1,6 +1,10 @@
 # Planner warning completeness and actions specification
 
-Status: implemented on 2026-07-20.
+- Status: implemented
+- Date: 2026-07-20
+- Owner: technical documentation
+- Evidence: verified
+- Contract: closed
 
 Priority: high.
 

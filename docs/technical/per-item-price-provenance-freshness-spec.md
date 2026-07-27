@@ -3,7 +3,11 @@
 - Status: implemented
 - Date: 2026-07-12
 - Owner: `src/domain/shared`, `src/data/schemas`, `src/adapters/market` and
+- Evidence: verified
+- Contract: living
+
   the scheduled market writer
+
 - Product surface: active PriceSet status, Loot price detail and Economy
   history
 - Related decisions: D-033, D-052, D-058, D-062, D-063, D-064 and D-085

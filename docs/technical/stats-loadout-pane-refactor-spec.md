@@ -1,6 +1,10 @@
 # Stats/Loadout pane and view-model refactor specification
 
-Status: implemented on 2026-07-13 as the next D-093 composition-root phase.
+- Status: implemented
+- Date: 2026-07-13
+- Owner: technical documentation
+- Evidence: verified
+- Contract: closed
 
 ## Purpose
 

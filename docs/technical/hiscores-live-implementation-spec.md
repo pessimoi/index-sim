@@ -1,8 +1,11 @@
 # Hiscores live implementation specification
 
-- Status: repository implementation complete; adopter deployment evidence gated
+- Status: implemented
 - Date: 2026-07-14
 - Owner: technical docs
+- Evidence: manual-gate-open
+- Contract: living
+
 - Source: conditional backlog work and the remaining `Hiscores` feature-inventory gap
 - Contract owner: [live-integrations-spec.md](live-integrations-spec.md)
 - Conditional rate-limit owner: [hiscores-global-rate-limit-spec.md](hiscores-global-rate-limit-spec.md)

@@ -1,10 +1,13 @@
 # Hiscores fallback readability specification
 
-- Status: implemented 2026-07-22
+- Status: implemented
 - Date: 2026-07-22
+- Owner: Hiscores topbar panel and Player level focus routing
+- Evidence: verified
+- Contract: closed
+
 - Priority: medium
 - Estimated effort: S
-- Owner: Hiscores topbar panel and Player level focus routing
 - Feature-inventory parents: Hiscores and Basic combat setup (`Valmis`)
 - Depends on: implemented Hiscores lookup controller and Hiscores Apply Undo
 

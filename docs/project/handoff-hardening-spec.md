@@ -1,8 +1,11 @@
 # Repository handoff hardening specification
 
-- Status: complete
+- Status: implemented
 - Date: 2026-07-11
 - Owner: project docs
+- Evidence: verified
+- Contract: closed
+
 - Source: adopter-ready completion boundary D-067
 - Related decisions: [D-059, D-060, D-065, D-066 and D-067](decisions.md)
 

@@ -1,10 +1,13 @@
 # Duel-only legacy import readiness specification
 
-- Status: implemented 2026-07-21; plan-derived readiness and Duel-only browser flow covered
+- Status: implemented
 - Date: 2026-07-21
+- Owner: legacy-migration view model, with existing App import transaction
+- Evidence: verified
+- Contract: closed
+
 - Priority: high
 - Estimated effort: S
-- Owner: legacy-migration view model, with existing App import transaction
 - Feature-inventory parent: Legacy saved setup migration (`Valmis`)
 - Depends on: the current sanitized legacy inspector and saved-Duel-setup merge policy
 

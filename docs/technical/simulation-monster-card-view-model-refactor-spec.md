@@ -1,6 +1,10 @@
 # Simulation and MonsterCard view-model refactor specification
 
-Status: Implemented on 2026-07-14.
+- Status: implemented
+- Date: 2026-07-14
+- Owner: technical documentation
+- Evidence: verified
+- Contract: closed
 
 ## Purpose
 

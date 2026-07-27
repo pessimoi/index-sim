@@ -1,6 +1,11 @@
 # Oletusskenaarion hintadatan kattavuusspeksi
 
-- Status: toteutettu ja repository-varmennettu 2026-07-20
+- Status: implemented
+- Date: 2026-07-20
+- Owner: technical documentation
+- Evidence: verified
+- Contract: closed
+
 - Päiväys: 2026-07-20
 - Prioriteetti: korkea
 - Arvioitu työmäärä: S

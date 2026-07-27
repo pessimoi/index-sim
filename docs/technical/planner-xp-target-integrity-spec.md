@@ -1,12 +1,16 @@
 # Planner XP and target integrity specification
 
+- Status: implemented
+- Date: 2026-07-19
+- Owner: technical documentation
+- Evidence: verified
+- Contract: closed
+
 Current lifecycle note: the implemented
 [calculation failure and Retry contract](calculation-failure-retry-lifecycle-spec.md)
 names an unrecomputed draft plus retained plan `stale` instead of `pending` and
 adds retained failed-refresh output plus Retry. XP/target reconciliation and the
 explicit Recompute boundary specified here are unchanged.
-
-Status: implemented on 2026-07-19.
 
 ## Purpose
 

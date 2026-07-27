@@ -1,6 +1,11 @@
 # MetricList presenter hygiene specification
 
-Status: implemented in Goal 4, 2026-07-13. The two controller specifications
+- Status: implemented
+- Date: 2026-07-13
+- Owner: technical documentation
+- Evidence: verified
+- Contract: closed
+
 remain separate later goals.
 
 ## Purpose

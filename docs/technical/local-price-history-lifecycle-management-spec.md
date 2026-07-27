@@ -1,9 +1,13 @@
 # Local price-history lifecycle management specification
 
-- Status: implemented on 2026-07-20
+- Status: implemented
+- Date: 2026-07-20
+- Owner: Economy price-history state, presentation and persistence lifecycle
+- Evidence: verified
+- Contract: closed
+
 - Priority: high
 - Estimated effort: M
-- Owner: Economy price-history state, presentation and persistence lifecycle
 - Feature-inventory parents: `Loot/economy summary` and `Market price sync`
   (`Valmis`)
 - Depends on: browser-local price-history v2, read-only shared history,

@@ -1,6 +1,10 @@
 # Hit distribution comparison visualization
 
-Status: implemented on 2026-07-12 under D-083.
+- Status: implemented
+- Date: 2026-07-12
+- Owner: technical documentation
+- Evidence: verified
+- Contract: closed
 
 ## Purpose
 

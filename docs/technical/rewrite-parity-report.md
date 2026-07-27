@@ -1,9 +1,12 @@
 # Rewrite vs legacy parity report
 
-- Status: accepted parity classification with dated audit evidence
+- Status: historical
+- Date: 2026-07-15
+- Owner: technical docs
+- Evidence: verified
+
 - Classification reviewed: 2026-07-15
 - Numeric audit evidence date: 2026-07-11
-- Owner: technical docs
 - Scope: calculation reliability of the Vite/React rewrite against the archived legacy `SimEngine.simulate()` baseline.
 
 ## Executive summary

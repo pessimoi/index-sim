@@ -1,6 +1,10 @@
 # Conditional loot presentation specification
 
-Status: implemented on 2026-07-12.
+- Status: implemented
+- Date: 2026-07-12
+- Owner: technical documentation
+- Evidence: verified
+- Contract: closed
 
 ## Purpose
 

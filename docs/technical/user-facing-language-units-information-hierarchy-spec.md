@@ -1,6 +1,10 @@
 # User-facing language, units and information hierarchy specification
 
-Status: implemented, 2026-07-19.
+- Status: implemented
+- Date: 2026-07-19
+- Owner: technical documentation
+- Evidence: verified
+- Contract: closed
 
 Decision context: this specification extends D-077 compact readability and
 D-102 PriceSet surface consolidation. It does not reopen either decision or

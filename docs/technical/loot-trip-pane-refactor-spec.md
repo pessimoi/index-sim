@@ -1,6 +1,10 @@
 # Loot and Trip pane and view-model refactor specification
 
-Status: implemented on 2026-07-14 as D-093 composition-root Phase 3F.
+- Status: implemented
+- Date: 2026-07-14
+- Owner: technical documentation
+- Evidence: verified
+- Contract: closed
 
 ## Purpose
 

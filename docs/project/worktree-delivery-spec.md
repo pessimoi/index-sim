@@ -1,8 +1,11 @@
 # Worktree delivery specification and evidence
 
-- Status: completed historical delivery record
+- Status: historical
 - Date: 2026-07-10
 - Owner: project delivery
+- Evidence: verified
+- Contract: closed
+
 - Source: the dated 2026-07-10 and 2026-07-13 worktree delivery windows
 - Related documents: [backlog.md](backlog.md), [../technical/testing.md](../technical/testing.md), [../operations/README.md](../operations/README.md)
 

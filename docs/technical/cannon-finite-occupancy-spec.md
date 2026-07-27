@@ -1,6 +1,10 @@
 # Cannon finite occupancy, cost and presentation specification
 
-Status: implemented under D-100, 2026-07-17.
+- Status: implemented
+- Date: 2026-07-17
+- Owner: technical documentation
+- Evidence: verified
+- Contract: closed
 
 ## Purpose
 

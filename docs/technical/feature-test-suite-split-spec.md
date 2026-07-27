@@ -1,6 +1,10 @@
 # Feature test-suite split specification
 
-Status: implemented, 2026-07-14 for ARCH-2026-05.
+- Status: implemented
+- Date: 2026-07-14
+- Owner: technical documentation
+- Evidence: verified
+- Contract: living
 
 ## Purpose
 

@@ -1,9 +1,13 @@
 # Setup transfer complete change-review specification
 
-- Status: implemented 2026-07-21 through PF-03A and PF-03B
+- Status: implemented
+- Date: 2026-07-21
+- Owner: pure setup-diff state, setup import review and shared-setup review
+- Evidence: verified
+- Contract: closed
+
 - Priority: high
 - Estimated effort: L
-- Owner: pure setup-diff state, setup import review and shared-setup review
   presentation
 - Feature-inventory parents: Basic combat setup, Setup comparison and
   shareable setup permalink (`Valmis`)

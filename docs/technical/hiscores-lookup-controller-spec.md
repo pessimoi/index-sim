@@ -1,6 +1,11 @@
 # Hiscores lookup controller and topbar panel specification
 
-Status: implemented as Goal 7, 2026-07-13. The controller, React hook and
+- Status: implemented
+- Date: 2026-07-13
+- Owner: technical documentation
+- Evidence: verified
+- Contract: closed
+
 topbar panel preserve the specified behavior and ownership boundaries.
 
 ## Purpose

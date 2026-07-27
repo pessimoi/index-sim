@@ -1,8 +1,11 @@
 # Scheduled market live-evidence specification
 
-- Status: writer retained; automatic GitHub Actions execution disabled under D-099
+- Status: implemented
 - Date: 2026-07-10
 - Owner: operations docs
+- Evidence: manual-gate-open
+- Contract: living
+
 - Source: conditional backlog work and accepted decisions D-021, D-033, D-034 and D-053
 - Contract owner: [../technical/live-integrations-spec.md](../technical/live-integrations-spec.md)
 - Disabled workflow template: [../../.github/disabled-workflows/update-market-prices.yml](../../.github/disabled-workflows/update-market-prices.yml)

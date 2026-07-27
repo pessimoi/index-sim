@@ -1,8 +1,11 @@
 # Setup comparison diff and impact explanation specification
 
-- Status: implemented and browser-verified under D-068
+- Status: implemented
 - Date: 2026-07-11
 - Owner: technical docs
+- Evidence: verified
+- Contract: closed
+
 - Source: approved post-V1 extension Goal 1
 - Feature-inventory parent: `Setup comparison` (`Valmis`)
 - Related decisions: D-031, D-042, D-049, D-059 and D-067

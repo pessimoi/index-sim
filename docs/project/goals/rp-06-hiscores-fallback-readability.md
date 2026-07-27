@@ -1,7 +1,11 @@
 # Goal
 
+- Status: implemented
+- Date: 2026-07-22
+- Owner: project execution
+- Evidence: verified
+
 - Id: RP-06
-- Status: completed 2026-07-22
 - Priority: medium
 - Estimated effort: S
 - Parent specification:

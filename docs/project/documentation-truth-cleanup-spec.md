@@ -1,8 +1,11 @@
 # Documentation truth cleanup specification
 
-- Status: complete
+- Status: implemented
 - Date: 2026-07-15
 - Owner: project documentation
+- Evidence: verified
+- Contract: closed
+
 - Source: post-handoff no-expansion repository review
 - Related decisions: [D-032, D-042, D-047, D-048, D-049, D-061, D-062, D-067 and D-095](decisions.md)
 

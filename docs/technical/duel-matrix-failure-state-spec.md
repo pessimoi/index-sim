@@ -1,6 +1,10 @@
 # Duel matrix failure-state specification
 
-Status: implemented on 2026-07-19.
+- Status: implemented
+- Date: 2026-07-19
+- Owner: technical documentation
+- Evidence: verified
+- Contract: closed
 
 ## Purpose
 

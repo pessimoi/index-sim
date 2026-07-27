@@ -1,6 +1,10 @@
 # Saved setup Merge and rename safety specification
 
-Status: implemented on 2026-07-20.
+- Status: implemented
+- Date: 2026-07-20
+- Owner: technical documentation
+- Evidence: verified
+- Contract: closed
 
 Implementation evidence:
 

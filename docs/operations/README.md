@@ -295,7 +295,7 @@ Use this checklist for a revision bump branch or PR:
 5. Review the snapshot diff summary for added, removed and changed simulator-consumed data only. The generated snapshot must not contain raw upstream file bodies, historical snapshot archives, absolute local paths, market price history or unused source-only content.
 6. Review representative calculation-impact rows first. Changed DPS, kills/hr, XP/hr, GP/hr or GP/XP rows block merge until they are fixed or accepted as intentional in the PR evidence.
 7. Review the informational all-monster scan second. It is advisory by default, but a reviewer may promote a finding to a required fix or explicit decision.
-8. Run the focused validation commands from [the generated game data testing guide](../technical/testing/runtime-data-deployment.md#generated-game-data-tests), plus broader golden/parity checks when generated data or formulas change calculation outputs.
+8. Run the focused validation commands from [the generated game data testing guide](../technical/testing/runtime-data-deployment.md#generated-runtime-and-source-data), plus broader golden/parity checks when generated data or formulas change calculation outputs.
 9. Keep any accepted calculation deltas in the revision-impact report or decision log. Do not silently refresh baselines.
 
 Diff-review rules for generated data:

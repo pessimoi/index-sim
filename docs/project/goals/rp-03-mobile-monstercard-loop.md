@@ -1,7 +1,11 @@
 # Goal
 
+- Status: implemented
+- Date: 2026-07-22
+- Owner: project execution
+- Evidence: verified
+
 - Id: RP-03
-- Status: complete 2026-07-22; visual review passed
 - Priority: high
 - Estimated effort: M
 - Parent specification:

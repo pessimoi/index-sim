@@ -1,6 +1,10 @@
 # Source-backed requirements and NPC size specification
 
-Status: implemented on 2026-07-11 under D-071.
+- Status: implemented
+- Date: 2026-07-11
+- Owner: technical documentation
+- Evidence: verified
+- Contract: closed
 
 ## Purpose
 

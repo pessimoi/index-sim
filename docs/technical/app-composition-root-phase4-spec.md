@@ -1,6 +1,10 @@
 # App composition-root Phase 4 final shell and ownership review specification
 
-Status: implemented on 2026-07-14 as D-093 composition-root Phase 4.
+- Status: implemented
+- Date: 2026-07-14
+- Owner: technical documentation
+- Evidence: verified
+- Contract: closed
 
 ## Purpose
 

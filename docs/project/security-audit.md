@@ -1,5 +1,10 @@
 # Tietoturva-auditointi 2026-07-14
 
+- Status: historical
+- Date: 2026-07-14
+- Owner: project documentation
+- Evidence: verified
+
 Tämä raportti kuvaa repositoryn nykyisen Vite/React- ja Cloudflare Worker
 -tuotantopolun lähdekoodiin perustuvan auditoinnin. Se ei ole ulkoisen
 tuotantoympäristön penetraatiotesti eikä todistus Cloudflare-tilin asetuksista.

@@ -1,10 +1,13 @@
 # Browser file-export outcome and feedback specification
 
-- Status: implemented 2026-07-21; all five browser download requests and failure feedback covered
+- Status: implemented
 - Date: 2026-07-21
+- Owner: browser download adapter and existing file-transfer controllers
+- Evidence: verified
+- Contract: closed
+
 - Priority: high
 - Estimated effort: M
-- Owner: browser download adapter and existing file-transfer controllers
 - Feature-inventory parents: Basic combat setup, Setup comparison, Market price
   sync and Workspace backup/restore (`Valmis`)
 - Depends on: current validated export builders and existing workflow-local

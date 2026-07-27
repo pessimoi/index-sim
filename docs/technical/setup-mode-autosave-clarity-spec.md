@@ -1,10 +1,13 @@
 # Default/custom setup mode and autosave clarity specification
 
-- Status: implemented and verified
+- Status: implemented
 - Date: 2026-07-21
+- Owner: setup shell, rewrite setup persistence and local-state feedback
+- Evidence: verified
+- Contract: living
+
 - Priority: high
 - Estimated effort: M
-- Owner: setup shell, rewrite setup persistence and local-state feedback
 - Feature-inventory parent: `Basic combat setup` (`Valmis`)
 - Depends on: the current `setupMode`, local-state recovery controller and
   application-level status/attention surfaces

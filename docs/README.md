@@ -1,211 +1,55 @@
 # Documentation map
 
-This directory is the project memory layer for humans and AI agents. It keeps current state, rewrite plans, decisions and operations separate.
+- Status: implemented
+- Date: 2026-07-27
+- Owner: documentation governance
+- Last verified: 2026-07-27
+- Evidence: verified
+- Contract: living
 
-## Where to go
+Use this page to choose the owning documentation area. It is intentionally not a
+feature or specification catalog.
 
-- AI-agent instructions: [../AGENTS.md](../AGENTS.md)
-- Product/domain overview: [product/README.md](product/README.md)
-- Feature inventory: [product/feature-inventory.md](product/feature-inventory.md)
-- Technical map and architecture: [technical/README.md](technical/README.md)
-- Rewrite specification: [technical/rewrite-spec.md](technical/rewrite-spec.md)
-- UI parity specification: [technical/ui-parity-spec.md](technical/ui-parity-spec.md)
-- Duel setup diff specification: [technical/duel-setup-diff-spec.md](technical/duel-setup-diff-spec.md)
-- Implemented saved setup Merge and rename safety specification: [technical/saved-setup-merge-rename-safety-spec.md](technical/saved-setup-merge-rename-safety-spec.md)
-- Stats source distribution specification: [technical/stats-source-distribution-spec.md](technical/stats-source-distribution-spec.md)
-- Hit distribution comparison visualization specification: [technical/hit-distribution-visualization-spec.md](technical/hit-distribution-visualization-spec.md)
-- Risk and variability specification: [technical/risk-variability-spec.md](technical/risk-variability-spec.md)
-- Source-backed incoming damage specification: [technical/source-backed-incoming-damage-spec.md](technical/source-backed-incoming-damage-spec.md)
-- Source-backed casket valuation specification: [technical/source-backed-casket-valuation-spec.md](technical/source-backed-casket-valuation-spec.md)
-- Per-item price provenance and freshness specification: [technical/per-item-price-provenance-freshness-spec.md](technical/per-item-price-provenance-freshness-spec.md)
-- Implemented PriceSet import discoverability and surface specification: [technical/price-set-import-discoverability-spec.md](technical/price-set-import-discoverability-spec.md)
-- Implemented user-facing language, units and information hierarchy specification: [technical/user-facing-language-units-information-hierarchy-spec.md](technical/user-facing-language-units-information-hierarchy-spec.md)
-- Implemented result rate semantics specification: [technical/result-rate-semantics-spec.md](technical/result-rate-semantics-spec.md)
-- Implemented entity label collision disambiguation specification: [technical/entity-label-collision-disambiguation-spec.md](technical/entity-label-collision-disambiguation-spec.md)
-- Implemented current-result price warning relevance and presentation specification: [technical/price-warning-relevance-presentation-spec.md](technical/price-warning-relevance-presentation-spec.md)
-- Implemented default-scenario price completeness specification: [technical/default-scenario-price-completeness-spec.md](technical/default-scenario-price-completeness-spec.md)
-- Contextual item-price correction specification: [technical/contextual-item-price-correction-spec.md](technical/contextual-item-price-correction-spec.md)
-- Dynamic loot market dependency coverage specification: [technical/dynamic-loot-market-dependency-coverage-spec.md](technical/dynamic-loot-market-dependency-coverage-spec.md)
-- Conditional loot presentation specification: [technical/conditional-loot-presentation-spec.md](technical/conditional-loot-presentation-spec.md)
-- Manual item price overrides specification: [technical/manual-item-price-overrides-spec.md](technical/manual-item-price-overrides-spec.md)
-- Economy destructive actions Undo specification: [technical/economy-destructive-actions-undo-spec.md](technical/economy-destructive-actions-undo-spec.md)
-- Implemented local price-history lifecycle management specification: [technical/local-price-history-lifecycle-management-spec.md](technical/local-price-history-lifecycle-management-spec.md)
-- Implemented user-friendly price date and time presentation specification: [technical/price-date-time-presentation-spec.md](technical/price-date-time-presentation-spec.md)
-- Implemented global Undo visibility and targeted Reset recovery specification: [technical/global-undo-visibility-targeted-reset-spec.md](technical/global-undo-visibility-targeted-reset-spec.md)
-- High-impact dynamic-loot market allowlist specification: [technical/high-impact-dynamic-loot-market-allowlist-spec.md](technical/high-impact-dynamic-loot-market-allowlist-spec.md)
-- Accessibility and keyboard specification: [technical/accessibility-keyboard-spec.md](technical/accessibility-keyboard-spec.md)
-- Requirement-aware loadout optimizer specification: [technical/requirement-aware-loadout-optimizer-spec.md](technical/requirement-aware-loadout-optimizer-spec.md)
-- Source-backed requirements and NPC size specification: [technical/source-backed-requirements-npc-size-spec.md](technical/source-backed-requirements-npc-size-spec.md)
-- Legacy Planner parity specification: [technical/legacy-planner-parity-spec.md](technical/legacy-planner-parity-spec.md)
-- Legacy migration layer refactor specification: [technical/legacy-migration-layer-refactor-spec.md](technical/legacy-migration-layer-refactor-spec.md)
-- App composition-root refactor specification: [technical/app-composition-root-refactor-spec.md](technical/app-composition-root-refactor-spec.md)
-- Implemented App composition-root Phase 4 final shell and ownership review specification: [technical/app-composition-root-phase4-spec.md](technical/app-composition-root-phase4-spec.md)
-- Stats/Loadout pane and view-model refactor specification: [technical/stats-loadout-pane-refactor-spec.md](technical/stats-loadout-pane-refactor-spec.md)
-- Compare/Duel pane, view-model and calculation-controller refactor specification: [technical/compare-duel-pane-refactor-spec.md](technical/compare-duel-pane-refactor-spec.md)
-- Planner pane, view-model and calculation-controller refactor specification: [technical/planner-pane-refactor-spec.md](technical/planner-pane-refactor-spec.md)
-- Implemented Planner results-first and advanced gear-pool specification: [technical/planner-results-first-advanced-gear-pool-spec.md](technical/planner-results-first-advanced-gear-pool-spec.md)
-- Implemented Planner warning completeness and actions specification: [technical/planner-warning-completeness-actions-spec.md](technical/planner-warning-completeness-actions-spec.md)
-- Risk pane, view-model and analysis-controller refactor specification: [technical/risk-pane-refactor-spec.md](technical/risk-pane-refactor-spec.md)
-- Loot and Trip pane and view-model refactor specification: [technical/loot-trip-pane-refactor-spec.md](technical/loot-trip-pane-refactor-spec.md)
-- Implemented Economy and Settings pane and price-data view-model refactor specification: [technical/economy-settings-pane-refactor-spec.md](technical/economy-settings-pane-refactor-spec.md)
-- Simulation and MonsterCard view-model refactor specification: [technical/simulation-monster-card-view-model-refactor-spec.md](technical/simulation-monster-card-view-model-refactor-spec.md)
-- Runtime bootstrap controller specification: [technical/runtime-bootstrap-controller-spec.md](technical/runtime-bootstrap-controller-spec.md)
-- Local-state recovery controller and Settings panel specification: [technical/local-state-recovery-controller-spec.md](technical/local-state-recovery-controller-spec.md)
-- Implemented local-state attention surface: [technical/local-state-attention-surface-spec.md](technical/local-state-attention-surface-spec.md)
-- Workspace backup and restore specification: [technical/workspace-backup-restore-spec.md](technical/workspace-backup-restore-spec.md)
-- Implemented Hiscores lookup controller and topbar panel specification: [technical/hiscores-lookup-controller-spec.md](technical/hiscores-lookup-controller-spec.md)
-- Hiscores Apply Undo specification: [technical/hiscores-apply-undo-spec.md](technical/hiscores-apply-undo-spec.md)
-- Implemented rewrite setup file-transfer controller specification: [technical/setup-file-transfer-controller-spec.md](technical/setup-file-transfer-controller-spec.md)
-- Implemented setup replacement Review/Undo contract: [technical/setup-replacement-review-undo-spec.md](technical/setup-replacement-review-undo-spec.md)
-- Implemented setup transfer complete change-review specification for setup files, shared links and saved-row Load: [technical/setup-transfer-change-review-spec.md](technical/setup-transfer-change-review-spec.md)
-- Implemented safe active setup reset specification: [technical/active-setup-reset-spec.md](technical/active-setup-reset-spec.md)
-- Implemented monster-specific changes management specification: [technical/monster-specific-changes-management-spec.md](technical/monster-specific-changes-management-spec.md)
-- Implemented Default/custom setup mode and autosave clarity specification: [technical/setup-mode-autosave-clarity-spec.md](technical/setup-mode-autosave-clarity-spec.md)
-- Cross-tab local-state conflict specification: [technical/cross-tab-local-state-conflict-spec.md](technical/cross-tab-local-state-conflict-spec.md)
-- Browser file-export outcome and feedback specification: [technical/file-export-outcome-feedback-spec.md](technical/file-export-outcome-feedback-spec.md)
-- Implemented transfer artifact scope and filename clarity specification: [technical/transfer-artifact-scope-filenames-spec.md](technical/transfer-artifact-scope-filenames-spec.md)
-- Duel-only legacy import readiness specification: [technical/duel-only-legacy-import-readiness-spec.md](technical/duel-only-legacy-import-readiness-spec.md)
-- Assistive-technology accessibility evidence specification: [technical/assistive-technology-accessibility-spec.md](technical/assistive-technology-accessibility-spec.md)
-- Manual assistive-technology evidence procedure: [technical/testing/accessibility-manual.md](technical/testing/accessibility-manual.md)
-- Implemented cross-browser release support specification: [technical/cross-browser-release-support-spec.md](technical/cross-browser-release-support-spec.md)
-- Implemented lazy pane loading and failure-isolation specification: [technical/lazy-pane-loading-failure-isolation-spec.md](technical/lazy-pane-loading-failure-isolation-spec.md)
-- Implemented PriceSet transfer and acceptance controller specification: [technical/price-set-transfer-controller-spec.md](technical/price-set-transfer-controller-spec.md)
-- Implemented Cannon feature-pane extraction specification: [technical/cannon-pane-extraction-spec.md](technical/cannon-pane-extraction-spec.md)
-- Implemented Cannon finite occupancy, cost and presentation specification: [technical/cannon-finite-occupancy-spec.md](technical/cannon-finite-occupancy-spec.md)
-- Implemented numeric input draft and validation contract: [technical/numeric-input-draft-validation-spec.md](technical/numeric-input-draft-validation-spec.md)
-- Implemented Planner XP and target integrity contract: [technical/planner-xp-target-integrity-spec.md](technical/planner-xp-target-integrity-spec.md)
-- Implemented Duel matrix failure-state contract: [technical/duel-matrix-failure-state-spec.md](technical/duel-matrix-failure-state-spec.md)
-- Implemented Dense/Planner/Risk failure and Retry lifecycle: [technical/calculation-failure-retry-lifecycle-spec.md](technical/calculation-failure-retry-lifecycle-spec.md)
-- Implemented game revision and setup-transfer context contract: [technical/game-revision-transfer-context-spec.md](technical/game-revision-transfer-context-spec.md)
-- MetricList presenter hygiene specification: [technical/metric-list-presenter-hygiene-spec.md](technical/metric-list-presenter-hygiene-spec.md)
-- Startup and bundle performance specification: [technical/startup-bundle-performance-spec.md](technical/startup-bundle-performance-spec.md)
-- Local development startup reliability specification: [technical/dev-startup-reliability-spec.md](technical/dev-startup-reliability-spec.md)
-- Implemented application error boundary and session-only recovery specification: [technical/application-error-boundary-spec.md](technical/application-error-boundary-spec.md)
-- Implemented session-only exit protection and direct backup specification: [technical/session-only-exit-protection-spec.md](technical/session-only-exit-protection-spec.md)
-- Trip and game-data-generator structural split assessment: [technical/large-module-structural-split-assessment.md](technical/large-module-structural-split-assessment.md)
-- Shareable setup permalink specification: [technical/shareable-setup-permalink-spec.md](technical/shareable-setup-permalink-spec.md)
-- Implemented mobile result and navigation loop specification: [technical/mobile-result-navigation-loop-spec.md](technical/mobile-result-navigation-loop-spec.md)
-- Implemented workbench browser history and page-context specification: [technical/workbench-browser-history-context-spec.md](technical/workbench-browser-history-context-spec.md)
-- Visual regression specification: [technical/visual-regression-spec.md](technical/visual-regression-spec.md)
-- Live integrations specification: [technical/live-integrations-spec.md](technical/live-integrations-spec.md)
-- Hiscores live implementation specification: [technical/hiscores-live-implementation-spec.md](technical/hiscores-live-implementation-spec.md)
-- Implemented-disabled Hiscores global provider-budget and conditional abuse-control specification: [technical/hiscores-global-rate-limit-spec.md](technical/hiscores-global-rate-limit-spec.md)
-- Workspace backup discoverability specification: [technical/release-polish-workspace-backup-discoverability-spec.md](technical/release-polish-workspace-backup-discoverability-spec.md)
-- Visible action feedback specification: [technical/release-polish-visible-action-feedback-spec.md](technical/release-polish-visible-action-feedback-spec.md)
-- Mobile MonsterCard navigation loop specification: [technical/release-polish-mobile-monstercard-loop-spec.md](technical/release-polish-mobile-monstercard-loop-spec.md)
-- Recommendation and optimizer Undo contract specification: [technical/release-polish-recommendation-optimizer-undo-spec.md](technical/release-polish-recommendation-optimizer-undo-spec.md)
-- Wide table discoverability specification: [technical/release-polish-wide-table-discoverability-spec.md](technical/release-polish-wide-table-discoverability-spec.md)
-- Hiscores fallback readability specification: [technical/release-polish-hiscores-fallback-readability-spec.md](technical/release-polish-hiscores-fallback-readability-spec.md)
-- Feature test-suite split specification: [technical/feature-test-suite-split-spec.md](technical/feature-test-suite-split-spec.md)
-- Testing strategy and commands: [technical/testing.md](technical/testing.md)
-- Detailed runtime/data/deployment tests: [technical/testing/runtime-data-deployment.md](technical/testing/runtime-data-deployment.md)
-- Detailed domain/integration tests: [technical/testing/domain-and-integrations.md](technical/testing/domain-and-integrations.md)
-- Detailed UI/state/browser tests: [technical/testing/ui-state-and-browser.md](technical/testing/ui-state-and-browser.md)
-- Running, build and deploy notes: [operations/README.md](operations/README.md)
-- Scheduled market live-evidence specification: [operations/market-live-evidence-spec.md](operations/market-live-evidence-spec.md)
-- Public deployment specification: [operations/public-deployment-spec.md](operations/public-deployment-spec.md)
-- Roadmap, backlog, decisions and ideas: [project/README.md](project/README.md)
-- Executable product-finishing goals: [project/goals/README.md](project/goals/README.md)
-- Historical worktree delivery specification and evidence: [project/worktree-delivery-spec.md](project/worktree-delivery-spec.md)
-- D-095 worker measurement commit specification: [project/d095-worker-measurement-commit-spec.md](project/d095-worker-measurement-commit-spec.md)
-- Repository handoff hardening specification: [project/handoff-hardening-spec.md](project/handoff-hardening-spec.md)
-- Documentation truth cleanup specification: [project/documentation-truth-cleanup-spec.md](project/documentation-truth-cleanup-spec.md)
-- Current numeric user-path audit: [project/numeric-user-path-audit.md](project/numeric-user-path-audit.md)
-- Current Revision 274 NPC attack source audit: [project/npc-attack-source-audit.md](project/npc-attack-source-audit.md)
-- Current repository documentation audit: [project/documentation-audit.md](project/documentation-audit.md)
-- Dated 2026-07-14 production-path architecture audit: [project/architecture-audit.md](project/architecture-audit.md)
-- Dated 2026-07-14 production-path security audit and D-099 follow-up: [project/security-audit.md](project/security-audit.md)
-- Dated 2026-07-14 production-path code audit: [project/code-audit.md](project/code-audit.md)
-- Dated 2026-07-14 maintainability and dead-code cleanup audit: [project/maintainability-cleanup.md](project/maintainability-cleanup.md)
-- Dated testing and release evidence: [project/testing-evidence.md](project/testing-evidence.md)
+## Area entrypoints
 
-## Supporting audit snapshots
+| Area       | Owns                                                          | Entrypoint                                     |
+| ---------- | ------------------------------------------------------------- | ---------------------------------------------- |
+| Product    | Domain concepts, supported workflows and product scope        | [Product and domain](product/README.md)        |
+| Technical  | Current architecture, validation and implementation contracts | [Technical documentation](technical/README.md) |
+| Operations | Run, build, deploy and maintenance procedures                 | [Operations](operations/README.md)             |
+| Project    | Current planning, decisions, evidence and history             | [Project memory](project/README.md)            |
 
-These files are useful evidence, but they are not the living source of truth. Promote durable findings into the docs above when they become active work.
+## Owner-level catalogs
 
-- [../ARCHITECTURE_AUDIT.md](../ARCHITECTURE_AUDIT.md)
-- [../PROJECT_REVIEW_NOTES.md](../PROJECT_REVIEW_NOTES.md)
-- [../SECURITY_AUDIT.md](../SECURITY_AUDIT.md)
+- [Technical specification catalog](technical/specifications.md): active,
+  living, implemented and historical specification classes.
+- [Executable goals](project/goals/README.md): active programs first, completed
+  PF/RP goals as historical execution evidence.
+- [Testing evidence](project/testing-evidence.md): dated repository, browser,
+  artifact and failure-triage snapshots.
+- [Generated evidence](project/generated-evidence.md): generator-owned reports
+  and exact commands.
+- [Audit and release evidence](project/audit-evidence.md): dated reviews,
+  delivery records and legacy audit snapshots.
+- [DOCS-01 documentation structure program](project/documentation-structure/README.md):
+  governance specifications and activation evidence.
 
-## Ownership rule
+These catalogs are linked directly so ordinary documents remain at most two
+links from this map and generated reports at most three.
 
-- Current runtime facts belong in [technical/architecture.md](technical/architecture.md) or [operations/README.md](operations/README.md).
-- Rewrite implementation requirements belong in [technical/rewrite-spec.md](technical/rewrite-spec.md).
-- Product concepts belong in [product/README.md](product/README.md).
-- Legacy-to-rewrite feature coverage belongs in [product/feature-inventory.md](product/feature-inventory.md).
-- Legacy-to-rewrite UI layout and workflow parity requirements belong in [technical/ui-parity-spec.md](technical/ui-parity-spec.md).
-- Duel setup and calculated-impact comparison requirements belong in [technical/duel-setup-diff-spec.md](technical/duel-setup-diff-spec.md).
-- Saved-setup file row classification, default-Keep matching-ID decisions, recipient-name/capacity resolution, explicit direct rename and exact single-key Merge/rename Undo belong in [technical/saved-setup-merge-rename-safety-spec.md](technical/saved-setup-merge-rename-safety-spec.md); transfer context retains revision/compatibility copy, the Duel diff retains ordinary calculated comparison and Workspace retains area-level Merge/transaction ownership.
-- Special-attack and cannon event-distribution requirements belong in [technical/stats-source-distribution-spec.md](technical/stats-source-distribution-spec.md).
-- Normal-versus-special hit-distribution comparison presentation and its whole-special event contract belong in [technical/hit-distribution-visualization-spec.md](technical/hit-distribution-visualization-spec.md).
-- Kill, trip, food, timed-GP and target-probability distribution requirements belong in [technical/risk-variability-spec.md](technical/risk-variability-spec.md).
-- Source-backed NPC attack profiles and shared Trip/Risk incoming-damage requirements belong in [technical/source-backed-incoming-damage-spec.md](technical/source-backed-incoming-damage-spec.md).
-- Ordinary fishing-casket opened-content valuation and its focused source-drift guard belong in [technical/source-backed-casket-valuation-spec.md](technical/source-backed-casket-valuation-spec.md).
-- Item-level price origin, observation/evaluation time, scheduled sidecar, history-v2 and PriceSet migration requirements belong in [technical/per-item-price-provenance-freshness-spec.md](technical/per-item-price-provenance-freshness-spec.md).
-- Full PriceSet import placement, format guidance, complete-replacement copy and separation from manual per-item correction belong in [technical/price-set-import-discoverability-spec.md](technical/price-set-import-discoverability-spec.md); transaction, schema and persistence behavior remain in the implemented PriceSet transfer and provenance specifications.
-- Source-name-first item/monster labels, technical-id disclosure, visible and accessible unit/abbreviation semantics and Settings-to-Economy price-information hierarchy belong in [technical/user-facing-language-units-information-hierarchy-spec.md](technical/user-facing-language-units-information-hierarchy-spec.md); D-077 retains compact clipping/selector ownership and D-102 retains the advanced full-PriceSet transaction surface.
-- Whole-cycle effective hourly values on Result, Dense, saved setup, Trip and Planner surfaces, explicitly separate on-site diagnostics in Stats, and display/sort/best-marker agreement belong in [technical/result-rate-semantics-spec.md](technical/result-rate-semantics-spec.md); `FullSimulationResult` retains both existing rate bases and all combat, Trip, XP, economy and Risk formulas.
-- Collision-aware source-name presentation, reviewed semantic descriptors, exact-id fallback and unique actionable Loot/Economy row names belong in [technical/entity-label-collision-disambiguation-spec.md](technical/entity-label-collision-disambiguation-spec.md); generated identities, price aliases, row calculations and the open manual assistive-technology evidence gate retain their existing owners.
-- Current-result used-price relevance, Result/Loot/Economy notice placement and complete disclosure behavior belong in [technical/price-warning-relevance-presentation-spec.md](technical/price-warning-relevance-presentation-spec.md); item provenance, freshness and storage contracts remain in the per-item price specification.
-- The accepted market observation, three-file snapshot update and release gate that keep the production default scenario free of mapped active price gaps belong in [technical/default-scenario-price-completeness-spec.md](technical/default-scenario-price-completeness-spec.md); warning behavior remains in the current-result warning specification and writer/provenance semantics remain under D-062/D-085.
-- Implemented direct item-scoped Result/Loot/Economy navigation into the existing manual-price editor, its one-shot focus contract and current-result Apply/Reset feedback belong in [technical/contextual-item-price-correction-spec.md](technical/contextual-item-price-correction-spec.md); warning relevance remains in the price-warning specification and overlay persistence remains in the manual-price specification.
-- Trip-derived market dependency inventory belongs in [technical/dynamic-loot-market-dependency-coverage-spec.md](technical/dynamic-loot-market-dependency-coverage-spec.md); source-reviewed admission of identified high-impact rows belongs in [technical/high-impact-dynamic-loot-market-allowlist-spec.md](technical/high-impact-dynamic-loot-market-allowlist-spec.md).
-- Inactive quest/clue row grouping belongs in [technical/conditional-loot-presentation-spec.md](technical/conditional-loot-presentation-spec.md); source eligibility and zero-calculation policy remain in [technical/conditional-quest-clue-loot-spec.md](technical/conditional-quest-clue-loot-spec.md).
-- Browser-local per-item price overlay and reset behavior belongs in [technical/manual-item-price-overrides-spec.md](technical/manual-item-price-overrides-spec.md).
-- Exact-raw one-step Undo for local price-history clear, manual-price reset/clear and imported PriceSet reset belongs in [technical/economy-destructive-actions-undo-spec.md](technical/economy-destructive-actions-undo-spec.md); storage schemas, PriceSet acceptance and Workspace atomic restore remain in their existing owners.
-- Browser-local comparison inventory, visible 20-point capacity, non-silent overflow, individual removal and reviewed oldest-point replacement belong in [technical/local-price-history-lifecycle-management-spec.md](technical/local-price-history-lifecycle-management-spec.md); shared history, provenance, analysis formulas and Workspace transfer remain in their existing owners.
-- Semantic visible price dates, browser-local exact time with UTC fallback, signed relative age, `<time>` markup and distinct capture/creation, observation, evaluation and manual-update wording belong in [technical/price-date-time-presentation-spec.md](technical/price-date-time-presentation-spec.md); D-085 retains timestamp meaning and the local price-history lifecycle specification retains management ownership.
-- Global one-slot Undo viewport placement, duplicate live-announcement prevention and the seven targeted Active assumptions Reset transactions belong in [technical/global-undo-visibility-targeted-reset-spec.md](technical/global-undo-visibility-targeted-reset-spec.md); area-specific raw Economy recovery, setup replacement and Hiscores Apply snapshots remain in their existing Undo specifications.
-- Workbench and Dense keyboard interaction requirements belong in [technical/accessibility-keyboard-spec.md](technical/accessibility-keyboard-spec.md).
-- Player-adjacent mobile headline results, measured tab overflow controls, the four-action mobile setup row and the 390/620/768 normal-flow evidence belong in [technical/mobile-result-navigation-loop-spec.md](technical/mobile-result-navigation-loop-spec.md); D-070 remains the base roving-tablist contract and D-075/D-082 retain desktop and compact-landscape ownership.
-- Allowlisted `pane` query state, user/routed Back/Forward behavior, lazy deep-link activation and the ready pane/target document title belong in [technical/workbench-browser-history-context-spec.md](technical/workbench-browser-history-context-spec.md); the first-visit Compare default, pane components, share-fragment capture and safe-session query retain their existing owners.
-- Bounded optimizer numeric-level eligibility belongs in [technical/requirement-aware-loadout-optimizer-spec.md](technical/requirement-aware-loadout-optimizer-spec.md); the base frontier/search contract remains in [technical/bounded-loadout-optimizer-spec.md](technical/bounded-loadout-optimizer-spec.md).
-- Generated item-requirement and NPC-size extraction/formula requirements belong in [technical/source-backed-requirements-npc-size-spec.md](technical/source-backed-requirements-npc-size-spec.md).
-- Optional archived Planner behavior comparison requirements belong in [technical/legacy-planner-parity-spec.md](technical/legacy-planner-parity-spec.md).
-- The phased `App.tsx` composition-root extraction contract belongs in [technical/app-composition-root-refactor-spec.md](technical/app-composition-root-refactor-spec.md).
-- The six ordered release-readiness finishing contracts belong in [technical/local-state-attention-surface-spec.md](technical/local-state-attention-surface-spec.md), [technical/setup-replacement-review-undo-spec.md](technical/setup-replacement-review-undo-spec.md), [technical/numeric-input-draft-validation-spec.md](technical/numeric-input-draft-validation-spec.md), [technical/planner-xp-target-integrity-spec.md](technical/planner-xp-target-integrity-spec.md), [technical/duel-matrix-failure-state-spec.md](technical/duel-matrix-failure-state-spec.md) and [technical/game-revision-transfer-context-spec.md](technical/game-revision-transfer-context-spec.md); their ordered implementation status belongs in [project/backlog.md](project/backlog.md).
-- Planner result-first ordering, lifecycle adjacency and the transient collapsed advanced gear-pool disclosure belong in [technical/planner-results-first-advanced-gear-pool-spec.md](technical/planner-results-first-advanced-gear-pool-spec.md); Planner calculations, state and controller lifecycle remain in their existing owners.
-- Complete structured Planner notice collection, current/previous scope, explicit code-to-copy/action policy and focus-safe routes to Planner, Loadout, Economy and Trip belong in [technical/planner-warning-completeness-actions-spec.md](technical/planner-warning-completeness-actions-spec.md); the result-first specification retains information-order ownership, Economy retains price-data ownership and the calculation controller retains lifecycle truth.
-- Complete browser-local workspace export, area review, Replace/Merge policy, atomic restore/Undo and sensitive-state inclusion belong in [technical/workspace-backup-restore-spec.md](technical/workspace-backup-restore-spec.md); the metadata-only health report and per-key recovery behavior remain in the local-state recovery and attention specifications.
-- Canonical, review-gated, persistence-aware reset of the active Default or current-target Custom setup belongs in [technical/active-setup-reset-spec.md](technical/active-setup-reset-spec.md); the broader feature status remains in [product/feature-inventory.md](product/feature-inventory.md) and implementation status in [project/backlog.md](project/backlog.md).
-- Complete allowlisted current-to-incoming field review, included/excluded transfer scope and stale comparison guards for setup files, shared links and saved-row registry reuse belong in [technical/setup-transfer-change-review-spec.md](technical/setup-transfer-change-review-spec.md); parsing, compatibility, Apply/Load, persistence, Dismiss and complete Undo remain in the existing transfer and replacement owners.
-- The Settings union of existing per-monster Custom, Cannon, Loot action, Loot settings and Compare-relevance state, category Review navigation and review-gated one-monster cleanup belong in [technical/monster-specific-changes-management-spec.md](technical/monster-specific-changes-management-spec.md); each value editor, storage schema, Workspace file restore and active Default/Custom mode remain in their existing owners.
-- Visible Default/current-monster Custom editing scope, explicit setup-switch action names and truthful rewrite-setup autosave durability feedback belong in [technical/setup-mode-autosave-clarity-spec.md](technical/setup-mode-autosave-clarity-spec.md); recovery policy remains in the local-state specifications and reset/replacement transaction behavior remains in their existing setup specifications.
-- External-tab change detection, per-area write suspension, freshness guards and explicit saved-data/current-tab conflict resolution belong in [technical/cross-tab-local-state-conflict-spec.md](technical/cross-tab-local-state-conflict-spec.md); ordinary local-state health, recovery and Workspace transfer retain their existing owners.
-- Typed browser download dispatch, truthful started/failed feedback and connected-anchor/object-URL lifetime belong in [technical/file-export-outcome-feedback-spec.md](technical/file-export-outcome-feedback-spec.md); every artifact builder, schema and import transaction remains with its workflow owner.
-- Exact artifact action names, adjacent included/excluded scope copy and the shared contextual sortable JSON filename contract belong in [technical/transfer-artifact-scope-filenames-spec.md](technical/transfer-artifact-scope-filenames-spec.md); envelope contents, parser selection, compatibility, persistence, Undo and truthful download outcome remain with their existing owners.
-- Duel-only legacy import readiness, plan-derived gating and compatible-area status copy belong in [technical/duel-only-legacy-import-readiness-spec.md](technical/duel-only-legacy-import-readiness-spec.md); sanitization, merge precedence and persistence remain in the existing legacy/Duel owners.
-- The bounded WCAG 2.2 AA journey matrix, automated accessibility scans and VoiceOver/NVDA evidence belong in [technical/assistive-technology-accessibility-spec.md](technical/assistive-technology-accessibility-spec.md); the implemented keyboard baseline remains in the accessibility and keyboard specification.
-- The implemented Playwright Firefox/WebKit/mobile-WebKit manifest, real-Safari claim gate and browser exception policy belong in [technical/cross-browser-release-support-spec.md](technical/cross-browser-release-support-spec.md); the complete Chromium and Darwin visual owners remain unchanged.
-- On-demand pane requests, mounted-visited behavior, named Suspense feedback, pane-level failure isolation and split shell/initial-pane measurement belong in [technical/lazy-pane-loading-failure-isolation-spec.md](technical/lazy-pane-loading-failure-isolation-spec.md); full-app startup/render recovery remains in the application error-boundary specification.
-- The independently implementable composition-root goals belong in [technical/metric-list-presenter-hygiene-spec.md](technical/metric-list-presenter-hygiene-spec.md), [technical/runtime-bootstrap-controller-spec.md](technical/runtime-bootstrap-controller-spec.md), [technical/local-state-recovery-controller-spec.md](technical/local-state-recovery-controller-spec.md), [technical/hiscores-lookup-controller-spec.md](technical/hiscores-lookup-controller-spec.md), [technical/setup-file-transfer-controller-spec.md](technical/setup-file-transfer-controller-spec.md), [technical/price-set-transfer-controller-spec.md](technical/price-set-transfer-controller-spec.md), [technical/cannon-pane-extraction-spec.md](technical/cannon-pane-extraction-spec.md), [technical/stats-loadout-pane-refactor-spec.md](technical/stats-loadout-pane-refactor-spec.md), [technical/compare-duel-pane-refactor-spec.md](technical/compare-duel-pane-refactor-spec.md), [technical/planner-pane-refactor-spec.md](technical/planner-pane-refactor-spec.md), [technical/risk-pane-refactor-spec.md](technical/risk-pane-refactor-spec.md), [technical/loot-trip-pane-refactor-spec.md](technical/loot-trip-pane-refactor-spec.md), [technical/economy-settings-pane-refactor-spec.md](technical/economy-settings-pane-refactor-spec.md), [technical/simulation-monster-card-view-model-refactor-spec.md](technical/simulation-monster-card-view-model-refactor-spec.md) and [technical/app-composition-root-phase4-spec.md](technical/app-composition-root-phase4-spec.md).
-- Current Cannon occupancy, combined/player-only/cannon-only calculation, cannonball cost routing and aligned pane presentation belong in [technical/cannon-finite-occupancy-spec.md](technical/cannon-finite-occupancy-spec.md); the earlier component-ownership extraction remains in [technical/cannon-pane-extraction-spec.md](technical/cannon-pane-extraction-spec.md).
-- Production entry budgets, paired cold/warm measurement and generated-runtime code splitting belong in [technical/startup-bundle-performance-spec.md](technical/startup-bundle-performance-spec.md).
-- Vite-dev first navigation, the pre-React startup shell, canonical app-readiness state and checked agent localhost handoff belong in [technical/dev-startup-reliability-spec.md](technical/dev-startup-reliability-spec.md).
-- Post-mount React render/lifecycle recovery, sanitized fatal actions and tab-scoped saved-data isolation belong in [technical/application-error-boundary-spec.md](technical/application-error-boundary-spec.md).
-- Dirty non-durable Workspace-area detection, bounded `beforeunload` registration and exact included-state acknowledgement through the existing Workspace export belong in [technical/session-only-exit-protection-spec.md](technical/session-only-exit-protection-spec.md); safe-session isolation, storage recovery, cross-tab conflict policy, Workspace privacy/schema and file-download truth retain their existing owners.
-- Calculation-worker startup, structured-clone/request-transfer and execution evidence belongs in [technical/calculation-worker-measurement-spec.md](technical/calculation-worker-measurement-spec.md); the accepted one-shot lifecycle and persistent-Worker reopen/implementation boundary belongs in [technical/calculation-worker-retention-spec.md](technical/calculation-worker-retention-spec.md).
-- Functional Playwright, composed view-model and testing-document ownership belongs in [technical/feature-test-suite-split-spec.md](technical/feature-test-suite-split-spec.md); current commands remain in [technical/testing.md](technical/testing.md) and dated results in [project/testing-evidence.md](project/testing-evidence.md).
-- Trip and game-data-generator split activation evidence belongs in [technical/large-module-structural-split-assessment.md](technical/large-module-structural-split-assessment.md).
-- Hiscores and live market sync requirements belong in [technical/live-integrations-spec.md](technical/live-integrations-spec.md).
-- Hiscores provider/runtime execution work belongs in [technical/hiscores-live-implementation-spec.md](technical/hiscores-live-implementation-spec.md).
-- Hiscores level Apply snapshot, global one-step Undo and Planner reconciliation evidence belong in [technical/hiscores-apply-undo-spec.md](technical/hiscores-apply-undo-spec.md); lookup, preview and normalized-player freshness remain in [technical/hiscores-lookup-controller-spec.md](technical/hiscores-lookup-controller-spec.md).
-- D-097 strict provider-budget implementation, activation and any future distributed Hiscores abuse control belong in [technical/hiscores-global-rate-limit-spec.md](technical/hiscores-global-rate-limit-spec.md).
-- Scheduled market live evidence and public deployment execution work belong in [operations/market-live-evidence-spec.md](operations/market-live-evidence-spec.md) and [operations/public-deployment-spec.md](operations/public-deployment-spec.md).
-- Historical reviewable commit grouping and delivery evidence belongs in [project/worktree-delivery-spec.md](project/worktree-delivery-spec.md); current delivery work must begin from a fresh status and scope review.
-- The bounded post-handoff documentation truth cleanup belongs in [project/documentation-truth-cleanup-spec.md](project/documentation-truth-cleanup-spec.md); current facts remain in their existing product, technical, operations and project owners.
-- Validation commands belong in [technical/testing.md](technical/testing.md).
-- Generated numeric cross-path and legacy-delta evidence belongs in [project/numeric-user-path-audit.md](project/numeric-user-path-audit.md).
-- Generated Revision 274 NPC attack-handler evidence belongs in [project/npc-attack-source-audit.md](project/npc-attack-source-audit.md).
-- Repository-wide documentation audit evidence belongs in [project/documentation-audit.md](project/documentation-audit.md); current facts still belong in their owning living documents.
-- Dated architecture audit evidence belongs in [project/architecture-audit.md](project/architecture-audit.md); current boundaries still belong in technical architecture, accepted choices in decisions and future work in backlog.
-- Dated security audit evidence belongs in [project/security-audit.md](project/security-audit.md); runtime and deployment facts still belong in architecture and operations, accepted choices in decisions and future hardening in backlog.
-- Dated code audit evidence belongs in [project/code-audit.md](project/code-audit.md); durable runtime and validation facts still belong in architecture, testing and backlog.
-- Repository-wide dead-code, CSS, test-ownership and documentation-truth cleanup evidence belongs in [project/maintainability-cleanup.md](project/maintainability-cleanup.md); living boundaries remain in architecture and current commands in testing.
-- Dated validation, release and superseded failure snapshots belong in [project/testing-evidence.md](project/testing-evidence.md); current commands and required gates remain in [technical/testing.md](technical/testing.md).
-- Accepted choices and open decision boundaries belong in [project/decisions.md](project/decisions.md).
-- Future work belongs in [project/roadmap.md](project/roadmap.md), [project/backlog.md](project/backlog.md) or [project/idea-inbox.md](project/idea-inbox.md).
-- Directly executable slicing, ordered prerequisites, required checks and documentation state transitions for the six specced finishing gaps belong in [project/goals/README.md](project/goals/README.md); the linked technical specifications remain requirement truth and [project/backlog.md](project/backlog.md) remains implementation status truth.
-- The 2026-07-22 release-polish requirements belong in [technical/release-polish-workspace-backup-discoverability-spec.md](technical/release-polish-workspace-backup-discoverability-spec.md), [technical/release-polish-visible-action-feedback-spec.md](technical/release-polish-visible-action-feedback-spec.md), [technical/release-polish-mobile-monstercard-loop-spec.md](technical/release-polish-mobile-monstercard-loop-spec.md), [technical/release-polish-recommendation-optimizer-undo-spec.md](technical/release-polish-recommendation-optimizer-undo-spec.md), [technical/release-polish-wide-table-discoverability-spec.md](technical/release-polish-wide-table-discoverability-spec.md) and [technical/release-polish-hiscores-fallback-readability-spec.md](technical/release-polish-hiscores-fallback-readability-spec.md); their execution slicing belongs in [project/goals/README.md](project/goals/README.md) and implementation status belongs in [project/backlog.md](project/backlog.md).
+## Current truth owners
 
-If a document and code disagree about current behavior, trust the code and update the document.
+| Question                                 | Owner                                                                                             |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| What does the product support?           | [Product overview](product/README.md) and [feature inventory](product/feature-inventory.md)       |
+| How is the current system structured?    | [Architecture](technical/architecture.md)                                                         |
+| Which checks should run?                 | [Testing](technical/testing.md)                                                                   |
+| How is the app run or deployed?          | [Operations](operations/README.md)                                                                |
+| What work is current?                    | [Backlog](project/backlog.md), [roadmap](project/roadmap.md) and [goals](project/goals/README.md) |
+| Which decisions are accepted or open?    | [Decision log](project/decisions.md)                                                              |
+| What did a dated run or audit find?      | [Testing evidence](project/testing-evidence.md) and [audit evidence](project/audit-evidence.md)   |
+| What do generated snapshots contain now? | Committed JSON/source-pin files and [generated evidence](project/generated-evidence.md)           |
+
+If documentation and runtime behavior disagree, treat code and validated data as
+current truth, then correct the owning document. Do not promote dated counts,
+hashes or audit conclusions into living current-state claims.

@@ -1,6 +1,11 @@
 # Workspace backup and restore specification
 
-Status: implemented 2026-07-19. The bounded envelope/registry, safe
+- Status: implemented
+- Date: 2026-07-19
+- Owner: technical documentation
+- Evidence: verified
+- Contract: living
+
 export/Review-before-restore, typed area planning and logical atomic
 Apply/Undo/recovery slices are complete.
 

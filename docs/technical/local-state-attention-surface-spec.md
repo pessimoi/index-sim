@@ -1,6 +1,10 @@
 # Local-state attention surface specification
 
-Status: implemented on 2026-07-18.
+- Status: implemented
+- Date: 2026-07-18
+- Owner: technical documentation
+- Evidence: verified
+- Contract: closed
 
 ## Purpose
 

@@ -1,299 +1,232 @@
 # Architecture
 
-This document separates current architecture from the proposed rewrite architecture.
+- Status: implemented
+- Date: 2026-07-27
+- Owner: technical architecture
+- Last verified: 2026-07-27
+- Evidence: verified
+- Contract: living
 
-## Current state, verified from repo
+This document owns the current runtime boundaries, dependency policy and source
+map. It deliberately contains no module totals, artifact measurements or test
+pass counts. Run `npm run architecture:check` for the current source graph and
+follow [testing.md](testing.md) for validation commands. Dated architectural
+measurements belong in [project evidence](../project/audit-evidence.md).
 
-- Product: 2004scape Combat Simulator, currently documented at Revision 274.
-- Rewrite direction: new implementation that preserves end-user workflows without preserving legacy architecture or legacy calculation decisions by default.
-- Production entrypoint: `index.html`, with a readable pre-JavaScript `starting`
-  shell and a small DOM-only startup guard loaded before the Vite module that
-  mounts `src/app/main.tsx`. The entry module mounts the root error boundary
-  immediately and lazy-loads `App`; its Suspense fallback retains the same
-  canonical `starting` marker, and a failed App chunk resolves to fixed
-  sanitized startup copy.
-- Runtime: static browser app built with Vite.
-- UI: React from npm dependencies bundled by Vite; no production CDN React or runtime Babel path is required.
-- Archived legacy runtime: `legacy/index.html` still loads the old script-order app for reference only.
-- Legacy source: plain JavaScript files attached to `window.*`; retained under D-060 for golden fixtures, archive comparison, legacy-derived static runtime snapshot generation and readiness comparison. The root app no longer executes those source files during normal bootstrap, and the archive is not a supported runtime or product truth source.
-- Rewrite styling: `src/app/styles.css`. Archived legacy styling remains in root `styles.css` plus substantial inline styles in `views.jsx`.
-- Data files: `prices.json`, `price-provenance.json`, `alch.json`, `price-history.json`.
-- Rewrite implementation: `package.json`, TypeScript/Vite/Vitest/Playwright config and `src/` directories now own the root app path.
-- Missing from this checkout: active GitHub Actions workflows, a general
-  merge-CI configuration, a stateful simulation backend, a general application
-  database schema and `run_sim.py`. Narrow repository-owned same-origin handlers,
-  Vite middleware and the Cloudflare Worker adapter do exist under `src/server`;
-  D-097's disabled aggregate rate-limit Durable Object is the only accepted
-  server-managed state. D-099 retains the hardened scheduled market workflow
-  template at `.github/disabled-workflows/update-market-prices.yml`, outside
-  GitHub's active workflow directory.
+## System context and entrypoints
 
-## Archived legacy script order
+Index Sim is a static-first Vite and React browser application with narrow
+same-origin integration handlers. The production deployment unit is a
+Cloudflare Worker with Static Assets; simulation state and calculations remain
+client-side.
 
-`legacy/index.html` loads the archived app in this order:
+- `index.html` is the production browser entrypoint. It renders a non-empty
+  pre-React startup shell, loads the DOM-only startup guard and then imports
+  `src/app/main.tsx`.
+- `src/app/main.tsx` mounts the root error boundary and lazy application
+  composition root.
+- `src/app/calculation-worker.ts` is constructed by URL as the calculation
+  Worker entrypoint.
+- `src/server/cloudflare-worker.ts` is the Cloudflare runtime entrypoint for
+  static assets and same-origin API routing.
+- The Vite Hiscores and market middleware modules are local development
+  entrypoints.
+- `legacy/index.html` is the archived script-order reference application. It
+  is not a supported production entrypoint.
 
-1. `gamedata.js` creates `window.GameData`.
-2. `engine.js` creates `window.SimEngine`.
-3. `trip.js` creates `window.TripModel`.
-4. `equipment.js` creates `window.Equipment`.
-5. `market.js` patches prices and exposes market helpers.
-6. `planner-core.js` creates `window.SimPlanner`.
-7. `planner.jsx` creates `window.PlannerPane`.
-8. `views.jsx` defines the main React UI.
-9. Inline JSX renders `<CombatWorkbench />`.
+Entrypoints that are invoked by HTML, Vite, Wrangler, Worker URL construction
+or repository tooling are explicitly classified in
+`scripts/check-architecture.ts`. A source module without an importer must be
+listed there for a concrete reason or the architecture check fails.
 
-The load order remains relevant for legacy parity and fixture work, but it is not the production app path.
+## Source ownership
 
-## Current source areas
+| Area              | Owns                                                                                                      | Must not own                                                  |
+| ----------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| `src/app`         | React composition, browser state, controllers, view models, presentation and user-triggered orchestration | Server implementation or a second domain truth                |
+| `src/domain`      | Pure calculation and planner rules, schemas and deterministic results                                     | React, browser globals, adapters, data loading or server code |
+| `src/data`        | Committed generated snapshot types and data access contracts                                              | UI state, browser effects or provider calls                   |
+| `src/adapters`    | Translation between browser/domain contracts and generated, storage, market or Hiscores boundaries        | React composition or server routing                           |
+| `src/server`      | Framework-neutral same-origin handlers, provider guards and the Cloudflare adapter                        | App presentation or browser adapter ownership                 |
+| `scripts`         | Repository generation, audits, measurements, deployment validation and local checks                       | Production browser state                                      |
+| Root legacy files | Archived calculation/UI reference and golden-fixture inputs                                               | Current production ownership                                  |
 
-- `engine.js`: combat math, specials, prayers, cannon, loot valuation, supply costs and trip integration.
-- `gamedata.js`: monster data, drop tables, item prices, alch values, loot rules and GameData mutators.
-- `equipment.js`: gear registry and bonus summing.
-- `trip.js`: food, potions, inventory, stackability, banking and incoming damage estimates.
-- `market.js`: market price sync, `prices.json`/`alch.json` loading and price history persistence.
-- `planner-core.js`: training-order planner domain logic.
-- `planner.jsx`: planner UI.
-- `views.jsx`: archived legacy main workbench, compare, loot, economy, settings, spreadsheet and docs-link architecture panel.
-- `src/app`: Vite/React rewrite UI for the selected parity slice. It owns form state, per-combat-type setup loadout state, rewrite-owned monster-specific custom setup state, view models and presentation, adapts into domain requests and uses the composed `FullSimulationResult` as the primary source for the main simulation view model's numeric result and warning fields. Dense Compare/Compare, current-target Duel rows and the on-demand Duel monster matrix read their rate, XP and economy numbers from that same composed result path instead of maintaining a separate combat+trip+XP truth source.
-- `src/app/startup-guard-core.ts` and `src/app/startup-guard.ts`: DOM-only
-  pre-React failure boundary. The external same-origin guard has no React,
-  domain, adapter, generated-data or application-state dependency; while the
-  one canonical marker is `starting`, an entry error or unhandled rejection
-  produces fixed sanitized `error` copy. The core also defines the typed
-  lazy-App load failure consumed by the React boundary so a deferred
-  application-chunk failure produces the same safe startup message rather than
-  raw loader detail.
-- `src/app/application-recovery.ts` and `src/app/components/shell/application-error-boundary.tsx`: root React render/lifecycle failure boundary and tab-scoped safe-default recovery. The boundary owns fixed post-mount `error` presentation and reload controls; the recovery owner selects isolated in-memory storage before persisted loaders run when the current tab carries the safe-session flag. It never clears or overwrites the original browser storage. `App` retains typed runtime-bootstrap `starting`/bootstrap-error composition and the ready workbench.
-- `src/app/components`: rewrite presentation owners. Phase 1 of the [composition-root refactor](app-composition-root-refactor-spec.md) moves shared form controls, generic dialog/status presenters, combat-result detail and distribution presenters, Economy price-history SVG charts and shared price/delta formatters here. [The implemented MetricList hygiene goal](metric-list-presenter-hygiene-spec.md) gives the generic `DisplayMetric`/`MetricList` presenter a readonly props-object component contract in `app-presenters.tsx`; combat-result presenters consume it instead of owning or directly invoking it. [The implemented local-state recovery goal](local-state-recovery-controller-spec.md) adds a pure Settings recovery panel with typed values/actions and the existing DOM contract. [The implemented local-state attention goal](local-state-attention-surface-spec.md) adds one pure ready-shell banner over a structured presentation model; `App` alone composes Settings activation and post-render heading focus while storage and recovery transitions stay in the existing controller. [The implemented Hiscores goal](hiscores-lookup-controller-spec.md) adds a typed topbar panel whose only browser effects are disclosure-scoped outside-pointer/Escape listeners and focus return. [The implemented Cannon pane goal](cannon-pane-extraction-spec.md) adds the first complete feature pane behind explicit calculated values and primitive actions while `App` retains schema mutation and Trip synchronization. The architecture-audit cleanup gives the always-visible MonsterCard rail its own pure, focused-test-covered component owner without changing its props, copy or styling. [The implemented Stats/Loadout phase](stats-loadout-pane-refactor-spec.md) gives `StatsPane` the exact Stats analysis landmark and `LoadoutPane` the equipment, special-attack and damage-distribution family while `App` retains live mutation and optimizer Apply/Undo. [The implemented Compare/Duel phase](compare-duel-pane-refactor-spec.md) gives both feature landmarks pure pane owners with readonly models and intent callbacks while preserving their DOM and CSS contracts. [The implemented Loot/Trip phase](loot-trip-pane-refactor-spec.md) gives both complete landmarks pure pane owners; Loot callbacks preserve caller-owned per-monster mutation and Undo, while Trip intents cross one normalized patch callback. [The implemented Economy/Settings phase](economy-settings-pane-refactor-spec.md) gives the exact three-mode shared wrapper and all Price data, Gear menu, Market, manual-price and history DOM to one pure pane family while App retains the existing browser transactions. Conditional setup import/reset/share reviews, the share dialog, legacy migration review and local-state attention banner load only when their App-owned gate is active; the legacy review also builds its metadata-only view model inside that conditional chunk, while lightweight heading ids remain outside those chunks so Settings focus and recovery routing do not pull whole panels into the direct entry. Components receive typed values and callbacks; they do not read storage, call adapters or start calculations.
-- `src/app/view-models/price-time.ts` is the pure owner for price-specific strict instant/date recognition, fixed `en-GB` exact copy, browser-IANA/UTC-zone handling, signed relative copy and same-minute occurrence disambiguation. `src/app/components/price-time.tsx` is the sole semantic `<time>` markup owner. `price-data.ts` assigns capture/creation/observation/evaluation/manual meaning and prepares every Market/history fact; Loot consumes prepared capture presentations and does not parse timestamps. `App` resolves the browser zone once and keeps the minute clock out of the memoized history analysis.
-- `src/app/controllers`: app-owned browser orchestration. [The runtime bootstrap controller](runtime-bootstrap-controller-spec.md) owns generated-runtime lifecycle, setup/Duel compatibility, selected/scheduled/bundled/manual startup PriceSet resolution and sanitized startup state. Its hook is the only `src/app` runtime-value importer of `@/adapters/generated`, and `App.tsx` applies one typed ready result before enabling persistence. [The local-state recovery controller](local-state-recovery-controller-spec.md) owns allowlisted health/report/failure/block/skip/persist/clear/export transitions behind a DOM-free core and thin React hook. Feature state stays in `App`, runtime compatibility blocks are installed before persistence starts, and successful manual-price clear is returned as an explicit caller-owned outcome. [The Economy destructive-actions Undo controller](economy-destructive-actions-undo-spec.md) owns the closed three-key exact-raw pre/postimage comparison, the bounded history/manual persistence transactions and the one-shot durable/session-only restore decision; raw strings stay in its in-memory closures, while App owns live preimages, caller-owned setters, invalidation and the global Undo slot. [The Hiscores lookup controller](hiscores-lookup-controller-spec.md) owns one-shot same-origin status loading, normalized-player/latest-request freshness, preview plus lookup/stale/no-change/error notices and last-player recovery integration. Under the implemented [Hiscores Apply Undo contract](hiscores-apply-undo-spec.md), `App` keeps the combat-form mutation, immutable snapshot, changed-field count and global one-step Undo behind that freshness outcome; the controller emits no competing changed-Apply success. [The rewrite setup file-transfer controller](setup-file-transfer-controller-spec.md) owns bounded file reading, strict contextual-v1/legacy-storage-v3 parser invocation, latest-request sequencing, fixed sanitized notices, one in-memory context-aware review candidate, setup-scope stale/Refresh and synchronous consume freshness, one-shot consume/Dismiss and deterministic contextual-v1 export construction. The pure `state/setup-transfer-changes.ts` owner holds the schema-drift-guarded field registry, semantic comparison and opaque fingerprints shared by the 13-group setup-file review, the eight-form-group plus target-cannon/loot shared-link review and saved-row Load review; review components receive only prepared values and intents. Under the implemented [setup replacement contract](setup-replacement-review-undo-spec.md), the controller and diff owner have no persistence or recovery authority: `App` alone captures, persists and applies all six setup state families and restores that complete boundary for imported Apply or saved-row Load Undo. [The PriceSet transfer controller](price-set-transfer-controller-spec.md) owns bounded import, generated-alch/manual-overlay acceptance, selected persistence/recovery, latest-state history update, export and reset confirmation; `App` selects fallbacks and applies typed runtime outcomes. [The Compare/Duel phase](compare-duel-pane-refactor-spec.md) adds focused hooks for the existing 250 ms Dense task/freshness lifecycle and the on-demand Duel view/matrix lifecycle; both use the existing calculation-task boundary and keep persistence and form/snapshot mutation in `App`. Under the implemented [Duel matrix lifecycle contract](duel-matrix-failure-state-spec.md), the Duel hook separately owns last success, source-scoped fixed failure and pending task, then exposes one derived presentation union to the pane. Under the implemented [Dense/Planner/Risk failure and Retry contract](calculation-failure-retry-lifecycle-spec.md), those three focused hooks use the shared five-state vocabulary while retaining feature-specific trigger rules, latest-success/source-scoped-failure/pending-task state and task-identity settlement guards.
-- `src/app/controllers/session-only-exit-protection.ts`: DOM-free session durability owner. It consumes Workspace's closed transfer registry/codecs, keeps canonical per-area durable baseline/current/backup acknowledgement only in memory and derives the closed non-durable reason/armed presentation. `LocalStateRecoveryControllerCore` reports verified durable and session-only outcomes; `App` settles one coherent live state only after runtime readiness. `use-session-only-before-unload.ts` owns one stable `beforeunload` listener while armed and performs no React mutation, persistence, export or async work in the handler.
-- `src/app/state/active-setup-reset.ts` owns the DOM-free active Default/current-target Custom reset candidate, grouped semantic diff, no-op and six-family stale/one-shot transitions. The pure shell review renders only typed presentation data; `App` retains the sole authority to persist and apply the complete `SavedSetupState` and register its Undo. Canonical values remain owned by `ui-state.ts`, so the reset does not duplicate Revision 274 defaults or change storage schemas.
-- `src/app/state/loot-settings.ts`: rewrite-owned browser-local per-monster loot settings for high-alch enablement, kill overhead seconds and talisman spot. It is versioned separately from row-level `index-sim:loot-prefs` so existing drop action preferences keep their v1 shape.
-- `src/app/state/selected-price-set.ts`: rewrite-owned browser-local selected active `PriceSet` state in `index-sim:price-set:selected`. It restores a valid selected `PriceSet` over the scheduled static snapshot or bundled fallback on load, validates with `PriceSetSchema`, rejects oversized/invalid/version-mismatched envelopes and clears only this key on local-override reset.
-- `src/app/state/price-history.ts`: keeps version-2 capped browser-local comparison snapshots with matching item metadata in `index-sim:price-history`, migrates valid v1 local rows as unknown, converts versioned committed history into read-only analysis snapshots with observed/retained/carried/legacy point status and merges the two sources only in memory. Clearing local history never changes shared history. App consumes one recovery-controller persistence skip when applying an exact Undo or initially loading a non-empty local history, so its normal effect cannot rewrite the restored raw envelope or `savedAt` value.
-- `src/app/controllers/local-state-batch.ts`: the shared deterministic exact-preimage write and reverse-rollback primitive for handled browser-local storage operations. Workspace restore and the implemented [monster-specific changes management](monster-specific-changes-management-spec.md) transaction consume it while retaining workflow-specific schema serialization, typed live Apply, recovery sequencing and one-step Undo records. The Settings inventory/candidate/panel remain storage-free; `App` composes current live owners, target/tab navigation and the global Undo surface.
-- `src/app/state/local-state-health.ts`: rewrite-owned browser-local state health reporting for allowlisted `index-sim:*` keys. It reuses the current versioned storage loaders, exposes only metadata/status/version/sanitized reason fields, reports invalid, unsupported, storage-unavailable and save-failed states, supports per-key and invalid-key clearing for known rewrite-owned keys only and powers the Settings recovery view. It does not read, export or log raw persisted payloads and does not migrate old rewrite versions automatically.
-- `src/domain/shared`: typed rewrite contracts for requests, context and shared data (`SimulationRequest`, `SimulationContext`, `GameDataSnapshot`, `PriceSet`, manual combat overrides and related types). The combat-only result is explicitly named `CombatSimulationResult`; composed whole-result output belongs to `src/domain/simulation`.
-- `src/domain/equipment`: pure equipment bonus summing and loadout-to-combat bonus mapping. It receives a `GameDataSnapshot` and does not read browser globals.
-- `src/domain/combat`: pure combat/equipment slice for max hit, hit chance, stance selection, prayers, boosts, attack speed, poison trickle and special-attack DPS. It does not own loot, trip, economy or planner behavior.
-- `src/domain/trip`: pure trip/loot/supply slice for inventory, banking, incoming damage, stackability, loot actions, alch handling, potion carry, cannon, supply costs and structured price warnings. D-058 keeps exact cut/uncut identities and fallback-only aliases. Random-herb `Loot` and `Unid`, gem/mega, D-084 casket and ultra-rare tables export the shared D-086 `DYNAMIC_LOOT_PRICE_DEPENDENCIES` contract directly from their calculation descriptors, so market coverage cannot silently omit a table row. D-087 maps all twelve identified gaps and leaves only the ten unsupported exact unidentified-herb identities advisory. It receives `SimulationRequest`, combat results, `GameDataSnapshot` and `PriceSet`; it does not read browser globals.
-- [The source-backed casket valuation implementation](source-backed-casket-valuation-spec.md) keeps ordinary `tag: "casket"` as one parent inventory pickup but values it from the exact Revision 274 opened-content table. Exact component prices win, existing reviewed aliases are fallback-only, missing components use generated source object cost with `price-fallback-used`, and the generated `casket` parent cost cannot override the marked composite value. The Loot view exposes eight reconciling nested bands and suppresses misleading parent-item history. Raw LostCity generation invokes a bounded focused trigger guard so denominator, thresholds, reward ids or quantity-expression drift fails before generated output is written.
-- [The per-item price provenance and freshness implementation](per-item-price-provenance-freshness-spec.md) keeps numeric `PriceSet.itemPrices` compatible while adding row-level value origin, observation/evaluation time and refresh status through validated `price-provenance.json`, version-2 shared/local history and explicit storage migrations. Generated object-cost fallbacks remain runtime-only and retain their own provenance.
-- `src/domain/risk`: pure, seeded modeled-outcome slice for kill-time percentiles, food sufficiency, trip variability, timed net GP, target probabilities and explicit stochastic/mean-only coverage. It composes accepted simulation inputs/results without changing `FullSimulationResult` expected-value ownership and has no browser, persistence or network dependency.
-- `src/domain/economy`: pure exact-first `PriceSet` lookup helpers, a limited legacy-derived price fallback alias map, alias-map collision validation and structured missing-price/missing-alch warnings. Source item identity is not collapsed through price aliases. It does not read browser state or mutate price data.
-- `src/domain/simulation`: pure composed-result foundation. It defines `FullSimulationResult`, scopes combat/trip warnings and composes current combat, trip/loot/supply and XP rate slices without React state, display strings, persistence envelopes, browser APIs or live network calls. The main `createSimulationViewModel()` path consumes this contract and composes UI-only labels, reset/review actions and loot rows with the focused `src/app/view-models/stats.ts`, `loadout.ts` and `active-assumptions.ts` owners.
-- `src/domain/planner`: pure training-plan search for the rewrite. It consumes `simulateCombat`, combat XP breakdowns, trip/loot/supply results, `GameDataSnapshot` and `PriceSet`; it does not own combat math or equipment bonus truth.
-- `src/data`: Zod schemas for `GameDataSnapshot`, its optional-at-generic-boundary typed game-revision context, items, monsters, drops, equipment, `PriceSet`, price history and live integration API contracts, raw data reliability helpers for duplicate JSON keys and duplicate id detection, committed generated-data outputs, plus the legacy data adapter that validates the current bundled data shape before static bridge snapshots are generated.
-- `src/data/market-source-mapping.ts`: bounded market item allowlist and item-id-to-source-slug mapping. The original 80 rows are catalog-audited; D-087 adds twelve page/parser-reviewed identified dynamic-loot rows, including `rune_2h → rune_2h_sword`. The ten unsupported species-specific unidentified herbs remain outside the 92-row allowlist.
-- `scripts/lostcity-content-runescript.ts`: shared bounded repository-local RuneScript reader for source-backed loot extraction and the Revision 274 NPC attack audit. It rejects symlinks and oversized source trees, emits repository-relative block references and leaves consumer-specific trigger/profile interpretation to the loot and attack-audit owners.
-- `src/adapters/static-runtime`: legacy-derived static bridge retained for regression/reference, bridge freshness and rollback evidence. It is no longer the root app bootstrap.
-- `src/adapters/legacy-runtime`: DOM-free trusted bundled legacy bootstrap helper. It builds the reference `GameDataSnapshot` by executing bundled `gamedata.js`, `engine.js` and `equipment.js` sources inside an adapter-owned sandbox, then validates the result through `src/data/legacy-adapter.ts`. It is retained for tests, golden/reference comparison and regenerating the legacy-derived static bridge, not as the root app bootstrap.
-- `src/adapters/browser`: browser-only file export/import helpers plus the shareable-setup current-base URL/fragment/clipboard boundary in `shareable-url.ts`. Legacy reference helpers are imported directly from `src/adapters/legacy-runtime` by tests and evidence tooling; the production browser barrel does not expose that archive boundary.
-- `src/app/state/setup-transfer-context.ts`: strict bounded revision-plus-snapshot stamp and pure exact/same-revision/different-revision/unknown comparison owner. It builds only from validated ready game data, never authorizes an entity id and contains no source commit/path, price, player or computed state.
-- `src/app/state/workspace-backup.ts`: pure bounded Workspace V1 envelope and exhaustive local-state policy registry. It classifies all eleven health ids, dispatches the ten transferable ids through closed area/version codecs owned by the current state schemas, requires the nine non-sensitive areas, keeps Hiscores opt-in and migration dismissal excluded, reuses `SetupTransferContextV1`, and returns only canonical data or fixed unsupported/invalid area status. Its export builder requires the App-selected `BrowserStorageAccess` capability but captures validated live state so a session-only value can be rescued without reading raw storage. `workspace-file-transfer.ts` is its production DOM-free importer/controller and owns the 10 MB latest-request race, fixed errors, one in-memory candidate and mutable plan selection. The dynamically loaded `workspace-file-transfer-review.ts` owns Revision/entity review plus privacy-safe summaries; `workspace-restore-plan.ts` owns fresh candidate/context validation, all closed Replace/Merge policies, exact effect/cap previews and the typed selected-area plus PriceSet-composition outcome. `use-workspace-file-transfer.ts` binds the existing browser read/download adapters. The lazy pure `workspace-backup-panel.tsx` owns Settings markup and focus targets, while `App.tsx` supplies one coherent live-state capture, current Planner pool and scheduled/bundled PriceSet fallback. The review/plan and presenter chunks keep the release entry inside its accepted raw and gzip budgets. G3 still has no storage write/remove, recovery unblock or live Apply authority; atomic Apply/Undo remains the final slice.
-- `src/app/state/workspace-backup.ts` also exposes codec-normalized, key-order-stable semantic fingerprints to the in-memory exit guard without changing or exposing the Workspace envelope. `workspace-file-transfer.ts` returns actual included area ids only with its typed successful download-request outcome, so acknowledgement retains the existing nine-required/sensitive-opt-in policy instead of duplicating it.
-- `src/app/state/shareable-setup.ts`: strict external permalink contract with contextual v2 generation and v1 parsing, bounded UTF-8 base64url codec, duplicate-key-safe parsing, shared context comparison, generated-game-data entity compatibility review and pure current-monster form/Cannon/loot apply/undo state. It does not own browser APIs, prices, collections, computed output or persistence.
-- `src/app/state/legacy-storage-migration.ts`: 92-line public owner for app-owned archived-browser-state inspection and legacy-to-rewrite mapping. Internal modules under `src/app/state/legacy-migration/` separate the exact key contracts/report helpers, one-record setup mapping, setup/custom/cannon/Duel inspection, preferences and price/review-only boundaries. The facade keeps one ordered metadata-only report and the unchanged public API; it consumes the generic `KeyValueStorage` interface but keeps rewrite schema dependencies out of `src/adapters/storage`. D-048 Planner state and D-049 full price history remain review-only.
-- `src/app/state/manual-price-overrides.ts`: capped versioned browser-local item-price overlay. It filters stored rows against the current base only for active composition, keeps temporarily unavailable item ids inactive rather than deleting them, guards new-row capacity, composes manual numeric values and metadata after base PriceSet resolution, preserves generated high alch and leaves the base object available for one-item or clear-all reset.
-- `src/adapters/generated`: root source-backed runtime adapter. It builds a schema-valid `SimulationContext` from committed `src/data/generated/game-data.json` and the validated scheduled price/provenance pair. Unlike generic legacy/reference fixtures, the root bootstrap requires the strict typed revision/source/commit/generated-at context. `src/app/controllers/use-runtime-bootstrap.ts` imports this runtime bootstrap dynamically behind the existing loading/error state, so the snapshot is a deferred Vite chunk; small generated price helpers remain direct imports. Node/tests retain the synchronous constructor. Generated item prices fill missing market ids with explicit runtime-only fallback metadata, while generated item alch values remain authoritative. Its DOM-free readiness core checks revision context, exact runtime ID coverage, required fields, monster combat/loot completeness, numeric PriceSet coverage and one metadata row per active numeric price; it also reports origin, refresh and quality counts.
-- `src/adapters/storage`: generic `KeyValueStorage`, memory storage and versioned `PersistedEnvelope<T>` read/save/clear helpers. Rewrite UI paths use non-fatal read/save/clear result metadata for browser storage access failures without changing the persisted envelope format. Rewrite-specific legacy mapping is app-owned and this adapter does not import `src/app`.
-- `src/adapters/market`: validated `PriceSet` file import, selected/import metadata normalization, read-only scheduled price/provenance/history loader with capture-time and key-set matching, same-origin market status/sync compatibility adapter and explicit response validation.
-- `src/adapters/hiscores`: same-origin browser adapter for hiscores status and lookup responses, plus versioned storage for the last searched player.
-- `src/data/market-sync-items.ts`: market sync item expansion for current-monster, all-supported and explicit item scopes. It consumes the Trip-owned dynamic dependency contract, returns approved mappings separately from missing mapping ids and audits active tag counts/affected monsters for generated runtime readiness instead of maintaining duplicate UI/data lists.
-- `src/server/hiscores-core.ts`: framework-neutral hiscores status/lookup handler with request validation, bounded provider and provider-budget timeouts, the existing per-client limiter, an asynchronous aggregate provider-budget gate and sanitized errors. Local/default runtimes inject an allow-all global gate.
-- `src/server/hiscores-global-rate-limit.ts`: D-097 fixed 60-second aggregate provider-budget owner. It validates Cloudflare mode/quota/binding state, calls one deterministic provider Durable Object, atomically persists aggregate window usage in SQLite-backed Durable Object storage and stores no player/query/client identity. Corrupt state, invalid configuration/response and coordinator failure fail closed.
-- `src/server/vite-hiscores-middleware.ts`: Vite dev/preview middleware that exposes the hiscores API boundary for local same-origin runs without choosing a production backend framework.
-- `src/server/cloudflare-worker.ts`: D-066 production fetch adapter. It injects the same fixed-origin provider, preserves one local limiter, maps trusted Cloudflare client metadata only into that ephemeral key, injects D-097's environment-backed aggregate gate, routes API before SPA fallback and adds sanitized API security responses.
-- `wrangler.jsonc` and `public/_headers`: one Cloudflare Worker + Static Assets root deployment, Worker-first `/api/*`, SPA fallback, D-097 SQLite Durable Object binding/v1 migration with mode `off`, static/API cache classes, CSP/security headers, preview URLs and disabled Workers Logs/Logpush.
-- `src/server/market-core.ts`: framework-neutral market status/sync handler with request validation, item allowlist expansion, timeout/rate-limit guard, partial failure reporting and sanitized errors. The default provider is disabled until an authoritative upstream is accepted.
-- `src/server/vite-market-middleware.ts`: Vite dev/preview middleware that exposes the market API boundary for local same-origin runs without choosing a production backend framework.
-- `vite.config.ts`: Vite dev/preview composition plus the exact scheduled-price asset classifier. Repository middleware intercepts only query-free allowlisted `GET`/`HEAD` paths; transform requests with any query and all other methods fall through to Vite.
-- `scripts/generate-game-data.ts` and `scripts/game-data-generator-core.ts`: repo-owned Revision 274 generator. The raw path requires explicit bounded `--game-revision 274`, recursively parses pinned `.npc`, `.obj`, `.dbrow`, `.param` and `.rs2` sources, resolves reviewed runtime mappings, writes only `source-pin.json`, `game-data.json` and the current revision-impact report, and rejects unsafe paths/output shapes. It writes and verifies one agreeing revision/source/commit/generated-at context across the snapshot and source pin before output. The committed report compares against the legacy-derived active-reference snapshot, uses scheduled prices plus generated fallbacks, runs 11 runtime representative cases and a 189-evaluation all-monster scan, and records accepted D-055/D-057/D-071/D-072 deltas. `scripts/lostcity-content-requirements.ts` parses numeric Attack, Strength, Defence, Ranged and Magic gates from pinned `levelrequire` triggers/definitions; quest completion clauses stay outside the contract. NPC config size is emitted for every generated monster with the source default of 1. Normalized `index-sim-source-slice` files remain isolated contract-test fixtures.
-- `scripts/lostcity-content-*`: direct LostCityRS/Content Revision 274 parser and snapshot assembler. It rejects duplicate config/handler definitions, emits repository-relative sanitized diagnostics, resolves all expected monster/item/weapon/ammo/spell/equipment identities and extracts 63/63 loot tables with 1,126 top-level entries. Under D-072, four quest-gated rows and 21 clue-scroll tertiary rows are retained with typed eligibility and excluded only from default valuation while exact player state is unavailable. D-055 through D-058 and D-072 own reviewed source deltas, identity semantics and conditional-loot policy.
-- Current generated runtime evidence: `npm run runtime:readiness` is `ready` with zero blockers across typed revision context, IDs, required runtime fields, 63 monster combat/loot/size rows, 94 requirement rows, 25 typed conditional loot rows and PriceSet coverage. `docs/project/revision-impact/current.md` passes 11/11 representative cases with accepted D-055/D-057/D-071/D-072 source and policy deltas; its refreshed scan finds 38 informational all-monster outliers and shows the configured first 25. D-059 makes this generated snapshot root runtime truth; the legacy-derived bridge remains reference evidence. The pure Settings view model presents the validated context through one always-visible header badge and one Settings Calculation context section without making source paths or generator commands browser data.
-- `scripts/write-scheduled-market-prices.ts`, `scripts/scheduled-market-writer-core.ts` and `scripts/markets-lostcity-item-page-adapter.ts`: repo-owned market snapshot writer, robust estimator and first-page Inertia adapter. `--input` keeps a normalized fixture/dev contract; `--upstream-url` must be the exact approved origin root and derives one `/items/{slug}` request per catalog-audited mapping. Requests run sequentially with bounded body/timeout/redirect checks and immediate removal of player identity fields. Adaptive filtering and freshness gates produce an in-memory logical set of `prices.json`, `price-provenance.json` and version-2 `price-history.json`. Retention preserves the value-establishing origin, observation time and quality while recording the new evaluation result. History keeps 12-hour points for 90 days and one latest point per older UTC day. D-099 disables automatic GitHub execution; the hardened schedule-only commit template is retained outside `.github/workflows` and still permits only the validated three-file set if explicitly restored.
-- `scripts/deployment-readiness-core.ts` and `scripts/verify-public-deployment.ts`: public-release validation. The artifact gate checks the D-066 root-path Vite output, Cloudflare `_headers` contract, hashed asset references, source-map/secret/path hygiene, validated market files, deterministic artifact SHA-256 and the D-094/D-098 direct entry-JavaScript raw/gzip budgets. The HTTPS smoke checks root/assets/market routes, response content types, cache classes, CSP/security headers, API-vs-SPA routing and enabled Hiscores status without issuing a player lookup. A future operator runs the HTTPS smoke against its preview/production instance before a live claim.
-- `scripts/dev-startup.mjs`: repository-owned strict-port Vite child lifecycle and Chromium readiness probe. Its checked mode emits `APP_READY` only after the canonical workbench state; its bounded check mode also proves controlled entry failure and live direct-versus-transformed scheduled-price routing. It writes no trace, screenshot or log and calls no upstream provider.
-- `scripts/measure-startup.mjs`: repository-owned local production startup evidence. It builds and previews the root artifact, runs paired cold and warm Playwright Chromium samples, waits for the canonical `ready` marker and reports timing plus transfer/decoded resource bytes without writing files or calling an upstream provider.
-- `src/tests`: unit/domain/schema/adapter/server/deployment tests, legacy and Planner golden/parity fixtures, source-parser/generator evidence, functional Playwright workflows and an isolated reviewed visual-regression suite.
+The main app composition root may coordinate cross-feature transactions, global
+status and Undo, persistence effects and lazy panes. Feature components receive
+typed values and intent callbacks; they do not read storage, call providers or
+start calculations directly. Controllers own bounded browser lifecycles, while
+domain modules remain free of browser and framework concerns.
 
-## Enforced dependency boundaries
+Current feature contracts and closed implementation evidence are catalogued in
+[the technical specification catalog](specifications.md). Historical extraction
+diaries in those specifications do not override the ownership table above.
 
-`npm run architecture:check` builds a TypeScript source-module graph for
-non-test `src/` code. The repository verification gate fails when it finds:
+## Dependency policy
 
-- an import cycle
-- a domain import into app, adapter, data or server code
-- a data import into app, adapter or server code
-- a server import into app or adapter code
-- an app import into server code
-- an archived legacy/static runtime module reachable from `src/app/main.tsx`
-- a source module with no source importer and no explicit HTML/Vite/Wrangler/Worker/script entrypoint classification
-- a stale or missing external-entrypoint classification
-- an undocumented or stale architecture exception
+`npm run architecture:check` builds the TypeScript source import graph and
+enforces these directions:
 
-The current graph has 149 source modules, no cycles, 134 modules reachable from
-the client entrypoint, eight explicit external entrypoints and zero documented
-exceptions. The eight roots are the two HTML client entries, Web Worker entry,
-direct Wrangler entry, two Vite middleware entries and two repository
-script/test/reference adapter entries. The G2 production controller now imports
-the Workspace state contract, so G1's temporary state-test root has been
-removed. New exceptions or external roots are not
-accepted implicitly: move the contract to its correct owner or update this
-document and the checker in the same reviewed change.
+- app code cannot import server code;
+- adapters cannot import app or server code;
+- data cannot import app, adapters or server code;
+- domain cannot import app, adapters, data or server code; and
+- server cannot import app or browser adapters.
 
-Both TypeScript projects enable `noUnusedLocals` and `noUnusedParameters`.
-This makes newly orphaned imports, declarations and parameters a typecheck
-failure instead of relying on occasional manual dead-code searches. The graph
-guard separately catches whole non-test source modules that TypeScript's unused
-checks cannot see.
+The same check rejects source cycles, unclassified orphan modules, stale
+external-entrypoint declarations and archived runtime code reachable from the
+production client entrypoint. The accepted exception set is explicit in the
+checker and is currently intended to remain empty. Counts printed by the command
+are execution evidence, not a prose contract.
 
-## Current risk boundaries
+## Browser bootstrap and recovery
 
-- Archived legacy domain code reads from `window.*` and is not isolated from browser state.
-- Archived `SimEngine.simulate()` is still the current-behavior golden fixture baseline, but it also reads and mutates `GameData`.
-- Legacy price data can come from embedded defaults, JSON files, live market fetches, imports and `localStorage`; the rewrite path receives explicit `PriceSet` values.
-- Legacy UI state, saved setup state and simulation request state are tightly coupled; the rewrite UI separates these contracts.
-- `views.jsx` no longer presents the stale Next.js/FastAPI/SQLite board; it links to docs instead.
-- `src/app/App.tsx` is the composition root after the completed [Phase 4 shell and ownership review](app-composition-root-phase4-spec.md), the implemented [ARCH-2026-03 retention review](app-composition-root-retention-spec.md) and code-audit persistence dependency cleanup. It intentionally keeps browser/runtime bootstrap, direct persistence effects, controller outcomes, global status/Undo, atomic setup/share/legacy transactions, cross-feature mutations and direct pane/MonsterCard composition. Its optional global Undo scope now marks only Economy-sensitive records, so a later accepted Economy mutation can invalidate an unsafe raw/live restore without removing an unrelated pending Undo. App captures and reapplies the exact live history/manual/PriceSet preimages while the bounded Economy controller owns raw comparison and its closed persistence transactions. Workspace adds coherent live/fallback capture and one typed live-application boundary; a Workspace Undo is Economy-scoped only when its selected areas include history, selected PriceSet or manual overrides. The DOM-free file-transfer controller owns candidate/review sequencing, the lazy restore-plan owner supplies selected next values and persistence intents, the lazy executor owns deterministic storage Apply/rollback plus its complete Undo record and the recovery controller owns bounded selected-id transitions. App's per-area blocked booleans prevent an unrelated recovery transition from rerunning another area's persistence effect, while selected Apply/Undo gets one-shot suppression. `state/workbench-browser-context.ts` owns exact allowlisted pane parsing/canonicalization, base/query/hash-preserving pane URLs, the exhaustive activation-source history policy and source-backed ready titles. App initializes its single active tab and requested family from that owner, composes explicit user/routed/history/internal activation, registers one `popstate` listener and owns document-title/focus cleanup; no pane component reads location or writes history. `state/pane-delivery.ts` owns the exhaustive tab-family map and monotonic session request set: the URL-selected family is requested initially, optional families on first activation and a visited family is never removed. Queryless startup still selects Compare. `components/shell/pane-boundary.tsx` keeps named loading plus sanitized loader/render failure below the shared shell, while the nested Workspace presenter has its own narrower boundary. The Economy/Settings, Risk, Duel, Planner, Loot, Trip, Loadout, Cannon and Compare panes plus Workspace presenter/plan/executor remain lazy artifact boundaries; App still prepares typed values and actions synchronously, and each pane remains mounted through its existing hidden-state contract after its chunk resolves. DOM-free `app-shell.ts` and `legacy-migration.ts` own root and legacy presentation, and pure modules under `components/shell`, `components/panes` and `components/settings` own their DOM. Feature state and persistence are not hidden in a broad reducer, context, hook or controller.
-- `src/app/view-models/simulation.ts` is a 213-line cross-feature composition adapter. It exports only the main `SimulationViewModel` contract/options and builder, preserves raw Loot compatibility fields and composes the existing `FullSimulationResult`. The implemented [Simulation and MonsterCard view-model refactor](simulation-monster-card-view-model-refactor-spec.md) moves MonsterCard types, standalone/supplied-combat builders, detail helpers and target option sorting into the direct `monster-card.ts` owner. The composed path reuses `FullSimulationResult.combat`; no compatibility re-export or second combat simulation was added. `simulation-input.ts` owns the cycle-free request mapping, `loot.ts` owns Loot presentation, stable main/nested table sorting and optimizer truth and `trip.ts` owns Trip control/output presentation. Pure `loot-pane.tsx` and `trip-pane.tsx` own the exact landmarks. `price-data.ts` directly owns PriceSet/manual/history/provenance presentation plus the neutral item-history contract, and `settings.ts` owns hidden-tier presentation; the pure `economy-settings-pane.tsx` consumes them. The focused `presentation-language.ts` owner resolves source-first entity labels, keeps exact technical ids separate, expands accepted compact labels for assistive names and formats semantic units without entering domain, generated-data or persistence schemas. Other direct feature owners include `planner.ts`, `compare.ts`, `duel.ts`, `stats.ts`, `loadout.ts`, `active-assumptions.ts` and the small Risk UI owner. These modules use direct imports without compatibility re-exports.
-- The implemented [legacy migration internal split](legacy-migration-internal-split-spec.md) replaces the former 1,799-line concentration with a 92-line public facade and six direct internal owners: contracts 265 lines, report helpers 127, setup mapping 510, setup-family inspection 381, preferences 389 and price/review boundaries 159. The public module still exposes the same exact-key policy and four behavior entrypoints, inspection remains metadata-only and write-free, rewrite state wins collisions, D-048/D-049 remain review-only and `App` retains the atomic Apply transaction. Focused ownership is split into policy, setup, preferences and prices suites while the behavioral boundary remains 44/44.
-- `src/domain/trip/index.ts` remains the stable public Trip/loot/supply domain boundary under the implemented [Trip retention and split-trigger specification](trip-domain-retention-spec.md). It has recognizable loot, incoming-damage, capacity, cannon, supply and orchestration seams behind the existing barrel. D-096 keeps a split conditional; file size or internal-only exports do not authorize a move-only refactor. A future split must retain the facade plus PriceSet, warning, result, numeric and golden contracts. The dated line/export/test measurements belong to the linked assessment and testing evidence rather than this living architecture owner.
-- `scripts/game-data-generator-core.ts` remains conditional under the implemented [generator retention and split-trigger specification](game-data-generator-core-retention-spec.md). Raw LostCity parsing is already separated and the production application does not import this repository-local script core. Retain the plan/source-slice/impact/output seams and generated artifact bytes until concrete change-history, dependency, reuse or isolation evidence activates a separate specification. The dated size, export and test measurements belong to the linked assessment and testing evidence.
-- Every Dense Compare, Planner, Duel matrix and Risk run starts a fresh Worker and structured-clones the full `SimulationContext`. [The implemented worker measurement](calculation-worker-measurement-spec.md) exercises the production Worker entry with five cold/warm pairs across eight typical/heavy profiles. JSON-shaped requests are 0.90-1.09 MB, but warm sender-side posting is only 1.6-2.3 ms median; startup/delivery is 31.8-56.7 ms and total non-execution overhead about 34-59 ms. Dense has the largest relative warm share at about 25% while staying at 137.7-140.8 ms median total; Planner, Risk and heavy Duel are 96-99% execution. D-095 therefore retains the cancellable one-shot lifecycle under the implemented [Worker retention and persistent-trigger contract](calculation-worker-retention-spec.md). Reopen only from its accepted-budget, repeated-demand, main-thread clone or production-resource evidence package. Any candidate must preserve version/context/request identity, controller freshness, context replacement and 30-second hard cancellation; because calculations are synchronous, active cancel still requires Worker termination rather than a queued cancel message.
-- The framework-neutral Hiscores and market cores intentionally duplicate small timeout, JSON-error and fixed-window client-limit mechanics. Their bounded in-memory maps remain per-process/isolate best-effort resource guards. D-097 separately implements a strict aggregate Hiscores provider budget in one disabled-by-default Durable Object; it is not a per-client abuse shield and Cloudflare warns that a singleton limiter can bottleneck. Enforcement and any location-scoped WAF rule remain conditional on provider quota, D-065 account evidence and load/rollback proof. Extract shared server primitives only with both handler suites preserving their public error/status contracts. See [the current security audit](../project/security-audit.md).
-- Test evidence is feature-owned after the implemented [ARCH-2026-05 feature test-suite split](feature-test-suite-split-spec.md). The former 5,046-line functional Playwright owner is now eight focused specs plus the existing shareable-setup spec behind a 347-line fixture module; the largest functional owners are shell/accessibility (1,136 lines), persistence/migration (925) and Cannon/Trip/Loot (830). The former 3,562-line combined view-model suite is now eight focused suites behind a 224-line fixture module; the largest is Stats at 803 lines. All 78 functional Chromium scenarios and the original 90 combined view-model cases retain their names and coverage. The compact `testing.md` owns current commands, three topic guides own living detail and [the testing evidence log](../project/testing-evidence.md) owns dated snapshots. Continue splitting only from a coherent feature or evidence seam.
-- The bounded assistive-technology quality layer is test-owned rather than an application runtime boundary. `src/tests/e2e/accessibility-manifest.ts` owns the typed AT-01 through AT-12 matrix, `accessibility-audit.spec.ts` applies axe only to deterministic production-preview states, and `playwright.accessibility.config.ts` isolates that preview on port 5174. The runtime change is limited to native/ARIA semantics, focusable scroll containers, readable contrast and visible reflow; no accessibility-only state, persistence schema, provider or backend is introduced. Manual VoiceOver/Safari and NVDA/browser evidence remains a separate release gate.
-- Cross-browser support is also a test-owned release boundary. `playwright.config.ts` retains the complete Chromium functional owner, while `playwright.cross-browser.config.ts` serves one separate production preview and runs only the CB-01 through CB-12 manifest serially in Firefox, desktop WebKit and mobile WebKit emulation. The manifest observes every page in its browser context, rejects live external HTTP(S), unexpected console/page errors and unjustified engine skips, and keeps the Chromium/Darwin pixel-baseline owner unchanged. Runtime hardening is standards-based: browser JSON downloads preserve an already focused keyboard trigger, short price instants normalize engine literal punctuation and the Planner gear disclosure has deterministic forward/backward keyboard focus. Playwright WebKit remains engine evidence rather than a branded-Safari or physical-device boundary.
-- The generated game-data snapshot is about 1 MiB and D-094 keeps it behind
-  the asynchronous runtime bootstrap controller. The root entry now also
-  defers `App` behind the immediately mounted startup/error shell. The current
-  29-file artifact has 22 JavaScript chunks: direct entry is 276,038 raw /
-  83,401 gzip bytes, deferred `App` is about 527.28 kB raw / 153.52 kB gzip and
-  generated runtime remains about 939.03 kB raw / 52.31 kB gzip.
-  Economy/Settings is about 46.70 kB raw; Duel, Loot, Planner, Loadout, Trip,
-  Compare, Cannon and Risk remain bounded pane chunks between about 4.05 and
-  23.03 kB raw. Conditional setup review code remains split between a 4.01 kB
-  detail owner and a 5.41 kB candidate-gated shell chunk.
-  D-098 remains 800,000 raw / 230,000 gzip for direct entry; no
-  budget was raised. This is a startup request boundary, not a claim of fewer
-  total artifact bytes. Vite still reports its large-chunk advisory for
-  deferred App/runtime chunks, and the checked startup command proves ready
-  and controlled lazy-load failure states.
+The startup path has two failure boundaries:
 
-Use [the current architecture audit](../project/architecture-audit.md) for the latest classified evidence, [../../ARCHITECTURE_AUDIT.md](../../ARCHITECTURE_AUDIT.md) for the historical 2026-07-13 implementation snapshot and [rewrite-spec.md](rewrite-spec.md) for the implementation-grade rewrite target.
+1. The DOM-only startup guard owns sanitized pre-React failure presentation.
+2. The React error boundary owns post-mount render and lifecycle recovery.
 
-## Target rewrite architecture
+Runtime bootstrap loads the committed generated snapshot asynchronously,
+validates revision and compatibility context, resolves the active PriceSet and
+only then enables persistence. A tab-scoped safe-session path can substitute
+isolated in-memory storage before persisted loaders run. It never clears or
+overwrites the original browser storage.
 
-Recommended shape:
+Optional panes are requested on first activation and retained after loading.
+Pane-local boundaries keep an optional chunk failure below the shared shell.
+The queryless route selects Compare; the browser-context owner handles
+allowlisted pane URLs, navigation history and ready document titles.
 
-```text
-src/domain/combat/
-  pure combat formulas, damage, XP, prayers, potions, specials
+## Calculation boundary
 
-src/domain/equipment/
-  pure loadout and equipment bonus summing
+The UI maps validated state into domain requests. The composed
+`FullSimulationResult` is the primary numeric truth for combat, Trip, XP and
+economy presentation. Compare, Duel, Planner and Risk may have feature-specific
+lifecycles, but must not create competing combat or Trip formula owners.
 
-src/domain/trip/
-  inventory, banking, food, potions, stackability, loot policy, alch and supply costs
+Long or cancellable calculations use the calculation Worker through a typed
+one-shot task protocol. Controllers own request identity, freshness, previous
+result retention, cancellation and fixed error copy. Worker lifecycle changes
+remain governed by
+[the retention contract](calculation-worker-retention-spec.md).
 
-src/domain/simulation/
-  composed FullSimulationResult contract and pure result assembly
+## Persistence and transfer boundaries
 
-src/data/
-  generated snapshots, schemas, provenance metadata
+Browser persistence is versioned and schema-validated. `src/app/state`,
+`src/app/controllers` and storage adapters divide responsibilities as
+follows:
 
-src/domain/economy/
-  pure PriceSet lookup, alch values and structured warnings
+- state modules define canonical values, migration and compatibility policy;
+- controllers own latest-request sequencing, review candidates and guarded
+  transactions;
+- storage adapters provide bounded browser access without feature policy; and
+- `App` applies cross-feature mutations and the single global Undo outcome.
 
-src/domain/planner/
-  training plan search using domain modules
+Setup, saved-setup, PriceSet and Workspace files are parsed by content and
+version, reviewed before mutation and applied through caller-owned boundaries.
+Cross-tab freshness uses exact raw baselines and blocks only conflicted areas.
+Workspace restore preflights selected areas, performs ordered persistence with
+rollback and keeps session-only recovery separate from durable writes.
 
-src/app/
-  React UI, routes/tabs, view models, persisted UI state
+No user accounts, auth service or general application database exist. The only
+accepted server-managed state is the dedicated aggregate Hiscores
+provider-budget Durable Object described by D-097; enforcement is committed
+disabled and activation requires the recorded decision boundary.
 
-src/adapters/browser/
-  localStorage, fetch, file imports and bootstrap wiring
+## Generated game data
 
-src/adapters/market/
-  browser price import and same-origin market status/sync glue
+The root app consumes `src/data/generated/game-data.json` with its agreeing
+source pin and generated schemas through `src/adapters/generated`. The manual
+`npm run data:generate` workflow parses a pinned LostCity content checkout,
+requires an explicit game revision and writes the snapshot, source pin and
+revision-impact report as one reviewed change.
 
-src/adapters/hiscores/
-  browser same-origin hiscores status/lookup glue and local last-player persistence
+Generated JSON and source-pin files are the machine-readable current truth for
+revision identity and catalog content. Markdown does not duplicate mutable
+snapshot totals. The generator-owned report is routed through
+[generated evidence](../project/generated-evidence.md). Raw upstream content
+remains gitignored and is not a production dependency.
 
-src/server/
-  framework-neutral API cores plus dev/preview middleware for accepted live integrations
-```
+The legacy-derived runtime snapshot and archived browser sources remain
+regression, fixture and rollback evidence. Production bootstrap must not import
+them.
 
-Recommended technology stack:
+## Prices and market data
 
-- TypeScript strict mode
-- React
-- Vite
-- Vitest
-- Playwright for e2e smoke/regression tests
-- Zod for data and persisted-state schemas
-- fast-check only where property tests add clear value
+Committed `prices.json`, `price-provenance.json`, `alch.json` and
+`price-history.json` form the static market inputs. Generated game data owns
+high-alch values; scheduled static prices take precedence for supported market
+items, with generated item fallbacks used only where allowed.
 
-The detailed rewrite contract is owned by [rewrite-spec.md](rewrite-spec.md).
+The local scheduled-price writer validates candidate files and provenance
+before deterministic writes. Automatic GitHub Actions execution is disabled
+under D-099; the retained workflow template lives outside the active workflow
+directory. The production UI therefore describes the committed snapshot and
+does not issue a user-triggered upstream market refresh.
 
-## Target boundaries
+Operational commands and freshness claim boundaries belong in
+[operations](../operations/README.md), not this architecture owner.
 
-- Domain modules must not import React or read DOM, `window`, `localStorage` or `fetch`.
-- `SimulationRequest` must be separate from UI form state and saved setup state.
-- `GameDataSnapshot` must be explicit and validated.
-- `PriceSet` must be explicit and passed into simulation or adapter boundaries.
-- Planner must consume domain APIs, not duplicate combat or equipment rules.
-- Browser persistence belongs in adapters and must be versioned.
-- Heavy Compare, Planner, on-demand Duel matrix and Risk execution goes through the typed, cancellable `src/app/calculation-task.ts` request/result boundary and a one-shot Web Worker. Each pane exposes an explicit `idle/building/ready/stale/failed` lifecycle, keeps only source-matching output current, retains older successful output only as labelled previous data, cancels superseded work and offers fixed sanitized Retry after non-cancelled failure without moving calculation output into persistence or `SimulationRequest`.
-- Results carry structured warnings/provenance so the UI can show lightweight uncertainty markers near affected numbers. Price warnings retain item identity, `loot`/`supply`/`cannon` consumer, current-result relevance and optional Loot row identity through the composed result. `src/app/view-models/price-data.ts` classifies those records into current-result issues, confidence notes and row-local notes and derives stable exact-item correct/inspect actions from the active D-090 base-item set. Result renders only a compact active missing/fallback issue, Loot renders supplying-row context and Economy owns the complete aggregate disclosure; all three emit the same typed action while `App` alone coordinates Economy activation, exact manual selection and one-shot focus. The rewrite view model keeps `warnings: string[]` compatibility and structured setup requirement warnings for the active loadout.
-- D-101 scopes Trip price notices at the lookup consumer: only active monetary inputs are marked current-result relevant, while displayed inactive Loot alternatives retain row-local context and exact one-GP coins suppress market-provenance noise. [The price-warning relevance and presentation implementation](price-warning-relevance-presentation-spec.md) owns classification and placement; [the per-item price provenance and freshness implementation](per-item-price-provenance-freshness-spec.md) continues to own metadata and storage.
+## Same-origin integrations and server boundary
 
-## Current rewrite extraction status
+The browser uses typed same-origin Hiscores and compatibility market adapters.
+Framework-neutral handlers under `src/server` own validation, timeouts,
+response limits, rate limiting and sanitized errors. Vite middleware adapts the
+same handlers for local development; the Cloudflare Worker adapts them for
+deployment.
 
-- Implemented: typed contracts, equipment bonus summing and combat core through base DPS, special-attack DPS and bounded manual accuracy/damage/speed overrides.
-- Implemented: pure trip/loot/supply domain for stackability, default loot actions, alch handling, incoming damage, food/potion/prayer/recoil/cannon inventory, domain-owned general potion carry recommendation, scarce/respawn-bound trip rate caps, banking efficiency, [D-100 finite independent-spawn cannon occupancy/overlay and supply cost calculations](cannon-finite-occupancy-spec.md). Combined cannon rates solve player-plus-cannon availability; the comparison-only `cannonOnlyDps` uses the same spot with player damage zero and does not enter XP, GP, supply or K/hr.
-- Implemented: D-081 source-backed incoming attacks. `MonsterDefinition.incomingAttacks` carries the generated Revision 274 formula/accuracy/selection contract; `src/domain/trip.createIncomingDamageDescriptor()` is the single normalization and expected-value owner. Exact rows use typed defence/prayer semantics, partial and legacy rows retain visible mean-only compatibility coverage, dragonfire/poison remain separate overlays, and `src/domain/risk` samples the same exact descriptor without reparsing monster fields.
-- Implemented: pure planner domain for gear eligibility, training stance selection, domain-backed candidate scoring, phase grouping and deterministic golden plan summaries.
-- Implemented: React/Vite rewrite UI using view models for combat setup, active-style gear quick actions, non-blocking generated requirement warnings for the selected weapon/equipped gear with D-051 manual fallback when generated data is missing, result summary, special attack controls/metrics, loot/economy, visible money warning surfacing, trip, final per-monster Cannon workbench tab, Duel snapshots/current-target comparison/on-demand monster matrix, monster compare and planner in a selected parity slice. The primary `createSimulationViewModel()` adapter exposes and reads combat, trip, XP/rate and structured warning sources from `FullSimulationResult`; Dense Compare/Compare, Duel rows and the Duel matrix reuse that same composed result path for numeric fields. Dense Compare, Planner and the on-demand Duel matrix now execute through a cancellable Web Worker after representative direct calculations exceeded the accepted 200 ms main-thread budget; the formulas and composed result ownership are unchanged. Planner remains a combat-focused domain consumer with explicit `CombatSimulationResult` typing instead of using the composed UI-facing result.
-- Implemented: the D-073/D-088 bounded loadout optimizer in `src/app/view-models/loadout.ts`. It receives the active form plus the UI's hidden-tier-filtered weapon/equipment option allowlists, defaults to filtering new candidates through the generated-first/D-051-fallback numeric requirement lookup, builds a deterministic two-dimension Pareto frontier capped at 512 states per weapon and evaluates survivors through `simulateCombat()` for current-target normal DPS. The unchanged form is always a candidate even when it has an unmet requirement, equal DPS prefers fewer changes, two-handed weapon normalization remains owned by `applyWeaponSelection()` and the UI applies or restores the complete form through existing default/custom setup ownership. An explicit session-local control restores D-073's warning-only candidate policy. It adds no request, persistence, provider or Planner state and does not read prices, quest state, ownership or future gear.
-- Implemented: Stats special-attack and cannon source details carry event-scoped hit distributions through the `src/app/view-models/stats.ts` `HitDistributionViewModel`. Special detail uses one modeled special hit (`expPerSpec / hits`) and cannon detail uses one fired cannonball (`cannonDps / ballsPerSec`) under D-069. The `LoadoutPane` user-facing `Damage distribution` panel lives at the end of the dynamically labelled active setup tab and renders an exact vertical discrete comparison: normal attack is the filled series, and a separately selected special weapon adds an outlined whole-special series. Miss and accurate zero are separate outcomes, sustained normal rolls are mixed from the combat-domain decay samples, and D-083 convolves source-verified independent component rolls for supported multi-hit specials. Expected-damage markers, exact and cumulative focus/hover values, full-target-HP KO context, an accessible exact-probability table and bounded chart-local overflow derive from the same probability series. Inactive/invalid states remain absent; cannon stays separately scoped; no distribution state enters `SimulationRequest` or persistence. [The Stats source distribution specification](stats-source-distribution-spec.md) owns source-detail scope, while [the Hit distribution visualization specification](hit-distribution-visualization-spec.md) owns the main comparison and its setup-tab placement.
-- Dense Compare and Duel rates-only simulation-view-model calls set `includeHitDistributionAnalysis: false`; they retain numeric combat/trip/rate outputs but omit transient histogram and comparison buckets that those worker-owned consumers never render. The active main workbench keeps the full default analysis path.
-- Implemented: the root workbench keyboard contract in `src/app/components/shell/workbench-shell.tsx`, `src/app/view-models/app-shell.ts` and `src/app/styles.css`. The navigation uses one roving `tablist` over a dynamic labelled `tabpanel`, supports arrow/Home/End activation, and has a first-focus skip link owned by the pure header shell. Dense monster rows use one selected-row Tab stop, arrow/Home/End focus movement and Enter/Space activation. Global `:focus-visible` styling restores an explicit non-layout-shifting outline, including file-button focus. D-070 keeps this a bounded interaction pass rather than a conformance claim; no domain or persisted state changes.
-- Implemented: the normal-flow mobile/portrait result and navigation loop in `workbench-shell.tsx`, `workbench-tab-navigation.tsx` and `styles.css`. The shell reuses `result.contextMetrics` for one Player-adjacent mobile `MetricList`, while desktop/compact landscape retain the setup-context owner. The navigation component wraps the unchanged single roving tablist with measured-overflow boundary controls, a `WORKBENCH_TABS`-derived native More disclosure and minimal horizontal active-tab reveal. These presentation owners add no app state, persistence, request, calculation or view-model branch; the 621+ landscape and 981+ desktop scroll-owner contracts remain unchanged.
-- Implemented: shared numeric editing in `src/app/components/numeric-field-core.ts`, `use-numeric-draft-field.ts` and `form-fields.tsx`. The pure core owns bounded ASCII integer/decimal syntax, inclusive ranges and minimum-relative step validation; the React hook owns literal draft retention, accepted-value emission, Enter/blur canonicalization, Escape, optional Reset and external-update cancellation. `NumberField`, `DecimalField` and `OptionalNumberField` use text inputs plus numeric/decimal `inputMode` so transitional drafts remain representable, while caller state, persistence and `SimulationRequest` continue to receive only accepted numbers or the optional committed `null`.
-- Implemented: rewrite-owned Planner UI state foundation in `src/app/state/planner.ts` with the unchanged version-1 `index-sim:planner-ui` persistence contract for metric, target levels, Auto-sentinel/current XP, skill locks, avg-over-session, only-current-gear and gear-pool restrictions. The state owner reconciles explicit XP and unlocked targets against the domain-owned `plannerXpBounds()` live-level interval without duplicating the XP curve; locked target preferences remain stored. `src/app/view-models/planner.ts` passes only concrete effective XP/targets into `src/domain/planner`, keeps Planner state out of `SimulationRequest`, constrains the gear pool and builds structured skill inputs plus summary/output presentation. It also owns the complete serializable Planner notice registry, occurrence index, deterministic ids/counts and data-only action intents; `src/app/view-models/warning-presentation.ts` shares bounded message normalization and money-warning classification with Economy. `src/domain/planner` supplies exact item metadata plus start/result/training warning collection, while `calculation-task.ts` attaches source-backed display labels before the Worker response. `PlannerPane` owns native disclosure and same-pane focus, and `App` resolves current cross-tab Loadout/Economy/Trip targets without changing the existing owners' values. `src/app/controllers/use-planner-calculation.ts` reconciles draft and last-computed snapshots before a replacement source, then retains the explicit Recompute, source freshness, cancellation and fixed status/error lifecycle; draft persistence, bounded adjustment notice and setup/Hiscores bridges remain in `App`. The pure `PlannerPane` exposes accessible Auto/reset, level-dependent XP bounds, effective/locked targets, dirty-output copy and the existing metric/lock/gear/Recompute workflow. Planner output still uses generated requirements first and D-051 fallback only for missing generated rows.
-- Implemented: rewrite-owned Duel snapshot workflow in `src/app/state/duel-snapshots.ts` with the separate unchanged versioned `index-sim:duel-snapshots` persistence contract for validated `CombatSetupFormState` snapshots capped at 12 entries. The state owner also supplies comparison-only normalized name keys, operation-level uniqueness, deterministic Save suffixes, duplicate-name occurrences and ID-stable rename derivation without tightening the readable v1 schema. `src/app/state/saved-setup-merge.ts` owns immutable imported/current review plans, complete classifications, default-Keep matching-ID decisions, selected-capacity and recipient-name reconciliation, stale fingerprints and exact candidates. `src/app/controllers/saved-setup-changes.ts` is the direct one-key Merge/rename transaction owner: it writes and readback-verifies a valid v1 envelope before one live publication, restores exact raw preimages after handled failure, offers explicit session-only Apply/Undo and protects later live/raw values with freshness guards. `src/app/view-models/duel.ts` builds current-target Duel comparison rows, structured active-setup field diffs, duplicate-name disambiguation, import-review source diffs and the user-triggered all-monster matrix by reusing the current simulation view-model path for ordinary calculated rows only, keeping review state and calculated comparison output out of `SimulationRequest`. The visible Duel tab uses explicit controlled Rename Save/Cancel, complete per-row import decisions and stale Refresh; Workspace and legacy continue to use their separate low-level ID-wins merge policy. The matrix remains on demand with its existing idle/building/ready/stale/failed lifecycle. New external files retain the contextual kind/version 1 envelope, prior strict version 1 remains readable as unknown context and bounded parse/entity gates run before any plan exists. [The saved setup Merge/rename specification](saved-setup-merge-rename-safety-spec.md) owns the collection transaction; [the setup diff specification](duel-setup-diff-spec.md) owns ordinary calculated comparison; [the failure-state specification](duel-matrix-failure-state-spec.md) owns matrix lifecycle and visible Retry semantics.
-- Implemented UI/state foundation: versioned rewrite setup and custom/cannon/Duel state, dense compare preferences, loot settings, hidden gear tiers, local-state recovery, bounded legacy migration, setup and PriceSet import/export, selected PriceSet persistence and scheduled-or-bundled fallback. Rewrite setup and Duel imports reject oversized, duplicate-key, duplicate-id, unsupported and current-game-data-incompatible input; incompatible persisted setup/snapshot state is preserved for explicit recovery while safe defaults run for the session. Browser JSON responses and persisted envelopes are size-bounded before parsing. Market prices from scheduled/imported/legacy PriceSets remain explicit, while D-090 applies a separate capped local manual-item overlay and generated Revision 274 high-alch values always win. Economy/Loot analyze read-only shared static history together with separate capped local comparisons. Economy Price history projects every local occurrence through transient duplicate-safe identity, exposes the `N/20` limit and uses action-owned complete-state persistence for direct Save, reviewed single-point removal and reviewed full-capacity oldest replacement. Destructive changes reuse exact-raw Economy Undo; full accepted PriceSets never evict a point, blocked saved raw remains protected and Workspace retains complete-area transfer ownership. D-089 splits already-typed D-072 conditional rows only in the Loot presentation: ordinary actionable rows retain the full table and inactive quest/clue rows use one collapsed native disclosure. Other setup, trip, planner and migration details remain owned by their feature modules and inventory rows.
-- Implemented: cross-tab browser-state freshness is owned by the DOM-free `src/app/controllers/cross-tab-conflicts.ts` controller and the thin `use-cross-tab-conflicts.ts` listener. The controller composes the health/Workspace id vocabulary into a closed ten-area registry, holds exact raw baselines and conflict pre/postimages only in memory, coalesces `storage` events and performs the same raw comparison synchronously before ordinary or transaction-scoped writes. `LocalStateRecoveryControllerCore` remains the invalid/unavailable-state owner and now delegates write guards plus verified baseline advancement. `App` owns canonical live values, reload, global Undo and the Settings resolution actions; `cross-tab-persistence.ts` serializes complete live values without pulling the lazy Workspace executor into the entry chunk. The shell and Settings receive metadata-only models. Safe-session memory storage installs no listener, legacy migration dismissal remains excluded, and schemas, Workspace envelopes, calculations and backend scope are unchanged.
-- Implemented: `src/adapters/browser` owns one synchronous typed JSON download-request boundary. It stringifies once, creates a connected hidden anchor, dispatches the click under the original user activation, removes the anchor immediately and revokes the object URL once after the current task. `file-export-outcome.ts` maps only the closed requested/failed result to fixed truthful copy; setup, saved-Duel, PriceSet, Workspace and local-state-recovery owners retain their envelope construction and workflow-local notices. Export failure changes no import review, reset confirmation, pending clear, storage, live state or Undo, and no surface claims that the browser completed a filesystem save.
-- Implemented: `src/app/transfer-artifact-file-name.ts` is the pure product-specific filename owner for the closed combat-setup, saved-setup-collection, PriceSet, Workspace-backup and local-state-recovery-report export set. It receives only validated artifact/context/revision/time values, produces bounded ASCII contextual UTC names and knows nothing about file contents or browser APIs. Workflow controllers capture one instant for envelope/report metadata and filename, then pass the name through the generic typed download boundary. Import remains content/schema selected; action labels and included/excluded descriptions stay with their presentation components.
-- Implemented: legacy-migration presentation derives `importReady`, singular/plural compatible-area status and the action outcome from the same `createImportPlan()` result. The saved-Duel plan item requires a non-empty validated snapshot list, so defensive empty states stay review-only. The inspector and App transaction remain unchanged: nested legacy Duel setup validation, rewrite-owned collision precedence, cap, persistence, legacy-key retention and migration dismissal continue through their existing owners.
-- Implemented: [D-102 PriceSet import discoverability](price-set-import-discoverability-spec.md) removes the topbar and Settings duplicates while retaining one advanced Market-owned full-PriceSet disclosure. The existing controller still owns bounded validation, generated high-alch authority, selected persistence, latest-state history updates, export and reset; the pane owns only guidance, one unscoped notice and responsive presentation. Manual per-item prices remain a separate overlay and preferred ordinary correction path.
-- Implemented: static shareable setup permalinks through `src/app/state/shareable-setup.ts`, `src/adapters/browser/shareable-url.ts` and `src/app/App.tsx`. New external version 2 fragments carry the shared revision/snapshot context; version 1 remains readable, with a matching id exact and a different id unknown rather than an inferred revision. The fragment is captured once, removed from the address bar, size/schema/duplicate-key/entity validated and held in memory until explicit Load. The review shows context plus the exhaustive shared form groups and current-monster Cannon/loot changes; only those included values participate in stale/Refresh and the synchronous Load guard. Dismiss clears the candidate without writing, no-op disables Load and changed Load uses existing persistence paths with one in-memory Undo restoring the complete pre-load owned state. PriceSet/history, player identity, custom/Duel collections, computed output and raw provenance stay outside the contract.
-- Implemented: root production entrypoint uses the Vite rewrite; legacy CDN/Babel HTML is archived at `legacy/index.html`.
-- Implemented: rewrite setup browser persistence remains version 3, while new external files use dedicated contextual kind/version 1 envelopes. Import validates the complete external v1 or prior strict storage-shaped v3 envelope and active entities before producing an in-memory context-aware review; older unrelated rewrite versions remain rejected rather than implicitly migrated.
-- Implemented: validated data/economy contracts for `GameDataSnapshot`, item definitions, item requirement definitions, monster/drop data, equipment data, `PriceSet`, imported price JSON, committed price history and committed generated-data outputs. Economy, loot, tagged-table and supply paths look up an exact source item/price key first and use the limited legacy-derived gem alias map only as a missing-key fallback. D-058 keeps cut and uncut Revision 274 gem identities distinct while preserving the D-052 fallback compatibility boundary; duplicate alias collisions remain validated.
-- Implemented: shared live integration contracts, strict timestamp/count/identity validation, duplicate-key rejection, mocked fixture basis, the D-061 first-party 2004Scape Hiscores JSON provider behind the same-origin status/lookup boundary, a market source allowlist, same-origin market compatibility scaffolding, the visible committed static price/history path, D-062's item-page writer and a hardened schedule-only commit-if-diff template. D-099 disables all repository GitHub Actions by keeping that template outside `.github/workflows`; browser adapters and local writer tests remain active. Browser adapters bound response streams before parsing; framework-neutral status and operation calls share timeout guards, ephemeral in-memory rate limiters have bounded client maps and provider reports must match the approved item/slug mapping. The production UI does not query the compatibility-only market status endpoint at startup: committed snapshot loading owns visible market values and states that automatic refresh is disabled. Vite dev/preview and the D-066 Cloudflare Worker inject the fixed-origin Hiscores provider with redirect, timeout, response-size, schema, rate-limit and sanitized-error boundaries. D-097 adds disabled aggregate server-managed rate state only: one SQLite Durable Object stores no player/query/client identity and is validated by the lockfile-pinned Wrangler dry-run. Cloudflare serves the Vite artifact and API as one root-path unit with observability/Logpush disabled; no default test calls the live upstream.
-- Implemented: legacy runtime adapter that turns current `gamedata.js`, `engine.js` and `equipment.js` objects into a validated reference snapshot inside a trusted sandbox without reading real browser globals, plus a committed legacy-derived static bridge retained under D-060 for reference, regression, freshness and rollback evidence. The root app no longer consumes that bridge, and no legacy deletion program is active.
-- Covered by tests: formulas, stance fallback, two-handed shield exclusion, thrown ammo handling, bounded manual combat override behavior, golden parity for ported combat fields across the 18 `SimEngine.simulate()` fixtures, trip/loot/supply parity across all 18 fixtures including cannon occupancy and cannonball supply plus focused scarce/respawn, inventory reserve detail and general potion carry recommendation coverage, planner unit tests plus 4 V1 acceptance golden plan fixtures, Planner UI state/schema and adapter tests including avg-over-session mapping, gear-pool cleanup, editor options, timeline data and deterministic chart data, UI view-model tests including active per-style loadout request mapping, multi-prayer/multi-boost request normalization, active-style gear quick action scoring, deterministic bounded whole-loadout improvement/no-regression, visible-option and two-handed candidate limits, frontier cap/sanitization, non-blocking requirements, setup requirement warning surfacing for selected weapon/equipped gear, manual override request mapping, Trip scarce/reserve mapping, derived potion recommendation, linked cannon/sparse assumptions, per-monster loot settings, money warning surfacing, dense compare filters/relevance state and custom setup dense row mapping, versioned persistence tests including per-style loadout, multi-prayer/multi-boost normalization, manual override, dense compare state, Trip scarce controls, derived recommendation non-persistence, per-monster cannon settings, per-monster loot settings, hidden gear tier state/filtering and custom setup validation, rewrite local state health tests for missing/loaded/invalid/version-mismatch metadata and allowlisted clearing, legacy migration/reset tests including nested `sim_input_v3.monsterSetups` custom setup import, nested `sim_input_v3.cannonByMonster` cannon import, nested `sim_input_v3.duelSetups` Duel snapshot import, conflict/invalid/unsafe skip paths, `sim_planner_v1` review-only/non-import behavior and compatible `sim_hidden_tiers_v1`, `sim_compare_sort_v1`, `sim_irrelevant_v1` and `sim_loot_prefs_v1` imports with invalid/unknown/ambiguous/oversized skips, local Economy movers and chronological item-trend analysis tests, Playwright smoke tests including per-style loadout restore, multi-prayer/multi-boost controls with compact primary edits, active-style gear quick actions, bounded whole-loadout apply/Undo, loadout requirement warning review to the active combat tab, manual combat override reset, hidden gear tier filtering with current selection preserved, Settings local state recovery/clear, dense compare filter/relevance persistence, Trip scarce/prayer/food/banking/potion-carry/recommendation-apply/inventory-reserve controls and grouped summary details, Result/Loot/Economy price warning surfacing, final Cannon tab link/reset/output metrics, Planner tab metric/current-XP/target/skill-lock/avg-over-session/gear-pool/Recompute/training-order/timeline/chart/warning flow, legacy Planner state import/keep/clear boundary, per-monster loot settings persistence, Economy history, item-trend/sparkline controls and SetupBar custom setup create/restore/remove, schema validation for the legacy snapshot, committed price files and legacy-derived static runtime bridge, raw JSON duplicate-key detection, duplicate legacy monster id rejection, malformed loot entry rejection, malformed imported price rejection, missing-price and price alias/fallback warnings, mocked live integration contract validation, mocked hiscores API/adapter/UI apply behavior and mocked market API/adapter/UI sync behavior.
-- Later product/data decisions remain for D-051 fallback removal, quest completion requirements and activation of D-072 conditional loot from exact player state. Source-backed numeric item requirements and NPC-size behavior are implemented under D-071. D-067 closes the retained repository implementation for Cloudflare/Hiscores and the market writer; D-099 later disables automatic market execution for capacity. Account connection, deployed D-065 verification and any explicit cron re-enablement are adopter operations. Public live and scheduled-current claims remain gated on concrete environment evidence after re-enablement.
-- The root runtime adapter consumes the schema-validated committed Revision 274 snapshot at `src/data/generated/game-data.json`. It composes scheduled market prices over generated price fallbacks and then replaces the complete high-alch map with generated Revision 274 values. D-059 records the switch and D-063 records alch ownership; the legacy-derived bridge and `alch.json` are reference/regression evidence only.
-- The accepted generated data source is one normalized current `GameDataSnapshot` generated from the pinned LostCityRS/Content revision. `npm run data:generate` parses the raw checkout, resolves every expected runtime monster/item/weapon/ammo/spell/equipment identity, extracts all 63 loot tables including 25 typed conditional rows, emits source-backed size for 63/63 monsters and numeric skill requirements for 94 current runtime items, writes the current snapshot/source pin/report, and produces representative plus all-monster impact evidence. `npm run runtime:readiness` reports zero blockers for the active generated snapshot. Planner/setup paths consume generated rows first; the visible, non-blocking D-051 manual fallback remains for legacy snapshots and current items without a generated row.
-- Target market price source remains `markets.lostcity.rs`; D-062's item-page estimator, D-064's read-only versioned history and D-085's per-item provenance/freshness path are implemented. D-099 disables the previously accepted scheduled-only GitHub Actions refresh while retaining its reviewed template and the committed price/provenance/history logical set. A future scheduled-current claim requires an explicit re-enable decision plus fresh successful-run evidence.
-- Runtime Babel, CDN React and real `window.*` script-order loading are no longer required for the root production app path.
-- Raw legacy source execution still exists inside an adapter-owned sandbox for tests, reference comparison and regenerating the committed legacy-derived static bridge. This is trusted bundled code, not user input, and it is no longer the normal root app bootstrap path. Runtime readiness treats missing generated identities, required fields, monster combat/loot rows and PriceSet coverage as blockers; accepted value differences belong to revision-impact evidence instead of being misclassified as coverage failures.
+The Hiscores path uses the accepted provider mapping and does not persist player
+or query identity on the server. The optional aggregate provider budget stores
+only window/config state in its dedicated Durable Object. Market values in the
+production UI remain committed static inputs even though compatibility handlers
+and local writer tooling are retained.
 
-## Open questions
+No stateful simulation backend, general API framework, account system or
+server-managed market history is part of the accepted design. Adding one
+requires an explicit decision in [decisions.md](../project/decisions.md).
 
-- A future adopter may choose a custom domain after its preview/production evidence passes; no domain decision is required by this repository.
-- Should D-051 fallback removal be reconsidered after all currently relevant runtime items have source-backed rows, and how should quest completion requirements be represented first?
-- What exact persisted or imported player-state contract, if any, should activate individual D-072 conditional loot policies in a later phase?
-- If the accepted `markets.lostcity.rs/items/{slug}` Inertia contract changes, what reviewed replacement contract should supersede D-062?
-- Should future Legacy Migration work broaden beyond the D-042-compatible `sim_input_v3.monsterSetups` and `sim_input_v3.cannonByMonster` import, for example to older shapes or additional legacy-only UI state?
-- Whether the eventual public UI-facing contract should be renamed back to `SimulationResult` remains open. Current code uses `CombatSimulationResult` for the combat-only slice and `FullSimulationResult` for the composed foundation.
-- D-048 keeps old planner state such as `sim_planner_v1` review-only/not migrated for V1. D-049 keeps full legacy price-history payloads review-only/not migrated for V1; any later full history import, shared/server-managed history or reset-only policy requires a separate product/storage decision.
-- How should quest completion state be represented before any attempt to remove or demote the D-051 fallback?
-- D-047 keeps future/hypothetical weapons out of the V1 rewrite Planner. Exposing them later requires a separate product/data provenance decision.
-- Should the app ever support user-selectable historical revisions, or keep only one current accepted revision?
+## Deployment shape
+
+The selected production target is a root-path Cloudflare Worker plus Static
+Assets. `wrangler.jsonc`, `public/_headers` and
+`scripts/verify-public-deployment.ts` own the repository configuration and
+artifact/HTTPS validation boundary.
+
+The release runner executes type, architecture, documentation, test, build,
+artifact, lint, format, dependency-audit and diff checks before upload. Account
+connection, preview/production smoke evidence and any custom domain remain
+adopter operations under D-067. No active repository GitHub Actions workflow
+owns deployment.
+
+## Archived legacy reference
+
+The archived runtime loads root JavaScript files in script order:
+`gamedata.js`, `engine.js`, `trip.js`, `equipment.js`, `market.js`,
+`planner-core.js`, `planner.jsx` and `views.jsx`. Those files use
+`window.*` contracts and remain sensitive to order.
+
+They may be read for golden fixtures, parity classification and rollback
+evidence. They are not current product truth, must not become client-reachable
+from `src/app/main.tsx` and must not dictate rewrite module boundaries.
+
+## Risks and decision boundaries
+
+- Browser-local state can be unavailable, invalid, non-durable or changed by
+  another tab. Recovery, attention, cross-tab and Workspace contracts mitigate
+  this without claiming server sync.
+- Generated content and market snapshots can become stale. Source pins,
+  provenance, readiness checks and explicit disabled-automation copy make the
+  boundary visible; they do not create automatic freshness.
+- Live-provider and aggregate-budget behavior needs deployed evidence before a
+  live availability or abuse-resistance claim.
+- Browser engines, branded Safari, physical devices and assistive technology
+  have separate evidence boundaries in [testing](testing.md).
+- Large modules are retained when a split has no demonstrated maintenance
+  trigger. Retention specifications own the reopen criteria.
+- Deployment account connection, observability and public-domain policy remain
+  adopter decisions.
+
+Accepted decisions and unresolved boundaries are recorded in
+[decisions.md](../project/decisions.md). Current implementation work belongs in
+[the backlog](../project/backlog.md). Dated architecture findings remain in
+[audit evidence](../project/audit-evidence.md); neither is a substitute for this
+living owner.

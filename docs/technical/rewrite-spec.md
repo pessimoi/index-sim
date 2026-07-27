@@ -1,8 +1,11 @@
 # Rewrite specification
 
-- Status: living target specification; the accepted V1 root rewrite is implemented, while explicit later decisions remain open
-- Owner: technical docs
+- Status: implemented
 - Date: 2026-07-06
+- Owner: technical docs
+- Evidence: verified
+- Contract: living
+
 - Reviewed: 2026-07-19 documentation truth audit
 - Scope: rewrite the current static 2004scape Combat Simulator into a maintainable, tested, typed architecture.
 

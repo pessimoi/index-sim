@@ -1,5 +1,10 @@
 # Koodiauditointi 2026-07-14
 
+- Status: historical
+- Date: 2026-07-14
+- Owner: project documentation
+- Evidence: verified
+
 Tämä raportti kuvaa repositoryn nykyisen Vite/React-tuotantopolun ja sitä
 tukevien controller-, domain-, data-, serveri-, Worker-, generaattori- ja
 deploy-koodien lähdekoodiin perustuvan auditoinnin. Se täydentää

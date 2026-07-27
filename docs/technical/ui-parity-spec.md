@@ -1,8 +1,11 @@
 # UI Parity Specification
 
-- Status: living parity specification; the accepted V1 replacement slice is implemented and remaining wider-parity boundaries are explicit
+- Status: implemented
 - Date: 2026-07-08
 - Owner: technical docs
+- Evidence: verified
+- Contract: living
+
 - Product inventory: [../product/feature-inventory.md](../product/feature-inventory.md)
 - Legacy UI source: `views.jsx` and `planner.jsx`
 - Rewrite UI source: `src/app`

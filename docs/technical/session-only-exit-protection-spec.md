@@ -1,9 +1,13 @@
 # Session-only exit protection and direct backup specification
 
-- Status: implemented 2026-07-21; focused Chromium and full cross-browser evidence recorded
+- Status: implemented
+- Date: 2026-07-21
+- Owner: ready-shell durability guard and existing Workspace export controller
+- Evidence: verified
+- Contract: living
+
 - Priority: high
 - Estimated effort: M
-- Owner: ready-shell durability guard and existing Workspace export controller
 - Feature-inventory parents: Application failure recovery, Local state
   recovery and Workspace backup/restore (`Valmis`)
 - Depends on: safe-session storage isolation, local-state durability outcomes,

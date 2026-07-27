@@ -3,6 +3,9 @@
 - Status: implemented
 - Date: 2026-07-12
 - Owner: `src/domain/trip` with pinned-source contract coverage
+- Evidence: verified
+- Contract: closed
+
 - Product surface: Loot valuation and nested casket details
 - Related decisions: D-055, D-058, D-059, D-062, D-072 and D-084
 
