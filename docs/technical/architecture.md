@@ -16,11 +16,11 @@ measurements belong in [project evidence](../project/audit-evidence.md).
 ## System context and entrypoints
 
 Index Sim is a static-first Vite and React browser application with narrow
-same-origin integration handlers. The production deployment unit is a
+same-origin integration handlers. The accepted deployment unit is a
 Cloudflare Worker with Static Assets; simulation state and calculations remain
 client-side.
 
-- `index.html` is the production browser entrypoint. It renders a non-empty
+- `index.html` is the supported root browser entrypoint. It renders a non-empty
   pre-React startup shell, loads the DOM-only startup guard and then imports
   `src/app/main.tsx`.
 - `src/app/main.tsx` mounts the root error boundary and lazy application
@@ -32,7 +32,7 @@ client-side.
 - The Vite Hiscores and market middleware modules are local development
   entrypoints.
 - `legacy/index.html` is the archived script-order reference application. It
-  is not a supported production entrypoint.
+  is not a supported entrypoint.
 
 Entrypoints that are invoked by HTML, Vite, Wrangler, Worker URL construction
 or repository tooling are explicitly classified in
@@ -48,8 +48,8 @@ listed there for a concrete reason or the architecture check fails.
 | `src/data`        | Committed generated snapshot types and data access contracts                                              | UI state, browser effects or provider calls                   |
 | `src/adapters`    | Translation between browser/domain contracts and generated, storage, market or Hiscores boundaries        | React composition or server routing                           |
 | `src/server`      | Framework-neutral same-origin handlers, provider guards and the Cloudflare adapter                        | App presentation or browser adapter ownership                 |
-| `scripts`         | Repository generation, audits, measurements, deployment validation and local checks                       | Production browser state                                      |
-| Root legacy files | Archived calculation/UI reference and golden-fixture inputs                                               | Current production ownership                                  |
+| `scripts`         | Repository generation, audits, measurements, deployment validation and local checks                       | Current browser state                                         |
+| Root legacy files | Archived calculation/UI reference and golden-fixture inputs                                               | Current supported-runtime ownership                           |
 
 The main app composition root may coordinate cross-feature transactions, global
 status and Undo, persistence effects and lazy panes. Feature components receive
@@ -127,6 +127,11 @@ Cross-tab freshness uses exact raw baselines and blocks only conflicted areas.
 Workspace restore preflights selected areas, performs ordered persistence with
 rollback and keeps session-only recovery separate from durable writes.
 
+Historical key, envelope, URL and alias readers are frozen and inventoried in
+the [legacy compatibility support matrix](legacy-compatibility-support-matrix.md).
+Adding one requires a real source/consumer and a sunset rule; a clean checkout
+does not authorize removal of an existing reader.
+
 No user accounts, auth service or general application database exist. The only
 accepted server-managed state is the dedicated aggregate Hiscores
 provider-budget Durable Object described by D-097; enforcement is committed
@@ -144,10 +149,10 @@ Generated JSON and source-pin files are the machine-readable current truth for
 revision identity and catalog content. Markdown does not duplicate mutable
 snapshot totals. The generator-owned report is routed through
 [generated evidence](../project/generated-evidence.md). Raw upstream content
-remains gitignored and is not a production dependency.
+remains gitignored and is not a runtime dependency.
 
 The legacy-derived runtime snapshot and archived browser sources remain
-regression, fixture and rollback evidence. Production bootstrap must not import
+regression, fixture and rollback evidence. Supported root bootstrap must not import
 them.
 
 ## Prices and market data
@@ -160,7 +165,7 @@ items, with generated item fallbacks used only where allowed.
 The local scheduled-price writer validates candidate files and provenance
 before deterministic writes. Automatic GitHub Actions execution is disabled
 under D-099; the retained workflow template lives outside the active workflow
-directory. The production UI therefore describes the committed snapshot and
+directory. The current UI therefore describes the committed snapshot and
 does not issue a user-triggered upstream market refresh.
 
 Operational commands and freshness claim boundaries belong in
@@ -177,7 +182,7 @@ deployment.
 The Hiscores path uses the accepted provider mapping and does not persist player
 or query identity on the server. The optional aggregate provider budget stores
 only window/config state in its dedicated Durable Object. Market values in the
-production UI remain committed static inputs even though compatibility handlers
+current UI remain committed static inputs even though compatibility handlers
 and local writer tooling are retained.
 
 No stateful simulation backend, general API framework, account system or
@@ -186,16 +191,18 @@ requires an explicit decision in [decisions.md](../project/decisions.md).
 
 ## Deployment shape
 
-The selected production target is a root-path Cloudflare Worker plus Static
+The accepted deployment target is a root-path Cloudflare Worker plus Static
 Assets. `wrangler.jsonc`, `public/_headers` and
 `scripts/verify-public-deployment.ts` own the repository configuration and
 artifact/HTTPS validation boundary.
 
-The release runner executes type, architecture, documentation, test, build,
-artifact, lint, format, dependency-audit and diff checks before upload. Account
-connection, preview/production smoke evidence and any custom domain remain
-adopter operations under D-067. No active repository GitHub Actions workflow
-owns deployment.
+The release runner derives a provider-neutral developer quality plan and a
+stronger handoff plan from one stage definition. The quality plan executes
+type, architecture, documentation, full test, lint, format and diff checks. The
+handoff plan adds build, artifact and dependency-audit checks before upload.
+Account connection, preview/production smoke evidence and any custom domain
+remain adopter operations under D-067. No active repository GitHub Actions
+workflow owns deployment.
 
 ## Archived legacy reference
 
@@ -207,6 +214,13 @@ The archived runtime loads root JavaScript files in script order:
 They may be read for golden fixtures, parity classification and rollback
 evidence. They are not current product truth, must not become client-reachable
 from `src/app/main.tsx` and must not dictate rewrite module boundaries.
+
+Normal Vitest, quality and handoff gates do not execute these root sources.
+Current tests use the source-backed generated context; explicitly historical
+assertions use committed immutable output or the static legacy-derived
+comparison snapshot. The consumer classes and retained manual commands are
+listed in the
+[archived legacy consumer inventory](archived-legacy-consumer-inventory.md).
 
 ## Risks and decision boundaries
 

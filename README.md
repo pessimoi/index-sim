@@ -6,7 +6,7 @@ Committed price snapshot captured 22 July 2026
 
 ## Quick start
 
-The production app path is the Vite/React rewrite:
+The supported root runtime is the Vite/React rewrite:
 
 Use Node 22 and npm 10. `.nvmrc` and `package.json` use the same major-version
 contract. From a fresh clone:
@@ -14,7 +14,7 @@ contract. From a fresh clone:
 ```sh
 nvm use
 npm ci
-npm run verify
+npm run quality
 npm run dev:checked
 ```
 
@@ -33,7 +33,7 @@ rendered. Run `npm run test:startup:dev` for a bounded check-only smoke of a
 fresh Vite process, normal and controlled-failure startup paths, and direct
 versus transformed scheduled-price requests.
 
-To exercise the production artifact locally:
+To exercise the optimized production artifact locally:
 
 ```sh
 npm run build
@@ -47,12 +47,13 @@ a disabled aggregate Hiscores provider-budget binding only. The optional raw gam
 game revision update; follow the runbook in
 [docs/operations/README.md](docs/operations/README.md#game-revision-bump-pr-runbook).
 
-`npm run verify` is the authoritative repository handoff gate. It runs typecheck,
-the source dependency-graph architecture check, the full unit and explicit golden
-suites, production build and artifact checks, lint, formatting, dependency audit
-when network access is available, and `git diff --check`. Browser and visual
-suites remain separate because they need a compatible Playwright/browser
-environment.
+`npm run quality` is the normal provider-neutral developer gate. It runs
+typecheck, the source dependency-graph architecture and documentation checks,
+the full unit suite, lint, formatting and `git diff --check` exactly once.
+`npm run verify:handoff` adds one production build, artifact validation and a
+dependency audit when network access is available. `npm run verify` remains a
+compatibility alias for that full handoff gate. Browser and visual suites remain
+separate because they need a compatible Playwright/browser environment.
 
 After a production build, verify the D-066 Cloudflare artifact contract with
 `npm run deploy:verify-artifact`.
@@ -70,7 +71,7 @@ execution and response timing for Dense, Planner, Duel and Risk. Results are
 workstation evidence; the command does not alter the production artifact or
 enable a persistent Worker.
 
-The accepted production target is one Cloudflare Worker with Static Assets.
+The accepted deployment target is one Cloudflare Worker with Static Assets.
 Cloudflare Builds should run `npm run deploy:cloudflare:build` for `master`, then
 `npm run deploy:cloudflare`; `npm run deploy:cloudflare:dry-run` validates the
 Worker/assets/Durable Object bundle without an account, and non-production versions use
@@ -78,7 +79,8 @@ Worker/assets/Durable Object bundle without an account, and non-production versi
 evidence are future-adopter operations required only before claiming a public
 instance; they are not repository setup requirements under D-067.
 
-The old browser runtime is archived at `legacy/index.html` for reference and parity work. It is not the production entrypoint.
+The old browser runtime is archived at `legacy/index.html` for reference and
+parity work. It is not a supported entrypoint.
 
 ## Documentation
 

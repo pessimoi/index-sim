@@ -23,6 +23,18 @@ Completed cards and their original evidence wording live in
 
 - `Blocked` - **#4 · High · L; manual gate open:** [assistive-technology accessibility evidence](../technical/assistive-technology-accessibility-spec.md) now has an exact typed AT-01 through AT-12 manifest, coherent focused searchable-selector semantics, deterministic zero-finding axe checkpoints, repaired metric/scroll/contrast semantics and a 320 CSS-pixel / 200% text reflow check. VoiceOver/Safari and NVDA/browser rows are explicitly `not run`; the release claim remains blocked until the manual runbook is completed.
 
+## Dev-first cleanup specifications
+
+- `Blocked` - **High · S:** The [toolchain dependency audit remediation specification](../technical/toolchain-dependency-audit-remediation-spec.md) has reproduced local ownership paths without mutating dependencies. Current fix selection waits for explicit approval to send the private repository dependency graph and package metadata to the npm audit endpoint, or equivalent current audit evidence supplied by the owner.
+
+- `Blocked` - **High · M; external state gate:** The [production-readiness trigger specification](../technical/production-readiness-trigger-boundary-spec.md) classifies Cloudflare state as `active-or-unknown`, preserves the binding/migration and has separated ordinary quality from account-free deployability. Config cleanup waits for owner/operator account, Worker-version, origin and namespace evidence.
+
+- `Blocked` - **High · M; tester-data gate:** The [legacy compatibility support sunset specification](../technical/legacy-compatibility-support-sunset-spec.md) now has a complete living support matrix and compatibility freeze; focused tests pass. Reader/alias sunset waits for the known tester's current-format backup or explicit no-data acknowledgement.
+
+- `Active` - **Medium · L; Stage 1 complete:** The [archived legacy fixture-extraction specification](../technical/archived-legacy-fixture-extraction-spec.md) now keeps executable archived sources out of default tests and normal handoff gates. Golden and Planner evidence is immutable, convenience tests use generated/static builders, and runtime readiness reads static evidence. Broad comparison-snapshot reduction remains active; root archived deletion waits for the external compatibility checkpoint.
+
+- `Blocked` - **Medium · M; consumer gate:** The [market compatibility scaffolding retirement specification](../technical/market-compatibility-scaffolding-retirement-spec.md) proves there is no repository application/script caller and now guards that boundary. External use remains `unknown`, so the Vite-only endpoints and their compatibility code are preserved until the known tester/maintainer confirms `no-consumer` or names the supported local tool.
+
 ## Current-app stabilization
 
 - `Conditional` - Activate D-097 enforcement or add the specification's location-scoped WAF abuse rule only if a provider quota, public deployment or adversarial-traffic evidence requires it. Activation still needs an accepted positive quota compatible with the fixed 60-second window, D-065 account/privacy evidence, singleton load/latency review and deployed rollback proof.
@@ -37,7 +49,7 @@ Completed cards and their original evidence wording live in
 
 ## Rewrite preparation
 
-- `Ongoing` - Keep V1 release evidence current after each release-impacting change. [Technical testing](../technical/testing.md) owns the current required commands and latest repository gate summary; [testing evidence](testing-evidence.md) owns dated counts, hashes and superseded failures. D-067 leaves Cloudflare account connection, deployed D-065/Hiscores evidence and concrete market-cron observation to an adopting operator; they are claim gates, not implementation backlog.
+- `Ongoing` - Refresh only the evidence for a claim materially affected by a change. [Technical testing](../technical/testing.md) owns current repository commands; [testing evidence](testing-evidence.md) owns intentionally recorded dated runs. Manual accessibility, public deployment, account/privacy, rollback and market-cron evidence gate only their corresponding claims and do not block normal development or repository handoff.
 
 - `Conditional` - Resolve only explicitly accepted exact-legacy Trip parity questions beyond the accepted food/banking, scarce/AFK target/respawn, reserve summary, prayer restore capacity, general potion carry controls, domain-owned potion recommendation/apply flow, grouped Trip summary and Cannon sparse-linking paths. Prayer potion modeling, live data, canonical data, provider decisions and exact archived legacy `potRec` numerical parity remain outside this backlog item unless separately accepted.
 
@@ -47,7 +59,7 @@ Completed cards and their original evidence wording live in
 
 - `Conditional` - Extend the rewrite UI to full legacy parity only if a later release explicitly raises the bar beyond the accepted selected parity slice. The current V1 replacement scope is already accepted for the visible workflows tracked in feature inventory.
 
-- `Conditional` - Delete archived legacy runtime files only after full parity, authoritative generated runtime replacement and legacy-deletion decisions are accepted. The root app no longer executes legacy source files during normal bootstrap, but `gamedata.js`, `engine.js` and `equipment.js` still feed golden/reference comparison and the legacy-derived static bridge regeneration path, so deletion remains later replacement-readiness work, not a current handoff blocker.
+- `Conditional` - Delete archived legacy runtime files only after authoritative generated-runtime replacement, the retained comparison-snapshot field manifest and the external compatibility decision are complete. Normal tests no longer execute root legacy sources, but the manual capture/bridge regeneration tools and archived UI still consume them, so deletion remains later replacement-readiness work, not a current handoff blocker.
 
 ## Documentation maintenance
 

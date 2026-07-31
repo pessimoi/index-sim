@@ -33,6 +33,8 @@ export const SHAREABLE_SETUP_VERSION = 2;
 export const SHAREABLE_SETUP_MAX_ENCODED_CHARS = 12_000;
 export const SHAREABLE_SETUP_MAX_JSON_BYTES = 8_192;
 
+// Version 1 is a retained, inventory-owned reader only. New historical URL
+// versions require a named consumer and support-matrix sunset rule.
 export type ShareableSetupErrorCode =
   | "body_too_large"
   | "duplicate_keys"

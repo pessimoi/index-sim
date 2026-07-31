@@ -104,6 +104,10 @@ Current hiscores run behavior:
 Current market run behavior:
 
 - Vite dev and preview expose same-origin `GET /api/market/status` and `POST /api/market/sync` through repo-owned middleware.
+- Those two Vite-only routes are compatibility scaffolding with no current
+  application or package-script caller. External maintainer/tester use is
+  unverified, so removal is paused at the
+  [market scaffolding consumer checkpoint](../technical/market-compatibility-scaffolding-retirement-spec.md).
 - The default market provider is disabled, so local runs show the disabled service state unless a test injects a provider.
 - Automatic market upstream refresh is disabled under D-099, and the UI says so explicitly.
 - The rewrite UI keeps JSON price import available as the offline fallback.
@@ -126,7 +130,7 @@ Retained market price writer target, currently disabled for automatic execution:
 - It uses the repository `GITHUB_TOKEN` with `contents: write`, with no separate app token unless the default token is insufficient. Official checkout/setup actions are pinned to full commit SHAs, checkout does not persist credentials and the token is exposed only to the final commit/push step.
 - It has no `workflow_dispatch` manual trigger.
 - It avoids artifact upload and large caches by default.
-- No browser, user action or production runtime request triggers upstream market fetches.
+- No browser, user action or supported-runtime request triggers upstream market fetches.
 - Local writer: `--input` validates normalized fixture data; `--upstream-url https://markets.lostcity.rs/` derives one `/items/{slug}` request per approved mapping. Requests are sequential with 350 ms spacing and per-page redirect/timeout/size/content checks. The adapter accepts bounded completed coin-only trades and drops usernames. A mapping-specific 404 retains its prior value and value-establishing provenance while recording a bounded evaluation reason. A mapping with neither usable trades nor an existing price stays absent so runtime generated fallback remains explicit. An all-retained run fails before write. Prices, provenance and history candidates are all validated before deterministic three-file writes.
 - Archived template: `.github/disabled-workflows/update-market-prices.yml` retains the reviewed 00:15/12:15 UTC schedule, validates `prices.json`, `price-provenance.json` and `price-history.json` plus focused tests and `git diff --check`, rejects every other changed file and commits only real three-file diffs. It has `contents: write`, no `workflow_dispatch`, no artifact upload and no broad secret requirement. `src/tests/workflow-security.test.ts` guards both the absence of active workflow YAML and the archived template's immutable pins, schedule-only trigger and delayed-write credential contract.
 
@@ -151,7 +155,9 @@ Current state:
 
 - Rewrite build: `npm run build`.
 - Rewrite preview: `npm run preview`.
-- Repository handoff/release gate: `npm run verify`.
+- Normal developer quality gate: `npm run quality`.
+- Repository handoff/release gate: `npm run verify:handoff` (`npm run verify`
+  remains a compatibility alias).
 - D-066 Cloudflare release gate: `npm run deploy:cloudflare:build`.
 - Account-free Wrangler bundle/binding/migration check: `npm run deploy:cloudflare:dry-run`.
 - Exact Wrangler preview upload: `npm run deploy:cloudflare:preview`.
@@ -161,11 +167,36 @@ Current state:
 - Deployed HTTPS smoke: `npm run deploy:smoke -- --origin <https-origin> --hiscores-mode enabled` after a Cloudflare preview exists.
 - Cloudflare account/Git connection and deployed evidence are adopter operations under D-067; no custom domain is required for preview.
 
+### Activation-state checkpoint
+
+The 2026-07-31 repository-side activation audit classifies external Cloudflare
+state as `active-or-unknown`. The checkout contains the committed Durable
+Object binding and `v1` migration but no workspace-local deployment record.
+D-067 says an account or public instance is not required from the current
+maintainer; it does not prove that no adopter, preview version or namespace
+exists outside this checkout.
+
+Until an owner/operator confirms the account, Worker version, origin and
+namespace state:
+
+- do not remove, rename, recreate or squash the Durable Object binding, class
+  identity, object name or migration;
+- keep enforcement `off`;
+- treat preview/upload, public smoke, aggregate enforcement and rollback
+  rehearsal as conditional adopter operations; and
+- use `npm run quality` for ordinary development and account-free
+  build/artifact/dry-run checks only for affected deployment surfaces.
+
+The classification may move to `never-provisioned` or
+`provisioned-no-public-traffic` only from external account/operator evidence,
+not from a clean clone or missing local Wrangler cache.
+
 Accepted deployment handling:
 
 - Keep `package.json` run/build/test scripts in sync with [../technical/testing.md](../technical/testing.md).
 - Keep simulation/domain deployment static-first inside the one Cloudflare Worker + Static Assets release unit.
-- Run the full repository gate before every production upload and use a Cloudflare version preview before the first public promotion.
+- Run the full repository handoff gate before every production upload and use a
+  Cloudflare version preview before the first public promotion.
 - Add market price freshness through scheduled repo automation and static JSON artifacts, not through user-triggered production sync.
 - Do not describe Hiscores as live-available until the Cloudflare runtime is deployed and evidenced. Do not describe market prices as scheduled-current unless the writer's latest configured run is validated.
 - Cloudflare Workers Builds watches `master`; market bot commits follow the same validation/deploy path. Do not add a second deploy provider or GitHub deploy workflow without a new decision.
@@ -335,7 +366,7 @@ does not prove a concrete public instance or scheduled-current market data.
 
 | Area                        | Repository-owned state                                                                                                                                              | Adopter or release follow-up                                                                                                                                                  |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Core release gate           | `npm run verify` and the D-066 artifact contract are implemented.                                                                                                   | Run the authoritative gate in Cloudflare Builds and before promotion; rerun dependency review after lockfile changes.                                                         |
+| Core release gate           | `npm run quality`, `npm run verify:handoff` and the D-066 artifact contract are implemented.                                                                        | Run the handoff gate in Cloudflare Builds and before promotion; rerun dependency review after lockfile changes.                                                               |
 | Browser and visual behavior | Functional and repository-local visual suites are implemented with mocked/same-origin fixtures.                                                                     | Run the functional suite and the applicable read-only visual comparison against the selected preview before production promotion.                                             |
 | Security and headers        | Worker-first API routing, static fallback, security headers, immutable workflow action pins and bounded provider behavior are repository-owned.                     | Verify effective preview/production headers, account log/drain settings, abuse-control assumptions and rollback behavior before public claims.                                |
 | Hiscores                    | D-061/D-065/D-066 implement the fixed provider, privacy boundary and production adapter; D-097 enforcement remains disabled.                                        | Connect the account, run deployed status/lookup smoke without retaining player queries and activate provider-wide limits only with accepted quota/load evidence.              |
@@ -351,7 +382,11 @@ owned by an adopter. They are not missing repository implementation under D-067/
 For repository handoff or a trusted-tester build, use this checklist. It is intentionally lighter than operating a public instance or full CI/CD pipeline:
 
 1. Confirm intended price snapshot date.
-2. Run `npm ci` from a fresh checkout and then the authoritative `npm run verify` gate from [../technical/testing.md](../technical/testing.md).
+2. Run `npm ci` from a fresh checkout and then the authoritative
+   `npm run quality` developer gate from
+   [../technical/testing.md](../technical/testing.md). Run
+   `npm run verify:handoff` when delivering the repository or a production
+   artifact.
 3. Smoke test the main UI in a browser if possible.
 4. Confirm no stale generated or local-only files are included accidentally.
 5. Run the live integration release copy audit and classify any remaining `run_sim.py` or legacy `/api/*` hits.

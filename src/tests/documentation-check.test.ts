@@ -1,5 +1,6 @@
 import {
   checkDocumentation,
+  createSpecificationCatalogPlan,
   parseDocumentationMetadata
 } from "../../scripts/documentation-check-core";
 
@@ -84,7 +85,7 @@ describe("documentation consistency", () => {
 
 ## Implemented evidence
 
-- [Example](example-spec.md) — status=\`implemented\`; contract=\`closed\`; owner=technical documentation; date=2026-07-27
+- [Example specification](example-spec.md) — status=\`implemented\`; contract=\`closed\`; owner=technical documentation; date=2026-07-27
 `,
       "docs/technical/example-spec.md": validMetadata,
       ...extraFiles
@@ -95,6 +96,31 @@ describe("documentation consistency", () => {
     const result = checkDocumentation({ files: fixture(), packageScripts: new Set() });
     expect(result.diagnostics).toEqual([]);
     expect(result.reachability.get("docs/technical/example-spec.md")).toBe(2);
+  });
+
+  it("derives a deterministic complete catalog row from document metadata", () => {
+    const files = fixture();
+    const parsed = parseDocumentationMetadata(
+      "docs/technical/example-spec.md",
+      files["docs/technical/example-spec.md"]!
+    );
+    const plan = createSpecificationCatalogPlan(
+      files,
+      new Map([["docs/technical/example-spec.md", parsed.metadata!]])
+    );
+
+    expect(plan).toEqual([
+      {
+        file: "docs/technical/example-spec.md",
+        group: "Implemented evidence",
+        label: "Example specification",
+        status: "implemented",
+        contract: "closed",
+        owner: "technical documentation",
+        date: "2026-07-27",
+        line: "- [Example specification](example-spec.md) — status=`implemented`; contract=`closed`; owner=technical documentation; date=2026-07-27"
+      }
+    ]);
   });
 
   it("reports broken files, anchors and npm scripts", () => {

@@ -60,7 +60,7 @@ Hiscores is a required v1 product capability. D-061 accepts the first-party API 
 - Game data: monsters, drops, item values, alch values and source revision notes.
 - Equipment: gear slots, bonuses and requirements.
 - Trip model: food, potions, inventory slots, stackability, banking time and incoming damage.
-- Economy: price snapshots, live/imported prices, alch values and price history.
+- Economy: committed/imported prices, manual overrides, alch values and price history.
 - Planner: training order and gear unlock optimization.
 
 ## Functional boundaries
@@ -74,7 +74,7 @@ Current app does not provide:
 
 Implemented external integration boundaries:
 
-- repo-owned Hiscores lookup with local Vite and Cloudflare production adapters
+- repo-owned Hiscores lookup with local Vite and Cloudflare deployment adapters
 - repo-owned market snapshot writer with numeric, item-provenance and versioned history outputs; D-099 currently disables its GitHub Actions schedule
 
 The implementation target for those live integrations is [../technical/live-integrations-spec.md](../technical/live-integrations-spec.md).

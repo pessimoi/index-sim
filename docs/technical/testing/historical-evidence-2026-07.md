@@ -532,7 +532,7 @@ Baseline changes are never automatic failure recovery. During an explicit audit
 review, regenerate a candidate with:
 
 ```sh
-npm run planner:parity:report -- --update-baseline --allow-needs-review
+npm run planner:parity:capture -- --update-baseline --allow-needs-review
 ```
 
 Review every changed field and replace every `needs-review` classification with

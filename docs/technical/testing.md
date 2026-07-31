@@ -1,9 +1,9 @@
 # Testing
 
 - Status: implemented
-- Date: 2026-07-27
+- Date: 2026-07-31
 - Owner: technical testing
-- Last verified: 2026-07-27
+- Last verified: 2026-07-31
 - Evidence: verified
 - Contract: living
 
@@ -11,20 +11,35 @@ This document owns the current repository gate, cross-cutting minimums and
 change-type routing. Topic guides own focused commands. Dated results belong in
 [testing evidence](../project/testing-evidence.md).
 
-## Authoritative gate
+## Authoritative developer gate
 
-Run the complete repository gate with:
+Run the normal provider-neutral developer gate with:
 
 ```sh
-npm run verify
+npm run quality
 ```
 
-The gate runs type checking, architecture and documentation checks, the unit
-and legacy-golden suites, production build and artifact validation, lint,
-formatting, dependency audit when network policy permits it, and
-`git diff --check`. The implementation is
-`scripts/run-cloudflare-release.mjs`; keep this description and the runner in
+The gate runs type checking, architecture and documentation checks, the full
+Vitest suite, lint, formatting and `git diff --check` exactly once. It does not
+build an artifact, invoke a provider or require network access. The implementation
+is `scripts/run-cloudflare-release.mjs`; keep this description and the runner in
 sync.
+
+The full `npm run test` gate caps Vitest at four workers. Calculation-heavy
+matrix tests retain their explicit CPU budgets while avoiding false wall-clock
+timeouts from eight-way workstation contention. Run repository commands with
+the committed Node 22/npm 10 engine contract; another Node major is not valid
+gate evidence.
+
+For repository handoff or a Cloudflare build, run:
+
+```sh
+npm run verify:handoff
+```
+
+The handoff gate composes the developer gate with one production build,
+artifact validation and dependency audit when network policy permits it.
+`npm run verify` remains a compatibility alias for `verify:handoff`.
 
 Last verified repository results are indexed by the dated
 [testing evidence owner](../project/testing-evidence.md). Do not copy its pass
@@ -34,11 +49,14 @@ totals, hashes or artifact measurements into this guide.
 
 | Purpose                                      | Command                          |
 | -------------------------------------------- | -------------------------------- |
+| Normal developer quality gate                | `npm run quality`                |
+| Repository handoff gate                      | `npm run verify:handoff`         |
 | Type safety                                  | `npm run typecheck`              |
 | Layering, cycles and entrypoints             | `npm run architecture:check`     |
 | Documentation links, metadata and navigation | `npm run docs:check`             |
 | Unit and component tests                     | `npm run test`                   |
 | Archived calculation fixtures                | `npm run test:golden`            |
+| Planner historical baseline/current digests  | `npm run planner:parity`         |
 | Production build                             | `npm run build`                  |
 | Artifact contract after build                | `npm run deploy:verify-artifact` |
 | Lint                                         | `npm run lint`                   |
@@ -46,8 +64,10 @@ totals, hashes or artifact measurements into this guide.
 | Patch whitespace                             | `git diff --check`               |
 
 Use `npm run test -- <files>` for a focused Vitest line. A focused pass is
-preliminary evidence; delivery still uses the complete gate unless a documented
-environment limitation prevents it.
+preliminary evidence; normal delivery still uses `npm run quality` unless a
+documented environment limitation prevents it. Lockfile, artifact, entrypoint,
+server/provider and release-runner changes additionally use the handoff gate or
+the stronger impact-specific checks below.
 
 ## Detailed guides
 
@@ -63,9 +83,15 @@ environment limitation prevents it.
 Historical prose removed from these living guides remains reachable through
 [testing evidence](../project/testing-evidence.md).
 
+`test:golden` and `planner:parity` validate committed immutable evidence and
+current rewrite behavior without executing root legacy JavaScript. Baseline
+recapture is manual through `fixtures:capture` or `planner:parity:capture` and
+requires an explicit baseline decision. The complete boundary is in the
+[archived legacy consumer inventory](archived-legacy-consumer-inventory.md).
+
 ## Change-type minimums
 
-| Change                                        | Minimum validation before the complete gate                                                   |
+| Change                                        | Minimum validation before the normal quality gate                                             |
 | --------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | Documentation only                            | `npm run docs:check`, `npm run format:check`, `git diff --check`                              |
 | Module boundary, entrypoint or adapter export | `npm run typecheck`, `npm run architecture:check`, focused tests                              |

@@ -10,6 +10,24 @@ This page preserves completed backlog cards extracted from the living backlog
 during DOCS-01. Card wording and evidence are unchanged; section headings show
 their former planning group. Current work remains in [backlog.md](backlog.md).
 
+## 2026-07-31 dev-first cleanup
+
+- `Done` - Implement the
+  [developer quality and release-gate separation specification](../technical/developer-quality-release-gate-separation-spec.md).
+  One testable stage plan now owns provider-neutral `quality`, repository
+  `verify:handoff` and exact-artifact Cloudflare operations without duplicate
+  TypeScript or golden stages. The canonical Node 22 quality command passes;
+  current npm advisory evidence remains the separate toolchain disclosure
+  gate, not a normal-development blocker.
+
+- `Done` - Implement the [documentation governance load-reduction and
+  phase-language specification](../technical/documentation-governance-load-reduction-spec.md).
+  Living owners now distinguish the supported runtime, optimized artifact,
+  deployment target and concrete public instance; normal changes update only
+  affected truth owners. The read-only documentation checker derives and
+  validates the complete technical catalog plan without rewriting closed or
+  dated evidence or changing roadmap direction.
+
 ## Release-readiness finishing
 
 - `Done` - Implement [the local-state attention surface specification](../technical/local-state-attention-surface-spec.md). Every ready pane now shares one structured non-dismissible metadata-only notice for unusable stored data, non-durable persistence or both; its only action activates Settings and focuses Local state recovery. Focused view-model/controller/pane suites pass 38/38 and targeted Chromium coverage passes 3/3 without changing recovery blocks, storage schemas or D-016/D-030 migration policy.

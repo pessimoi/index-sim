@@ -17,7 +17,11 @@ Lifecycle rules:
 
 ## Active contracts
 
-_No entries._
+- [Archived legacy runtime fixture-extraction and retirement specification](archived-legacy-fixture-extraction-spec.md) — status=`active`; contract=`living`; owner=calculation regression fixtures and generated-data tooling; date=2026-07-31
+- [Legacy compatibility support inventory and sunset specification](legacy-compatibility-support-sunset-spec.md) — status=`active`; contract=`living`; owner=browser persistence and transfer compatibility; date=2026-07-31
+- [Market compatibility scaffolding retirement specification](market-compatibility-scaffolding-retirement-spec.md) — status=`active`; contract=`living`; owner=market adapter and local server boundary; date=2026-07-31
+- [Production-readiness trigger and dormant Cloudflare infrastructure specification](production-readiness-trigger-boundary-spec.md) — status=`active`; contract=`living`; owner=deployment architecture and server integration; date=2026-07-31
+- [Toolchain dependency audit remediation specification](toolchain-dependency-audit-remediation-spec.md) — status=`active`; contract=`living`; owner=Node toolchain and deployment tooling; date=2026-07-31
 
 ## Living contracts
 
@@ -28,6 +32,8 @@ _No entries._
 - [Calculation Worker retention and persistent-trigger specification](calculation-worker-retention-spec.md) — status=`implemented`; contract=`living`; owner=technical documentation; date=2026-07-14
 - [Cross-browser release support specification](cross-browser-release-support-spec.md) — status=`implemented`; contract=`living`; owner=Playwright configuration, browser adapters and release testing; date=2026-07-21
 - [Cross-tab local-state conflict safety specification](cross-tab-local-state-conflict-spec.md) — status=`implemented`; contract=`living`; owner=browser persistence boundary, local-state recovery and ready-shell feedback; date=2026-07-21
+- [Developer quality and release-gate separation specification](developer-quality-release-gate-separation-spec.md) — status=`implemented`; contract=`living`; owner=developer workflow and technical testing; date=2026-07-31
+- [Documentation governance load-reduction and phase-language specification](documentation-governance-load-reduction-spec.md) — status=`implemented`; contract=`living`; owner=documentation governance and project planning; date=2026-07-31
 - [Local development startup reliability specification](dev-startup-reliability-spec.md) — status=`implemented`; contract=`living`; owner=technical documentation; date=2026-07-15
 - [Feature test-suite split specification](feature-test-suite-split-spec.md) — status=`implemented`; contract=`living`; owner=technical documentation; date=2026-07-14
 - [Game-data generator core retention and split-trigger specification](game-data-generator-core-retention-spec.md) — status=`implemented`; contract=`living`; owner=technical documentation; date=2026-07-14

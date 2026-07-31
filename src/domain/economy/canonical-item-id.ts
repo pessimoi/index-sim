@@ -40,6 +40,8 @@ const LEGACY_GEM_PRICE_ALIAS_PROVENANCE: DataProvenance = {
     "Explicit legacy-derived price-key alias foundation. This is not an authoritative upstream item mapping."
 };
 
+// Compatibility freeze: exact current ids remain canonical. New fallback
+// aliases require a source/collision review and support-matrix sunset rule.
 export const CANONICAL_ITEM_PRICE_ALIASES: readonly CanonicalItemIdAlias[] = [
   {
     alias: "sapphire",

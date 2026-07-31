@@ -12,6 +12,8 @@ import type {
 
 export const LEGACY_INPUT_STORAGE_KEY = "sim_input_v3";
 
+// Compatibility freeze: additions require a real source/consumer, a sunset
+// rule and an updated legacy-compatibility-support-matrix.md entry.
 export const LEGACY_STORAGE_KEYS = [
   LEGACY_INPUT_STORAGE_KEY,
   "sim_planner_v1",

@@ -13,7 +13,7 @@ This file is the first stop for AI agents working in this repository. Keep it sh
 1. Run or inspect `git status --short` and protect unrelated user changes.
 2. Read `README.md`, this file and [docs/README.md](docs/README.md).
 3. For technical work, read [docs/technical/architecture.md](docs/technical/architecture.md) and [docs/technical/testing.md](docs/technical/testing.md).
-4. Search the code with `rg` before editing. The production rewrite is module-based, but the archived legacy runtime is script-order and `window.*` driven; changes to shared data, adapters or legacy-reference files can still have global effects.
+4. Search the code with `rg` before editing. The current rewrite is module-based, but the archived legacy runtime is script-order and `window.*` driven; changes to shared data, adapters or legacy-reference files can still have global effects.
 5. If a claim is not verifiable from code or docs, mark it in the relevant document as an open question.
 6. Run temporary scripts, caches and generated helper files from inside this repository, not from `/tmp` or other external scratch paths, unless a human explicitly approves. This avoids endpoint-security noise on the user's work machine.
 
@@ -39,7 +39,7 @@ The legacy `views.jsx` `ArchitectureBoard` is only a docs-link panel. Treat the 
 
 ## Source map
 
-- Production app entrypoint: `index.html` for the Vite/React rewrite.
+- Supported root app entrypoint: `index.html` for the Vite/React rewrite.
 - Rewrite UI shell: `src/app`
 - Archived legacy runtime entrypoint: `legacy/index.html`
 - Legacy UI shell and panes: `views.jsx`
@@ -60,7 +60,7 @@ The legacy `views.jsx` `ArchitectureBoard` is only a docs-link panel. Treat the 
 - Generated runtime commands: `scripts/report-generated-runtime-readiness.ts`, `scripts/write-legacy-derived-runtime-snapshot.ts`, `npm run runtime:readiness`, `npm run runtime:coverage-plan`, `npm run runtime:write-legacy-derived`
 - Disabled scheduled market workflow template: `.github/disabled-workflows/update-market-prices.yml`
 - Provider-neutral deployment validation: `scripts/deployment-readiness-core.ts`, `scripts/verify-public-deployment.ts`, `npm run deploy:verify-artifact`, `npm run deploy:smoke`
-- Production deployment target: Cloudflare Worker + Static Assets through `src/server/cloudflare-worker.ts`, `wrangler.jsonc`, `public/_headers`, `npm run deploy:cloudflare:build`, `npm run deploy:cloudflare:dry-run`, `npm run deploy:cloudflare:preview`, `npm run deploy:cloudflare`
+- Accepted deployment target: Cloudflare Worker + Static Assets through `src/server/cloudflare-worker.ts`, `wrangler.jsonc`, `public/_headers`, `npm run deploy:cloudflare:build`, `npm run deploy:cloudflare:dry-run`, `npm run deploy:cloudflare:preview`, `npm run deploy:cloudflare`
 - Rewrite styling: `src/app/styles.css`
 - Archived legacy styling: `styles.css` plus inline styles in `views.jsx`
 - Same-origin service boundaries: `src/server`, `src/adapters/hiscores`, `src/adapters/market`
@@ -70,7 +70,7 @@ The legacy `views.jsx` `ArchitectureBoard` is only a docs-link panel. Treat the 
 - Calculation Worker measurement: `scripts/measure-calculation-worker.mjs`, `scripts/worker-measurement-browser.ts`, `npm run worker:measure`
 - Documentation map: `docs/README.md`
 
-The root app path is now the Vite rewrite and boots from the validated source-backed generated Revision 274 snapshot. The legacy-derived static bridge and legacy browser runtime files remain regression/reference, fixture and rollback evidence, not the production entrypoint.
+The supported root app is the Vite rewrite and boots from the validated source-backed generated Revision 274 snapshot. The legacy-derived static bridge and legacy browser runtime files remain regression/reference, fixture and rollback evidence, not supported entrypoints.
 
 No active GitHub Actions workflow, general application database schema or stateful simulation backend exists in this checkout. D-099 moves the retained scheduled market writer template outside `.github/workflows` because the current maintainer has no Actions capacity; re-enabling it requires an explicit capacity and freshness-policy decision. D-097 adds one dedicated SQLite Durable Object for aggregate Hiscores provider-budget state, committed with enforcement `off`. D-066 selects Cloudflare Workers Builds as the optional production build/deploy integration; D-067 leaves account connection and live-operation evidence to a future adopter.
 
@@ -80,7 +80,10 @@ No active GitHub Actions workflow, general application database schema or statef
 
 - Read first: [docs/README.md](docs/README.md) and the owning document.
 - Check: links, stale current-state claims and duplicated truth.
-- Validate: `git diff --check`.
+- Update only the current truth owner or active specification whose owned
+  behavior/status changed. Closed specs and dated evidence are not recurring
+  checklists.
+- Validate: `npm run docs:check`, `npm run format:check`, `git diff --check`.
 - Update docs only; do not change code to match docs unless explicitly asked.
 
 ### UI change
@@ -88,12 +91,13 @@ No active GitHub Actions workflow, general application database schema or statef
 - Read first: [docs/product/README.md](docs/product/README.md), [docs/technical/architecture.md](docs/technical/architecture.md).
 - Check code: `src/app`, `src/app/state`, `src/app/view-models`, `src/adapters` and affected domain modules. Touch `views.jsx` or `planner.jsx` only for archived legacy work.
 - Risks: persisted schema drift, UI state leaking into `SimulationRequest`, hidden coupling to legacy data bootstrap, text overflow.
+- Compatibility freeze: a new historical storage key, file/URL version or price alias requires a real source/consumer, an entry in [the support matrix](docs/technical/legacy-compatibility-support-matrix.md) and an explicit sunset rule.
 - Validate: `npm run typecheck`, relevant unit tests, browser smoke if possible, `git diff --check`.
 - Update docs if user workflows, persisted state or run assumptions change.
 
 ### API or backend change
 
-- Current state: repo-owned framework-neutral Hiscores and market handlers, Vite middleware and a Cloudflare Worker adapter exist under `src/server`. D-097's disabled aggregate Hiscores provider-budget Durable Object is the only server-managed state; no stateful simulation backend, general database, auth service or `run_sim.py` exists. `/api/prices` and `/api/scrape` are archived legacy references; the rewrite uses `/api/hiscores` and compatibility `/api/market/*` boundaries while the committed static price snapshot owns current production market values. Automatic market refresh is disabled under D-099.
+- Current state: repo-owned framework-neutral Hiscores and market handlers, Vite middleware and a Cloudflare Worker adapter exist under `src/server`. D-097's disabled aggregate Hiscores provider-budget Durable Object is the only server-managed state; no stateful simulation backend, general database, auth service or `run_sim.py` exists. `/api/prices` and `/api/scrape` are archived legacy references; the rewrite uses `/api/hiscores`, while Vite-only `/api/market/*` remains externally unverified compatibility scaffolding with no current app caller. Committed static price snapshots own current-app market values. Automatic market refresh is disabled under D-099.
 - Ask a human before adding another backend framework, server-managed state, auth or a changed deployment shape.
 - Read first: [docs/operations/README.md](docs/operations/README.md), [docs/project/decisions.md](docs/project/decisions.md).
 - Update docs: operations, architecture, testing and decisions.
@@ -133,7 +137,8 @@ No active GitHub Actions workflow, general application database schema or statef
 
 ## Documentation update triggers
 
-Update docs in the same change when you alter:
+Update the named living owner in the same change only when you alter its owned
+truth:
 
 - architecture boundaries or module ownership
 - run, build, deploy or validation commands
@@ -142,11 +147,16 @@ Update docs in the same change when you alter:
 - accepted technical decisions or unresolved decision boundaries
 - test strategy or required checks
 
+Do not refresh closed specs or dated evidence for unrelated changes. Update the
+backlog or roadmap only when work status, priority or project direction really
+changes. A behavior-preserving internal edit inside an accepted boundary does
+not need a new decision.
+
 ## Testing line
 
 Use [docs/technical/testing.md](docs/technical/testing.md) as the owner. The current minimum for documentation-only changes is `git diff --check`. For source changes, run syntax checks for affected `.js` files and parse affected JSON files. Run `npm run architecture:check` when changing module boundaries, entrypoints, adapters or barrel exports. Add stronger tests before risky refactors.
 
-Keep test helpers, npm caches and generated scratch files inside the repo and ignore them when appropriate. Do not use `/tmp`-style script locations unless the user explicitly asks for that.
+Keep test helpers, npm caches and generated scratch files inside the repo and ignore them when appropriate. Do not use `/tmp`-style script locations unless the user explicitly asks for that. Use `npm run quality` as the normal provider-neutral developer gate and `npm run verify:handoff` for repository handoff, lockfile, artifact or release-runner changes.
 
 ## Git practice
 
@@ -157,7 +167,7 @@ Keep test helpers, npm caches and generated scratch files inside the repo and ig
 
 ## Done criteria
 
-- The owning docs are updated.
+- Owning living docs are updated when their current truth changed.
 - Current state, target plan, accepted decisions and open questions are separated.
 - Validation commands were run or the reason for skipping them is documented.
 - Final response lists changed files, evidence used, open questions and checks.

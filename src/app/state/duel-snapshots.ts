@@ -23,6 +23,8 @@ export const DUEL_SNAPSHOTS_IMPORT_MAX_BYTES = 250_000;
 export const DUEL_SNAPSHOTS_TRANSFER_KIND = "index-sim-saved-setups";
 export const DUEL_SNAPSHOTS_TRANSFER_VERSION = 1;
 
+// Legacy non-contextual exports remain read-only compatibility. Do not add
+// another historical envelope without a named consumer and sunset rule.
 export interface DuelSnapshotState {
   id: string;
   name: string;

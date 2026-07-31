@@ -13,6 +13,8 @@ export const SETUP_IMPORT_MAX_BYTES = 250_000;
 export const REWRITE_SETUP_TRANSFER_KIND = "index-sim-rewrite-setup";
 export const REWRITE_SETUP_TRANSFER_VERSION = 1;
 
+// The non-contextual rewrite storage envelope is retained input compatibility,
+// not a template for accepting additional historical file shapes.
 export interface RewriteSetupTransferEnvelopeV1 {
   kind: typeof REWRITE_SETUP_TRANSFER_KIND;
   version: typeof REWRITE_SETUP_TRANSFER_VERSION;

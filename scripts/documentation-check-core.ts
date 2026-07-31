@@ -54,6 +54,17 @@ export interface DocumentationCheckResult {
   readonly reachability: ReadonlyMap<string, number>;
 }
 
+export interface SpecificationCatalogPlanEntry {
+  readonly file: string;
+  readonly group: string;
+  readonly label: string;
+  readonly status: DocumentationStatus;
+  readonly contract: DocumentationContract;
+  readonly owner: string;
+  readonly date: string;
+  readonly line: string;
+}
+
 const METADATA_FIELDS = new Map([
   ["Status", "status"],
   ["Date", "date"],
@@ -434,6 +445,43 @@ function expectedCatalogGroup(metadata: DocumentationMetadata): string {
   return "Superseded or historical";
 }
 
+function documentTitle(text: string): string {
+  return text.match(/^#\s+(.+?)\s*$/m)?.[1]?.trim() ?? "";
+}
+
+export function createSpecificationCatalogPlan(
+  files: Readonly<Record<string, string>>,
+  metadata: ReadonlyMap<string, DocumentationMetadata>
+): readonly SpecificationCatalogPlanEntry[] {
+  return Object.keys(files)
+    .filter((file) => file.startsWith("docs/technical/") && file.endsWith("-spec.md"))
+    .flatMap((file) => {
+      const documentMetadata = metadata.get(file);
+      const contract = documentMetadata?.contract;
+      if (!documentMetadata || !contract) return [];
+      const label = documentTitle(files[file] ?? "");
+      return [
+        {
+          file,
+          group: expectedCatalogGroup(documentMetadata),
+          label,
+          status: documentMetadata.status,
+          contract,
+          owner: documentMetadata.owner,
+          date: documentMetadata.date,
+          line:
+            `- [${label}](${posix.basename(file)}) — ` +
+            `status=\`${documentMetadata.status}\`; contract=\`${contract}\`; ` +
+            `owner=${documentMetadata.owner}; date=${documentMetadata.date}`
+        }
+      ];
+    })
+    .sort(
+      (left, right) =>
+        left.group.localeCompare(right.group, "en") || left.label.localeCompare(right.label, "en")
+    );
+}
+
 function checkSpecificationCatalog(
   files: Readonly<Record<string, string>>,
   metadata: ReadonlyMap<string, DocumentationMetadata>
@@ -448,25 +496,43 @@ function checkSpecificationCatalog(
   const diagnostics: DocumentationDiagnostic[] = [];
   const entries = new Map<
     string,
-    { group: string; line: number; status?: string; contract?: string }[]
+    {
+      group: string;
+      line: number;
+      label?: string;
+      status?: string;
+      contract?: string;
+      owner?: string;
+      date?: string;
+    }[]
   >();
   let group = "";
   for (const [lineIndex, line] of catalog.split(/\r?\n/).entries()) {
     const heading = line.match(/^##\s+(.+)$/)?.[1];
     if (heading) group = heading.trim();
-    const link = line.match(/^- \[[^\]]+\]\(([^)#]+-spec\.md)\)/);
+    const link = line.match(/^- \[([^\]]+)\]\(([^)#]+-spec\.md)\)/);
     if (!link) continue;
-    const target = resolveLink(catalogFile, link[1] ?? "").file;
+    const target = resolveLink(catalogFile, link[2] ?? "").file;
     const status = line.match(/status=`([^`]+)`/)?.[1];
     const contract = line.match(/contract=`([^`]+)`/)?.[1];
+    const owner = line.match(/; owner=(.*); date=/)?.[1];
+    const date = line.match(/; date=(\d{4}-\d{2}-\d{2})$/)?.[1];
     const existing = entries.get(target) ?? [];
-    existing.push({ group, line: lineIndex + 1, status, contract });
+    existing.push({
+      group,
+      line: lineIndex + 1,
+      label: link[1],
+      status,
+      contract,
+      owner,
+      date
+    });
     entries.set(target, existing);
   }
 
-  const specifications = Object.keys(files).filter(
-    (file) => file.startsWith("docs/technical/") && file.endsWith("-spec.md")
-  );
+  const plan = createSpecificationCatalogPlan(files, metadata);
+  const planByFile = new Map(plan.map((entry) => [entry.file, entry]));
+  const specifications = plan.map((entry) => entry.file);
   for (const file of specifications) {
     const rows = entries.get(file) ?? [];
     if (rows.length === 0) {
@@ -486,27 +552,32 @@ function checkSpecificationCatalog(
       );
       continue;
     }
-    const documentMetadata = metadata.get(file);
-    if (!documentMetadata) continue;
+    const expected = planByFile.get(file);
+    if (!expected) continue;
     const row = rows[0];
-    const expectedGroup = expectedCatalogGroup(documentMetadata);
-    if (row?.group !== expectedGroup) {
+    if (row?.group !== expected.group) {
       diagnostics.push(
         diagnostic(
           catalogFile,
           row?.line ?? 1,
           "catalog-group",
-          `${file} belongs in ${expectedGroup}, not ${row?.group || "an unnamed group"}`
+          `${file} belongs in ${expected.group}, not ${row?.group || "an unnamed group"}`
         )
       );
     }
-    if (row?.status !== documentMetadata.status || row.contract !== documentMetadata.contract) {
+    if (
+      row?.label !== expected.label ||
+      row?.status !== expected.status ||
+      row.contract !== expected.contract ||
+      row.owner !== expected.owner ||
+      row.date !== expected.date
+    ) {
       diagnostics.push(
         diagnostic(
           catalogFile,
           row?.line ?? 1,
           "catalog-metadata",
-          `${file} catalog metadata disagrees with its header`
+          `${file} catalog row disagrees with the deterministic metadata plan`
         )
       );
     }
