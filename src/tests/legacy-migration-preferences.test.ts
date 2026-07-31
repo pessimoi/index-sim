@@ -1,4 +1,4 @@
-import { loadBundledLegacyContext } from "../adapters/legacy-runtime";
+import { loadCurrentTestContext } from "./helpers/current-sim";
 import { createMemoryStorage } from "../adapters/storage";
 import { inspectLegacySetupMigration } from "../app/state/legacy-storage-migration";
 import type { GameDataSnapshot } from "../domain/shared";
@@ -7,7 +7,7 @@ describe("legacy preference migration", () => {
   let gameData: GameDataSnapshot;
 
   beforeAll(async () => {
-    const loaded = await loadBundledLegacyContext();
+    const loaded = await loadCurrentTestContext();
     gameData = loaded.context.gameData;
   });
 
@@ -67,7 +67,7 @@ describe("legacy preference migration", () => {
     expect(report.skippedFields).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          field: "lootPrefs.giant.Coins",
+          field: "lootPrefs.hobgoblin_armed.Coins",
           reason: "ambiguous legacy drop name for monster"
         })
       ])

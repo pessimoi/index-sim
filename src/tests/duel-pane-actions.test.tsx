@@ -4,7 +4,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { loadBundledLegacyContext } from "../adapters/legacy-runtime";
+import { loadCurrentTestContext } from "./helpers/current-sim";
 import {
   DuelPane,
   type DuelPaneActions,
@@ -30,7 +30,7 @@ let root: Root;
 let context: SimulationContext;
 
 beforeAll(async () => {
-  context = (await loadBundledLegacyContext()).context;
+  context = (await loadCurrentTestContext()).context;
 });
 
 beforeEach(() => {

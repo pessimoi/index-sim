@@ -2,6 +2,8 @@
   "schemaVersion": 1,
   "capturedAt": "2026-07-05",
   "source": {
+    "sourceCommit": "01bf4d54cdee248b8b22c59a176da29f76a45d3c",
+    "captureScriptSha256": "01d09d90e42aa2b620324abd9b7062cfa614d0dd59acee42fc8d519932988401",
     "scripts": ["gamedata.js", "engine.js", "trip.js", "equipment.js"],
     "entrypoint": "SimEngine.simulate() via Node vm context",
     "excludedScripts": ["market.js", "planner-core.js", "views.jsx", "planner.jsx"],

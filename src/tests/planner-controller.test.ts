@@ -2,7 +2,7 @@
 
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { loadBundledLegacyContext } from "../adapters/legacy-runtime";
+import { loadCurrentTestContext } from "./helpers/current-sim";
 import type { RunningCalculationTask } from "../app/calculation-worker-client";
 import type { PlannerCalculationRequest } from "../app/calculation-task";
 import {
@@ -100,7 +100,7 @@ describe("Planner calculation controller", () => {
   });
 
   it("starts only while active and cancels on deactivation or unmount", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const requests: PlannerCalculationRequest[] = [];
     const cancels: Array<ReturnType<typeof vi.fn>> = [];
     const startTask = (request: PlannerCalculationRequest) => {
@@ -177,7 +177,7 @@ describe("Planner calculation controller", () => {
   });
 
   it("keeps draft edits pending until Recompute and retains automatic source refreshes", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const requests: PlannerCalculationRequest[] = [];
     const resolvers: Array<(value: PlannerPanelViewModel) => void> = [];
     const startTask = (request: PlannerCalculationRequest) => {
@@ -237,7 +237,7 @@ describe("Planner calculation controller", () => {
   });
 
   it("reconciles Apply and Undo sources and rejects the late applied-level result", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const requests: PlannerCalculationRequest[] = [];
     const resolvers: Array<(value: PlannerPanelViewModel) => void> = [];
     const cancels: Array<ReturnType<typeof vi.fn>> = [];
@@ -319,7 +319,7 @@ describe("Planner calculation controller", () => {
   });
 
   it("retries first and refresh failures while retaining the previous plan", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const requests: PlannerCalculationRequest[] = [];
     const resolvers: Array<(panel: PlannerPanelViewModel) => void> = [];
     const rejectors: Array<(reason: unknown) => void> = [];
@@ -413,7 +413,7 @@ describe("Planner calculation controller", () => {
   });
 
   it("keeps status precedence and the fixed Planner error contract", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const plannerState = createDefaultPlannerUiState(DEFAULT_FORM_STATE);
     const source = {
       form: DEFAULT_FORM_STATE,

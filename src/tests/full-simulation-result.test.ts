@@ -1,5 +1,5 @@
 import { LEGACY_GOLDEN_CASES } from "./fixtures/legacy-case-definitions";
-import { buildLegacyInput, createLegacyRuntime } from "./helpers/legacy-sim";
+import { buildLegacyInput, createLegacyFixtureRuntime } from "./helpers/legacy-sim";
 import { domainContextFromLegacy, domainRequestFromLegacyInput } from "./helpers/domain-planner";
 import { computeCombatXpBreakdown, simulateCombat } from "../domain/combat";
 import {
@@ -21,7 +21,7 @@ function fullSimulationInputFromFixture(caseId: string): {
   expect(definition).toBeDefined();
   if (!definition) throw new Error(`Missing fixture definition: ${caseId}`);
 
-  const runtime = createLegacyRuntime();
+  const runtime = createLegacyFixtureRuntime();
   const context = domainContextFromLegacy(runtime);
   const legacyInput = buildLegacyInput(runtime, definition);
   const request = domainRequestFromLegacyInput(legacyInput);

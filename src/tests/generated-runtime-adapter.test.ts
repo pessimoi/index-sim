@@ -1,4 +1,3 @@
-import { loadBundledLegacyContext } from "../adapters/legacy-runtime";
 import {
   createGeneratedRuntimeContext,
   createGeneratedRuntimeReadinessReport,
@@ -102,7 +101,7 @@ describe("generated runtime adapter", () => {
   });
 
   it("reports the raw generated runtime catalog ready when ids and required fields are covered", async () => {
-    const legacy = await loadBundledLegacyContext();
+    const legacy = createLegacyDerivedStaticRuntimeContext();
     const generated = createGeneratedRuntimeContext({
       loadedAt: "2026-07-09T00:00:00.000Z"
     });
@@ -174,7 +173,7 @@ describe("generated runtime adapter", () => {
       "unidentified_tarromin"
     ]);
     expect(itemPriceMetadataCoverage).toMatchObject({ missingCount: 0, blocking: true });
-    expect(report.referenceSnapshotId).toBe("browser-legacy-runtime");
+    expect(report.referenceSnapshotId).toBe("legacy-derived-runtime-snapshot");
     expect(report.candidateSnapshotId).toBe("lostcity-376072662e78-runtime");
     expect(monsterCoverage).toMatchObject({
       blocking: true,
@@ -249,7 +248,7 @@ describe("generated runtime adapter", () => {
       allowNotReady: true
     });
 
-    const legacy = await loadBundledLegacyContext();
+    const legacy = createLegacyDerivedStaticRuntimeContext();
     const generated = createGeneratedRuntimeContext({
       loadedAt: "2026-07-09T00:00:00.000Z"
     });
@@ -282,7 +281,7 @@ describe("generated runtime adapter", () => {
       allowNotReady: false
     });
 
-    const legacy = await loadBundledLegacyContext();
+    const legacy = createLegacyDerivedStaticRuntimeContext();
     const generated = createGeneratedRuntimeContext({
       loadedAt: "2026-07-09T00:00:00.000Z"
     });
@@ -321,7 +320,7 @@ describe("generated runtime adapter", () => {
   });
 
   it("keeps missing required runtime fields blocking while allowing accepted value deltas", async () => {
-    const legacy = await loadBundledLegacyContext();
+    const legacy = createLegacyDerivedStaticRuntimeContext();
     const generated = createGeneratedRuntimeContext({
       loadedAt: "2026-07-09T00:00:00.000Z"
     });
@@ -395,7 +394,7 @@ describe("generated runtime adapter", () => {
       allowNotReady: false
     });
 
-    const legacy = await loadBundledLegacyContext();
+    const legacy = createLegacyDerivedStaticRuntimeContext();
     const bridge = createLegacyDerivedStaticRuntimeContext();
     const report = createGeneratedRuntimeReadinessReport({
       reference: legacy.context,

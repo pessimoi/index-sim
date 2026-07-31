@@ -1,80 +1,73 @@
 import fixtureSet from "./fixtures/legacy-golden.json";
 import { LEGACY_GOLDEN_CASES } from "./fixtures/legacy-case-definitions";
-import { runLegacyCase, summarizeLegacyResult } from "./helpers/legacy-sim";
+import {
+  LEGACY_GOLDEN_CAPTURE,
+  LEGACY_GOLDEN_CLASSIFICATIONS
+} from "./fixtures/legacy-golden-manifest";
 
 interface GoldenFixture {
+  capturedAt: string;
+  source: {
+    sourceCommit: string;
+    captureScriptSha256: string;
+  };
   tolerances: {
     defaultNumericAbs: number;
   };
   cases: Array<{
     id: string;
+    description: string;
+    input: Record<string, unknown>;
     expected: unknown;
   }>;
 }
 
 const fixtures = fixtureSet as GoldenFixture;
-const definitionsById = new Map(
-  LEGACY_GOLDEN_CASES.map((definition) => [definition.id, definition])
-);
 
-function compareWithTolerance(
-  actual: unknown,
-  expected: unknown,
-  tolerance: number,
-  path: string
-): void {
-  if (typeof expected === "number") {
-    expect(typeof actual, path).toBe("number");
-    expect(Math.abs((actual as number) - expected), path).toBeLessThanOrEqual(tolerance);
+function expectFiniteNumbers(value: unknown, path: string): void {
+  if (typeof value === "number") {
+    expect(Number.isFinite(value), path).toBe(true);
     return;
   }
-
-  if (Array.isArray(expected)) {
-    expect(Array.isArray(actual), path).toBe(true);
-    const actualArray = actual as unknown[];
-    expect(actualArray.length, path).toBe(expected.length);
-    expected.forEach((value, index) => {
-      compareWithTolerance(actualArray[index], value, tolerance, `${path}[${index}]`);
-    });
+  if (Array.isArray(value)) {
+    value.forEach((entry, index) => expectFiniteNumbers(entry, `${path}[${index}]`));
     return;
   }
-
-  if (expected && typeof expected === "object") {
-    expect(actual && typeof actual === "object" && !Array.isArray(actual), path).toBe(true);
-    const actualRecord = actual as Record<string, unknown>;
-    const expectedRecord = expected as Record<string, unknown>;
-    expect(Object.keys(actualRecord).sort(), path).toEqual(Object.keys(expectedRecord).sort());
-    for (const [key, value] of Object.entries(expectedRecord)) {
-      compareWithTolerance(actualRecord[key], value, tolerance, `${path}.${key}`);
+  if (value && typeof value === "object") {
+    for (const [key, entry] of Object.entries(value)) {
+      expectFiniteNumbers(entry, `${path}.${key}`);
     }
-    return;
   }
-
-  expect(actual, path).toEqual(expected);
 }
 
 describe("legacy golden fixtures", () => {
-  it("keeps fixture IDs aligned with case definitions", () => {
+  it("keeps immutable fixture IDs and normalized inputs aligned with case definitions", () => {
     expect(fixtures.cases.map((testCase) => testCase.id)).toEqual(
       LEGACY_GOLDEN_CASES.map((definition) => definition.id)
     );
+    for (const [index, definition] of LEGACY_GOLDEN_CASES.entries()) {
+      const fixture = fixtures.cases[index]!;
+      expect(fixture.description).toBe(definition.description);
+      expect(fixture.input.combatType).toBe(definition.combatType);
+      expect(fixture.input.monsterId).toBe(definition.monsterId);
+    }
   });
 
-  for (const testCase of fixtures.cases) {
-    it(`matches ${testCase.id}`, () => {
-      const definition = definitionsById.get(testCase.id);
-      expect(definition, `Missing case definition for ${testCase.id}`).toBeDefined();
-      if (!definition) {
-        throw new Error(`Missing case definition for ${testCase.id}`);
-      }
+  it("records final capture provenance and one reviewed classification per case", () => {
+    expect(fixtures.capturedAt).toBe(LEGACY_GOLDEN_CAPTURE.capturedAt);
+    expect(fixtures.source.sourceCommit).toBe(LEGACY_GOLDEN_CAPTURE.sourceCommit);
+    expect(fixtures.source.captureScriptSha256).toBe(LEGACY_GOLDEN_CAPTURE.captureScriptSha256);
+    expect(Object.keys(LEGACY_GOLDEN_CLASSIFICATIONS)).toEqual(
+      fixtures.cases.map((testCase) => testCase.id)
+    );
+    expect(Object.values(LEGACY_GOLDEN_CLASSIFICATIONS)).not.toContain("historical-only");
+  });
 
-      const actual = summarizeLegacyResult(runLegacyCase(definition));
-      compareWithTolerance(
-        actual,
-        testCase.expected,
-        fixtures.tolerances.defaultNumericAbs,
-        testCase.id
-      );
-    });
-  }
+  it("keeps accepted output immutable, finite and tolerance-controlled", () => {
+    expect(fixtures.tolerances.defaultNumericAbs).toBeGreaterThan(0);
+    for (const testCase of fixtures.cases) {
+      expect(testCase.expected).toBeTypeOf("object");
+      expectFiniteNumbers(testCase.expected, testCase.id);
+    }
+  });
 });

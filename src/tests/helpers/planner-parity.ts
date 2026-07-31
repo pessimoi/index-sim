@@ -195,9 +195,9 @@ export function runPlannerParityAudit(
         legacy: normalizedLegacy,
         rewrite: normalizedRewrite,
         differences,
-        legacyDigest: digest(normalizedLegacy),
-        rewriteDigest: digest(normalizedRewrite),
-        differenceDigest: digest(differences),
+        legacyDigest: plannerParityDigest(normalizedLegacy),
+        rewriteDigest: plannerParityDigest(normalizedRewrite),
+        differenceDigest: plannerParityDigest(differences),
         differenceCount: differences.length
       });
     }
@@ -738,7 +738,7 @@ function stableNumber(value: number): number {
   return Number(value.toFixed(6));
 }
 
-function digest(value: unknown): string {
+export function plannerParityDigest(value: unknown): string {
   return createHash("sha256").update(stableJson(value)).digest("hex").slice(0, 16);
 }
 
@@ -765,7 +765,7 @@ function preview(value: unknown): string | number | boolean | null {
   return "[object]";
 }
 
-function createCurrentProductContext(rootDir = process.cwd()): SimulationContext {
+export function createCurrentProductContext(rootDir = process.cwd()): SimulationContext {
   const gameData = parseGameDataSnapshot(
     JSON.parse(readFileSync(resolve(rootDir, "src/data/generated/game-data.json"), "utf8"))
   );

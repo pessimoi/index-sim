@@ -2,7 +2,7 @@
 
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { loadBundledLegacyContext } from "../adapters/legacy-runtime";
+import { loadCurrentTestContext } from "./helpers/current-sim";
 import type { RunningCalculationTask } from "../app/calculation-worker-client";
 import type { RiskAnalysisCalculationRequest } from "../app/calculation-task";
 import {
@@ -103,7 +103,7 @@ describe("Risk analysis controller", () => {
   });
 
   it("starts idle with exact defaults and filters target-drop options", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const startTask = vi.fn();
     let controller: RiskAnalysisController | null = null;
 
@@ -134,7 +134,7 @@ describe("Risk analysis controller", () => {
   });
 
   it("runs only explicitly and retains a stale display after control edits", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const statuses: string[] = [];
     const requests: RiskAnalysisCalculationRequest[] = [];
     const deferred = deferredTask();
@@ -177,7 +177,7 @@ describe("Risk analysis controller", () => {
   });
 
   it("cancels a running task silently when an exact source reference changes", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const statuses: string[] = [];
     const obsolete = deferredTask();
     const current = deferredTask();
@@ -219,7 +219,7 @@ describe("Risk analysis controller", () => {
   });
 
   it("keeps a first failure sanitized and recoverable through explicit Retry", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const first = deferredTask();
     const retry = deferredTask();
     const tasks = [first, retry];
@@ -257,7 +257,7 @@ describe("Risk analysis controller", () => {
   });
 
   it("settles only the latest replacement task and supports explicit cancellation", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const statuses: string[] = [];
     const first = deferredTask();
     const second = deferredTask();
@@ -308,7 +308,7 @@ describe("Risk analysis controller", () => {
   });
 
   it("sanitizes failures, retains the previous build and cancels on unmount", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const statuses: string[] = [];
     const ready = deferredTask();
     const failed = deferredTask();

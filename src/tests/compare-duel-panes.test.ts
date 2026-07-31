@@ -1,6 +1,6 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { loadBundledLegacyContext } from "../adapters/legacy-runtime";
+import { loadCurrentTestContext } from "./helpers/current-sim";
 import {
   ComparePane,
   type ComparePaneActions,
@@ -74,7 +74,7 @@ function inOrder(markup: string, fragments: readonly string[]): void {
 
 describe("Compare and Duel panes", () => {
   it("keeps the Compare landmark, freshness, filters, sortable table and selected row contract", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const allRows = createDenseCompareRows(DEFAULT_FORM_STATE, context);
     const activeRow = allRows.find((row) => row.monsterId === DEFAULT_FORM_STATE.monsterId)!;
     const rows = [activeRow, ...allRows.filter((row) => row !== activeRow)].slice(0, 4);
@@ -129,7 +129,7 @@ describe("Compare and Duel panes", () => {
   });
 
   it("shows a fixed Dense failure, retained previous rows and Retry", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const rows = createDenseCompareRows(DEFAULT_FORM_STATE, context).slice(0, 2);
     const markup = renderToStaticMarkup(
       createElement(ComparePane, {
@@ -197,7 +197,7 @@ describe("Compare and Duel panes", () => {
   });
 
   it("keeps saved setup controls, current-target comparison and diff disclosure semantics", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const snapshot = createDuelSnapshot("saved-ranged", "Saved ranged", {
       ...DEFAULT_FORM_STATE,
       combatStyle: "ranged",

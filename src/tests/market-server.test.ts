@@ -1,4 +1,4 @@
-import { loadBundledLegacyContext } from "../adapters/legacy-runtime";
+import { loadCurrentTestContext } from "./helpers/current-sim";
 import type { MarketProvider } from "../server/market-core";
 import {
   MarketProviderError,
@@ -90,7 +90,7 @@ describe("market API handler", () => {
   });
 
   it("validates request JSON, body size and item allowlist", async () => {
-    const context = await loadBundledLegacyContext().then((result) => result.context);
+    const context = await loadCurrentTestContext().then((result) => result.context);
     const handle = handler(context);
 
     const invalidJson = await handle({ method: "POST", url: "/api/market/sync", body: "{bad" });
@@ -111,7 +111,7 @@ describe("market API handler", () => {
   });
 
   it("syncs current-monster prices into a validated PriceSet with partial failures", async () => {
-    const context = await loadBundledLegacyContext().then((result) => result.context);
+    const context = await loadCurrentTestContext().then((result) => result.context);
     const response = await handler(context)({
       method: "POST",
       url: "/api/market/sync",
@@ -132,7 +132,7 @@ describe("market API handler", () => {
   });
 
   it("supports all-supported and explicit item sync scopes", async () => {
-    const context = await loadBundledLegacyContext().then((result) => result.context);
+    const context = await loadCurrentTestContext().then((result) => result.context);
     const allSupported = await handler(context)({
       method: "POST",
       url: "/api/market/sync",
@@ -153,7 +153,7 @@ describe("market API handler", () => {
   });
 
   it("sanitizes unavailable and invalid provider failures", async () => {
-    const context = await loadBundledLegacyContext().then((result) => result.context);
+    const context = await loadCurrentTestContext().then((result) => result.context);
     const unavailable = await handler(context, {
       status: () => availableStatus,
       sync: () => {
@@ -197,7 +197,7 @@ describe("market API handler", () => {
   });
 
   it("enforces per-process sync rate limits and provider timeouts", async () => {
-    const context = await loadBundledLegacyContext().then((result) => result.context);
+    const context = await loadCurrentTestContext().then((result) => result.context);
     const rateLimited = createMarketApiHandler({
       provider: fixtureProvider(),
       gameData: context.gameData,

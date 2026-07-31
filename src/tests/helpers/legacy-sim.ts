@@ -1,6 +1,9 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createContext, runInContext } from "node:vm";
+import { createLegacyDerivedStaticRuntimeContext } from "../../adapters/static-runtime";
+import { loadoutToCombatBonuses, sumEquipmentBonuses } from "../../domain/equipment";
+import { EQUIPMENT_SLOTS, type CombatStyle, type Loadout } from "../../domain/shared";
 
 export const LEGACY_SCRIPT_FILES = ["gamedata.js", "engine.js", "trip.js", "equipment.js"] as const;
 
@@ -214,6 +217,66 @@ export function createLegacyRuntime(rootDir = process.cwd()): LegacyRuntime {
   }
 
   return context as LegacyRuntime;
+}
+
+/**
+ * App-owned, non-executable compatibility facade for historical fixture inputs.
+ *
+ * Default tests use this committed static snapshot instead of opening root
+ * legacy JavaScript. `createLegacyRuntime()` remains only for the explicit
+ * manual capture path while that historical tool is retained.
+ */
+export function createLegacyFixtureRuntime(): LegacyRuntime {
+  const { context } = createLegacyDerivedStaticRuntimeContext();
+  const { gameData, priceSet } = context;
+  const equipment = {
+    SLOT_DEFS: EQUIPMENT_SLOTS.map((slot) => ({
+      key: slot,
+      label: slot,
+      items: gameData.equipment[slot]
+    })),
+    sumBonuses(loadout: LegacyGear & { weapon: string; ammo: string }) {
+      return sumEquipmentBonuses(
+        {
+          weaponId: loadout.weapon,
+          ammoId: loadout.ammo,
+          gear: loadout
+        },
+        gameData
+      );
+    },
+    loadoutToInput(loadout: LegacyGear & { weapon: string; ammo: string }, combatType: CombatType) {
+      return loadoutToCombatBonuses(
+        {
+          weaponId: loadout.weapon,
+          ammoId: loadout.ammo,
+          gear: loadout
+        } satisfies Loadout,
+        combatType satisfies CombatStyle,
+        gameData
+      );
+    }
+  };
+  const runtime = {
+    GameData: {
+      MONSTERS: Object.values(gameData.monsters),
+      ITEM_PRICES: priceSet.itemPrices,
+      ALCH_VALUES: priceSet.alchValues
+    },
+    SimEngine: {
+      simulate() {
+        throw new Error(
+          "Static legacy fixtures do not execute archived SimEngine; use committed expected output."
+        );
+      },
+      WEAPONS: gameData.weapons,
+      ARROWS: gameData.ammo,
+      SPELLS: gameData.spells
+    },
+    Equipment: equipment
+  } as unknown as LegacyRuntime;
+  runtime.window = runtime;
+  return runtime;
 }
 
 export function getMonster(runtime: LegacyRuntime, monsterId: string): LegacyMonster {

@@ -3,14 +3,14 @@ import {
   activeAssumptionRow,
   createGeneratedRuntimeContext,
   createSimulationViewModel,
-  loadBundledLegacyContext,
+  loadCurrentTestContext,
   optimizeLootPrefsForMonster
 } from "./ui-view-model-fixture";
-import type { CombatSetupFormState, SimulationContext } from "./ui-view-model-fixture";
+import type { CombatSetupFormState } from "./ui-view-model-fixture";
 
 describe("rewrite UI view models", () => {
   it("builds full current-monster loot rows with stable duplicate-safe row ids", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const form: CombatSetupFormState = {
       ...DEFAULT_FORM_STATE,
       monsterId: "jogre"
@@ -35,7 +35,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("builds loot value composition with top contributors, tail grouping and full nested rows", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const form: CombatSetupFormState = {
       ...DEFAULT_FORM_STATE,
       monsterId: "firegiant"
@@ -63,7 +63,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("exposes sensible loot actions and per-action net GP/hr impacts", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const form: CombatSetupFormState = {
       ...DEFAULT_FORM_STATE,
       trip: {
@@ -102,7 +102,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("surfaces source-weighted unid herb valuation and generic proxy use", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const form: CombatSetupFormState = {
       ...DEFAULT_FORM_STATE,
       monsterId: "giant"
@@ -205,37 +205,10 @@ describe("rewrite UI view models", () => {
   });
 
   it("shows generated conditional loot as a locked, sanitized zero-value row", async () => {
-    const { context } = await loadBundledLegacyContext();
-    const conditionalContext: SimulationContext = {
-      ...context,
-      gameData: {
-        ...context.gameData,
-        monsters: {
-          ...context.gameData.monsters,
-          greater_demon: {
-            ...context.gameData.monsters.greater_demon,
-            loot: [
-              ...(context.gameData.monsters.greater_demon.loot ?? []),
-              {
-                name: "Clue scroll (hard)",
-                tag: "clue_hard",
-                chance: 1 / 128,
-                qtyAvg: 1,
-                eligibility: {
-                  kind: "clue",
-                  tier: "hard",
-                  membersOnly: true,
-                  requiresNoClue: true
-                }
-              }
-            ]
-          }
-        }
-      }
-    };
+    const { context } = await loadCurrentTestContext();
     const result = createSimulationViewModel(
       { ...DEFAULT_FORM_STATE, monsterId: "greater_demon" },
-      conditionalContext,
+      context,
       {},
       { "Clue scroll (hard)": "loot" }
     );
@@ -256,7 +229,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("labels trip-layer eaten or displaced loot rows in the view model when present", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const result = createSimulationViewModel(
       {
         ...DEFAULT_FORM_STATE,
@@ -285,7 +258,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("adds browser-local price history context to loot rows without changing loot math", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const base = createSimulationViewModel(DEFAULT_FORM_STATE, context);
     const withHistory = createSimulationViewModel(
       DEFAULT_FORM_STATE,
@@ -339,7 +312,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("normalizes malformed loot price history display numbers to a neutral missing state", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const result = createSimulationViewModel(
       DEFAULT_FORM_STATE,
       context,
@@ -372,7 +345,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("applies per-monster high-alch, overhead and talisman loot settings", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const form: CombatSetupFormState = {
       ...DEFAULT_FORM_STATE,
       monsterId: "green_dragon"
@@ -526,7 +499,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("optimizes loot prefs deterministically from canonical defaults", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const form: CombatSetupFormState = {
       ...DEFAULT_FORM_STATE,
       trip: {

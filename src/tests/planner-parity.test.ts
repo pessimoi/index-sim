@@ -3,72 +3,15 @@ import { join } from "node:path";
 import baselineJson from "./fixtures/planner-parity-baseline.json";
 import { PLANNER_PARITY_CASES } from "./fixtures/planner-parity-cases";
 import {
-  checkPlannerParityBaseline,
-  createPlannerParityBaseline,
-  normalizeLegacyPlan,
+  createCurrentProductContext,
   normalizeRewritePlan,
-  runPlannerParityAudit,
+  plannerParityDigest,
   type PlannerParityBaseline
 } from "./helpers/planner-parity";
 import { buildPlan } from "../domain/planner";
 import { createPlannerRuntime, plannerInputFromDefinition } from "./helpers/domain-planner";
-import { createLegacyPlannerRuntime, runLegacyPlannerCase } from "./helpers/legacy-planner";
 
 const baseline = baselineJson as PlannerParityBaseline;
-
-describe("legacy Planner audit adapter", () => {
-  it("runs a fixed-source case deterministically", () => {
-    const runtime = createLegacyPlannerRuntime();
-    const testCase = PLANNER_PARITY_CASES[0]!;
-    const first = normalizeLegacyPlan(
-      runLegacyPlannerCase(runtime, testCase.definition, testCase.options),
-      runtime
-    );
-    const second = normalizeLegacyPlan(
-      runLegacyPlannerCase(runtime, testCase.definition, testCase.options),
-      runtime
-    );
-
-    expect(second).toEqual(first);
-  });
-
-  it("rejects duplicate and unknown pool ids before execution", () => {
-    const runtime = createLegacyPlannerRuntime();
-    const testCase = PLANNER_PARITY_CASES[0]!;
-    expect(() =>
-      runLegacyPlannerCase(runtime, testCase.definition, {
-        ...testCase.options,
-        pool: { ...testCase.options.pool, weapon: ["rune_scimitar", "rune_scimitar"] }
-      })
-    ).toThrow("duplicate ids");
-    expect(() =>
-      runLegacyPlannerCase(runtime, testCase.definition, {
-        ...testCase.options,
-        pool: { ...testCase.options.pool, weapon: ["not_a_real_weapon"] }
-      })
-    ).toThrow("weapon is unknown");
-  });
-
-  it("rejects future gear and invalid numeric output", () => {
-    const runtime = createLegacyPlannerRuntime();
-    const testCase = PLANNER_PARITY_CASES[0]!;
-    expect(() =>
-      runLegacyPlannerCase(runtime, testCase.definition, {
-        ...testCase.options,
-        pool: { ...testCase.options.pool, weapon: ["abyssal_whip"] }
-      })
-    ).toThrow("Hypothetical Planner gear");
-
-    const { runtime: domainRuntime, context } = createPlannerRuntime();
-    const plan = buildPlan(
-      plannerInputFromDefinition(domainRuntime, testCase.definition),
-      context,
-      testCase.options
-    );
-    plan.start.dps = Number.NaN;
-    expect(() => normalizeRewritePlan(plan)).toThrow("invalid number");
-  });
-});
 
 describe("legacy Planner representative matrix", () => {
   it("keeps the required bounded case intents and both comparison modes", () => {
@@ -97,38 +40,37 @@ describe("legacy Planner representative matrix", () => {
     }
   });
 
-  it("matches the reviewed deterministic baseline", () => {
-    const audit = runPlannerParityAudit();
-    const status = checkPlannerParityBaseline(audit, baseline);
+  it("keeps reviewed historical rows complete and current rewrite digests stable", () => {
+    const baselineById = new Map(baseline.comparisons.map((entry) => [entry.id, entry]));
+    const { runtime, context: referenceContext } = createPlannerRuntime();
+    const currentContext = createCurrentProductContext();
 
-    expect(audit.caseCount).toBe(16);
-    expect(audit.comparisonCount).toBe(32);
-    expect(status).toEqual({
-      valid: true,
-      missing: [],
-      unexpected: [],
-      stale: [],
-      needsReview: [],
-      rewriteGaps: []
-    });
-
-    const changedComparisonIndex = audit.comparisons.findIndex(
-      (comparison) => comparison.result === "different"
-    );
-    expect(changedComparisonIndex).toBeGreaterThanOrEqual(0);
-
-    const changedAudit = {
-      ...audit,
-      comparisons: audit.comparisons.map((comparison, index) =>
-        index === changedComparisonIndex
-          ? { ...comparison, differenceDigest: "changed" }
-          : comparison
-      )
-    };
+    expect(baseline.comparisons).toHaveLength(32);
     expect(
-      createPlannerParityBaseline(changedAudit, baseline).comparisons[changedComparisonIndex]
-        ?.classification
-    ).toBe("needs-review");
+      baseline.comparisons.filter(
+        (entry) => entry.classification === "needs-review" || entry.classification === "rewrite-gap"
+      )
+    ).toEqual([]);
+
+    for (const testCase of PLANNER_PARITY_CASES) {
+      for (const mode of testCase.modes) {
+        const entry = baselineById.get(`${testCase.id}::${mode}`);
+        expect(
+          entry,
+          `Missing immutable Planner baseline for ${testCase.id}::${mode}`
+        ).toBeDefined();
+        if (!entry) continue;
+        const context = mode === "reference-context" ? referenceContext : currentContext;
+        const rewrite = normalizeRewritePlan(
+          buildPlan(
+            plannerInputFromDefinition(runtime, testCase.definition),
+            context,
+            testCase.options
+          )
+        );
+        expect(plannerParityDigest(rewrite)).toBe(entry.rewriteDigest);
+      }
+    }
   }, 60_000);
 });
 

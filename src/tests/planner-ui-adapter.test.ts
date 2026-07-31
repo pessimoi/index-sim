@@ -1,4 +1,4 @@
-import { loadBundledLegacyContext } from "../adapters/legacy-runtime";
+import { loadCurrentTestContext } from "./helpers/current-sim";
 import { plannerXpBounds, xpAt } from "../domain/planner";
 import {
   DEFAULT_FORM_STATE,
@@ -22,7 +22,7 @@ import {
 
 describe("planner UI adapter", () => {
   it("maps planner UI state into domain planner input and options", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const allowedPool = plannerAllowedPool(DEFAULT_FORM_STATE.combatStyle, context);
     const weaponId = allowedPool.weapon?.[0] ?? DEFAULT_FORM_STATE.weaponId;
     const plannerState = PlannerUiStateSchema.parse({
@@ -72,7 +72,7 @@ describe("planner UI adapter", () => {
   });
 
   it("builds visible Auto, explicit, locked and level-99 rows from effective adapter values", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const form: CombatSetupFormState = {
       ...DEFAULT_FORM_STATE,
       levels: { ...DEFAULT_FORM_STATE.levels, attack: 60, strength: 65, magic: 99 }
@@ -166,7 +166,7 @@ describe("planner UI adapter", () => {
   });
 
   it("maps Planner avg-over-session independently from combat setup sustained mode", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const form: CombatSetupFormState = { ...DEFAULT_FORM_STATE, sustained: false };
     const plannerState = PlannerUiStateSchema.parse({
       ...createDefaultPlannerUiState(form),
@@ -180,7 +180,7 @@ describe("planner UI adapter", () => {
   });
 
   it("builds a cleaned planner gear pool editor from the canonical allowed pool", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const allowedPool = plannerAllowedPool(DEFAULT_FORM_STATE.combatStyle, context);
     const weaponIds = allowedPool.weapon ?? [];
     expect(weaponIds.length).toBeGreaterThan(1);
@@ -225,7 +225,7 @@ describe("planner UI adapter", () => {
   });
 
   it("uses locked skills to keep a planner skill out of the training order", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const form: CombatSetupFormState = {
       ...DEFAULT_FORM_STATE,
       levels: {
@@ -257,7 +257,7 @@ describe("planner UI adapter", () => {
   }, 15_000);
 
   it("builds planner panel summary, training order and empty state rows", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const plan = createPlannerViewModel(DEFAULT_FORM_STATE, context);
     const panel = createPlannerPanelViewModel(plan);
 

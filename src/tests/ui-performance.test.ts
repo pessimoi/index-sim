@@ -1,4 +1,4 @@
-import { loadBundledLegacyContext } from "../adapters/legacy-runtime";
+import { loadCurrentTestContext } from "./helpers/current-sim";
 import { createDuelSnapshot } from "../app/state/duel-snapshots";
 import { DEFAULT_FORM_STATE, type CombatSetupFormState } from "../app/state/ui-state";
 import { createPlannerViewModel } from "../app/view-models/planner";
@@ -29,7 +29,7 @@ describe("rewrite UI performance smoke", () => {
   let context: SimulationContext;
 
   beforeAll(async () => {
-    const loaded = await loadBundledLegacyContext();
+    const loaded = await loadCurrentTestContext();
     context = loaded.context;
   });
 
@@ -70,5 +70,7 @@ describe("rewrite UI performance smoke", () => {
 
     expect(cellCount).toBe(Object.keys(context.gameData.monsters).length * 13);
     expect(matrixMs).toBeLessThan(12_000);
-  }, 20_000);
+    // Keep the CPU budget assertion strict while allowing wall-clock contention
+    // from the full parallel Vitest gate on developer workstations.
+  }, 30_000);
 });

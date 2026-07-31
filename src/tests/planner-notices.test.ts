@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { loadBundledLegacyContext } from "../adapters/legacy-runtime";
+import { loadCurrentTestContext } from "./helpers/current-sim";
 import { DEFAULT_FORM_STATE } from "../app/state/ui-state";
 import {
   PLANNER_NOTICE_CODE_REGISTRY,
@@ -40,9 +40,9 @@ function warning(
 
 async function planFixture(): Promise<{
   plan: PlannerPlan;
-  context: Awaited<ReturnType<typeof loadBundledLegacyContext>>["context"];
+  context: Awaited<ReturnType<typeof loadCurrentTestContext>>["context"];
 }> {
-  const { context } = await loadBundledLegacyContext();
+  const { context } = await loadCurrentTestContext();
   const source = createPlannerViewModel(DEFAULT_FORM_STATE, context);
   expect(source.steps.length).toBeGreaterThanOrEqual(2);
 

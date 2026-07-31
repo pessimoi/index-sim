@@ -8,7 +8,7 @@ import {
   formToSimulationRequest,
   formToTripPolicy,
   formatNumber,
-  loadBundledLegacyContext,
+  loadCurrentTestContext,
   normalizeFormState,
   rangedDagannothForm,
   rangedRockCrabForm,
@@ -21,7 +21,7 @@ import type { CombatSetupFormState } from "./ui-view-model-fixture";
 
 describe("rewrite UI view models", () => {
   it("maps selected melee special attack into SimulationRequest only when valid", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const form: CombatSetupFormState = {
       ...DEFAULT_FORM_STATE,
       weaponId: "dragon_dagger_p",
@@ -66,7 +66,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("maps ranged special attack ammo through current valid arrow fallback", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const thrownMainForm: CombatSetupFormState = {
       ...DEFAULT_FORM_STATE,
       combatStyle: "ranged",
@@ -118,7 +118,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("exposes special attack metrics in the simulation view model", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const form: CombatSetupFormState = {
       ...DEFAULT_FORM_STATE,
       weaponId: "dragon_dagger_p",
@@ -196,8 +196,8 @@ describe("rewrite UI view models", () => {
     expect(comparisonSpecial?.koChance).toBeGreaterThan(0);
   });
 
-  it("surfaces dragon halberd NPC-size fallback warning only for that special path", async () => {
-    const { context } = await loadBundledLegacyContext();
+  it("uses generated NPC size and warns only when the dragon-halberd size is unavailable", async () => {
+    const { context } = await loadCurrentTestContext();
     const warningText =
       "NPC size data is not modeled; dragon halberd second-hit behavior follows the current legacy fixture assumption.";
     const daggerResult = createSimulationViewModel(
@@ -220,50 +220,65 @@ describe("rewrite UI view models", () => {
       },
       context
     );
+    const missingSizeContext = structuredClone(context);
+    delete missingSizeContext.gameData.monsters.rock_crab.size;
+    const fallbackResult = createSimulationViewModel(
+      {
+        ...DEFAULT_FORM_STATE,
+        monsterId: "rock_crab",
+        weaponId: "dragon_halberd",
+        styleId: "aggressive",
+        gear: { ...DEFAULT_FORM_STATE.gear, shield: "none" },
+        boosts: ["super_att", "super_str"],
+        specialAttack: { weaponId: "dragon_halberd", ammoId: "none" }
+      },
+      missingSizeContext
+    );
 
     expect(daggerResult.specialWarnings).toEqual([]);
     expect(halberdResult.combat.specialAttack?.key).toBe("dragon_halberd");
-    expect(halberdResult.specialWarnings).toEqual([
+    expect(halberdResult.specialWarnings).toEqual([]);
+    expect(fallbackResult.specialWarnings).toEqual([
       {
         code: "dragon-halberd-npc-size-fallback",
         severity: "info",
         message: warningText
       }
     ]);
-    expect(halberdResult.warnings).toContain(warningText);
-    expect(activeAssumptionRow(halberdResult, "special-warnings")).toMatchObject({
+    expect(fallbackResult.warnings).toContain(warningText);
+    expect(activeAssumptionRow(fallbackResult, "special-warnings")).toMatchObject({
       label: "Special attack assumption",
       reviewTab: "melee",
       detail: warningText
     });
     expect(
-      halberdResult.statsSourceBreakdown.rows.find((row) => row.id === "special-attack")
+      fallbackResult.statsSourceBreakdown.rows.find((row) => row.id === "special-attack")
     ).toMatchObject({
       label: "Special attack",
       status: "partial",
       statusLabel: "partial"
     });
     expect(
-      halberdResult.statsSourceBreakdown.rows
+      fallbackResult.statsSourceBreakdown.rows
         .find((row) => row.id === "special-attack")
         ?.notes.join("\n")
     ).toContain(warningText);
-    expect(statsSourceDetail(halberdResult, "special-attack")).toMatchObject({
+    expect(statsSourceDetail(fallbackResult, "special-attack")).toMatchObject({
       status: "partial",
       statusLabel: "partial",
       histogramScopeLabel: "Per special hit",
-      warnings: halberdResult.specialWarnings
+      warnings: fallbackResult.specialWarnings
     });
     expect(
-      statsSourceDetail(halberdResult, "special-attack")?.histogram?.probabilityTotal
+      statsSourceDetail(fallbackResult, "special-attack")?.histogram?.probabilityTotal
     ).toBeCloseTo(1);
-    expect(statsSourceDetail(halberdResult, "special-attack")?.notes.join("\n")).toContain(
+    expect(statsSourceDetail(fallbackResult, "special-attack")?.notes.join("\n")).toContain(
       warningText
     );
   });
 
   it("builds hit distribution histogram data from the combat result", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const result = createSimulationViewModel(DEFAULT_FORM_STATE, context);
     const distribution = result.hitDistribution;
     const probabilityTotal = distribution.buckets.reduce(
@@ -304,7 +319,7 @@ describe("rewrite UI view models", () => {
   }, 15_000);
 
   it("omits transient hit-distribution presentation data from explicit rates-only paths", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const result = createSimulationViewModel(
       DEFAULT_FORM_STATE,
       context,
@@ -326,7 +341,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("builds default melee Stats combat roll detail metrics from current result data", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const result = createSimulationViewModel(DEFAULT_FORM_STATE, context);
     const metrics = combatRollMetrics(result);
 
@@ -400,7 +415,7 @@ describe("rewrite UI view models", () => {
   }, 15_000);
 
   it("builds ranged Stats combat roll detail without melee-only assumptions", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const result = createSimulationViewModel(rangedRockCrabForm(), context);
     const metrics = combatRollMetrics(result);
     const notes = result.combatRollDetail.metrics.map((metric) => metric.note).join("\n");
@@ -418,7 +433,7 @@ describe("rewrite UI view models", () => {
   }, 15_000);
 
   it("builds magic Stats combat roll detail without special or cannon histogram claims", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const magicForm = normalizeFormState({
       ...switchCombatStyleLoadout(DEFAULT_FORM_STATE, "magic"),
       weaponId: "staff_of_fire",
@@ -439,7 +454,7 @@ describe("rewrite UI view models", () => {
   }, 15_000);
 
   it("renders unavailable Stats combat roll values as fallbacks instead of zero", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const result = createSimulationViewModel(DEFAULT_FORM_STATE, context);
     const detail = createStatsCombatRollDetailViewModel({
       combat: {
@@ -484,7 +499,7 @@ describe("rewrite UI view models", () => {
   }, 15_000);
 
   it("builds Stats XP routing rows with player, skill and modeled loot XP rows", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const result = createSimulationViewModel(DEFAULT_FORM_STATE, context);
     const rows = new Map(result.xpRouting.rows.map((row) => [row.id, row]));
     const skillRows = result.xpRouting.rows.filter((row) => row.id.startsWith("skill-"));
@@ -524,7 +539,7 @@ describe("rewrite UI view models", () => {
   }, 15_000);
 
   it("adapts the composed full simulation result as the primary numeric source", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const request = formToSimulationRequest(DEFAULT_FORM_STATE, context.gameData);
     const fullResult = simulateFullSimulation(
       {
@@ -555,7 +570,7 @@ describe("rewrite UI view models", () => {
   }, 15_000);
 
   it("builds Stats source breakdown rows from current combat and trip outputs", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const result = createSimulationViewModel(DEFAULT_FORM_STATE, context);
     const rows = new Map(result.statsSourceBreakdown.rows.map((row) => [row.id, row]));
     const normalDetail = statsSourceDetail(result, "normal-attack");
@@ -630,7 +645,7 @@ describe("rewrite UI view models", () => {
   }, 15_000);
 
   it("marks magic special source breakdown as not modeled without adding formulas", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const magicForm = normalizeFormState({
       ...switchCombatStyleLoadout(DEFAULT_FORM_STATE, "magic"),
       weaponId: "staff_of_fire",
@@ -664,7 +679,7 @@ describe("rewrite UI view models", () => {
   }, 15_000);
 
   it("models Magic alch XP from tracked in-trip alch casts", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const form = normalizeFormState({
       ...DEFAULT_FORM_STATE,
       monsterId: "chaos_dwarf",
@@ -710,7 +725,7 @@ describe("rewrite UI view models", () => {
   }, 15_000);
 
   it("adds the Stats cannon XP routing row only when cannon contributes", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const form = rangedDagannothForm();
     const withoutCannon = createSimulationViewModel(form, context);
     const withCannon = createSimulationViewModel(form, context, {
@@ -796,7 +811,7 @@ describe("rewrite UI view models", () => {
   }, 15_000);
 
   it("keeps cannon source details modeled for an extremely sparse spot", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const idleResult = createSimulationViewModel(rangedRockCrabForm(), context, {
       rock_crab: { enabled: true, targets: 1, respawnSec: 3600 }
     });

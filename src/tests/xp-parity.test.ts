@@ -2,7 +2,7 @@ import fixtureSet from "./fixtures/legacy-golden.json";
 import { LEGACY_GOLDEN_CASES } from "./fixtures/legacy-case-definitions";
 import {
   buildLegacyInput,
-  createLegacyRuntime,
+  createLegacyFixtureRuntime,
   type LegacyCaseDefinition,
   type LegacyInput,
   type LegacyRuntime
@@ -176,7 +176,7 @@ function expectedXpRows(fixture: Record<string, unknown>): Map<string, number> {
 }
 
 function expectModeledXpRowParity(caseId: string, rowKey: string): void {
-  const runtime = createLegacyRuntime();
+  const runtime = createLegacyFixtureRuntime();
   const context = domainContextFromLegacy(runtime);
   const definition = definitionsById.get(caseId);
   const fixture = fixturesById.get(caseId);
@@ -218,7 +218,7 @@ describe("XP parity with legacy golden fixtures", () => {
 
   for (const testCase of parityCases) {
     it(`matches combat XP/hr fields for ${testCase.id}`, () => {
-      const runtime = createLegacyRuntime();
+      const runtime = createLegacyFixtureRuntime();
       const context = domainContextFromLegacy(runtime);
       const definition = definitionsById.get(testCase.id);
       expect(definition, `Missing case definition for ${testCase.id}`).toBeDefined();
@@ -253,7 +253,7 @@ describe("XP parity with legacy golden fixtures", () => {
 describe("cannon XP ownership", () => {
   it("models combined cannon damage, rather than theoretical cannon-only DPS, as XP", () => {
     const caseId = "ranged_magic_shortbow_dagannoth_cannon";
-    const runtime = createLegacyRuntime();
+    const runtime = createLegacyFixtureRuntime();
     const context = domainContextFromLegacy(runtime);
     const definition = definitionsById.get(caseId);
     const fixture = fixturesById.get(caseId);
@@ -299,7 +299,7 @@ describe("loot XP ownership parity", () => {
 describe("XP intentional delta diagnostics", () => {
   it("documents the accepted ring-of-recoil XP/hr direct-damage attribution delta", () => {
     const caseId = "melee_ring_recoil_fire_giant_food_trip";
-    const runtime = createLegacyRuntime();
+    const runtime = createLegacyFixtureRuntime();
     const context = domainContextFromLegacy(runtime);
     const definition = definitionsById.get(caseId);
     const fixture = fixturesById.get(caseId);

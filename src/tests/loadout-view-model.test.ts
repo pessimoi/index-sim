@@ -7,7 +7,7 @@ import {
   createSimulationViewModel,
   equipmentSlotOptions,
   gearQuickActionForSlot,
-  loadBundledLegacyContext,
+  loadCurrentTestContext,
   normalizeFormState,
   optimizeVisibleLoadout,
   spellOptions,
@@ -18,7 +18,7 @@ import {
 
 describe("rewrite UI view models", () => {
   it("builds searchable loadout option view models from the validated game snapshot", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
 
     expect(weaponOptions(context.gameData, "melee")).toEqual(
       expect.arrayContaining([
@@ -55,7 +55,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("selects deterministic visible gear quick actions for the active combat style", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const helmOptions = equipmentSlotOptions(context.gameData, "helm");
     const bodyOptions = equipmentSlotOptions(context.gameData, "body");
 
@@ -103,7 +103,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("limits gear quick actions to the supplied visible candidates and shield lock", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const hiddenBestOptions = equipmentSlotOptions(context.gameData, "helm").filter(
       (option) => option.id !== "berserker_helm"
     );
@@ -137,7 +137,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("includes unmet requirements in gear quick action reasons", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const action = gearQuickActionForSlot({
       gameData: context.gameData,
       slot: "helm",
@@ -157,7 +157,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("uses generated requirements in gear quick action reasons before manual fallback", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const generatedContext = withGeneratedRequirement(context, "berserker_helm", { strength: 50 });
     const action = gearQuickActionForSlot({
       gameData: generatedContext.gameData,
@@ -178,7 +178,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("keeps normal gear quick action reasons when requirements are met", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const action = gearQuickActionForSlot({
       gameData: context.gameData,
       slot: "helm",
@@ -198,7 +198,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("includes unmet requirements when the current gear is already the best option", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const action = gearQuickActionForSlot({
       gameData: context.gameData,
       slot: "body",
@@ -218,7 +218,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("does not add requirement copy for gear with no known requirement", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const action = gearQuickActionForSlot({
       gameData: context.gameData,
       slot: "amulet",
@@ -240,7 +240,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("optimizes the visible whole loadout deterministically for current-target normal DPS", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const form = normalizeFormState({
       ...DEFAULT_FORM_STATE,
       monsterId: "black_dragon",
@@ -269,7 +269,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("keeps whole-loadout optimization inside visible candidates and two-handed rules", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const form = normalizeFormState({
       ...DEFAULT_FORM_STATE,
       monsterId: "black_dragon",
@@ -306,7 +306,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("filters unmet optimizer candidates by default and reports bounded no-regression results", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const form = normalizeFormState({
       ...DEFAULT_FORM_STATE,
       monsterId: "black_dragon",
@@ -340,7 +340,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("keeps the original warning-only candidate policy behind an explicit optimizer input", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const form = normalizeFormState({
       ...DEFAULT_FORM_STATE,
       monsterId: "black_dragon",
@@ -373,7 +373,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("keeps an unmet current loadout as the no-regression baseline", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const form = normalizeFormState({
       ...DEFAULT_FORM_STATE,
       weaponId: "dragon_longsword",
@@ -409,7 +409,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("keeps the current loadout on an equal visible candidate set", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const form = normalizeFormState(DEFAULT_FORM_STATE);
     const result = optimizeVisibleLoadout({
       form,
@@ -443,7 +443,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("sanitizes an invalid frontier limit without dropping valid candidates", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const form = normalizeFormState({
       ...DEFAULT_FORM_STATE,
       monsterId: "black_dragon",
@@ -465,7 +465,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("clears and locks shield state when a two-handed weapon is selected", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const ranged = normalizeFormState({
       ...switchCombatStyleLoadout(DEFAULT_FORM_STATE, "ranged"),
       weaponId: "steel_knife_w",
@@ -501,7 +501,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("surfaces unmet setup requirements for low defence rune armour", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const result = createSimulationViewModel(
       {
         ...DEFAULT_FORM_STATE,
@@ -523,8 +523,8 @@ describe("rewrite UI view models", () => {
       severity: "warning"
     });
     expect(runeBodyWarning?.message).toContain("Rune platebody requires Defence 40");
-    expect(result.setupRequirements.source).toBe("manual-fallback");
-    expect(result.setupRequirements.policyLabel).toBe("Manual requirement fallback");
+    expect(result.setupRequirements.source).toBe("generated");
+    expect(result.setupRequirements.policyLabel).toBe("Generated requirement data");
     expect(activeAssumptionRow(result, "setup-requirements")).toMatchObject({
       label: "Setup requirements",
       reviewTab: "melee",
@@ -534,7 +534,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("surfaces unmet setup requirements for low attack dragon weapons", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const form = applyWeaponSelection(
       {
         ...DEFAULT_FORM_STATE,
@@ -565,7 +565,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("uses generated setup requirements without the manual fallback label", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const generatedContext = withGeneratedRequirement(context, "iron_scimitar", { strength: 5 });
     const form = applyWeaponSelection(
       {
@@ -601,7 +601,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("keeps matching setup levels free of requirement warnings", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const result = createSimulationViewModel(DEFAULT_FORM_STATE, context);
 
     expect(result.setupRequirements.warnings).toEqual([]);
@@ -609,7 +609,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("ignores selected gear with no known setup requirement", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const form = applyWeaponSelection(
       {
         ...DEFAULT_FORM_STATE,

@@ -8,16 +8,17 @@ import {
   expectCloseToFixture,
   expectedFor,
   formToSimulationRequest,
-  loadBundledLegacyContext,
+  loadCurrentTestContext,
   normalizeFormState,
   rangedRockCrabForm,
   switchCombatStyleLoadout
 } from "./ui-view-model-fixture";
+import { createLegacyDerivedStaticRuntimeContext } from "../adapters/static-runtime";
 import type { CombatSetupFormState } from "./ui-view-model-fixture";
 
 describe("rewrite UI view models", () => {
   it("keeps form state separate from SimulationRequest", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const request = formToSimulationRequest(DEFAULT_FORM_STATE);
 
     expect(request.monsterId).toBe(DEFAULT_FORM_STATE.monsterId);
@@ -45,7 +46,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("builds SimulationRequest from the restored active per-style loadout", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const melee = normalizeFormState({
       ...DEFAULT_FORM_STATE,
       weaponId: "dragon_dagger_p",
@@ -76,7 +77,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("maps restored active gear, ammo and spell selections into SimulationRequest", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const magic = normalizeFormState({
       ...switchCombatStyleLoadout(DEFAULT_FORM_STATE, "magic"),
       weaponId: "staff_of_fire",
@@ -117,7 +118,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("maps manual combat overrides into SimulationRequest and visible combat metrics", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const form: CombatSetupFormState = {
       ...DEFAULT_FORM_STATE,
       manualOverrides: {
@@ -159,7 +160,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("composes MonsterCard presentation from the full simulation combat result", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const result = createSimulationViewModel(DEFAULT_FORM_STATE, context);
 
     expect(result.monsterCard).toMatchObject({
@@ -179,7 +180,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("builds result, compare and planner models from the domain", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const result = createSimulationViewModel(DEFAULT_FORM_STATE, context);
     const compareRows = createCompareRows(DEFAULT_FORM_STATE, context, 3);
     const planner = createPlannerViewModel(DEFAULT_FORM_STATE, context);
@@ -193,7 +194,7 @@ describe("rewrite UI view models", () => {
   }, 15_000);
 
   it("matches the legacy fixture numbers for the default melee summary", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = createLegacyDerivedStaticRuntimeContext();
     const result = createSimulationViewModel(DEFAULT_FORM_STATE, context);
     const expected = expectedFor("melee_rune_scimitar_hill_giant_super_prayers");
 
@@ -204,7 +205,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("matches the legacy fixture numbers for a ranged safespot summary", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = createLegacyDerivedStaticRuntimeContext();
     const form = rangedRockCrabForm();
     const result = createSimulationViewModel(form, context);
     const expected = expectedFor("ranged_magic_shortbow_rock_crab_safespot");

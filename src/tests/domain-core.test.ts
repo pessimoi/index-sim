@@ -4,7 +4,7 @@ import fixtureSet from "./fixtures/legacy-golden.json";
 import { LEGACY_GOLDEN_CASES } from "./fixtures/legacy-case-definitions";
 import {
   buildLegacyInput,
-  createLegacyRuntime,
+  createLegacyFixtureRuntime,
   type LegacyInput,
   type LegacyRuntime
 } from "./helpers/legacy-sim";
@@ -159,7 +159,7 @@ describe("pure combat formulas", () => {
     expect(hitChance(10_000, -1)).toBeGreaterThan(0);
     expect(hitChance(10_000, -1)).toBeLessThanOrEqual(1);
 
-    const runtime = createLegacyRuntime();
+    const runtime = createLegacyFixtureRuntime();
     const context = domainContextFromLegacy(runtime);
     const definition = definitionsById.get("melee_rune_scimitar_hill_giant_super_prayers");
     expect(definition).toBeDefined();
@@ -248,7 +248,7 @@ describe("pure combat formulas", () => {
   });
 
   it("resolves melee stance ids through the equipped weapon", () => {
-    const context = domainContextFromLegacy(createLegacyRuntime());
+    const context = domainContextFromLegacy(createLegacyFixtureRuntime());
 
     expect(resolveMeleeStance("dragon_halberd", "accurate", context.gameData)).toMatchObject({
       id: "controlled",
@@ -263,7 +263,7 @@ describe("pure combat formulas", () => {
   });
 
   it("applies bounded manual combat overrides without changing the derived default path", () => {
-    const runtime = createLegacyRuntime();
+    const runtime = createLegacyFixtureRuntime();
     const context = domainContextFromLegacy(runtime);
     const definition = definitionsById.get("melee_rune_scimitar_hill_giant_super_prayers");
     expect(definition).toBeDefined();
@@ -308,7 +308,7 @@ describe("pure combat formulas", () => {
   });
 
   it("uses source-backed NPC size for dragon halberd selected-target hits", () => {
-    const runtime = createLegacyRuntime();
+    const runtime = createLegacyFixtureRuntime();
     const legacyContext = domainContextFromLegacy(runtime);
     const definition = definitionsById.get("melee_dragon_halberd_rock_crab_small_target_spec");
     expect(definition).toBeDefined();
@@ -346,7 +346,7 @@ describe("pure combat formulas", () => {
 
 describe("pure equipment core", () => {
   it("sums weapon, ammo and gear bonuses without browser globals", () => {
-    const context = domainContextFromLegacy(createLegacyRuntime());
+    const context = domainContextFromLegacy(createLegacyFixtureRuntime());
     const twoHanded = sumEquipmentBonuses(
       {
         weaponId: "magic_shortbow",
@@ -372,7 +372,7 @@ describe("pure equipment core", () => {
   });
 
   it("maps summed bonuses into combat input fields", () => {
-    const context = domainContextFromLegacy(createLegacyRuntime());
+    const context = domainContextFromLegacy(createLegacyFixtureRuntime());
     const bonuses = loadoutToCombatBonuses(
       {
         weaponId: "dragon_dagger_p",
@@ -392,7 +392,7 @@ describe("pure equipment core", () => {
 describe("combat/equipment domain parity with legacy golden fixtures", () => {
   for (const testCase of fixtures.cases) {
     it(`matches ported combat fields for ${testCase.id}`, () => {
-      const runtime = createLegacyRuntime();
+      const runtime = createLegacyFixtureRuntime();
       const context = domainContextFromLegacy(runtime);
       const definition = definitionsById.get(testCase.id);
       expect(definition, `Missing case definition for ${testCase.id}`).toBeDefined();

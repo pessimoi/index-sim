@@ -1,6 +1,6 @@
 import { createElement, isValidElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { loadBundledLegacyContext } from "../adapters/legacy-runtime";
+import { loadCurrentTestContext } from "./helpers/current-sim";
 import { TripPane } from "../app/components/panes/trip-pane";
 import { SelectField } from "../app/components/form-fields";
 import {
@@ -28,7 +28,7 @@ function selectChange(tree: ReactNode, label: string, value: string): void {
 }
 
 async function fixture(form: CombatSetupFormState = DEFAULT_FORM_STATE) {
-  const { context } = await loadBundledLegacyContext();
+  const { context } = await loadCurrentTestContext();
   const simulation = createSimulationViewModel(form, context);
   return createTripPaneViewModel({ form, result: simulation.trip });
 }

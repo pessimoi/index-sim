@@ -3,13 +3,13 @@ import {
   activeAssumptionRow,
   activeAssumptionRows,
   createSimulationViewModel,
-  loadBundledLegacyContext
+  loadCurrentTestContext
 } from "./ui-view-model-fixture";
 import type { CombatSetupFormState } from "./ui-view-model-fixture";
 
 describe("rewrite UI view models", () => {
   it("keeps advisory price freshness out of active assumptions", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const result = createSimulationViewModel(DEFAULT_FORM_STATE, {
       ...context,
       priceSet: {
@@ -25,18 +25,24 @@ describe("rewrite UI view models", () => {
     });
 
     expect(result.activeAssumptions).toMatchObject({
-      statusLabel: "Default assumptions active",
-      totalCount: 0,
-      hasActiveRows: false,
+      statusLabel: "1 active modifier",
+      totalCount: 1,
+      hasActiveRows: true,
       hiddenCount: 0
     });
     expect(result.priceNotices.notes.length).toBeGreaterThan(0);
-    expect(result.activeAssumptions.visibleRows).toEqual([]);
+    expect(result.activeAssumptions.visibleRows).toEqual([
+      expect.objectContaining({
+        id: "active-price-set",
+        label: "Active PriceSet",
+        value: "Synced"
+      })
+    ]);
     expect(result.activeAssumptions.hiddenRows).toEqual([]);
   });
 
   it("keeps inherited trip loot settings review-only in active assumptions", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const result = createSimulationViewModel(
       {
         ...DEFAULT_FORM_STATE,
@@ -57,7 +63,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("summarizes enabled cannon settings with a Cannon review target", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const result = createSimulationViewModel(DEFAULT_FORM_STATE, context, {
       giant: {
         enabled: true,
@@ -80,7 +86,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("keeps structured money warnings available for UI surfacing", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const itemPrices = { ...context.priceSet.itemPrices };
     delete itemPrices.uncut_sapphire;
     const result = createSimulationViewModel(DEFAULT_FORM_STATE, {
@@ -107,7 +113,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("summarizes imported and synced PriceSet modifiers", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const imported = createSimulationViewModel(DEFAULT_FORM_STATE, {
       ...context,
       priceSet: {
@@ -144,7 +150,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("keeps active assumption priority order and five-row visibility stable", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const form: CombatSetupFormState = {
       ...DEFAULT_FORM_STATE,
       manualOverrides: {
@@ -232,7 +238,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("keeps targeted active-assumption resets scoped in the view model", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const form: CombatSetupFormState = {
       ...DEFAULT_FORM_STATE,
       manualOverrides: {

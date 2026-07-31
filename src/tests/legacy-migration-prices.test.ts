@@ -1,4 +1,4 @@
-import { loadBundledLegacyContext } from "../adapters/legacy-runtime";
+import { loadCurrentTestContext } from "./helpers/current-sim";
 import { createMemoryStorage } from "../adapters/storage";
 import { inspectLegacySetupMigration } from "../app/state/legacy-storage-migration";
 import type { GameDataSnapshot, PriceSet } from "../domain/shared";
@@ -7,7 +7,7 @@ describe("legacy price migration", () => {
   let gameData: GameDataSnapshot;
 
   beforeAll(async () => {
-    const loaded = await loadBundledLegacyContext();
+    const loaded = await loadCurrentTestContext();
     gameData = loaded.context.gameData;
   });
 

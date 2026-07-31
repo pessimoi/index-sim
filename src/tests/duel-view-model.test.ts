@@ -5,7 +5,7 @@ import {
   createDuelMatrixViewModel,
   createDuelSnapshot,
   createSimulationViewModel,
-  loadBundledLegacyContext,
+  loadCurrentTestContext,
   normalizeFormState,
   switchCombatStyleLoadout
 } from "./ui-view-model-fixture";
@@ -20,7 +20,7 @@ import {
 
 describe("rewrite UI view models", () => {
   it("builds duel comparison rows for live and snapshots on the current monster", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const snapshotForm = normalizeFormState({
       ...switchCombatStyleLoadout(DEFAULT_FORM_STATE, "ranged"),
       monsterId: "firegiant",
@@ -133,7 +133,7 @@ describe("rewrite UI view models", () => {
   }, 15_000);
 
   it("excludes shared target and inactive setup caches from Duel setup diffs", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const snapshotForm = normalizeFormState({
       ...DEFAULT_FORM_STATE,
       monsterId: "firegiant",
@@ -160,7 +160,7 @@ describe("rewrite UI view models", () => {
   }, 15_000);
 
   it("builds an all-monster Duel matrix only from live and saved setup inputs", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const snapshotForm = normalizeFormState({
       ...switchCombatStyleLoadout(DEFAULT_FORM_STATE, "ranged"),
       monsterId: "firegiant",
@@ -226,7 +226,7 @@ describe("rewrite UI view models", () => {
   }, 30_000);
 
   it("sorts current-target setup rows by labels and outcomes without mutating source order", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const snapshot = createDuelSnapshot(
       "snap-ranged",
       "Alpha ranged",
@@ -274,7 +274,7 @@ describe("rewrite UI view models", () => {
   }, 15_000);
 
   it("sorts the Duel matrix by monster or the selected metric for a setup", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const snapshot = createDuelSnapshot(
       "snap-ranged",
       "Ranged saved",

@@ -1,4 +1,4 @@
-import { loadBundledLegacyContext } from "../adapters/legacy-runtime";
+import { loadCurrentTestContext } from "./helpers/current-sim";
 import {
   auditDynamicLootMarketDependencies,
   expandAllSupportedMarketSyncItemIds,
@@ -17,7 +17,7 @@ import type { GameDataSnapshot } from "../domain/shared";
 
 describe("market sync item expansion", () => {
   it("expands current-monster loot through validated mappings and support dependencies", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const expansion = expandMarketSyncItemIdsForMonster(context.gameData, "green_dragon");
 
     expect(expansion.itemIds).toEqual(
@@ -135,7 +135,7 @@ describe("market sync item expansion", () => {
   });
 
   it("keeps explicit items scope allowlisted and reports missing mappings", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const expansion = expandMarketSyncRequestItems(context.gameData, {
       scope: "items",
       itemIds: ["lobster", "not_mapped"],

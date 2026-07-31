@@ -4,7 +4,7 @@ import {
   formToSimulationRequest,
   formToTripPolicy,
   formatNumber,
-  loadBundledLegacyContext,
+  loadCurrentTestContext,
   normalizeFormState,
   rangedDagannothForm,
   rangedRockCrabForm,
@@ -14,7 +14,7 @@ import type { CombatSetupFormState } from "./ui-view-model-fixture";
 
 describe("rewrite UI view models", () => {
   it("maps extended trip controls to the domain policy without leaking into SimulationRequest", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const form: CombatSetupFormState = {
       ...DEFAULT_FORM_STATE,
       trip: {
@@ -90,7 +90,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("applies manual food count and food-per-kill override to the trip view model", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const form: CombatSetupFormState = {
       ...DEFAULT_FORM_STATE,
       trip: {
@@ -108,7 +108,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("applies recoil ring count when ring of recoil is equipped", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const form: CombatSetupFormState = {
       ...DEFAULT_FORM_STATE,
       monsterId: "firegiant",
@@ -155,7 +155,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("applies scarce spot controls to the trip view model", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const form: CombatSetupFormState = {
       ...rangedRockCrabForm(),
       trip: {
@@ -177,7 +177,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("applies potion, auto-bank and reserve defaults to the trip view model", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const magicForm = normalizeFormState({
       ...switchCombatStyleLoadout(DEFAULT_FORM_STATE, "magic"),
       boosts: ["magic"],
@@ -223,7 +223,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("exposes potion carry recommendation without adding it to SimulationRequest", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const vialMode = createSimulationViewModel(
       {
         ...DEFAULT_FORM_STATE,
@@ -340,7 +340,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("applies manual prayer restore controls to the trip view model", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const auto = createSimulationViewModel(DEFAULT_FORM_STATE, context);
     const manualDoses = createSimulationViewModel(
       {
@@ -377,7 +377,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("builds the Stats Trip and banking summary from the trip result", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const form = normalizeFormState({
       ...DEFAULT_FORM_STATE,
       trip: {
@@ -421,7 +421,7 @@ describe("rewrite UI view models", () => {
   }, 15_000);
 
   it("applies per-monster cannon settings to visible rates", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const form = rangedDagannothForm();
     const withoutCannon = createSimulationViewModel(form, context);
     const withCannon = createSimulationViewModel(form, context, {
@@ -443,7 +443,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("keeps cannon output and linked sparse trip assumptions in one view model", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const form: CombatSetupFormState = {
       ...rangedDagannothForm(),
       trip: {

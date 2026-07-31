@@ -2,7 +2,7 @@
 
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { loadBundledLegacyContext } from "../adapters/legacy-runtime";
+import { loadCurrentTestContext } from "./helpers/current-sim";
 import type { RunningCalculationTask } from "../app/calculation-worker-client";
 import type {
   DenseCompareCalculationRequest,
@@ -126,7 +126,7 @@ describe("Compare and Duel controllers", () => {
 
   it("preserves Dense debounce, source replacement cancellation and inactive-tab cancellation", async () => {
     vi.useFakeTimers();
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const requests: DenseCompareCalculationRequest[] = [];
     const cancels: Array<ReturnType<typeof vi.fn>> = [];
     const startTask = (request: DenseCompareCalculationRequest) => {
@@ -196,7 +196,7 @@ describe("Compare and Duel controllers", () => {
   });
 
   it("derives every Dense lifecycle state and keeps Duel matrix filtering pure", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const source = {
       form: DEFAULT_FORM_STATE,
       context,
@@ -277,7 +277,7 @@ describe("Compare and Duel controllers", () => {
   });
 
   it("keeps Dense first and refresh failures recoverable with the latest successful rows", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     vi.useFakeTimers();
     const requests: DenseCompareCalculationRequest[] = [];
     const resolvers: Array<(rows: ReturnType<typeof createDenseCompareRows>) => void> = [];
@@ -378,7 +378,7 @@ describe("Compare and Duel controllers", () => {
   });
 
   it("derives every Duel matrix lifecycle state with strict source identity", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const snapshot = createDuelSnapshot("saved", "Saved", DEFAULT_FORM_STATE);
     const source = {
       form: DEFAULT_FORM_STATE,
@@ -486,7 +486,7 @@ describe("Compare and Duel controllers", () => {
   });
 
   it("starts Duel matrix only on intent, guards busy reruns and cancels on unmount", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const snapshot = createDuelSnapshot("saved", "Saved", DEFAULT_FORM_STATE);
     const requests: DuelMatrixCalculationRequest[] = [];
     const cancel = vi.fn();
@@ -540,7 +540,7 @@ describe("Compare and Duel controllers", () => {
   });
 
   it("reuses a fresh Duel matrix and requires an explicit rebuild after its sources change", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const snapshot = createDuelSnapshot("saved", "Saved", DEFAULT_FORM_STATE);
     const requests: DuelMatrixCalculationRequest[] = [];
     const resolvers: Array<(value: DuelMatrixViewModel) => void> = [];
@@ -615,7 +615,7 @@ describe("Compare and Duel controllers", () => {
   });
 
   it("shows a fixed first-build failure and lets Retry replace it without leaking raw errors", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const snapshot = createDuelSnapshot("saved", "Saved", DEFAULT_FORM_STATE);
     const resolvers: Array<(value: DuelMatrixViewModel) => void> = [];
     const rejectors: Array<(reason: unknown) => void> = [];
@@ -672,7 +672,7 @@ describe("Compare and Duel controllers", () => {
   });
 
   it("retains previous output across failed refresh and silently replaces obsolete tasks", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const snapshot = createDuelSnapshot("saved", "Saved", DEFAULT_FORM_STATE);
     const requests: DuelMatrixCalculationRequest[] = [];
     const resolvers: Array<(value: DuelMatrixViewModel) => void> = [];

@@ -29,7 +29,7 @@ import {
   assertGameDataSourcePinAgreement,
   parsePriceSetJson
 } from "../data/schemas";
-import { createLegacyRuntime } from "./helpers/legacy-sim";
+import { createLegacyFixtureRuntime } from "./helpers/legacy-sim";
 
 function readTextFile(fileName: string): string {
   return readFileSync(join(process.cwd(), fileName), "utf8");
@@ -140,7 +140,7 @@ function findDuplicateObjectLiteralKeys(sourceText: string, sourceLabel: string)
 
 describe("validated game data snapshots", () => {
   it("adapts the current legacy runtime into a validated GameDataSnapshot", () => {
-    const runtime = createLegacyRuntime();
+    const runtime = createLegacyFixtureRuntime();
     const snapshot = createGameDataSnapshotFromLegacy({
       gameData: runtime.GameData,
       simEngine: runtime.SimEngine,
@@ -157,7 +157,7 @@ describe("validated game data snapshots", () => {
   });
 
   it("creates a validated bundled PriceSet from the legacy runtime without metadata keys", () => {
-    const runtime = createLegacyRuntime();
+    const runtime = createLegacyFixtureRuntime();
     const priceSet = createPriceSetFromLegacyGameData({ gameData: runtime.GameData });
 
     expect(PriceSetSchema.parse(priceSet)).toMatchObject({
@@ -236,7 +236,7 @@ describe("validated game data snapshots", () => {
   });
 
   it("keeps revision context optional for legacy snapshots but strict and source-pin comparable", () => {
-    const runtime = createLegacyRuntime();
+    const runtime = createLegacyFixtureRuntime();
     const legacy = createGameDataSnapshotFromLegacy({
       gameData: runtime.GameData,
       simEngine: runtime.SimEngine,
@@ -295,7 +295,7 @@ describe("validated game data snapshots", () => {
   });
 
   it("rejects duplicate legacy monster ids before object conversion can hide them", () => {
-    const runtime = createLegacyRuntime();
+    const runtime = createLegacyFixtureRuntime();
     const duplicatedMonster = { ...runtime.GameData.MONSTERS[0], id: "chicken" };
     const error = expectDataReliabilityError(
       () =>

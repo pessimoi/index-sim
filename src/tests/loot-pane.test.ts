@@ -1,6 +1,6 @@
 import { createElement, isValidElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { loadBundledLegacyContext } from "../adapters/legacy-runtime";
+import { loadCurrentTestContext } from "./helpers/current-sim";
 import { createGeneratedRuntimeContext } from "../adapters/generated";
 import { LootPane, type LootPaneActions } from "../app/components/panes/loot-pane";
 import { DEFAULT_FORM_STATE } from "../app/state/ui-state";
@@ -47,7 +47,7 @@ function elements(node: ReactNode): ReactElement[] {
 
 describe("Loot pane", () => {
   it("shows the current High alch setting while calculated results catch up", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const simulation = createSimulationViewModel(DEFAULT_FORM_STATE, context);
     const markup = renderToStaticMarkup(
       createElement(LootPane, {
@@ -73,7 +73,7 @@ describe("Loot pane", () => {
   });
 
   it("renders friendly semantic latest and baseline capture facts", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const simulation = createSimulationViewModel(DEFAULT_FORM_STATE, context);
     const template = simulation.loot.actionableRows[0]!;
     const timeContext = createPriceTimeContext(new Date("2026-07-20T13:00:00Z"), "UTC");
@@ -121,7 +121,7 @@ describe("Loot pane", () => {
   });
 
   it("renders source names as primary copy and underscored ids only in technical details", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const simulation = createSimulationViewModel(DEFAULT_FORM_STATE, context);
     const template = simulation.loot.actionableRows.find((row) => row.expandedRows.length > 0)!;
     const nestedTemplate = template.expandedRows[0]!;
@@ -182,7 +182,7 @@ describe("Loot pane", () => {
   });
 
   it("keeps the complete landmark, controls, composition and action table order", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const simulation = createSimulationViewModel(DEFAULT_FORM_STATE, context);
     const markup = renderToStaticMarkup(
       createElement(LootPane, {
@@ -231,7 +231,7 @@ describe("Loot pane", () => {
   });
 
   it("validates a selected action against the row before invoking the caller", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const simulation = createSimulationViewModel(DEFAULT_FORM_STATE, context);
     const row = simulation.loot.actionableRows.find(
       (candidate) => candidate.availableActions.length > 1
@@ -272,7 +272,7 @@ describe("Loot pane", () => {
   });
 
   it("routes sortable column headings through the controlled pane action", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const simulation = createSimulationViewModel(DEFAULT_FORM_STATE, context);
     const calls: string[] = [];
     const nestedCalls: string[] = [];
@@ -323,7 +323,7 @@ describe("Loot pane", () => {
   });
 
   it("emits the exact structured item action from row and nested price notices", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const simulation = createSimulationViewModel(
       DEFAULT_FORM_STATE,
       context,

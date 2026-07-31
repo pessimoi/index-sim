@@ -8,11 +8,6 @@ import {
   type RuntimeCoverageSummary
 } from "../src/adapters/generated/readiness";
 import { createGeneratedRuntimePriceSet } from "../src/adapters/generated/price-fallback";
-import {
-  createGameDataSnapshotFromLegacy,
-  createPriceSetFromLegacyGameData,
-  type LegacySnapshotInput
-} from "../src/data/legacy-adapter";
 import { parseJsonWithDuplicateKeyCheck } from "../src/data/reliability";
 import {
   assertGameDataSourcePinAgreement,
@@ -31,18 +26,6 @@ export interface CliOptions {
   candidate: "generated" | "legacy-derived-static";
   exampleLimit: number;
   allowNotReady: boolean;
-}
-
-interface LegacySandbox extends Record<string, unknown> {
-  window: LegacySandbox;
-  GameData?: LegacySnapshotInput["gameData"];
-  SimEngine?: LegacySnapshotInput["simEngine"];
-  Equipment?: LegacySnapshotInput["equipment"];
-  localStorage: {
-    getItem(key: string): string | null;
-    setItem(key: string, value: string): void;
-    removeItem(key: string): void;
-  };
 }
 
 export function usage(): string {
@@ -125,72 +108,23 @@ function readRepoJson(path: string): unknown {
   return parseJsonWithDuplicateKeyCheck(readRepoText(path), { source: path });
 }
 
-function executeLegacySource(sandbox: LegacySandbox, source: string, label: string): void {
-  const runner = new Function(
-    "window",
-    "localStorage",
-    "console",
-    `${source}\n//# sourceURL=${label}`
-  );
-  runner(sandbox, sandbox.localStorage, console);
-}
-
-function createSandbox(): LegacySandbox {
-  const storage = new Map<string, string>();
-  const sandbox = {
-    localStorage: {
-      getItem: (key: string) => storage.get(key) ?? null,
-      setItem: (key: string, value: string) => {
-        storage.set(key, String(value));
-      },
-      removeItem: (key: string) => {
-        storage.delete(key);
-      }
-    }
-  } as LegacySandbox;
-  sandbox.window = sandbox;
-  return sandbox;
-}
-
-function loadLegacyReferenceContext(): SimulationContext {
-  const sandbox = createSandbox();
-  executeLegacySource(sandbox, readRepoText("gamedata.js"), "legacy-gamedata.js");
-  executeLegacySource(sandbox, readRepoText("engine.js"), "legacy-engine.js");
-  executeLegacySource(sandbox, readRepoText("equipment.js"), "legacy-equipment.js");
-
-  if (!sandbox.GameData || !sandbox.SimEngine || !sandbox.Equipment) {
-    throw new Error("Legacy bundled data did not expose GameData, SimEngine and Equipment");
-  }
-
+function loadHistoricalReferenceContext(): SimulationContext {
   return {
-    gameData: createGameDataSnapshotFromLegacy({
-      gameData: sandbox.GameData,
-      simEngine: sandbox.SimEngine,
-      equipment: sandbox.Equipment,
-      id: "browser-legacy-runtime",
-      label: "Browser bundled legacy runtime"
-    }),
-    priceSet: createPriceSetFromLegacyGameData({
-      gameData: sandbox.GameData,
-      id: "browser-legacy-prices",
-      label: "Browser bundled legacy prices"
-    })
+    gameData: parseGameDataSnapshot(
+      readRepoJson("src/data/generated/legacy-derived-runtime-game-data.json")
+    ),
+    priceSet: normalizePriceSetItemMetadata(
+      PriceSetSchema.parse(
+        readRepoJson("src/data/generated/legacy-derived-runtime-price-set.json")
+      ),
+      { fallbackOrigin: "legacy-static", fallbackReasonCode: "legacy-metadata-unavailable" }
+    )
   };
 }
 
 function loadGeneratedCandidateContext(candidate: CliOptions["candidate"]): SimulationContext {
   if (candidate === "legacy-derived-static") {
-    return {
-      gameData: parseGameDataSnapshot(
-        readRepoJson("src/data/generated/legacy-derived-runtime-game-data.json")
-      ),
-      priceSet: normalizePriceSetItemMetadata(
-        PriceSetSchema.parse(
-          readRepoJson("src/data/generated/legacy-derived-runtime-price-set.json")
-        ),
-        { fallbackOrigin: "legacy-static", fallbackReasonCode: "legacy-metadata-unavailable" }
-      )
-    };
+    return loadHistoricalReferenceContext();
   }
 
   const gameData = parseGameDataSnapshot(readRepoJson("src/data/generated/game-data.json"));
@@ -358,7 +292,7 @@ export function formatSourceSliceCoveragePlanMarkdown(
 export async function createReadinessReport(
   options: Pick<CliOptions, "candidate" | "exampleLimit">
 ): Promise<GeneratedRuntimeReadinessReport> {
-  const legacy = loadLegacyReferenceContext();
+  const legacy = loadHistoricalReferenceContext();
   const generated = loadGeneratedCandidateContext(options.candidate);
   return createGeneratedRuntimeReadinessReport({
     reference: legacy,

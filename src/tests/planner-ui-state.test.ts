@@ -1,5 +1,5 @@
 import { createMemoryStorage, loadPersisted } from "../adapters/storage";
-import { loadBundledLegacyContext } from "../adapters/legacy-runtime";
+import { loadCurrentTestContext } from "./helpers/current-sim";
 import { defaultPool, plannerXpBounds, xpAt } from "../domain/planner";
 import { DEFAULT_FORM_STATE } from "../app/state/ui-state";
 import { createHiscoresLevelApplyTransaction } from "../app/state/hiscores";
@@ -209,7 +209,7 @@ describe("planner UI state", () => {
   });
 
   it("drops unknown or unavailable gear pool ids against the active planner pool", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const allowedPool = defaultPool("melee", context);
     const weaponId = allowedPool.weapon?.[0];
     const helmId = allowedPool.helm?.find((itemId) => itemId !== "none");
@@ -232,7 +232,7 @@ describe("planner UI state", () => {
   });
 
   it("applies gear pool slot selections without accepting unknown ids or emptying a slot", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const allowedPool = defaultPool("melee", context);
     const weaponIds = allowedPool.weapon ?? [];
     expect(weaponIds.length).toBeGreaterThan(1);

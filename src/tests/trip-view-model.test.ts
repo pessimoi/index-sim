@@ -1,11 +1,11 @@
-import { loadBundledLegacyContext } from "../adapters/legacy-runtime";
+import { loadCurrentTestContext } from "./helpers/current-sim";
 import { DEFAULT_FORM_STATE, normalizeFormState } from "../app/state/ui-state";
 import { createSimulationViewModel } from "../app/view-models/simulation";
 import { createTripPaneViewModel } from "../app/view-models/trip";
 
 describe("Trip view model", () => {
   it("owns the exact group order, quick summaries and negative-economy predicate", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const simulation = createSimulationViewModel(DEFAULT_FORM_STATE, context);
     const presentation = createTripPaneViewModel({
       form: DEFAULT_FORM_STATE,
@@ -38,7 +38,7 @@ describe("Trip view model", () => {
   });
 
   it("derives manual modes and mutually exclusive prayer controls from form truth", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const form = normalizeFormState({
       ...DEFAULT_FORM_STATE,
       combatStyle: "magic",
@@ -71,7 +71,7 @@ describe("Trip view model", () => {
   });
 
   it("keeps recommendation presentation and non-finite fallbacks DOM-free", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const simulation = createSimulationViewModel(DEFAULT_FORM_STATE, context);
     const result = {
       ...simulation.trip,

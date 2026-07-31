@@ -12,7 +12,7 @@ import type {
 import { type PlannerInput, type PlannerPlan } from "../../domain/planner";
 import {
   buildLegacyInput,
-  createLegacyRuntime,
+  createLegacyFixtureRuntime,
   type LegacyCaseDefinition,
   type LegacyInput,
   type LegacyRuntime
@@ -125,7 +125,7 @@ export function plannerInputFromDefinition(
 }
 
 export function createPlannerRuntime() {
-  const runtime = createLegacyRuntime();
+  const runtime = createLegacyFixtureRuntime();
   return {
     runtime,
     context: domainContextFromLegacy(runtime)

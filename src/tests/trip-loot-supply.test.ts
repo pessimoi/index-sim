@@ -2,7 +2,7 @@ import fixtureSet from "./fixtures/legacy-golden.json";
 import { LEGACY_GOLDEN_CASES } from "./fixtures/legacy-case-definitions";
 import {
   buildLegacyInput,
-  createLegacyRuntime,
+  createLegacyFixtureRuntime,
   type LegacyCaseDefinition,
   type LegacyInput,
   type LegacyRuntime
@@ -215,7 +215,7 @@ describe("trip/loot/supply unit rules", () => {
   });
 
   it("materializes tagged herb and gem details from the same priced domain tables", () => {
-    const runtime = createLegacyRuntime();
+    const runtime = createLegacyFixtureRuntime();
     const context = domainContextFromLegacy(runtime);
     const result = evaluateLoot(
       {
@@ -237,7 +237,7 @@ describe("trip/loot/supply unit rules", () => {
   });
 
   it("values unidentified random herbs by their source item ids before using the generic proxy", () => {
-    const runtime = createLegacyRuntime();
+    const runtime = createLegacyFixtureRuntime();
     const baseContext = domainContextFromLegacy(runtime);
     const drop = { name: "Random herb", tag: "herb", chance: 1, qtyAvg: 1 };
     const monster: MonsterDefinition = {
@@ -488,7 +488,7 @@ describe("trip/loot/supply unit rules", () => {
   });
 
   it("keeps conditional quest and clue rows visible but outside every default calculation", () => {
-    const runtime = createLegacyRuntime();
+    const runtime = createLegacyFixtureRuntime();
     const baseContext = domainContextFromLegacy(runtime);
     const questDrop = {
       name: "Quest reward key",
@@ -562,7 +562,7 @@ describe("trip/loot/supply unit rules", () => {
   });
 
   it("produces structured warnings for missing and approximate price data", () => {
-    const runtime = createLegacyRuntime();
+    const runtime = createLegacyFixtureRuntime();
     const context = domainContextFromLegacy(runtime);
     const monster = {
       ...context.gameData.monsters.chicken,
@@ -648,7 +648,7 @@ describe("trip/loot/supply unit rules", () => {
   });
 
   it("surfaces structured warnings when jewel table prices use aliases or fallbacks", () => {
-    const runtime = createLegacyRuntime();
+    const runtime = createLegacyFixtureRuntime();
     const context = domainContextFromLegacy(runtime);
     const withoutCanonicalSapphire = { ...context.priceSet.itemPrices };
     delete withoutCanonicalSapphire.uncut_sapphire;
@@ -681,7 +681,7 @@ describe("trip/loot/supply unit rules", () => {
   });
 
   it("values direct loot keys through canonical prices without alias warnings", () => {
-    const runtime = createLegacyRuntime();
+    const runtime = createLegacyFixtureRuntime();
     const context = domainContextFromLegacy(runtime);
     const withoutAliasSapphire = { ...context.priceSet.itemPrices };
     delete withoutAliasSapphire.sapphire;
@@ -712,7 +712,7 @@ describe("trip/loot/supply unit rules", () => {
   });
 
   it("keeps alias fallback warnings when direct loot canonical prices are missing", () => {
-    const runtime = createLegacyRuntime();
+    const runtime = createLegacyFixtureRuntime();
     const context = domainContextFromLegacy(runtime);
     const withoutCanonicalSapphire = { ...context.priceSet.itemPrices };
     delete withoutCanonicalSapphire.uncut_sapphire;
@@ -746,7 +746,7 @@ describe("trip/loot/supply unit rules", () => {
   });
 
   it("bounds cannon target and respawn settings inside the domain", () => {
-    const runtime = createLegacyRuntime();
+    const runtime = createLegacyFixtureRuntime();
     const context = domainContextFromLegacy(runtime);
     const definition = definitionsById.get("ranged_magic_shortbow_dagannoth_cannon");
     expect(definition).toBeDefined();
@@ -766,7 +766,7 @@ describe("trip/loot/supply unit rules", () => {
   });
 
   it("keeps sparse cannon fire finite and exposes a player-free theoretical DPS", () => {
-    const runtime = createLegacyRuntime();
+    const runtime = createLegacyFixtureRuntime();
     const context = domainContextFromLegacy(runtime);
     const definition = definitionsById.get("ranged_magic_shortbow_dagannoth_cannon");
     expect(definition).toBeDefined();
@@ -810,7 +810,7 @@ describe("trip/loot/supply unit rules", () => {
   });
 
   it("reports cannonball price provenance only when cannonballs affect the result", () => {
-    const runtime = createLegacyRuntime();
+    const runtime = createLegacyFixtureRuntime();
     const baseContext = domainContextFromLegacy(runtime);
     const context: SimulationContext = {
       ...baseContext,
@@ -854,7 +854,7 @@ describe("trip/loot/supply unit rules", () => {
   });
 
   it("applies safespot override and protect prayer to incoming damage", () => {
-    const runtime = createLegacyRuntime();
+    const runtime = createLegacyFixtureRuntime();
     const context = domainContextFromLegacy(runtime);
     const definition = definitionsById.get("ranged_magic_shortbow_rock_crab_safespot");
     expect(definition).toBeDefined();
@@ -888,7 +888,7 @@ describe("trip/loot/supply unit rules", () => {
   });
 
   it("reports food price provenance only when food is consumed", () => {
-    const runtime = createLegacyRuntime();
+    const runtime = createLegacyFixtureRuntime();
     const baseContext = domainContextFromLegacy(runtime);
     const context: SimulationContext = {
       ...baseContext,
@@ -938,7 +938,7 @@ describe("trip/loot/supply unit rules", () => {
   });
 
   it("normalizes exact typed melee, ranged and magic profiles through one descriptor", () => {
-    const runtime = createLegacyRuntime();
+    const runtime = createLegacyFixtureRuntime();
     const baseContext = domainContextFromLegacy(runtime);
     const definition = definitionsById.get("melee_ring_recoil_fire_giant_food_trip");
     if (!definition) throw new Error("Missing incoming profile fixture");
@@ -1035,7 +1035,7 @@ describe("trip/loot/supply unit rules", () => {
   });
 
   it("keeps partial and legacy incoming models on visible compatibility paths and fails bad exact data", () => {
-    const runtime = createLegacyRuntime();
+    const runtime = createLegacyFixtureRuntime();
     const context = domainContextFromLegacy(runtime);
     const definition = definitionsById.get("melee_ring_recoil_fire_giant_food_trip");
     if (!definition) throw new Error("Missing compatibility fixture");
@@ -1116,7 +1116,7 @@ describe("trip/loot/supply unit rules", () => {
   });
 
   it("applies antifire and antipoison trip controls to incoming damage", () => {
-    const runtime = createLegacyRuntime();
+    const runtime = createLegacyFixtureRuntime();
     const context = domainContextFromLegacy(runtime);
     const dragonDefinition = definitionsById.get("melee_black_dragon_food_limited_trip");
     const poisonBaseDefinition = definitionsById.get("melee_ring_recoil_fire_giant_food_trip");
@@ -1164,7 +1164,7 @@ describe("trip/loot/supply unit rules", () => {
   });
 
   it("applies recoil ring count to recoil trip capacity", () => {
-    const runtime = createLegacyRuntime();
+    const runtime = createLegacyFixtureRuntime();
     const context = domainContextFromLegacy(runtime);
     const definition = definitionsById.get("melee_ring_recoil_fire_giant_food_trip");
     expect(definition).toBeDefined();
@@ -1189,7 +1189,7 @@ describe("trip/loot/supply unit rules", () => {
   });
 
   it("applies prayer restore quantities and altar timing to trip capacity", () => {
-    const runtime = createLegacyRuntime();
+    const runtime = createLegacyFixtureRuntime();
     const context = domainContextFromLegacy(runtime);
     const definition = definitionsById.get("melee_rune_scimitar_hill_giant_super_prayers");
     expect(definition).toBeDefined();
@@ -1246,7 +1246,7 @@ describe("trip/loot/supply unit rules", () => {
   });
 
   it("recommends general potion carry and reports vial match state", () => {
-    const runtime = createLegacyRuntime();
+    const runtime = createLegacyFixtureRuntime();
     const context = domainContextFromLegacy(runtime);
     const definition = definitionsById.get("melee_rune_scimitar_hill_giant_super_prayers");
     expect(definition).toBeDefined();
@@ -1307,7 +1307,7 @@ describe("trip/loot/supply unit rules", () => {
   });
 
   it("recommends single-dose carry and scales above one vial for long trips", () => {
-    const runtime = createLegacyRuntime();
+    const runtime = createLegacyFixtureRuntime();
     const context = domainContextFromLegacy(runtime);
     const definition = definitionsById.get("melee_dba_sustained_moss_giant");
     expect(definition).toBeDefined();
@@ -1341,7 +1341,7 @@ describe("trip/loot/supply unit rules", () => {
   });
 
   it("reports inactive recommendation states for sustained-off, no boosts and manual trips", () => {
-    const runtime = createLegacyRuntime();
+    const runtime = createLegacyFixtureRuntime();
     const context = domainContextFromLegacy(runtime);
     const definition = definitionsById.get("ranged_magic_shortbow_rock_crab_safespot");
     expect(definition).toBeDefined();
@@ -1399,7 +1399,7 @@ describe("trip/loot/supply unit rules", () => {
   });
 
   it("applies scarce spot respawn limits and exposes trip reserve details", () => {
-    const runtime = createLegacyRuntime();
+    const runtime = createLegacyFixtureRuntime();
     const context = domainContextFromLegacy(runtime);
     const definition = definitionsById.get("ranged_magic_shortbow_rock_crab_safespot");
     expect(definition).toBeDefined();
@@ -1455,7 +1455,7 @@ describe("trip/loot/supply parity with legacy golden fixtures", () => {
 
   for (const caseId of parityCaseIds) {
     it(`matches trip/loot/supply fields for ${caseId}`, () => {
-      const runtime = createLegacyRuntime();
+      const runtime = createLegacyFixtureRuntime();
       const context = domainContextFromLegacy(runtime);
       const definition = definitionsById.get(caseId);
       const fixture = fixturesById.get(caseId);

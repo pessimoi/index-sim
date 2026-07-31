@@ -1,5 +1,5 @@
 import fixtureSet from "./fixtures/legacy-golden.json";
-import { loadBundledLegacyContext } from "../adapters/legacy-runtime";
+import { loadCurrentTestContext } from "./helpers/current-sim";
 import { createGeneratedRuntimeContext } from "../adapters/generated";
 import {
   DEFAULT_FORM_STATE,
@@ -210,7 +210,7 @@ export {
   formToTripPolicy,
   formatNumber,
   gearQuickActionForSlot,
-  loadBundledLegacyContext,
+  loadCurrentTestContext,
   normalizeFormState,
   optimizeLootPrefsForMonster,
   optimizeVisibleLoadout,

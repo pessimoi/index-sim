@@ -5,7 +5,7 @@ import {
   createDenseCompareRows,
   createDenseCompareScaleModel,
   createSimulationViewModel,
-  loadBundledLegacyContext,
+  loadCurrentTestContext,
   normalizeFormState,
   setCustomSetupForMonster,
   sortDenseCompareRows,
@@ -15,7 +15,7 @@ import type { DenseCompareRowViewModel } from "./ui-view-model-fixture";
 
 describe("rewrite UI view models", () => {
   it("builds dense compare rows for every monster with the active target marked", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const rows = createDenseCompareRows(DEFAULT_FORM_STATE, context);
     const activeVm = createSimulationViewModel(DEFAULT_FORM_STATE, context);
     const monsterCount = Object.keys(context.gameData.monsters).length;
@@ -59,7 +59,7 @@ describe("rewrite UI view models", () => {
   }, 15_000);
 
   it("uses monster-specific custom setup snapshots in dense compare rows", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const customRockCrab = normalizeFormState({
       ...switchCombatStyleLoadout(DEFAULT_FORM_STATE, "ranged"),
       monsterId: "rock_crab",
@@ -93,7 +93,7 @@ describe("rewrite UI view models", () => {
   }, 15_000);
 
   it("adds dense compare markers for rewrite-owned per-monster state", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const customGreenDragon = normalizeFormState({
       ...DEFAULT_FORM_STATE,
       monsterId: "green_dragon"
@@ -138,7 +138,7 @@ describe("rewrite UI view models", () => {
   }, 15_000);
 
   it("sorts dense compare rows with explicit keys and falls back on invalid sort state", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const defaultRows = createDenseCompareRows(
       DEFAULT_FORM_STATE,
       context,
@@ -180,7 +180,7 @@ describe("rewrite UI view models", () => {
   }, 15_000);
 
   it("filters dense compare rows by monster name and keeps the current target visible", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const rows = createDenseCompareRows(DEFAULT_FORM_STATE, context, {
       ...DEFAULT_DENSE_COMPARE_STATE,
       monsterFilter: "rock crab"
@@ -197,14 +197,14 @@ describe("rewrite UI view models", () => {
   }, 15_000);
 
   it("filters dense compare rows by drop names, item keys and nested expanded rows", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const bigBoneRows = createDenseCompareRows(DEFAULT_FORM_STATE, context, {
       ...DEFAULT_DENSE_COMPARE_STATE,
       dropFilter: "big_bones"
     });
     const nestedGemRows = createDenseCompareRows(DEFAULT_FORM_STATE, context, {
       ...DEFAULT_DENSE_COMPARE_STATE,
-      dropFilter: "diamond"
+      dropFilter: "gem"
     });
 
     expect(bigBoneRows.length).toBeGreaterThan(1);
@@ -269,7 +269,7 @@ describe("rewrite UI view models", () => {
   });
 
   it("hides irrelevant dense compare rows unless showIrrelevant is enabled", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const hiddenRows = createDenseCompareRows(DEFAULT_FORM_STATE, context, {
       ...DEFAULT_DENSE_COMPARE_STATE,
       irrelevantMonsterIds: [DEFAULT_FORM_STATE.monsterId, "rock_crab"]

@@ -1,4 +1,4 @@
-import { loadBundledLegacyContext } from "../adapters/legacy-runtime";
+import { loadCurrentTestContext } from "./helpers/current-sim";
 import { createGeneratedRuntimeContext } from "../adapters/generated";
 import { simulateFullSimulation } from "../domain/simulation";
 import { DEFAULT_FORM_STATE, formToSimulationRequest } from "../app/state/ui-state";
@@ -26,7 +26,7 @@ async function fixture(
     >;
   } = {}
 ) {
-  const { context } = await loadBundledLegacyContext();
+  const { context } = await loadCurrentTestContext();
   const form = DEFAULT_FORM_STATE;
   const request = formToSimulationRequest(form, context.gameData);
   const fullInput = createFullSimulationInput(form, request, {}, options.settings ?? {});
@@ -47,7 +47,7 @@ async function fixture(
 
 describe("Loot view model", () => {
   it("uses game-data, row-source and conditional names without replacing technical identity", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const form = DEFAULT_FORM_STATE;
     const request = formToSimulationRequest(form, context.gameData);
     const fullInput = createFullSimulationInput(form, request, {}, {});
@@ -190,7 +190,7 @@ describe("Loot view model", () => {
   });
 
   it("keeps the optimizer deterministic behind the Loot owner", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const first = optimizeLootPrefsForMonster(DEFAULT_FORM_STATE, context);
     const second = optimizeLootPrefsForMonster(DEFAULT_FORM_STATE, context);
 

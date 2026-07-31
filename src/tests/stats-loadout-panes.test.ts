@@ -1,6 +1,6 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { loadBundledLegacyContext } from "../adapters/legacy-runtime";
+import { loadCurrentTestContext } from "./helpers/current-sim";
 import {
   LoadoutPane,
   type LoadoutPanePresentationModel
@@ -52,7 +52,7 @@ function inOrder(markup: string, fragments: readonly string[]): void {
 
 describe("Stats and Loadout panes", () => {
   it("keeps the extracted Stats analysis sections, roles and summaries in order", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const simulation = createSimulationViewModel(DEFAULT_FORM_STATE, context);
     const markup = renderToStaticMarkup(
       createElement(StatsPane, {
@@ -86,7 +86,7 @@ describe("Stats and Loadout panes", () => {
   });
 
   it("keeps Loadout, special attack and damage distribution under one pane contract", async () => {
-    const { context } = await loadBundledLegacyContext();
+    const { context } = await loadCurrentTestContext();
     const simulation = createSimulationViewModel(DEFAULT_FORM_STATE, context);
     const gearOptions = Object.fromEntries(
       EQUIPMENT_SLOTS.map((slot) => [slot, [{ id: "none", label: "None" }]])

@@ -1,4 +1,4 @@
-import { loadBundledLegacyContext } from "../adapters/legacy-runtime";
+import { loadCurrentTestContext } from "./helpers/current-sim";
 import { createMemoryStorage } from "../adapters/storage";
 import {
   LEGACY_INPUT_STORAGE_KEY,
@@ -12,7 +12,7 @@ describe("legacy setup migration", () => {
   let gameData: GameDataSnapshot;
 
   beforeAll(async () => {
-    const loaded = await loadBundledLegacyContext();
+    const loaded = await loadCurrentTestContext();
     gameData = loaded.context.gameData;
   });
 
