@@ -232,6 +232,7 @@ describe("Cloudflare production worker", () => {
       devDependencies: Record<string, string>;
     };
     const releaseScript = readFileSync(resolve("scripts/run-cloudflare-release.mjs"), "utf8");
+    const releasePlan = readFileSync(resolve("scripts/cloudflare-release-plan.mjs"), "utf8");
     const eslintConfig = readFileSync(resolve("eslint.config.js"), "utf8");
     const prettierIgnore = readFileSync(resolve(".prettierignore"), "utf8");
 
@@ -239,14 +240,12 @@ describe("Cloudflare production worker", () => {
     expect(packageJson.scripts["deploy:cloudflare:dry-run"]).toBe(
       "$NODE scripts/run-cloudflare-release.mjs dry-run"
     );
-    expect(releaseScript).toContain(
-      'runNode("node_modules/wrangler/bin/wrangler.js", ...wranglerArgs)'
-    );
+    expect(releasePlan).toContain('"node_modules/wrangler/bin/wrangler.js"');
     expect(releaseScript).toContain('WRANGLER_SEND_METRICS: "false"');
     expect(releaseScript).toContain('WRANGLER_LOG_PATH: ".wrangler/logs"');
-    expect(releaseScript).toContain('"--outdir", ".wrangler/dry-run"');
-    expect(releaseScript).not.toContain('"--outdir", "dist/');
-    expect(releaseScript).not.toContain("--package=wrangler@");
+    expect(releasePlan).toContain('"--outdir", ".wrangler/dry-run"');
+    expect(releasePlan).not.toContain('"--outdir", "dist/');
+    expect(releasePlan).not.toContain("--package=wrangler@");
     expect(eslintConfig).toContain('".wrangler/**"');
     expect(prettierIgnore.split(/\r?\n/u)).toContain(".wrangler");
   });

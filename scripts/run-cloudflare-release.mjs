@@ -1,8 +1,11 @@
 import { spawnSync } from "node:child_process";
+import { getReleasePlan, releaseCommands } from "./cloudflare-release-plan.mjs";
 
 const command = process.argv[2];
-if (!new Set(["gate", "dry-run", "preview", "deploy"]).has(command)) {
-  console.error("Usage: node scripts/run-cloudflare-release.mjs gate|dry-run|preview|deploy");
+if (!releaseCommands.includes(command)) {
+  console.error(
+    "Usage: node scripts/run-cloudflare-release.mjs quality|handoff|dry-run|preview|deploy"
+  );
   process.exit(2);
 }
 
@@ -30,44 +33,7 @@ function runNode(modulePath, ...args) {
   run(process.execPath, [modulePath, ...args]);
 }
 
-function buildAndVerify() {
-  runNode("node_modules/typescript/bin/tsc", "-b");
-  runNode("node_modules/vite/bin/vite.js", "build", "--config", "vite.config.ts");
-  runNode(
-    "node_modules/vite-node/vite-node.mjs",
-    "--config",
-    "vitest.config.ts",
-    "scripts/verify-public-deployment.ts",
-    "artifact"
-  );
-}
-
-if (command === "gate") {
-  runNode("node_modules/typescript/bin/tsc", "-b");
-  runNode(
-    "node_modules/vite-node/vite-node.mjs",
-    "--config",
-    "vitest.config.ts",
-    "scripts/check-architecture.ts"
-  );
-  runNode(
-    "node_modules/vite-node/vite-node.mjs",
-    "--config",
-    "vitest.config.ts",
-    "scripts/check-documentation.ts"
-  );
-  runNode("node_modules/vitest/vitest.mjs", "run", "--config", "vitest.config.ts");
-  runNode(
-    "node_modules/vitest/vitest.mjs",
-    "run",
-    "--config",
-    "vitest.config.ts",
-    "src/tests/legacy-golden.test.ts"
-  );
-  buildAndVerify();
-  runNode("node_modules/eslint/bin/eslint.js", ".");
-  runNode("node_modules/prettier/bin/prettier.cjs", "--check", ".");
-
+function runAudit() {
   const npmCli = process.env.npm_execpath;
   if (!npmCli) {
     console.error("Repository verification requires npm_execpath");
@@ -78,15 +44,15 @@ if (command === "gate") {
   } else {
     runNode(npmCli, "audit");
   }
-  run("git", ["diff", "--check"]);
-  process.exit(0);
 }
 
-buildAndVerify();
-const wranglerArgs =
-  command === "preview"
-    ? ["versions", "upload"]
-    : command === "dry-run"
-      ? ["deploy", "--dry-run", "--outdir", ".wrangler/dry-run"]
-      : ["deploy"];
-runNode("node_modules/wrangler/bin/wrangler.js", ...wranglerArgs);
+for (const stage of getReleasePlan(command)) {
+  console.log(`[release:${command}] ${stage.id}`);
+  if (stage.kind === "node") {
+    runNode(stage.modulePath, ...stage.args);
+  } else if (stage.kind === "process") {
+    run(stage.executable, [...stage.args]);
+  } else {
+    runAudit();
+  }
+}
